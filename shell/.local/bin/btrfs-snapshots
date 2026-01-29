@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ──────────────────────────────────────────────
+# btrfs-snapshots — Snapper helper for systemd-boot systems
+# ──────────────────────────────────────────────
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
+NC='\033[0m'
+
+usage() {
+    echo -e "${BOLD}Usage:${NC} btrfs-snapshots <command> [args]"
+    echo ""
+    echo -e "${BOLD}Commands:${NC}"
+    echo "  list   [root|home]     List snapshots (default: both)"
+    echo "  create [root|home]     Create a manual snapshot (default: root)"
+    echo "  diff   <number>        Show files changed in a snapshot (root config)"
+    echo "  rollback <number>      Rollback using snapper undochange (root config)"
+    echo ""
+    echo -e "${BOLD}Examples:${NC}"
+    echo "  btrfs-snapshots list"
+    echo "  btrfs-snapshots list home"
+    echo "  btrfs-snapshots create root"
+    echo "  btrfs-snapshots diff 42"
+    echo "  btrfs-snapshots rollback 42"
+}
+
+cmd_list() {
+    local config="${1:-}"
+
+    if [[ -z "$config" ]]; then
+        echo -e "${CYAN}${BOLD}── root snapshots (/):${NC}"
+        snapper -c root list
+        echo ""
+        echo -e "${CYAN}${BOLD}── home snapshots (/home):${NC}"
+        snapper -c home list
+    else
+        case "$config" in
+            root)
+                echo -e "${CYAN}${BOLD}── root snapshots (/):${NC}"
+                snapper -c root list
+                ;;
+            home)
+                echo -e "${CYAN}${BOLD}── home snapshots (/home):${NC}"
+                snapper -c home list
+                ;;
+            *)
+                echo -e "${RED}Unknown config: $config${NC} (use 'root' or 'home')"
+                exit 1
+                ;;
+        esac
+    fi
+}
+
+cmd_create() {
+    local config="${1:-root}"
+
+    case "$config" in
+        root|home) ;;
+        *)
+            echo -e "${RED}Unknown config: $config${NC} (use 'root' or 'home')"
+            exit 1
+            ;;
+    esac
+
+    read -rp "Description for snapshot: " desc
+    if [[ -z "$desc" ]]; then
+        desc="manual snapshot"
+    fi
+
+    sudo snapper -c "$config" create --description "$desc" --cleanup-algorithm number --print-number
+    echo -e "${GREEN}Snapshot created on '$config' config.${NC}"
+}
+
+cmd_diff() {
+    local num="${1:-}"
+    local config="${2:-root}"
+
+    if [[ -z "$num" ]]; then
+        echo -e "${RED}Error: snapshot number required.${NC}"
+        echo "Usage: btrfs-snapshots diff <number> [root|home]"
+        exit 1
+    fi
+
+    echo -e "${CYAN}${BOLD}── Changes in snapshot #$num ($config):${NC}"
+    snapper -c "$config" status "$num..0"
+}
+
+cmd_rollback() {
+    local num="${1:-}"
+    local config="${2:-root}"
+
+    if [[ -z "$num" ]]; then
+        echo -e "${RED}Error: snapshot number required.${NC}"
+        echo "Usage: btrfs-snapshots rollback <number> [root|home]"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}${BOLD}WARNING: This will undo changes between snapshot #$num and the current state.${NC}"
+    echo -e "Config: ${BOLD}$config${NC}"
+    echo ""
+
+    # Show what will change
+    echo -e "${CYAN}Files that will be modified:${NC}"
+    snapper -c "$config" status "$num..0"
+    echo ""
+
+    read -rp "Proceed with rollback? [s/N]: " confirm
+    if [[ "$confirm" =~ ^[sS]$ ]]; then
+        sudo snapper -c "$config" undochange "$num..0"
+        echo -e "${GREEN}Rollback complete. Changes from snapshot #$num have been restored.${NC}"
+        echo -e "${YELLOW}Note: A reboot may be needed for some changes to take effect.${NC}"
+    else
+        echo "Rollback cancelled."
+    fi
+}
+
+# ── Main ──
+
+if [[ $# -lt 1 ]]; then
+    usage
+    exit 0
+fi
+
+case "$1" in
+    list)     cmd_list "${2:-}" ;;
+    create)   cmd_create "${2:-root}" ;;
+    diff)     cmd_diff "${2:-}" "${3:-root}" ;;
+    rollback) cmd_rollback "${2:-}" "${3:-root}" ;;
+    -h|--help|help)
+        usage
+        ;;
+    *)
+        echo -e "${RED}Unknown command: $1${NC}"
+        usage
+        exit 1
+        ;;
+esac

@@ -357,6 +357,135 @@ post_stow_fixes() {
             log_info "Skipped kanata udev rules."
         fi
     fi
+
+    # NVIDIA mkinitcpio modules (NVIDIA category)
+    if [[ ${SELECTED[8]} -eq 1 ]]; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Add NVIDIA modules to mkinitcpio.conf? (requires sudo) [s/N]:${NC} ")" nvidia_confirm
+        if [[ "$nvidia_confirm" =~ ^[sS]$ ]]; then
+            if grep -q "^MODULES=.*nvidia" /etc/mkinitcpio.conf 2>/dev/null; then
+                log_info "NVIDIA modules already present in mkinitcpio.conf."
+            else
+                sudo sed -i 's/^MODULES=(\(.*\))/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm \1)/' /etc/mkinitcpio.conf && \
+                    log_ok "Added NVIDIA modules to /etc/mkinitcpio.conf"
+                sudo mkinitcpio -P && \
+                    log_ok "Regenerated initramfs."
+            fi
+        else
+            log_info "Skipped NVIDIA mkinitcpio config."
+        fi
+    fi
+
+    # zram-generator config (System category)
+    if [[ ${SELECTED[7]} -eq 1 ]] && [[ -f "$etc_dir/zram-generator/zram-generator.conf" ]]; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Install zram-generator config to /etc/? (requires sudo) [s/N]:${NC} ")" zram_confirm
+        if [[ "$zram_confirm" =~ ^[sS]$ ]]; then
+            sudo mkdir -p /etc/systemd
+            sudo cp "$etc_dir/zram-generator/zram-generator.conf" /etc/systemd/zram-generator.conf && \
+                log_ok "Installed: /etc/systemd/zram-generator.conf"
+            log_info "zram will be active after reboot."
+        else
+            log_info "Skipped zram-generator config."
+        fi
+    fi
+
+    # UFW firewall setup (System category)
+    if [[ ${SELECTED[7]} -eq 1 ]] && command -v ufw &>/dev/null; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Configure UFW firewall? (requires sudo) [s/N]:${NC} ")" ufw_confirm
+        if [[ "$ufw_confirm" =~ ^[sS]$ ]]; then
+            sudo ufw default deny incoming && \
+                log_ok "UFW: default deny incoming"
+            sudo ufw default allow outgoing && \
+                log_ok "UFW: default allow outgoing"
+            sudo ufw allow 1714:1764/udp && \
+                log_ok "UFW: allowed KDE Connect UDP"
+            sudo ufw allow 1714:1764/tcp && \
+                log_ok "UFW: allowed KDE Connect TCP"
+            sudo ufw --force enable && \
+                log_ok "UFW: enabled"
+            sudo systemctl enable --now ufw && \
+                log_ok "UFW: systemd service enabled"
+        else
+            log_info "Skipped UFW configuration."
+        fi
+    fi
+
+    # Snapper Btrfs snapshots (System category)
+    if [[ ${SELECTED[7]} -eq 1 ]] && command -v snapper &>/dev/null; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Configure Snapper for Btrfs snapshots? (requires sudo) [s/N]:${NC} ")" snapper_confirm
+        if [[ "$snapper_confirm" =~ ^[sS]$ ]]; then
+
+            # --- Config: root (/) ---
+            if ! sudo snapper -c root get-config &>/dev/null 2>&1; then
+                sudo snapper -c root create-config /
+                log_ok "Snapper: created root config"
+            else
+                log_info "Snapper: root config already exists"
+            fi
+
+            # Timeline settings for root
+            sudo snapper -c root set-config \
+                TIMELINE_CREATE=yes \
+                TIMELINE_CLEANUP=yes \
+                TIMELINE_MIN_AGE=1800 \
+                TIMELINE_LIMIT_HOURLY=5 \
+                TIMELINE_LIMIT_DAILY=7 \
+                TIMELINE_LIMIT_WEEKLY=4 \
+                TIMELINE_LIMIT_MONTHLY=6 \
+                TIMELINE_LIMIT_YEARLY=0
+
+            # Number cleanup (for snap-pac)
+            sudo snapper -c root set-config \
+                NUMBER_CLEANUP=yes \
+                NUMBER_MIN_AGE=1800 \
+                NUMBER_LIMIT=50 \
+                NUMBER_LIMIT_IMPORTANT=10
+
+            # --- Config: home (/home) ---
+            if ! sudo snapper -c home get-config &>/dev/null 2>&1; then
+                sudo snapper -c home create-config /home
+                log_ok "Snapper: created home config"
+            else
+                log_info "Snapper: home config already exists"
+            fi
+
+            # Timeline settings for home (less aggressive)
+            sudo snapper -c home set-config \
+                TIMELINE_CREATE=yes \
+                TIMELINE_CLEANUP=yes \
+                TIMELINE_MIN_AGE=1800 \
+                TIMELINE_LIMIT_HOURLY=5 \
+                TIMELINE_LIMIT_DAILY=7 \
+                TIMELINE_LIMIT_WEEKLY=4 \
+                TIMELINE_LIMIT_MONTHLY=3 \
+                TIMELINE_LIMIT_YEARLY=0
+
+            sudo snapper -c home set-config \
+                NUMBER_CLEANUP=yes \
+                NUMBER_MIN_AGE=1800 \
+                NUMBER_LIMIT=30 \
+                NUMBER_LIMIT_IMPORTANT=10
+
+            # Allow user to list snapshots without sudo
+            sudo snapper -c root set-config ALLOW_USERS=$USER
+            sudo snapper -c home set-config ALLOW_USERS=$USER
+
+            # Timers
+            sudo systemctl enable --now snapper-timeline.timer snapper-cleanup.timer
+            log_ok "Snapper: all configs and timers ready"
+
+            # snap-pac config
+            if [[ -f "$etc_dir/snap-pac/snap-pac.ini" ]]; then
+                sudo cp "$etc_dir/snap-pac/snap-pac.ini" /etc/snap-pac.ini
+                log_ok "Installed: /etc/snap-pac.ini"
+            fi
+        else
+            log_info "Skipped Snapper configuration."
+        fi
+    fi
 }
 
 enable_services() {
@@ -382,6 +511,18 @@ enable_services() {
     if [[ ${SELECTED[5]} -eq 1 ]]; then
         systemctl --user enable gamemoded.service 2>/dev/null && \
             log_ok "Enabled: gamemoded.service" || true
+    fi
+
+    # Docker (Development category)
+    if [[ ${SELECTED[6]} -eq 1 ]] && command -v docker &>/dev/null; then
+        sudo systemctl enable docker.service 2>/dev/null && \
+            log_ok "Enabled: docker.service"
+        if ! groups "$USER" | grep -q docker; then
+            sudo usermod -aG docker "$USER" && \
+                log_ok "Added $USER to docker group (re-login required)"
+        else
+            log_info "$USER is already in docker group."
+        fi
     fi
 }
 
@@ -417,6 +558,29 @@ post_install_notes() {
     if [[ ${SELECTED[9]} -eq 1 ]]; then
         echo -e "${YELLOW}  OpenRGB:${NC}"
         echo "    sudo udevadm control --reload-rules && sudo udevadm trigger"
+        echo ""
+    fi
+
+    if [[ ${SELECTED[6]} -eq 1 ]]; then
+        echo -e "${YELLOW}  Docker:${NC}"
+        echo "    Re-login required for docker group to take effect."
+        echo "    Test with: docker run hello-world"
+        echo ""
+    fi
+
+    if [[ ${SELECTED[7]} -eq 1 ]]; then
+        echo -e "${YELLOW}  System:${NC}"
+        echo "    zram: Verify after reboot with 'swapon --show'"
+        echo "    UFW: Check status with 'sudo ufw status'"
+        echo ""
+        echo -e "${YELLOW}  Snapper (Btrfs snapshots):${NC}"
+        echo "    List snapshots:     btrfs-snapshots list"
+        echo "    Create snapshot:    btrfs-snapshots create [root|home]"
+        echo "    View changes:       btrfs-snapshots diff <number>"
+        echo "    Rollback:           btrfs-snapshots rollback <number>"
+        echo "    Manual rollback:    sudo snapper -c root undochange <num>..0"
+        echo "    Note: systemd-boot does not support boot-from-snapshot."
+        echo "          Rollback is done live via snapper undochange."
         echo ""
     fi
 

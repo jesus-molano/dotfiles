@@ -119,3 +119,13 @@ media,libdvdcss,native
 media,libgsf,native
 media,libopenraw,native
 media,poppler-glib,native
+core,hyprlock,native
+core,hypridle,native
+system,zram-generator,native
+gaming,proton-ge-custom-bin,aur
+development,direnv,native
+development,lazygit,native
+development,docker,native
+development,docker-compose,native
+system,snapper,native
+system,snap-pac,native
