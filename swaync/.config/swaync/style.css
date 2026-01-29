@@ -1,0 +1,44 @@
+@define-color base      #1e1e2e;
+@define-color mantle    #181825;
+@define-color text      #cdd6f4;
+@define-color subtext0  #a6adc8;
+@define-color surface0  #313244;
+@define-color surface1  #45475a;
+@define-color overlay0  #6c7086;
+@define-color mauve     #cba6f7;
+@define-color red       #f38ba8;
+
+* { font-family: "JetBrainsMono Nerd Font"; }
+
+.control-center {
+    background: alpha(@base, 0.95);
+    border-radius: 12px;
+    border: 1px solid @surface0;
+    padding: 12px;
+}
+
+.notification {
+    background: @surface0;
+    border-radius: 10px;
+    margin: 6px;
+    border: 1px solid @surface1;
+}
+
+.notification-content { padding: 12px; }
+.notification .summary { color: @text; font-size: 14px; font-weight: 600; }
+.notification .body { color: @subtext0; font-size: 12px; }
+.notification .time { color: @overlay0; font-size: 11px; }
+.notification.critical { border: 1px solid @red; }
+
+.close-button {
+    background: @surface1;
+    color: @text;
+    border-radius: 6px;
+}
+
+.close-button:hover { background: @red; color: @base; }
+
+.widget-dnd { background: @surface0; border-radius: 10px; margin: 6px; padding: 8px 16px; }
+.widget-dnd > switch { background: @surface1; border-radius: 8px; }
+.widget-dnd > switch:checked { background: @mauve; }
+.widget-dnd > switch slider { background: @text; border-radius: 6px; }

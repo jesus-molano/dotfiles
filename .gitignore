@@ -1,0 +1,15 @@
+# Fish runtime state
+fish/.config/fish/fish_variables
+
+# Micro plugin runtime
+micro/.config/micro/buffers/
+micro/.config/micro/plugins/
+
+# Font cache
+fonts/.local/share/fonts/.uuid
+
+# OS generated
+.DS_Store
+*.swp
+*.swo
+*~

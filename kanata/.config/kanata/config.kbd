@@ -1,0 +1,21 @@
+;; Configuración básica para que el teclado siga funcionando normal
+(defcfg
+  process-unmapped-keys yes
+)
+
+;; Teclas físicas que vamos a interceptar
+(defsrc
+  caps a s d f h j k l
+)
+
+;; Alias y Lógica
+(defalias
+  ;; Tap = Esc, Hold = Hyper
+  ;; USAMOS: lctl (Left Ctrl), lalt (Left Alt), lmet (Left Meta/Win), lsft (Left Shift)
+  cap (tap-hold 150 150 esc (multi lctl lalt lmet lsft))
+)
+
+;; Capa base
+(deflayer base
+  @cap a s d f h j k l
+)

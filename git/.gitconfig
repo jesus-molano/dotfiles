@@ -1,0 +1,7 @@
+[user]
+	name = jesus-molano
+	email = jessumolano@gmail.com
+[init]
+	defaultBranch = main
+[core]
+	editor = nvim

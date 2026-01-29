@@ -1,0 +1,71 @@
+{
+    "layer": "top",
+    "position": "top",
+    "height": 36,
+    "margin-top": 6,
+    "margin-left": 10,
+    "margin-right": 10,
+    "modules-left": ["hyprland/workspaces", "hyprland/window"],
+    "modules-center": ["clock"],
+    "modules-right": ["tray", "bluetooth", "network", "hyprland/language", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp", "custom/notification"],
+    "hyprland/workspaces": {
+        "format": "{icon}",
+        "on-click": "activate",
+        "all-outputs": true,
+        "format-icons": {"1":"󰆍","2":"󰈹","3":"󰨞","4":"󰉋","5":"󰊗","6":"󰝚","default":"󰑊"},
+        "persistent-workspaces": {
+            "1": [],
+            "2": [],
+            "3": [],
+            "4": [],
+            "5": [],
+            "6": []
+        }
+    },
+    "hyprland/window": {"format": "{}", "max-length": 40},
+    "hyprland/language": {"format": "󰌌 {}", "format-en": "US", "format-es": "ES"},
+    "clock": {"format": "󰥔 {:%H:%M}", "format-alt": "󰃭 {:%A, %d %B %Y}"},
+    "memory": {"format": "󰍛 {}%", "interval": 5},
+    "cpu": {"format": "󰻠 {usage}%", "interval": 5},
+    "pulseaudio": {"format": "{icon} {volume}%", "format-muted": "󰝟 muted", "format-icons": {"default": ["󰕿","󰖀","󰕾"]}, "on-click": "pavucontrol"},
+    "bluetooth": {
+        "format": "󰂯 {status}",
+        "format-connected": "󰂱",
+        "format-connected-battery": "󰂱 {device_battery_percentage}%",
+        "format-disabled": "󰂲",
+        "format-off": "󰂲",
+        "tooltip-format": "{controller_alias}\n{num_connections} conectado(s)",
+        "tooltip-format-connected": "{controller_alias}\n\n{device_enumerate}",
+        "tooltip-format-enumerate-connected": "  {device_alias}",
+        "tooltip-format-enumerate-connected-battery": "  {device_alias} ({device_battery_percentage}%)",
+        "on-click": "~/.config/waybar/scripts/rofi-bluetooth.sh",
+        "on-click-right": "bluetoothctl power on"
+    },
+    "network": {
+        "format-wifi": "󰤨",
+        "format-ethernet": "󰈀 {ifname}",
+        "format-disconnected": "󰤭 Sin conexión",
+        "format-disabled": "󰤮",
+        "tooltip-format-wifi": "  {essid}\n󰩟  {ipaddr}/{cidr}\n󰢮  {signalStrength}%\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
+        "tooltip-format-ethernet": "󰈀  {ifname}\n󰩟  {ipaddr}/{cidr}\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
+        "tooltip-format-disconnected": "Sin conexión",
+        "interval": 5,
+        "on-click": "~/.config/waybar/scripts/rofi-wifi.sh"
+    },
+    "tray": {"icon-size": 16, "spacing": 8},
+    "custom/cpu-temp": {
+        "format": "󰔏 {}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/hw-monitor.sh cpu-temp",
+        "interval": 5,
+        "on-click": "coolercontrol"
+    },
+    "custom/gpu-temp": {
+        "format": "󰢮 {}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/hw-monitor.sh gpu-temp",
+        "interval": 5,
+        "on-click": "coolercontrol"
+    },
+    "custom/notification": {"format": "{icon}", "format-icons": {"notification": "󰂚", "none": "󰂜", "dnd-notification": "󰂛", "dnd-none": "󰪑"}, "return-type": "json", "exec-if": "which swaync-client", "exec": "swaync-client -swb", "on-click": "swaync-client -t -sw", "escape": true}
+}

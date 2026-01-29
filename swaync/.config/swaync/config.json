@@ -1,0 +1,17 @@
+{
+    "positionX": "right",
+    "positionY": "top",
+    "control-center-margin-top": 10,
+    "control-center-margin-bottom": 10,
+    "control-center-margin-right": 10,
+    "notification-icon-size": 64,
+    "notification-body-image-height": 100,
+    "notification-body-image-width": 200,
+    "timeout": 10,
+    "timeout-low": 5,
+    "timeout-critical": 0,
+    "control-center-width": 380,
+    "notification-window-width": 380,
+    "transition-time": 200,
+    "hide-on-action": true
+}

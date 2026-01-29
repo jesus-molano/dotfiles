@@ -1,0 +1,84 @@
+configuration {
+    modi: "drun";
+    show-icons: true;
+    display-drun: "🔎";
+    drun-display-format: "{name}";
+    disable-history: false;
+    sidebar-mode: false;
+}
+
+/* --- ESTA PARTE ES LA QUE ARREGLA EL FONDO BLANCO --- */
+* {
+    font: "JetBrainsMono Nerd Font 12"; /* Ajusta si usas otra fuente */
+    bg: #1e1e2e;      /* Fondo Oscuro (Catppuccin Mocha) */
+    bg-alt: #313244;  /* Fondo un poco más claro para selección */
+    fg: #cdd6f4;      /* Texto Blanco/Gris */
+    accent: #89b4fa;  /* Azul para resaltar */
+    
+    /* El truco mágico: todo transparente por defecto */
+    background-color: transparent;
+    text-color: @fg;
+    margin: 0;
+    padding: 0;
+    spacing: 0;
+}
+
+window {
+    width: 600px;
+    background-color: @bg; /* Solo la ventana tiene color de fondo */
+    border: 2px;
+    border-color: @accent;
+    border-radius: 12px;
+    padding: 0;
+}
+
+mainbox {
+    children: [inputbar, listview];
+}
+
+inputbar {
+    background-color: @bg-alt;
+    padding: 12px;
+    margin: 12px;
+    border-radius: 8px;
+    children: [prompt, entry];
+}
+
+prompt {
+    text-color: @accent;
+    background-color: inherit;
+    padding: 0 8px 0 0;
+}
+
+entry {
+    background-color: inherit;
+    text-color: @fg;
+    placeholder: "Buscar aplicaciones...";
+}
+
+listview {
+    margin: 0 12px 12px 12px;
+    lines: 8;
+    columns: 1;
+}
+
+element {
+    padding: 10px;
+    border-radius: 8px;
+    background-color: transparent; /* Aseguramos transparencia aquí también */
+    text-color: @fg;
+}
+
+element selected {
+    background-color: @bg-alt; /* Color al pasar el ratón por encima */
+    text-color: @accent;
+}
+
+element-icon {
+    size: 24px;
+    margin: 0 10px 0 0;
+}
+
+element-text {
+    vertical-align: 0.5;
+}
