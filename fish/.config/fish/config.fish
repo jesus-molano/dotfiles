@@ -21,4 +21,5 @@ if command -q direnv
     direnv hook fish | source
 end
 
+zoxide init fish | source
 starship init fish | source
