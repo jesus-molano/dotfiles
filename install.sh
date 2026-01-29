@@ -310,6 +310,53 @@ post_stow_fixes() {
             log_ok "GTK-4.0 symlinks valid."
         fi
     fi
+
+    # Deploy /etc/ configs from system-etc/
+    local etc_dir="$DOTFILES_DIR/system-etc"
+
+    # Network tuning (System category)
+    if [[ ${SELECTED[7]} -eq 1 ]] && [[ -f "$etc_dir/sysctl.d/99-network-performance.conf" ]]; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Apply network tuning to /etc/? (requires sudo) [s/N]:${NC} ")" net_confirm
+        if [[ "$net_confirm" =~ ^[sS]$ ]]; then
+            sudo cp "$etc_dir/sysctl.d/99-network-performance.conf" /etc/sysctl.d/ && \
+                log_ok "Installed: /etc/sysctl.d/99-network-performance.conf"
+            sudo cp "$etc_dir/NetworkManager/conf.d/wifi-powersave-off.conf" /etc/NetworkManager/conf.d/ && \
+                log_ok "Installed: /etc/NetworkManager/conf.d/wifi-powersave-off.conf"
+            sudo sysctl --system &>/dev/null && \
+                log_ok "Applied sysctl settings."
+        else
+            log_info "Skipped network config."
+        fi
+    fi
+
+    # Gaming sysctl (Gaming category)
+    if [[ ${SELECTED[5]} -eq 1 ]] && [[ -f "$etc_dir/sysctl.d/99-gaming.conf" ]]; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Apply gaming sysctl tuning to /etc/? (requires sudo) [s/N]:${NC} ")" gaming_confirm
+        if [[ "$gaming_confirm" =~ ^[sS]$ ]]; then
+            sudo cp "$etc_dir/sysctl.d/99-gaming.conf" /etc/sysctl.d/ && \
+                log_ok "Installed: /etc/sysctl.d/99-gaming.conf"
+            sudo sysctl --system &>/dev/null && \
+                log_ok "Applied sysctl settings."
+        else
+            log_info "Skipped gaming sysctl config."
+        fi
+    fi
+
+    # Kanata udev rules (Keyboard category)
+    if [[ ${SELECTED[3]} -eq 1 ]] && [[ -f "$etc_dir/udev/rules.d/99-kanata.rules" ]]; then
+        echo ""
+        read -rp "$(echo -e "${YELLOW}  Install kanata udev rules to /etc/? (requires sudo) [s/N]:${NC} ")" kanata_confirm
+        if [[ "$kanata_confirm" =~ ^[sS]$ ]]; then
+            sudo cp "$etc_dir/udev/rules.d/99-kanata.rules" /etc/udev/rules.d/ && \
+                log_ok "Installed: /etc/udev/rules.d/99-kanata.rules"
+            sudo udevadm control --reload-rules && sudo udevadm trigger && \
+                log_ok "Reloaded udev rules."
+        else
+            log_info "Skipped kanata udev rules."
+        fi
+    fi
 }
 
 enable_services() {
