@@ -1,0 +1,19 @@
+pre-commit:
+  parallel: true
+  commands:
+    biome:
+      glob: "*.{js,ts,jsx,tsx,json,css,vue}"
+      run: biome check --staged --write {staged_files}
+    types:
+      glob: "*.{ts,tsx,vue}"
+      run: pnpm typecheck
+
+pre-push:
+  commands:
+    tests:
+      run: pnpm vitest run --reporter=dot
+
+commit-msg:
+  commands:
+    commitlint:
+      run: pnpm commitlint --edit {1}

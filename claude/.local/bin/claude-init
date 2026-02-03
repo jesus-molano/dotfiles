@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# claude-init — Initialize Claude Code config and shared tooling in a project
+# Usage:
+#   claude-init nuxt4         Copy Nuxt 4 Claude config + shared tooling
+#   claude-init next16        Copy Next.js 16 Claude config + shared tooling
+#   claude-init shared        Copy only shared tooling (biome, lefthook, commitlint, CI)
+#   claude-init claude        Copy only Claude config (auto-detects framework)
+
+set -euo pipefail
+
+TEMPLATES="$HOME/dotfiles/claude/.claude/templates"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+CYAN='\033[0;36m'
+DIM='\033[2m'
+RESET='\033[0m'
+
+info()  { printf "${CYAN}::${RESET} %s\n" "$1"; }
+ok()    { printf "${GREEN}OK${RESET} %s\n" "$1"; }
+skip()  { printf "${DIM}-- %s (already exists, skipping)${RESET}\n" "$1"; }
+err()   { printf "${RED}!!${RESET} %s\n" "$1" >&2; }
+
+# Copy file only if it doesn't exist (no overwrite)
+copy_safe() {
+  local src="$1" dest="$2"
+  if [[ -f "$dest" ]]; then
+    skip "$dest"
+    return
+  fi
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+  ok "$dest"
+}
+
+# Copy file, overwriting existing
+copy_force() {
+  local src="$1" dest="$2"
+  mkdir -p "$(dirname "$dest")"
+  cp "$src" "$dest"
+  ok "$dest"
+}
+
+detect_framework() {
+  if [[ -f "nuxt.config.ts" ]] || [[ -f "nuxt.config.js" ]]; then
+    echo "nuxt4"
+  elif [[ -f "next.config.ts" ]] || [[ -f "next.config.js" ]] || [[ -f "next.config.mjs" ]]; then
+    echo "next16"
+  else
+    echo ""
+  fi
+}
+
+SHARED_COPIED=false
+
+copy_shared() {
+  info "Copying shared tooling configs..."
+  copy_safe "$TEMPLATES/shared/biome.json" "./biome.json"
+  copy_safe "$TEMPLATES/shared/lefthook.yml" "./lefthook.yml"
+  copy_safe "$TEMPLATES/shared/commitlint.config.mjs" "./commitlint.config.mjs"
+  mkdir -p .github/workflows
+  copy_safe "$TEMPLATES/shared/ci-workflow.yml" ".github/workflows/ci.yml"
+  SHARED_COPIED=true
+}
+
+print_next_steps() {
+  echo ""
+  printf "${CYAN}Next steps:${RESET}\n"
+  if [[ "$SHARED_COPIED" == true ]]; then
+    echo "  pnpm add -D @biomejs/biome @commitlint/cli @commitlint/config-conventional lefthook"
+    echo "  pnpm exec lefthook install"
+  fi
+  echo ""
+}
+
+copy_claude() {
+  local framework="$1"
+  if [[ -z "$framework" ]]; then
+    err "Could not detect framework. Use: claude-init nuxt4 or claude-init next16"
+    exit 1
+  fi
+  if [[ ! -d "$TEMPLATES/$framework" ]]; then
+    err "Unknown framework: $framework. Options: nuxt4, next16"
+    exit 1
+  fi
+  info "Copying Claude config for $framework..."
+  copy_force "$TEMPLATES/$framework/CLAUDE.md" ".claude/CLAUDE.md"
+  copy_force "$TEMPLATES/$framework/settings.json" ".claude/settings.json"
+}
+
+usage() {
+  cat <<EOF
+Usage: claude-init <command>
+
+Commands:
+  nuxt4     Copy Nuxt 4 Claude config + shared tooling
+  next16    Copy Next.js 16 Claude config + shared tooling
+  shared    Copy only shared tooling (biome, lefthook, commitlint, CI)
+  claude    Copy only Claude config (auto-detects framework from project)
+
+Shared files are never overwritten if they exist.
+Claude config (.claude/) is always overwritten with latest template.
+EOF
+  exit 1
+}
+
+# --- Main ---
+
+[[ $# -lt 1 ]] && usage
+
+case "$1" in
+  nuxt4)
+    copy_claude "nuxt4"
+    copy_shared
+    echo ""
+    info "Reference guide: $TEMPLATES/nuxt4/project-scaffold.md"
+    ;;
+  next16)
+    copy_claude "next16"
+    copy_shared
+    echo ""
+    info "Reference guide: $TEMPLATES/next16/project-scaffold.md"
+    ;;
+  shared)
+    copy_shared
+    ;;
+  claude)
+    framework=$(detect_framework)
+    copy_claude "$framework"
+    ;;
+  -h|--help)
+    usage
+    ;;
+  *)
+    err "Unknown command: $1"
+    usage
+    ;;
+esac
+
+echo ""
+printf "${GREEN}Done.${RESET}\n"
+print_next_steps

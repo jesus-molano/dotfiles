@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm *)", "Bash(npx *)", "Bash(nuxt *)",
+      "Bash(vitest *)", "Bash(playwright *)",
+      "Bash(biome *)", "Bash(vue-tsc *)",
+      "Bash(git *)", "Bash(gh *)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)", "Bash(sudo *)",
+      "Bash(git push --force *)", "Bash(git push -f *)",
+      "Read(.env)", "Read(.env.*)", "Write(.env)", "Write(.env.*)"
+    ]
+  }
+}
