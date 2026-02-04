@@ -74,7 +74,7 @@
         "exec": "checkupdates 2>/dev/null | wc -l",
         "interval": 3600,
         "signal": 8,
-        "on-click": "kitty -e bash -c 'sudo pacman -Syu; echo Done; read'"
+        "on-click": "kitty -e bash -c 'paru -Syu; echo Done; read'"
     },
     "custom/music": {
         "format": "{}",

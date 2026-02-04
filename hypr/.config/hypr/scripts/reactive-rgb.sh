@@ -2,7 +2,6 @@
 # Reactive RGB - Maps CPU temperature to Catppuccin Mocha colors via OpenRGB
 # Launched from Hyprland autostart, runs in background
 
-SENSOR_FILE="/sys/class/hwmon/hwmon*/temp1_input"
 INTERVAL=5
 LAST_COLOR=""
 
@@ -41,9 +40,10 @@ temp_to_color() {
 
 apply_color() {
     local color=$1
-    openrgb -d 0 -m static -c "$color" &>/dev/null &
-    openrgb -d 1 -m static -c "$color" &>/dev/null &
-    openrgb -d 2 -m static -c "$color" &>/dev/null &
+    # Device indices are hardware-dependent — adjust if USB devices change order
+    for d in 0 1 2; do
+        openrgb -d "$d" -m static -c "$color" &>/dev/null &
+    done
     wait
 }
 
@@ -55,7 +55,10 @@ while true; do
     if [[ -n "$temp" ]]; then
         color=$(temp_to_color "$temp")
         if [[ "$color" != "$LAST_COLOR" ]]; then
-            apply_color "$color"
+            if ! apply_color "$color"; then
+                sleep 10
+                continue
+            fi
             LAST_COLOR="$color"
         fi
     fi

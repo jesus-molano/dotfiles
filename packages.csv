@@ -15,6 +15,7 @@ core,xorg-xwayland,native
 core,uwsm,native
 core,jq,native
 terminal,kitty-git,aur
+terminal,neovim,native
 terminal,fish,native
 terminal,zsh,native
 terminal,bash-completion,native
