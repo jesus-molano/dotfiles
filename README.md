@@ -129,6 +129,7 @@ npm         npm config
 claude      Claude Code config, rules, skills, agents, hooks
 mimeapps    Default application associations
 fonts       Custom font files
+system-etc  System configs (NetworkManager, sysctl, udev, zram)
 ```
 
 To stow/unstow individual packages:
