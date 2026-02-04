@@ -17,19 +17,18 @@ refresh_cache() {
         fi
     fi
 
-    # Collect all sensor data at once
-    local sensors_out gpu_out
-    sensors_out="$(sensors 2>/dev/null)"
+    # Collect sensor data with chip filters to avoid hangs
+    local gpu_out
     gpu_out="$(nvidia-smi --query-gpu=temperature.gpu,fan.speed,power.draw,utilization.gpu --format=csv,noheader,nounits 2>/dev/null)"
 
-    # Parse CPU temp (k10temp Tctl)
+    # Parse CPU temp (k10temp Tctl) — filtered by chip
     local cpu_temp
-    cpu_temp="$(echo "$sensors_out" | awk '/k10temp-pci-00c3/,/^$/' | awk '/Tctl/ {gsub(/[^0-9.]/, "", $2); printf "%.0f", $2}')"
+    cpu_temp="$(sensors -u k10temp-pci-00c3 2>/dev/null | awk '/temp1_input/ {printf "%.0f", $2}')"
 
-    # Parse NZXT fan speeds
+    # Parse NZXT fan speeds — filtered by chip
     local fan2_rpm fan3_rpm
-    fan2_rpm="$(echo "$sensors_out" | awk '/nzxtsmart2-hid/,/^$/' | awk '/^FAN 2:/ {print $3}')"
-    fan3_rpm="$(echo "$sensors_out" | awk '/nzxtsmart2-hid/,/^$/' | awk '/^FAN 3:/ {print $3}')"
+    fan2_rpm="$(sensors nzxtsmart2-hid-3-1 2>/dev/null | awk '/^FAN 2:/ {print $3}')"
+    fan3_rpm="$(sensors nzxtsmart2-hid-3-1 2>/dev/null | awk '/^FAN 3:/ {print $3}')"
 
     # Parse GPU data
     local gpu_temp gpu_fan gpu_power gpu_util
