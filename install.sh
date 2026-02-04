@@ -296,6 +296,13 @@ stow_packages() {
 }
 
 post_stow_fixes() {
+    # Claude Code MCP servers (Development category)
+    if [[ ${SELECTED[6]} -eq 1 ]] && [[ -x "$DOTFILES_DIR/claude/setup-mcp.sh" ]]; then
+        "$DOTFILES_DIR/claude/setup-mcp.sh" && \
+            log_ok "Claude Code: MCP servers configured" || \
+            log_warn "Claude Code: MCP setup failed (run claude/setup-mcp.sh manually)"
+    fi
+
     # Fix .npmrc hardcoded home path
     if [[ -f "$HOME/.npmrc" ]]; then
         sed -i "s|/home/jesus|$HOME|g" "$HOME/.npmrc"

@@ -127,5 +127,6 @@ development,direnv,native
 development,lazygit,native
 development,docker,native
 development,docker-compose,native
+development,1password-cli,aur
 system,snapper,native
 system,snap-pac,native
