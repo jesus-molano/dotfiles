@@ -36,7 +36,13 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `Hyper + C` | WebStorm |
 | `Hyper + N` | Notification center |
 | `Hyper + P` | Color picker |
-| `Hyper + M` | Toggle MangoHud |
+| `Hyper + M` | YouTube Music |
+| `Hyper + G` | Toggle MangoHud |
+| `Hyper + D` | Discord |
+| `Hyper + 1` | 1Password |
+| `Hyper + L` | Lock screen |
+| `Hyper + /` | Show keybinds |
+| `Hyper + .` | Claude skills |
 
 ### Windows
 
@@ -72,7 +78,7 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 
 | Bind | Action |
 |------|--------|
-| `ALT + Ctrl + Space` | Switch US/ES layout |
+| `Super + Space` | Switch US/ES layout |
 
 ## Installation
 
