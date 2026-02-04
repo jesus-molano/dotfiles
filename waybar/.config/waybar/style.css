@@ -71,7 +71,7 @@ window#waybar {
 
 #pulseaudio, #memory, #cpu, #tray, #custom-notification,
 #bluetooth, #network, #custom-cpu-temp, #custom-gpu-temp,
-#mpris, #battery {
+#custom-music, #battery {
     color: @text;
     background: @surface0;
     border-radius: 10px;
@@ -99,9 +99,8 @@ window#waybar {
 #custom-gpu-temp.critical { color: @red; background: alpha(@red, 0.15); }
 
 /* Music */
-#mpris { color: @pink; }
-#mpris.paused { color: @overlay0; font-style: italic; }
-#mpris.stopped { color: @overlay0; }
+#custom-music.playing { color: @pink; }
+#custom-music.paused { color: @overlay0; }
 
 /* Battery (solo visible en portátil) */
 #battery { color: @green; }
