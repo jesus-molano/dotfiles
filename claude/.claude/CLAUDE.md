@@ -26,12 +26,6 @@ Vue 3.5 / Nuxt 4 · React 19 / Next.js 16.
 - Never rely on training data alone for framework APIs — check current docs first
 - Current stack: Vue 3.5, Nuxt 4, React 19, Next.js 16
 
-## Session Continuity
-- Before `/clear` on long tasks, save state to `docs/session-state.md`
-- Format: ONLY task name, completed items (1 line each), pending items, key file paths
-- Hard limit: 30 lines max. No code snippets, no explanations
-- On resume: read session-state.md, then delete it after loading context
-
 ## Token Efficiency
 - Concise. No preambles, no restating questions
 - Surgical edits — never rewrite entire files
