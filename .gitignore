@@ -8,6 +8,9 @@ micro/.config/micro/plugins/
 # Font cache
 fonts/.local/share/fonts/.uuid
 
+# Secrets
+.env.op
+
 # OS generated
 .DS_Store
 *.swp

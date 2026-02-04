@@ -7,19 +7,21 @@
     "margin-right": 10,
     "modules-left": ["hyprland/window"],
     "modules-center": ["hyprland/workspaces"],
-    "modules-right": ["custom/music", "tray", "bluetooth", "network", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp", "battery", "custom/notification", "clock"],
+    "modules-right": ["custom/music", "bluetooth", "network", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
         "all-outputs": false,
-        "format-icons": {"1":"󰆍","2":"󰈹","3":"󰨞","4":"󰉋","5":"󰊗","6":"󰝚","default":"󰑊"},
+        "format-icons": {"1":"󰆍","2":"󰈹","3":"󰨞","4":"󰉋","5":"󰊗","6":"󰝚","7":"󰙯","8":"󰭹","default":"󰑊"},
         "persistent-workspaces": {
             "1": [],
             "2": [],
             "3": [],
             "4": [],
             "5": [],
-            "6": []
+            "6": [],
+            "7": [],
+            "8": []
         }
     },
     "hyprland/window": {"format": "{}", "max-length": 40},
@@ -67,13 +69,12 @@
         "on-click": "coolercontrol"
     },
     "custom/notification": {"format": "{icon}", "format-icons": {"notification": "󰂚", "none": "󰂜", "dnd-notification": "󰂛", "dnd-none": "󰪑"}, "return-type": "json", "exec-if": "which swaync-client", "exec": "swaync-client -swb", "on-click": "swaync-client -t -sw", "escape": true},
-    "battery": {
-        "states": {"warning": 30, "critical": 15},
-        "format": "{icon} {capacity}%",
-        "format-charging": "󰂄 {capacity}%",
-        "format-plugged": "󰚥 {capacity}%",
-        "format-icons": ["󰂎", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"],
-        "tooltip-format": "{timeTo}\n{power} W"
+    "custom/updates": {
+        "format": "󰏔 {}",
+        "exec": "checkupdates 2>/dev/null | wc -l",
+        "interval": 3600,
+        "signal": 8,
+        "on-click": "kitty -e bash -c 'sudo pacman -Syu; echo Done; read'"
     },
     "custom/music": {
         "format": "{}",

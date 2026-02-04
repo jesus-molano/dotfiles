@@ -21,6 +21,22 @@ if command -q direnv
     direnv hook fish | source
 end
 
+# 1Password secrets
+if command -q op
+    op inject -i ~/.env.op 2>/dev/null | source
+end
+
 zoxide init fish | source
 starship init fish | source
 export PATH="$HOME/.local/bin:$PATH"
+
+# Dev abbreviations
+abbr -a dev 'pnpm dev'
+abbr -a build 'pnpm build'
+abbr -a lint 'pnpm lint'
+abbr -a test 'pnpm test'
+abbr -a g 'git'
+abbr -a gs 'git status'
+abbr -a gd 'git diff'
+abbr -a gl 'git log --oneline -20'
+abbr -a lg 'lazygit'
