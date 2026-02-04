@@ -1,6 +1,7 @@
 ---
 name: a11y-audit
 description: Audit project for WCAG 2.1 AA accessibility compliance
+disable-model-invocation: true
 context: fork
 agent: Explore
 ---

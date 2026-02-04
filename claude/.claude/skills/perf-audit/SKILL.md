@@ -1,6 +1,7 @@
 ---
 name: perf-audit
 description: Audit project for performance issues across Vue/Nuxt and React/Next.js
+disable-model-invocation: true
 context: fork
 agent: Explore
 ---
