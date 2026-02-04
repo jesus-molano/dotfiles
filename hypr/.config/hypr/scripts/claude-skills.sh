@@ -16,4 +16,4 @@ skills=$(cat <<'EOF'
 EOF
 )
 
-echo "$skills" | rofi -dmenu -p "Claude Skills" -i -theme ~/.config/rofi/launchers/type-1/style-2.rasi
+echo "$skills" | rofi -dmenu -p "Claude Skills" -i -theme ~/.config/rofi/launchers/type-1/style-2.rasi -theme-str 'window { width: 750px; }'

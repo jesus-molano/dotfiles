@@ -45,4 +45,4 @@ binds=$(awk '
 }
 ' "$CONFIG")
 
-echo "$binds" | rofi -dmenu -p "Keybindings" -i -theme ~/.config/rofi/launchers/type-1/style-2.rasi
+echo "$binds" | rofi -dmenu -p "Keybindings" -i -theme ~/.config/rofi/launchers/type-1/style-2.rasi -theme-str 'window { width: 750px; }'
