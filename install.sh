@@ -93,30 +93,46 @@ log_ok()      { echo -e "${GREEN}[OK]${NC} $1"; }
 log_warn()    { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
+TOTAL_STEPS=8
+log_phase() {
+    local step=$1 title=$2
+    echo ""
+    echo -e "${BOLD}${MAGENTA}══ Step ${step}/${TOTAL_STEPS}: ${title} ══${NC}"
+    echo ""
+}
+
+log_hint() { echo -e "  ${CYAN}↳${NC} $1"; }
+
 check_prerequisites() {
-    log_info "Checking prerequisites..."
+    log_phase 1 "Prerequisites"
 
     # Not root
     if [[ $EUID -eq 0 ]]; then
         log_error "Do not run this script as root."
+        log_hint "Run as your normal user: ./install.sh"
+        log_hint "The script will ask for sudo only when needed."
         exit 1
     fi
 
     # Arch-based
     if ! command -v pacman &>/dev/null; then
-        log_error "pacman not found. This script requires Arch Linux or CachyOS."
+        log_error "pacman not found."
+        log_hint "This installer requires Arch Linux or a derivative (CachyOS, EndeavourOS, etc)."
         exit 1
     fi
 
     # Internet
     if ! ping -c 1 -W 3 archlinux.org &>/dev/null; then
         log_error "No internet connection detected."
+        log_hint "Check with: ip link && ping 1.1.1.1"
+        log_hint "If on WiFi: nmcli device wifi connect <SSID> password <pass>"
         exit 1
     fi
 
     # packages.csv exists
     if [[ ! -f "$PACKAGES_CSV" ]]; then
         log_error "packages.csv not found at $PACKAGES_CSV"
+        log_hint "Make sure you cloned the full repo: git clone https://github.com/jesus-molano/dotfiles"
         exit 1
     fi
 
@@ -124,27 +140,47 @@ check_prerequisites() {
 }
 
 install_paru() {
+    log_phase 2 "AUR Helper"
+
     if command -v paru &>/dev/null; then
         log_ok "paru is already installed."
         return
     fi
 
     log_info "Installing paru (AUR helper)..."
+    log_hint "paru is needed to install packages from the Arch User Repository (AUR)."
+
     local tmpdir
     tmpdir=$(mktemp -d)
-    git clone https://aur.archlinux.org/paru-bin.git "$tmpdir/paru-bin"
-    (cd "$tmpdir/paru-bin" && makepkg -si --noconfirm)
+    if ! git clone https://aur.archlinux.org/paru-bin.git "$tmpdir/paru-bin"; then
+        log_error "Failed to clone paru-bin from AUR."
+        log_hint "Check your internet connection and try again."
+        rm -rf "$tmpdir"
+        exit 1
+    fi
+
+    if ! (cd "$tmpdir/paru-bin" && makepkg -si --noconfirm); then
+        log_error "Failed to build/install paru."
+        log_hint "Make sure base-devel is installed: sudo pacman -S --needed base-devel"
+        log_hint "Then retry: cd /tmp && git clone https://aur.archlinux.org/paru-bin.git && cd paru-bin && makepkg -si"
+        rm -rf "$tmpdir"
+        exit 1
+    fi
+
     rm -rf "$tmpdir"
     log_ok "paru installed."
 }
 
 install_stow() {
+    log_phase 3 "GNU Stow"
+
     if command -v stow &>/dev/null; then
         log_ok "stow is already installed."
         return
     fi
 
     log_info "Installing GNU Stow..."
+    log_hint "Stow manages dotfiles by creating symlinks from this repo to your \$HOME."
     sudo pacman -S --noconfirm stow
     log_ok "stow installed."
 }
@@ -154,6 +190,7 @@ display_menu() {
         clear
         banner
         echo -e "${BOLD}  Select categories to install:${NC}"
+        echo -e "  ${CYAN}Toggle numbers to include/exclude. Press Enter when done.${NC}"
         echo ""
 
         for i in $(seq 1 11); do
@@ -199,7 +236,53 @@ display_menu() {
     done
 }
 
+confirm_selection() {
+    log_phase 4 "Confirmation"
+
+    local sel_cats=() total_pkgs=0 total_stow=0
+
+    for i in $(seq 1 11); do
+        if [[ ${SELECTED[$i]} -eq 1 ]]; then
+            sel_cats+=("${CAT_DESC[$i]}")
+            local key="${CAT_KEY[$i]}"
+            local count
+            count=$(grep -c "^${key}," "$PACKAGES_CSV" 2>/dev/null || echo 0)
+            total_pkgs=$((total_pkgs + count))
+            if [[ -n "${CAT_STOW[$i]}" ]]; then
+                for _ in ${CAT_STOW[$i]}; do
+                    total_stow=$((total_stow + 1))
+                done
+            fi
+        fi
+    done
+
+    if [[ ${#sel_cats[@]} -eq 0 ]]; then
+        log_warn "No categories selected. Nothing to do."
+        exit 0
+    fi
+
+    echo -e "  ${BOLD}Categories:${NC}  ${sel_cats[*]}"
+    echo -e "  ${BOLD}Packages:${NC}    $total_pkgs to install via paru"
+    echo -e "  ${BOLD}Stow modules:${NC} $total_stow config sets to deploy"
+    echo ""
+    echo -e "  ${BOLD}What will happen next:${NC}"
+    echo -e "    1. Install $total_pkgs packages (official repos + AUR)"
+    echo -e "    2. Back up existing configs that would conflict"
+    echo -e "    3. Deploy dotfiles via GNU Stow (symlinks)"
+    echo -e "    4. Apply system configs (each one asks for confirmation)"
+    echo -e "    5. Enable systemd services"
+    echo ""
+
+    read -rp "$(echo -e "  ${BOLD}Proceed with installation? [Y/n]:${NC} ")" proceed
+    if [[ "$proceed" =~ ^[nN]$ ]]; then
+        log_info "Installation cancelled."
+        exit 0
+    fi
+}
+
 install_packages() {
+    log_phase 5 "Package Installation"
+
     local packages=()
 
     for i in $(seq 1 11); do
@@ -219,11 +302,14 @@ install_packages() {
     fi
 
     log_info "Installing ${#packages[@]} packages..."
+    log_hint "Packages come from official repos and the AUR. Already-installed ones are skipped (--needed)."
     paru -S --needed --noconfirm "${packages[@]}"
-    log_ok "Packages installed."
+    log_ok "All ${#packages[@]} packages installed successfully."
 }
 
 backup_configs() {
+    log_phase 6 "Config Backup & Deployment"
+
     local stow_pkgs=()
 
     for i in $(seq 1 11); do
@@ -239,6 +325,7 @@ backup_configs() {
     fi
 
     log_info "Backing up existing configs to $BACKUP_DIR..."
+    log_hint "Existing config files are moved to the backup dir before stow creates symlinks."
     local backed_up=0
 
     for pkg in "${stow_pkgs[@]}"; do
@@ -263,6 +350,7 @@ backup_configs() {
 
     if [[ $backed_up -gt 0 ]]; then
         log_ok "Backed up $backed_up files to $BACKUP_DIR"
+        log_hint "To restore: cp -r $BACKUP_DIR/* \$HOME/"
     else
         log_info "No existing configs to back up."
     fi
@@ -288,19 +376,29 @@ stow_packages() {
 
     for pkg in "${stow_pkgs[@]}"; do
         if [[ -d "$DOTFILES_DIR/$pkg" ]]; then
-            stow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" 2>/dev/null && \
-                log_ok "Stowed: $pkg" || \
-                log_warn "Conflict stowing: $pkg (run 'stow -d $DOTFILES_DIR -t $HOME $pkg' manually)"
+            if stow -d "$DOTFILES_DIR" -t "$HOME" "$pkg" 2>/dev/null; then
+                log_ok "Stowed: $pkg"
+            else
+                log_warn "Conflict stowing: $pkg"
+                log_hint "Debug with: stow -v -d $DOTFILES_DIR -t \$HOME $pkg"
+                log_hint "Common fix: delete the conflicting file, then re-run stow."
+            fi
         fi
     done
 }
 
 post_stow_fixes() {
+    log_phase 7 "System Configuration"
+    log_hint "Each system change below asks for confirmation. You can skip any of them."
+
     # Claude Code MCP servers (Development category)
     if [[ ${SELECTED[6]} -eq 1 ]] && [[ -x "$DOTFILES_DIR/claude/setup-mcp.sh" ]]; then
-        "$DOTFILES_DIR/claude/setup-mcp.sh" && \
-            log_ok "Claude Code: MCP servers configured" || \
-            log_warn "Claude Code: MCP setup failed (run claude/setup-mcp.sh manually)"
+        if "$DOTFILES_DIR/claude/setup-mcp.sh"; then
+            log_ok "Claude Code: MCP servers configured"
+        else
+            log_warn "Claude Code: MCP setup failed."
+            log_hint "Run manually later: $DOTFILES_DIR/claude/setup-mcp.sh"
+        fi
     fi
 
     # Fix .npmrc hardcoded home path
@@ -312,7 +410,9 @@ post_stow_fixes() {
     # Verify GTK symlinks point to valid targets
     if [[ -L "$HOME/.config/gtk-4.0/gtk.css" ]]; then
         if [[ ! -e "$HOME/.config/gtk-4.0/gtk.css" ]]; then
-            log_warn "GTK symlink target missing. Install catppuccin-gtk-theme-mocha first."
+            log_warn "GTK-4.0 symlink target missing."
+            log_hint "Install the theme first: paru -S catppuccin-gtk-theme-mocha"
+            log_hint "Then re-run stow: stow -d $DOTFILES_DIR -t \$HOME gtk"
         else
             log_ok "GTK-4.0 symlinks valid."
         fi
@@ -324,6 +424,8 @@ post_stow_fixes() {
     # Network tuning (System category)
     if [[ ${SELECTED[7]} -eq 1 ]] && [[ -f "$etc_dir/sysctl.d/99-network-performance.conf" ]]; then
         echo ""
+        log_hint "Enables BBR congestion control, optimises TCP buffers, enables TCP Fast Open,"
+        log_hint "and disables WiFi power saving for lower latency."
         read -rp "$(echo -e "${YELLOW}  Apply network tuning to /etc/? (requires sudo) [s/N]:${NC} ")" net_confirm
         if [[ "$net_confirm" =~ ^[sS]$ ]]; then
             sudo cp "$etc_dir/sysctl.d/99-network-performance.conf" /etc/sysctl.d/ && \
@@ -340,6 +442,7 @@ post_stow_fixes() {
     # Gaming sysctl (Gaming category)
     if [[ ${SELECTED[5]} -eq 1 ]] && [[ -f "$etc_dir/sysctl.d/99-gaming.conf" ]]; then
         echo ""
+        log_hint "Sets vm.max_map_count (required by many games) and lowers swappiness for gaming."
         read -rp "$(echo -e "${YELLOW}  Apply gaming sysctl tuning to /etc/? (requires sudo) [s/N]:${NC} ")" gaming_confirm
         if [[ "$gaming_confirm" =~ ^[sS]$ ]]; then
             sudo cp "$etc_dir/sysctl.d/99-gaming.conf" /etc/sysctl.d/ && \
@@ -354,6 +457,7 @@ post_stow_fixes() {
     # Kanata udev rules (Keyboard category)
     if [[ ${SELECTED[3]} -eq 1 ]] && [[ -f "$etc_dir/udev/rules.d/99-kanata.rules" ]]; then
         echo ""
+        log_hint "Grants kanata access to /dev/uinput so it can remap keys without root."
         read -rp "$(echo -e "${YELLOW}  Install kanata udev rules to /etc/? (requires sudo) [s/N]:${NC} ")" kanata_confirm
         if [[ "$kanata_confirm" =~ ^[sS]$ ]]; then
             sudo cp "$etc_dir/udev/rules.d/99-kanata.rules" /etc/udev/rules.d/ && \
@@ -368,6 +472,7 @@ post_stow_fixes() {
     # NVIDIA mkinitcpio modules (NVIDIA category)
     if [[ ${SELECTED[8]} -eq 1 ]]; then
         echo ""
+        log_hint "Loads NVIDIA modules early in initramfs for Wayland/KMS support, then regenerates initramfs."
         read -rp "$(echo -e "${YELLOW}  Add NVIDIA modules to mkinitcpio.conf? (requires sudo) [s/N]:${NC} ")" nvidia_confirm
         if [[ "$nvidia_confirm" =~ ^[sS]$ ]]; then
             if grep -q "^MODULES=.*nvidia" /etc/mkinitcpio.conf 2>/dev/null; then
@@ -386,6 +491,7 @@ post_stow_fixes() {
     # zram-generator config (System category)
     if [[ ${SELECTED[7]} -eq 1 ]] && [[ -f "$etc_dir/zram-generator/zram-generator.conf" ]]; then
         echo ""
+        log_hint "Creates compressed swap in RAM — faster than disk swap and reduces SSD wear."
         read -rp "$(echo -e "${YELLOW}  Install zram-generator config to /etc/? (requires sudo) [s/N]:${NC} ")" zram_confirm
         if [[ "$zram_confirm" =~ ^[sS]$ ]]; then
             sudo mkdir -p /etc/systemd
@@ -400,6 +506,7 @@ post_stow_fixes() {
     # UFW firewall setup (System category)
     if [[ ${SELECTED[7]} -eq 1 ]] && command -v ufw &>/dev/null; then
         echo ""
+        log_hint "Enables firewall: deny incoming, allow outgoing, open ports 1714-1764 for KDE Connect."
         read -rp "$(echo -e "${YELLOW}  Configure UFW firewall? (requires sudo) [s/N]:${NC} ")" ufw_confirm
         if [[ "$ufw_confirm" =~ ^[sS]$ ]]; then
             sudo ufw default deny incoming && \
@@ -422,6 +529,8 @@ post_stow_fixes() {
     # Snapper Btrfs snapshots (System category)
     if [[ ${SELECTED[7]} -eq 1 ]] && command -v snapper &>/dev/null; then
         echo ""
+        log_hint "Sets up automatic Btrfs snapshots (timeline + snap-pac hooks on pacman operations)."
+        log_hint "Lets you roll back system or home to any previous snapshot."
         read -rp "$(echo -e "${YELLOW}  Configure Snapper for Btrfs snapshots? (requires sudo) [s/N]:${NC} ")" snapper_confirm
         if [[ "$snapper_confirm" =~ ^[sS]$ ]]; then
 
@@ -496,28 +605,36 @@ post_stow_fixes() {
 }
 
 enable_services() {
-    log_info "Enabling systemd user services..."
+    log_phase 8 "Services & Finishing"
+
+    log_info "Enabling systemd services..."
 
     # Kanata
     if [[ ${SELECTED[3]} -eq 1 ]] && [[ -f "$HOME/.config/systemd/user/kanata.service" ]]; then
         systemctl --user daemon-reload
-        systemctl --user enable kanata.service 2>/dev/null && \
-            log_ok "Enabled: kanata.service" || \
+        if systemctl --user enable kanata.service 2>/dev/null; then
+            log_ok "Enabled: kanata.service"
+        else
             log_warn "Could not enable kanata.service"
+            log_hint "Make sure your user is in the input and uinput groups:"
+            log_hint "  sudo usermod -aG input,uinput \$USER && reboot"
+        fi
     fi
 
     # PipeWire (System category)
     if [[ ${SELECTED[7]} -eq 1 ]]; then
         for svc in pipewire.socket pipewire-pulse.socket wireplumber.service; do
             systemctl --user enable "$svc" 2>/dev/null && \
-                log_ok "Enabled: $svc" || true
+                log_ok "Enabled: $svc" || \
+                log_warn "Could not enable $svc (may already be running or not installed)"
         done
     fi
 
     # GameMode (Gaming category)
     if [[ ${SELECTED[5]} -eq 1 ]]; then
         systemctl --user enable gamemoded.service 2>/dev/null && \
-            log_ok "Enabled: gamemoded.service" || true
+            log_ok "Enabled: gamemoded.service" || \
+            log_warn "Could not enable gamemoded.service (is gamemode installed?)"
     fi
 
     # Docker (Development category)
@@ -535,7 +652,7 @@ enable_services() {
 
 install_fonts() {
     if [[ ${SELECTED[4]} -eq 1 ]] && [[ -d "$HOME/.local/share/fonts" ]]; then
-        log_info "Refreshing font cache..."
+        log_info "Refreshing font cache so newly installed fonts are available to all apps..."
         fc-cache -fv &>/dev/null
         log_ok "Font cache updated."
     fi
@@ -551,6 +668,7 @@ post_install_notes() {
     if [[ ${SELECTED[8]} -eq 1 ]]; then
         echo -e "${YELLOW}  NVIDIA:${NC}"
         echo "    Add to kernel params: nvidia_drm.modeset=1"
+        echo -e "    ${CYAN}(Required for Wayland — without it, Hyprland won't start on NVIDIA.)${NC}"
         echo "    If using SDDM: sudo systemctl enable sddm"
         echo ""
     fi
@@ -559,6 +677,7 @@ post_install_notes() {
         echo -e "${YELLOW}  Kanata (keyboard remapper):${NC}"
         echo "    sudo usermod -aG input,uinput \$USER"
         echo "    (Log out and back in for group changes to take effect)"
+        echo "    Start the service: systemctl --user start kanata.service"
         echo ""
     fi
 
@@ -572,6 +691,7 @@ post_install_notes() {
         echo -e "${YELLOW}  Docker:${NC}"
         echo "    Re-login required for docker group to take effect."
         echo "    Test with: docker run hello-world"
+        echo -e "    ${CYAN}If 'permission denied': make sure you re-logged after group change.${NC}"
         echo ""
     fi
 
@@ -581,6 +701,7 @@ post_install_notes() {
         echo "    UFW: Check status with 'sudo ufw status'"
         echo ""
         echo -e "${YELLOW}  Snapper (Btrfs snapshots):${NC}"
+        echo -e "    ${CYAN}Snapshots let you undo bad updates or recover deleted configs.${NC}"
         echo "    List snapshots:     btrfs-snapshots list"
         echo "    Create snapshot:    btrfs-snapshots create [root|home]"
         echo "    View changes:       btrfs-snapshots diff <number>"
@@ -592,9 +713,19 @@ post_install_notes() {
     fi
 
     echo -e "${YELLOW}  General:${NC}"
+    local current_shell
+    current_shell=$(basename "$SHELL")
+    echo "    Current shell: $current_shell"
     echo "    Change default shell: chsh -s /usr/bin/fish"
-    echo "    Reboot recommended after installation."
+    echo -e "    ${CYAN}Reboot applies kernel params, udev rules, and group changes.${NC}"
     echo ""
+
+    # Show backup location if one was created
+    if [[ -d "$BACKUP_DIR" ]]; then
+        echo -e "    ${CYAN}Config backup: $BACKUP_DIR${NC}"
+        echo ""
+    fi
+
     echo -e "${GREEN}${BOLD}  Installation complete!${NC}"
     echo ""
 }
@@ -610,6 +741,7 @@ main() {
     install_paru
     install_stow
     display_menu
+    confirm_selection
     install_packages
     backup_configs
     stow_packages
