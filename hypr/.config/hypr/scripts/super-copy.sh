@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -euo pipefail
+
 class=$(hyprctl activewindow -j | jq -r '.class')
 case "$class" in
     kitty|Alacritty|foot|org.wezfurlong.wezterm|com.mitchellh.ghostty)

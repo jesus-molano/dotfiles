@@ -46,10 +46,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Detect build output directory
+        id: build-dir
+        run: |
+          if [ -d ".next" ]; then
+            echo "path=.next/" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=.output/" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: build
-          path: .output/ # Nuxt: .output/, Next.js: .next/
+          path: ${{ steps.build-dir.outputs.path }}
           retention-days: 1
 
   e2e:
@@ -64,8 +72,16 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - name: Detect build output directory
+        id: build-dir
+        run: |
+          if [ -f "next.config.ts" ] || [ -f "next.config.js" ] || [ -f "next.config.mjs" ]; then
+            echo "path=.next/" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=.output/" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/download-artifact@v4
         with:
           name: build
-          path: .output/
+          path: ${{ steps.build-dir.outputs.path }}
       - run: pnpm exec playwright test

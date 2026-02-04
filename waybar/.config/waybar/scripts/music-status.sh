@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -uo pipefail
 
 generate_bars() {
     local chars=(▁ ▂ ▃ ▄ ▅ ▆ ▇)

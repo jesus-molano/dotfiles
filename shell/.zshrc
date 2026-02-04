@@ -22,3 +22,19 @@ fi
 export PATH="$HOME/.local/bin:$PATH"
 
 eval "$(zoxide init zsh)"
+
+# direnv
+if command -v direnv &>/dev/null; then
+  eval "$(direnv hook zsh)"
+fi
+
+# Dev aliases (matching Fish abbreviations)
+alias dev='pnpm dev'
+alias build='pnpm build'
+alias lint='pnpm lint'
+alias test='pnpm test'
+alias g='git'
+alias gs='git status'
+alias gd='git diff'
+alias gl='git log --oneline -20'
+alias lg='lazygit'

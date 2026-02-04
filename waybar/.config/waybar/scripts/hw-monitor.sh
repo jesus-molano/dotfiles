@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Hardware monitor for Waybar custom modules
 # Usage: hw-monitor.sh {cpu-temp|gpu-temp|fan-speed}
 # Outputs JSON: {"text": "...", "tooltip": "...", "class": "..."}
@@ -19,16 +20,22 @@ refresh_cache() {
 
     # Collect sensor data with chip filters to avoid hangs
     local gpu_out
-    gpu_out="$(nvidia-smi --query-gpu=temperature.gpu,fan.speed,power.draw,utilization.gpu --format=csv,noheader,nounits 2>/dev/null)"
+    gpu_out="$(timeout 2 nvidia-smi --query-gpu=temperature.gpu,fan.speed,power.draw,utilization.gpu --format=csv,noheader,nounits 2>/dev/null || true)"
 
-    # Parse CPU temp (k10temp Tctl) — filtered by chip
-    local cpu_temp
-    cpu_temp="$(sensors -u k10temp-pci-00c3 2>/dev/null | awk '/temp1_input/ {printf "%.0f", $2}')"
+    # Parse CPU temp (k10temp Tctl) — detect chip dynamically
+    local k10_chip cpu_temp
+    k10_chip="$(sensors -u 2>/dev/null | grep -m1 '^k10temp' | cut -d: -f1 || echo "")"
+    if [[ -n "$k10_chip" ]]; then
+        cpu_temp="$(sensors -u "$k10_chip" 2>/dev/null | awk '/temp1_input/ {printf "%.0f", $2; exit}')"
+    fi
 
     # Parse NZXT fan speeds — filtered by chip
-    local fan2_rpm fan3_rpm
-    fan2_rpm="$(sensors nzxtsmart2-hid-3-1 2>/dev/null | awk '/^FAN 2:/ {print $3}')"
-    fan3_rpm="$(sensors nzxtsmart2-hid-3-1 2>/dev/null | awk '/^FAN 3:/ {print $3}')"
+    local nzxt_chip fan2_rpm fan3_rpm
+    nzxt_chip="$(sensors -u 2>/dev/null | grep -m1 '^nzxtsmart' | cut -d: -f1 || echo "")"
+    if [[ -n "$nzxt_chip" ]]; then
+        fan2_rpm="$(sensors "$nzxt_chip" 2>/dev/null | awk '/^FAN 2:/ {print $3}')"
+        fan3_rpm="$(sensors "$nzxt_chip" 2>/dev/null | awk '/^FAN 3:/ {print $3}')"
+    fi
 
     # Parse GPU data
     local gpu_temp gpu_fan gpu_power gpu_util
@@ -48,20 +55,23 @@ EOF
 }
 
 refresh_cache
+if [[ ! -f "$CACHE_FILE" ]]; then
+    refresh_cache
+fi
 source "$CACHE_FILE"
 
 case "$1" in
     cpu-temp)
         class="normal"
-        (( CPU_TEMP >= 80 )) && class="critical"
-        (( CPU_TEMP >= 65 && CPU_TEMP < 80 )) && class="warning"
+        (( CPU_TEMP >= 80 )) && class="critical" || true
+        (( CPU_TEMP >= 65 && CPU_TEMP < 80 )) && class="warning" || true
         printf '{"text": "%s°C", "tooltip": "CPU (k10temp Tctl): %s°C\\nFAN 2: %s RPM\\nFAN 3: %s RPM", "class": "%s"}\n' \
             "$CPU_TEMP" "$CPU_TEMP" "$FAN2_RPM" "$FAN3_RPM" "$class"
         ;;
     gpu-temp)
         class="normal"
-        (( GPU_TEMP >= 83 )) && class="critical"
-        (( GPU_TEMP >= 70 && GPU_TEMP < 83 )) && class="warning"
+        (( GPU_TEMP >= 83 )) && class="critical" || true
+        (( GPU_TEMP >= 70 && GPU_TEMP < 83 )) && class="warning" || true
         printf '{"text": "%s°C", "tooltip": "GPU: %s°C\\nFan: %s%%\\nPower: %s W\\nUsage: %s%%", "class": "%s"}\n' \
             "$GPU_TEMP" "$GPU_TEMP" "$GPU_FAN" "$GPU_POWER" "$GPU_UTIL" "$class"
         ;;

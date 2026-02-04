@@ -28,7 +28,7 @@
     "clock": {"format": "󰥔 {:%H:%M}", "format-alt": "󰃭 {:%A, %d %B %Y}"},
     "memory": {"format": "󰍛 {}%", "interval": 5},
     "cpu": {"format": "󰻠 {usage}%", "interval": 5},
-    "pulseaudio": {"format": "{icon} {volume}%", "format-muted": "󰝟 muted", "format-icons": {"default": ["󰕿","󰖀","󰕾"]}, "on-click": "pavucontrol"},
+    "pulseaudio": {"format": "{icon} {volume}%", "format-muted": "󰝟 silenciado", "format-icons": {"default": ["󰕿","󰖀","󰕾"]}, "on-click": "pavucontrol"},
     "bluetooth": {
         "format": "󰂯 {status}",
         "format-connected": "󰂱",

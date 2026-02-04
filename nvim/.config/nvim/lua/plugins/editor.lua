@@ -1,7 +1,7 @@
 return {
   -- mini.files as file explorer (lightweight alternative to neo-tree)
   {
-    "echasnovski/mini.files",
+    "nvim-mini/mini.files",
     opts = {
       windows = {
         preview = true,

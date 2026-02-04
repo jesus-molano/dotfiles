@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Show Claude Code skills cheatsheet in rofi
 
 skills=$(cat <<'EOF'

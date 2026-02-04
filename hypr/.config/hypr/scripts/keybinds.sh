@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Show keybindings from hyprland.conf in rofi
 
 CONFIG="$HOME/.config/hypr/hyprland.conf"

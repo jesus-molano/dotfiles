@@ -42,7 +42,8 @@
       "Bash(docker *)",
       "Bash(docker-compose *)",
       "Bash(jq *)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(stow *)"
     ],
     "deny": [
       "Bash(rm -rf /)",
@@ -59,7 +60,6 @@
       "Bash(rm -rf .*)",
       "Read(.env)",
       "Read(.env.*)",
-      "Read(.env.local)",
       "Read(*/.env)",
       "Read(*/.env.*)",
       "Read(**/.credentials*)",
@@ -95,7 +95,6 @@
     ],
     "SessionStart": [
       {
-        "matcher": "compact",
         "hooks": [
           {
             "type": "command",
@@ -106,5 +105,6 @@
       }
     ]
   },
-  "alwaysThinkingEnabled": true
+  "alwaysThinkingEnabled": true,
+  "language": "es"
 }

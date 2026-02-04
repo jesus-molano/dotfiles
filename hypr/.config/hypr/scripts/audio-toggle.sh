@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+set -euo pipefail
+command -v pactl &>/dev/null || exit 1
+
 current=$(pactl get-default-sink)
 sinks=($(pactl list short sinks | awk '{print $2}'))
 

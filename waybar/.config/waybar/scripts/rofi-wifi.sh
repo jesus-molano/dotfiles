@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 
 # WiFi management menu via rofi + nmcli
 
@@ -69,7 +70,29 @@ connect_to() {
         pass=$(rofi -dmenu -password -p "Contraseña" -theme "$THEME" \
             -theme-str 'entry { placeholder: "Contraseña para '"$ssid"'..."; }')
         [[ -z "$pass" ]] && return
-        nmcli device wifi connect "$ssid" password "$pass" 2>/dev/null
+        # Pass password via temp NM config file to avoid visibility in ps
+        local tmp_conn
+        tmp_conn=$(mktemp /tmp/nm-wifi.XXXXXX)
+        chmod 600 "$tmp_conn"
+        cat > "$tmp_conn" <<NMCONN
+[connection]
+id=$ssid
+type=wifi
+autoconnect=true
+[wifi]
+mode=infrastructure
+ssid=$ssid
+[wifi-security]
+key-mgmt=wpa-psk
+psk=$pass
+[ipv4]
+method=auto
+[ipv6]
+method=auto
+NMCONN
+        nmcli connection load "$tmp_conn" 2>/dev/null
+        rm -f "$tmp_conn"
+        nmcli connection up "$ssid" 2>/dev/null
     else
         nmcli device wifi connect "$ssid" 2>/dev/null
     fi

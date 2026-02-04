@@ -1,11 +1,52 @@
 [user]
 	name = jesus-molano
 	email = jessumolano@gmail.com
+	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOiWj5OG9LuaQVD6MRVguuuP6oR6NyFCuNcRnhGuJtxS
 [init]
 	defaultBranch = main
 [core]
 	editor = nvim
+	excludesfile = ~/.gitignore_global
+	pager = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	side-by-side = true
+	line-numbers = true
+	hyperlinks = true
+	syntax-theme = Catppuccin Mocha
 [diff]
 	tool = nvimdiff
+	colorMoved = default
 [merge]
 	tool = nvimdiff
+	conflictstyle = diff3
+[rerere]
+	enabled = true
+[pull]
+	rebase = true
+[fetch]
+	prune = true
+[push]
+	autoSetupRemote = true
+[column]
+	ui = auto
+[branch]
+	sort = -committerdate
+[alias]
+	st = status -sb
+	co = checkout
+	br = branch --sort=-committerdate
+	ci = commit
+	amend = commit --amend --no-edit
+	unstage = reset HEAD --
+	last = log -1 HEAD
+	graph = log --oneline --graph --decorate --all -20
+[commit]
+	gpgsign = true
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	program = /opt/1Password/op-ssh-sign
+	allowedSignersFile = ~/.ssh/allowed_signers

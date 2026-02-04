@@ -1,4 +1,5 @@
 #!/bin/bash
+set -uo pipefail
 
 # Bluetooth management menu via rofi + bluetoothctl
 
@@ -13,6 +14,7 @@ btctl_session() {
     local fifo
     fifo=$(mktemp -u /tmp/btctl.XXXXX)
     mkfifo "$fifo"
+    trap 'rm -f "$fifo"' EXIT
     bluetoothctl < "$fifo" >/dev/null 2>&1 &
     local pid=$!
     exec 3>"$fifo"

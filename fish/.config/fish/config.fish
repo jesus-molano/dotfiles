@@ -21,10 +21,7 @@ if command -q direnv
     direnv hook fish | source
 end
 
-# 1Password secrets
-if command -q op
-    op inject -i ~/.env.op 2>/dev/null | source
-end
+# 1Password secrets — run `secrets` to load on demand
 
 zoxide init fish | source
 starship init fish | source

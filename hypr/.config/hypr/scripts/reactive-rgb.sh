@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # Reactive RGB - Maps CPU temperature to Catppuccin Mocha colors via OpenRGB
 # Launched from Hyprland autostart, runs in background
 
 INTERVAL=5
 LAST_COLOR=""
+
+command -v openrgb &>/dev/null || exit 0
 
 get_cpu_temp() {
     # k10temp Tctl - read from sysfs (millidegrees)
@@ -40,9 +43,13 @@ temp_to_color() {
 
 apply_color() {
     local color=$1
-    # Device indices are hardware-dependent — adjust if USB devices change order
-    for d in 0 1 2; do
-        openrgb -d "$d" -m static -c "$color" &>/dev/null &
+    local device_count
+    device_count=$(openrgb --noautoconnect -l 2>/dev/null | grep -c "^[0-9]*: ")
+    if (( device_count == 0 )); then
+        return 1
+    fi
+    for (( d=0; d<device_count; d++ )); do
+        openrgb --noautoconnect -d "$d" -m static -c "$color" &>/dev/null &
     done
     wait
 }

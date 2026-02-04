@@ -16,6 +16,7 @@ core,uwsm,native
 core,jq,native
 terminal,kitty-git,aur
 terminal,neovim,native
+terminal,tree-sitter-cli,native
 terminal,fish,native
 terminal,zsh,native
 terminal,bash-completion,native
@@ -126,6 +127,8 @@ system,zram-generator,native
 gaming,proton-ge-custom-bin,aur
 development,direnv,native
 development,lazygit,native
+development,git-delta,native
+development,just,native
 development,docker,native
 development,docker-compose,native
 development,1password-cli,aur
