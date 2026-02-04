@@ -26,6 +26,15 @@ Vue 3.5 / Nuxt 4 · React 19 / Next.js 16.
 - Never rely on training data alone for framework APIs — check current docs first
 - Current stack: Vue 3.5, Nuxt 4, React 19, Next.js 16
 
+## Model Routing
+- Exploration/search/read → Explore agent (Haiku, already default)
+- Mechanical implementation of approved plans → implementer agent (Sonnet)
+- Code reviews → code-reviewer agent (Sonnet)
+- Architecture decisions → arch-advisor agent (Opus)
+- Planning, debugging, complex reasoning → main conversation (Opus)
+- Use `model: "sonnet"` on general-purpose Task calls when the task is straightforward implementation
+- Use `model: "haiku"` on Task calls that only search, read, or gather info
+
 ## Token Efficiency
 - Concise. No preambles, no restating questions
 - Surgical edits — never rewrite entire files

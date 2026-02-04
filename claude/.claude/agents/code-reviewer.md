@@ -4,6 +4,7 @@ description: Read-only frontend code quality reviewer
 disallowedTools:
   - Write
   - Edit
+model: sonnet
 ---
 
 # Code Reviewer Agent

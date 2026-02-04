@@ -4,6 +4,7 @@ description: Architecture advisor for Vue/Nuxt and React/Next.js projects
 disallowedTools:
   - Write
   - Edit
+model: opus
 ---
 
 # Architecture Advisor Agent
