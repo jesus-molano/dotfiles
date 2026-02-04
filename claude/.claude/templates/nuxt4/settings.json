@@ -3,7 +3,7 @@
     "allow": [
       "Bash(pnpm *)", "Bash(npx *)", "Bash(nuxt *)",
       "Bash(vitest *)", "Bash(playwright *)",
-      "Bash(biome *)", "Bash(vue-tsc *)",
+      "Bash(biome *)", "Bash(vue-tsc *)", "Bash(lefthook *)",
       "Bash(git *)", "Bash(gh *)"
     ],
     "deny": [

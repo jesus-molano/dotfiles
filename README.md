@@ -120,6 +120,7 @@ micro       Micro editor settings + colorschemes
 gaming      GameMode, MangoHud, vkBasalt
 git         Git config
 npm         npm config
+claude      Claude Code config, rules, skills, agents, hooks
 mimeapps    Default application associations
 fonts       Custom font files
 ```
@@ -131,6 +132,21 @@ cd ~/dotfiles
 stow <package>      # deploy
 stow -D <package>   # remove
 ```
+
+## Claude Code
+
+The `claude` stow package deploys global config to `~/.claude/` (rules, skills, agents, hooks).
+
+Project templates (Nuxt 4, Next.js 16) are **not** symlinked — use `claude-init` to copy them into a project:
+
+```bash
+claude-init nuxt4     # Copy Nuxt 4 config + shared tooling
+claude-init next16    # Copy Next.js 16 config + shared tooling
+```
+
+This copies `.claude/CLAUDE.md`, `.claude/settings.json`, `.claude/project-scaffold.md`, and shared configs (biome, lefthook, commitlint, CI). Templates use **phased scaffolding** — each phase is executed one at a time.
+
+MCP servers (Context7, Playwright, Sequential Thinking) are configured by `setup-mcp.sh`, which runs automatically during installation.
 
 ## Credits
 

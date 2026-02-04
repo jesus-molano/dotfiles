@@ -70,6 +70,9 @@ print_next_steps() {
     echo "  pnpm exec lefthook install"
   fi
   echo ""
+  echo "  The project uses phased scaffolding. See .claude/project-scaffold.md"
+  echo "  Start with Phase 0 (Foundation), then advance one phase at a time."
+  echo ""
 }
 
 copy_claude() {
@@ -85,6 +88,7 @@ copy_claude() {
   info "Copying Claude config for $framework..."
   copy_force "$TEMPLATES/$framework/CLAUDE.md" ".claude/CLAUDE.md"
   copy_force "$TEMPLATES/$framework/settings.json" ".claude/settings.json"
+  copy_force "$TEMPLATES/$framework/project-scaffold.md" ".claude/project-scaffold.md"
 }
 
 usage() {
@@ -99,6 +103,11 @@ Commands:
 
 Shared files are never overwritten if they exist.
 Claude config (.claude/) is always overwritten with latest template.
+
+Files copied to .claude/:
+  CLAUDE.md              Project instructions for Claude Code
+  settings.json          Permissions and hooks
+  project-scaffold.md    Phased development guide (Phase 0-6/7)
 EOF
   exit 1
 }

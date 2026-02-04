@@ -10,7 +10,7 @@ arguments:
     description: Generate co-located test file
     type: boolean
   - name: with-story
-    description: Generate co-located Storybook story
+    description: Generate co-located story file
     type: boolean
 ---
 
@@ -25,32 +25,19 @@ Auto-detect framework from project config:
 Create `{name}.vue`:
 ```vue
 <script setup lang="ts">
-interface Props {
-  // Define props
-}
+interface Props {}
 
-const props = defineProps<Props>()
-const emit = defineEmits<{
-  // Define events
-}>()
-
-onUnmounted(() => {
-  // Cleanup: event listeners, intervals, subscriptions
-})
+defineProps<Props>()
 </script>
 
 <template>
-  <div>
-    <!-- Component template -->
-  </div>
+  <div></div>
 </template>
 
-<style scoped>
-/* Scoped styles */
-</style>
+<style scoped></style>
 ```
 
-If `--with-tests`, create `{name}.test.ts`:
+If `--with-tests`, create `{name}.nuxt.test.ts`:
 ```ts
 import { mountSuspended } from '@nuxt/test-utils/runtime'
 import { describe, expect, it } from 'vitest'
@@ -82,24 +69,12 @@ export const Default: Story = {}
 
 ## React (Next.js 16)
 
-Create `{name}.tsx`:
+Create `{name}.tsx` as a **Server Component** (default):
 ```tsx
-interface {name}Props {
-  // Define props
-}
+interface {name}Props {}
 
-export function {name}({ }: {name}Props) {
-  useEffect(() => {
-    return () => {
-      // Cleanup: event listeners, intervals, subscriptions
-    }
-  }, [])
-
-  return (
-    <div>
-      {/* Component JSX */}
-    </div>
-  )
+export function {name}({}: {name}Props) {
+  return <div></div>
 }
 ```
 
@@ -137,5 +112,5 @@ export const Default: Story = {}
 - Place the component in the nearest `components/` directory or current directory
 - Use PascalCase for file names
 - Always include TypeScript types for props
-- Always include cleanup in onUnmounted (Vue) or useEffect return (React)
-- Never add "use client" unless the component uses client-only APIs (hooks, event handlers, browser APIs)
+- React: Server Component by default. Only add `"use client"` when the component uses hooks, event handlers, or browser APIs
+- Vue: Add `defineEmits`, `onUnmounted`, or other APIs only when the component actually needs them

@@ -1,93 +1,50 @@
-# Project Instructions — Nuxt 4
+# Project: {name} — Nuxt 4
 
 ## Stack
-- Nuxt 4 (Vue 3.5, Nitro, Vite)
-- TypeScript strict mode with split configs
-- pnpm, Biome, Lefthook, Commitlint
-- Vitest + @nuxt/test-utils, Playwright for e2e
+Nuxt 4 (Vue 3.5, Nitro, Vite) · TypeScript strict · pnpm · Biome
 
 ## Architecture
-Feature-based with `app/` directory (srcDir):
+Feature-based with `app/` as srcDir (Nuxt 4 default):
 
 ```
 app/
-├── components/ui/        # Shared base UI components
+├── components/ui/        # Shared dumb components (no business logic)
 ├── composables/          # Shared composables
-├── features/             # Feature modules (THE pattern)
+├── features/             # Feature modules (primary pattern)
 │   └── {feature}/
 │       ├── components/
 │       ├── composables/
-│       ├── stores/       # Pinia setup stores
 │       ├── types/
-│       ├── __tests__/
 │       └── index.ts      # Public barrel export
 ├── layouts/
 ├── middleware/
-├── pages/
+├── pages/                # Thin wrappers — orchestrate, don't implement
 ├── plugins/
 └── utils/
-shared/                   # Shared between app/ and server/
+shared/                   # Shared types/utils between app/ and server/
 ├── types/
 └── utils/
 server/
-├── api/
+├── api/                  # BFF proxy — client NEVER calls external APIs
 ├── middleware/
-├── plugins/
 ├── utils/
 └── routes/
 ```
 
-## Key Patterns
-
-### Data Fetching
-- `useAsyncData` / `useFetch` with unique string keys
-- shallowRef by default (Nuxt 4) — opt into deep only when needed
-- Server routes proxy external APIs — never expose keys client-side
-
-### State
-- Pinia setup stores (`defineStore` with setup syntax)
-- Server state in useAsyncData, NOT in stores
-- Local ref/reactive for component state
-
-### Components
+## Conventions
 - `<script setup lang="ts">` always
-- defineProps with TypeScript interface
-- defineEmits with typed events
-- Scoped styles, slots for composition
-- onUnmounted / onWatcherCleanup for cleanup
+- `defineProps<T>()` with interface, `defineEmits<T>()`
+- `useRuntimeConfig()` for env access — NEVER `process.env` or `import.meta.env`
+- Components < 150 lines
+- Barrel exports (`index.ts`) only at feature boundaries
+- Trust Nuxt auto-imports — don't explicitly import `ref`, `computed`, `useFetch`
 
-### Error Handling
-- `createError({ status, statusText, fatal })` — Nuxt 4 uses status/statusText
-- `error.vue` for global error page
-- `onErrorCaptured` for component error boundaries
+## Phased Development
+This project uses phased scaffolding. Refer to `project-scaffold.md` for phases.
 
-### Rendering
-- routeRules for hybrid rendering:
-  - `prerender: true` for static pages
-  - `isr: seconds` for incremental static regeneration
-  - `swr: seconds` for stale-while-revalidate
-  - `ssr: false` for SPA sections
+**CRITICAL: Execute ONE phase at a time. ASK the user before advancing to the next phase.**
+Never scaffold everything at once — each phase should be complete and working before moving on.
 
-### Modules
-```ts
-modules: [
-  '@pinia/nuxt', '@nuxtjs/i18n', '@nuxt/image', '@nuxt/fonts',
-  '@nuxt/scripts', '@nuxt/test-utils', '@vueuse/nuxt',
-  'nuxt-security', '@nuxtjs/seo',
-]
-```
-
-### i18n
-- @nuxtjs/i18n v10 with lazy-loaded locales
-- Locale files in `i18n/locales/` (outside app/)
-
-### Testing
-- Unit tests: `test/unit/` (node environment)
-- Nuxt tests: `test/nuxt/` (nuxt environment, mountSuspended)
-- E2E: `test/e2e/` (Playwright)
-
-### Memory Leak Prevention
-- onWatcherCleanup for AbortController in watchers
-- useEventListener from VueUse (auto-cleanup)
-- onUnmounted for manual cleanup
-- Never store component refs at module level
+## Docs
+Use Context7 MCP (`resolve-library-id` → `query-docs`) before implementing any Nuxt/Vue API.
+Never rely on training data alone for framework-specific code.
