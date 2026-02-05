@@ -12,6 +12,7 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | Launcher | [Rofi](https://github.com/davatorium/rofi) (adi1090x themes) |
 | Terminal | [Kitty](https://sw.kovidgoyal.net/kitty/) |
 | Shell | [Fish](https://fishshell.com/) + [Starship](https://starship.rs/) |
+| Editor | [Neovim](https://neovim.io/) (LazyVim) — WebStorm as main IDE |
 | Multiplexer | [Zellij](https://zellij.dev/) |
 | Notifications | [SwayNC](https://github.com/ErikReider/SwayNotificationCenter) |
 | Theme | [Catppuccin Mocha](https://github.com/catppuccin/catppuccin) |
@@ -61,8 +62,10 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 
 | Bind | Action |
 |------|--------|
-| `ALT + 1-6` | Switch workspace |
-| `ALT + Shift + 1-6` | Move window to workspace |
+| `ALT + 1-8` | Switch workspace |
+| `ALT + Shift + 1-8` | Move window to workspace |
+| `ALT + `` ` `` ` | Toggle scratchpad |
+| `ALT + Shift + `` ` `` ` | Move to scratchpad |
 
 ### Clipboard & Media
 
@@ -73,6 +76,14 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `ALT + Shift + V` | Clipboard history (rofi) |
 | `ALT + A` | Toggle audio output |
 | `Hyper + S` | Screenshot (region select) |
+
+### Groups/Tabs
+
+| Bind | Action |
+|------|--------|
+| `ALT + G` | Toggle group |
+| `ALT + Tab` | Next in group |
+| `ALT + Shift + Tab` | Previous in group |
 
 ### Keyboard Layout
 
@@ -123,8 +134,9 @@ swaync      Notification center
 gtk         GTK-4.0 theme symlinks
 kvantum     Qt5/Qt6 Kvantum theme
 micro       Micro editor settings + colorschemes
+nvim        Neovim (LazyVim) + treesitter + mini.files
 gaming      GameMode, MangoHud, vkBasalt
-git         Git config
+git         Git config (delta, SSH signing via 1Password)
 npm         npm config
 claude      Claude Code config, rules, skills, agents, hooks
 mimeapps    Default application associations
@@ -132,13 +144,79 @@ fonts       Custom font files
 system-etc  System configs (NetworkManager, sysctl, udev, zram)
 ```
 
-To stow/unstow individual packages:
+### Management
 
 ```bash
-cd ~/dotfiles
-stow <package>      # deploy
-stow -D <package>   # remove
+just stow [pkg...]     # Deploy packages (all if none specified)
+just unstow <pkg...>   # Remove packages
+just restow [pkg...]   # Re-deploy (unstow + stow)
+just check [pkg...]    # Dry-run
+just status            # Show which packages are deployed
+just list              # List available packages
+just install           # Run full installer
 ```
+
+Or use the `dotf` Fish function:
+
+```fish
+dotf stow [pkg...]     # Deploy
+dotf unstow <pkg...>   # Remove
+dotf restow [pkg...]   # Re-deploy
+dotf list              # List packages
+dotf edit              # Open in $EDITOR
+dotf check [pkg...]    # Dry-run
+```
+
+## Packages
+
+The installer reads `packages.csv` and lets you pick categories:
+
+| Category | Examples |
+|----------|----------|
+| core | Hyprland, Waybar, Rofi, SwayNC, hyprlock, hypridle, swww, cliphist |
+| terminal | Kitty, Neovim, Fish, Zsh, Starship, Zellij, zoxide, ripgrep, fzf |
+| keyboard | Kanata |
+| themes | Catppuccin (GTK, cursors, Kvantum), Papirus, Nerd Fonts |
+| gaming | Steam, Lutris, GameMode, MangoHud, vkBasalt, Gamescope, Proton-GE |
+| development | Git, delta, Rust, fnm, Docker, direnv, lazygit, just, 1Password CLI |
+| system | PipeWire, NetworkManager, Bluetooth, btop, yazi, snapper, brightnessctl |
+| nvidia | nvidia-dkms, nvidia-utils, libva-nvidia-driver, egl-wayland |
+| hardware | OpenRGB, CoolerControl, liquidctl |
+| browsers | Google Chrome |
+| media | mpv, VLC, ffmpegthumbnailer |
+
+## Shell Functions
+
+Fish functions available after stowing `fish`:
+
+| Function | Description |
+|----------|-------------|
+| `dotf` | Manage dotfiles with GNU Stow (stow, unstow, restow, list, edit, check) |
+| `proj` | Quick project switcher — uses fzf to search `~/projects`, `~/work`, `~/dotfiles` |
+| `opsync` | Load 1Password secrets into environment via `op inject` |
+
+## Scripts
+
+### Hyprland (`hypr/.config/hypr/scripts/`)
+
+| Script | Description |
+|--------|-------------|
+| `audio-toggle.sh` | Switch between audio outputs (speakers/headphones) |
+| `super-copy.sh` | Smart copy — detects context (terminal vs GUI) |
+| `super-paste.sh` | Smart paste — detects context (terminal vs GUI) |
+| `keybinds.sh` | Show keybinds cheatsheet in Rofi |
+| `claude-skills.sh` | Show Claude Code skills cheatsheet in Rofi |
+| `reactive-rgb.sh` | Maps CPU temp to Catppuccin colors via OpenRGB (runs in background) |
+
+### Waybar (`waybar/.config/waybar/scripts/`)
+
+| Script | Description |
+|--------|-------------|
+| `hw-monitor.sh` | Hardware monitoring (CPU, GPU, temps) for bar tooltip |
+| `music-status.sh` | Music player status via playerctl |
+| `music-toggle.sh` | Play/pause toggle via playerctl |
+| `rofi-bluetooth.sh` | Bluetooth device manager in Rofi |
+| `rofi-wifi.sh` | WiFi network manager in Rofi |
 
 ## Claude Code
 
