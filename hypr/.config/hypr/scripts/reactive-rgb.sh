@@ -6,7 +6,11 @@ set -euo pipefail
 INTERVAL=5
 LAST_COLOR=""
 
-command -v openrgb &>/dev/null || exit 0
+HAS_OPENRGB=false
+HAS_LIQUIDCTL=false
+command -v openrgb &>/dev/null && HAS_OPENRGB=true
+command -v liquidctl &>/dev/null && HAS_LIQUIDCTL=true
+$HAS_OPENRGB || $HAS_LIQUIDCTL || exit 0
 
 get_cpu_temp() {
     # k10temp Tctl - read from sysfs (millidegrees)
@@ -29,29 +33,40 @@ get_cpu_temp() {
 temp_to_color() {
     local temp=$1
     if (( temp < 45 )); then
-        echo "89B4FA"   # Blue - cool
+        echo "0000FF"   # Blue - cool
     elif (( temp < 60 )); then
-        echo "94E2D5"   # Teal - normal
+        echo "00FF00"   # Green - normal
     elif (( temp < 72 )); then
-        echo "F9E2AF"   # Yellow - warm
+        echo "FFFF00"   # Yellow - warm
     elif (( temp < 80 )); then
-        echo "FAB387"   # Peach - hot
+        echo "FF6600"   # Orange - hot
     else
-        echo "F38BA8"   # Red - critical
+        echo "FF0000"   # Red - critical
     fi
 }
 
 apply_color() {
     local color=$1
-    local device_count
-    device_count=$(openrgb --noautoconnect -l 2>/dev/null | grep -c "^[0-9]*: ")
-    if (( device_count == 0 )); then
-        return 1
+    local applied=false
+
+    # OpenRGB: GPU, motherboard, LED strips
+    if $HAS_OPENRGB; then
+        local device_count
+        device_count=$(openrgb --noautoconnect -l 2>/dev/null | grep -c "^[0-9]*: ")
+        for (( d=0; d<device_count; d++ )); do
+            openrgb --noautoconnect -d "$d" -m static -c "$color" &>/dev/null &
+        done
+        (( device_count > 0 )) && applied=true
     fi
-    for (( d=0; d<device_count; d++ )); do
-        openrgb --noautoconnect -d "$d" -m static -c "$color" &>/dev/null &
-    done
+
+    # liquidctl: NZXT Smart Device V2 fan LEDs
+    if $HAS_LIQUIDCTL; then
+        liquidctl --match "Smart Device" set led2 color fixed "$color" &>/dev/null &
+        applied=true
+    fi
+
     wait
+    $applied || return 1
 }
 
 # Wait for OpenRGB server to be ready
