@@ -14,14 +14,7 @@
         "all-outputs": false,
         "format-icons": {"1":"󰆍","2":"󰈹","3":"󰨞","4":"󰉋","5":"󰊗","6":"󰝚","7":"󰙯","8":"󰭹","default":"󰑊"},
         "persistent-workspaces": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": [],
-            "8": []
+            "*": [1, 2, 3, 4, 5, 6, 7, 8]
         }
     },
     "hyprland/window": {"format": "{}", "max-length": 40},
@@ -71,7 +64,7 @@
     "custom/notification": {"format": "{icon}", "format-icons": {"notification": "󰂚", "none": "󰂜", "dnd-notification": "󰂛", "dnd-none": "󰪑"}, "return-type": "json", "exec-if": "which swaync-client", "exec": "swaync-client -swb", "on-click": "swaync-client -t -sw", "escape": true},
     "custom/updates": {
         "format": "󰏔 {}",
-        "exec": "checkupdates 2>/dev/null | wc -l",
+        "exec": "~/.config/waybar/scripts/check-updates.sh",
         "interval": 3600,
         "signal": 8,
         "on-click": "kitty -e bash -c 'paru -Syu; echo Done; read'"
