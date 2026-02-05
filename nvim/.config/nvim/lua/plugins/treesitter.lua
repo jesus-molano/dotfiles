@@ -17,6 +17,8 @@ return {
         "typescript",
         "vue",
         "yaml",
+        "toml",
+        "graphql",
       },
     },
   },

@@ -12,7 +12,7 @@
 (defalias
   ;; Tap = Esc, Hold = Hyper
   ;; USAMOS: lctl (Left Ctrl), lalt (Left Alt), lmet (Left Meta/Win), lsft (Left Shift)
-  cap (tap-hold 150 150 esc (multi lctl lalt lmet lsft))
+  cap (tap-hold 150 200 esc (multi lctl lalt lmet lsft))
 )
 
 ;; Capa base

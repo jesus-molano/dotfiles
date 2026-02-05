@@ -67,3 +67,23 @@ check *packages:
             stow -t ~ -n "$pkg" 2>&1
         done
     fi
+
+# Run the full installer
+install:
+    {{dotfiles_dir}}/install.sh
+
+# Show stow status (which packages are deployed)
+status:
+    #!/usr/bin/env bash
+    cd {{dotfiles_dir}}
+    for dir in */; do
+        pkg="${dir%/}"
+        case "$pkg" in [A-Z]*) continue;; esac
+        if stow -t ~ -n "$pkg" 2>&1 | grep -q "WARNING"; then
+            echo "✗ $pkg (conflicts)"
+        elif [ -L "$HOME/.config/$pkg" ] || stow -t ~ -n "$pkg" 2>&1 | grep -q "^$"; then
+            echo "✓ $pkg"
+        else
+            echo "? $pkg (not stowed)"
+        fi
+    done

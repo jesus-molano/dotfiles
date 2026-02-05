@@ -25,7 +25,7 @@ end
 
 zoxide init fish | source
 starship init fish | source
-export PATH="$HOME/.local/bin:$PATH"
+fish_add_path -g "$HOME/.local/bin"
 
 # Dev abbreviations
 abbr -a dev 'pnpm dev'
