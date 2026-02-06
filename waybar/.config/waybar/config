@@ -36,15 +36,13 @@
         "on-click-right": "bluetoothctl power on"
     },
     "network": {
-        "format-wifi": "󰤨",
-        "format-ethernet": "󰈀 {ifname}",
-        "format-disconnected": "󰤭 Sin conexión",
-        "format-disabled": "󰤮",
-        "tooltip-format-wifi": "  {essid}\n󰩟  {ipaddr}/{cidr}\n󰢮  {signalStrength}%\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
+        "interface": "enp*",
+        "format-ethernet": "󰈀",
+        "format-disconnected": "",
+        "format-disabled": "",
         "tooltip-format-ethernet": "󰈀  {ifname}\n󰩟  {ipaddr}/{cidr}\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
-        "tooltip-format-disconnected": "Sin conexión",
         "interval": 5,
-        "on-click": "~/.config/waybar/scripts/rofi-wifi.sh"
+        "on-click": "nm-connection-editor"
     },
     "tray": {"icon-size": 16, "spacing": 8},
     "custom/cpu-temp": {
