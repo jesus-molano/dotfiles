@@ -42,7 +42,7 @@
         "format-disabled": "",
         "tooltip-format-ethernet": "󰈀  {ifname}\n󰩟  {ipaddr}/{cidr}\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
         "interval": 5,
-        "on-click": "kitty -e nmtui"
+        "on-click": "~/.config/waybar/scripts/rofi-network.sh"
     },
     "tray": {"icon-size": 16, "spacing": 8},
     "custom/cpu-temp": {
