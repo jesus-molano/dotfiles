@@ -70,7 +70,7 @@ window#waybar {
 }
 
 #pulseaudio, #memory, #cpu, #tray, #custom-notification,
-#bluetooth, #network, #custom-cpu-temp, #custom-gpu-temp,
+#bluetooth, #network, #network-wifi, #custom-cpu-temp, #custom-gpu-temp,
 #custom-music, #custom-updates {
     color: @text;
     background: @surface0;
@@ -88,6 +88,9 @@ window#waybar {
 #network { color: @teal; }
 #network.disconnected { color: @overlay0; }
 #network.disabled { color: @overlay0; }
+#network-wifi { color: @teal; }
+#network-wifi.disconnected { color: @overlay0; }
+#network-wifi.disabled { color: @overlay0; }
 #custom-cpu-temp { color: @red; }
 #custom-gpu-temp { color: @yellow; }
 #custom-notification { color: @lavender; }
