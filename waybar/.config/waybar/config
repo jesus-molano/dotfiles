@@ -42,7 +42,7 @@
         "format-disabled": "",
         "tooltip-format-ethernet": "󰈀  {ifname}\n󰩟  {ipaddr}/{cidr}\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
         "interval": 5,
-        "on-click": "nm-connection-editor"
+        "on-click": "kitty -e nmtui"
     },
     "tray": {"icon-size": 16, "spacing": 8},
     "custom/cpu-temp": {
