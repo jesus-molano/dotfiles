@@ -1,70 +1,147 @@
 #!/bin/bash
 set -uo pipefail
 
-# Network management menu via rofi + nmcli
+# Unified network management menu via rofi + nmcli (ethernet + wifi)
 
 THEME="$HOME/.config/waybar/scripts/rofi-theme.rasi"
 ROFI="rofi -dmenu -i -theme $THEME"
 
 notify() { notify-send -a "Red" "$1" "$2"; }
 
+# ── Ethernet helpers ──
+
 active_ethernet() {
-    nmcli -t -f NAME,TYPE connection show --active | grep ethernet | cut -d: -f1
+    nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | grep ethernet | cut -d: -f1
 }
 
-active_iface() {
-    nmcli -t -f DEVICE,TYPE device status | grep ethernet | cut -d: -f1 | head -1
+eth_iface() {
+    nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null | grep "ethernet:connected" | cut -d: -f1 | head -1
 }
 
-connection_details() {
-    local iface
-    iface=$(active_iface)
-    [[ -z "$iface" ]] && return
+# ── WiFi helpers ──
 
-    local ip speed
-    ip=$(nmcli -t -f IP4.ADDRESS device show "$iface" 2>/dev/null | head -1 | cut -d: -f2)
-    speed=$(cat "/sys/class/net/$iface/speed" 2>/dev/null)
-    [[ -n "$speed" ]] && speed="${speed} Mbps" || speed="desconocida"
-
-    echo "󰩟  $ip"
-    echo "󰓅  $speed"
+wifi_status() {
+    nmcli -t -f WIFI general 2>/dev/null | head -1
 }
 
-saved_profiles() {
-    nmcli -t -f NAME,TYPE connection show | grep ethernet | cut -d: -f1
+active_wifi() {
+    nmcli -t -f active,ssid dev wifi 2>/dev/null | grep "^yes" | cut -d: -f2
 }
 
-main_menu() {
+scan_and_list() {
+    nmcli device wifi rescan 2>/dev/null
     local current
-    current=$(active_ethernet)
+    current=$(active_wifi)
 
-    local options=""
+    nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null | \
+        grep -v '^--' | grep -v '^$' | \
+        sort -t: -k2 -rn | \
+        awk -F: -v cur="$current" '!seen[$1]++ {
+            if ($2 >= 75) icon = "󰤨"
+            else if ($2 >= 50) icon = "󰤥"
+            else if ($2 >= 25) icon = "󰤢"
+            else icon = "󰤟"
+            lock = ($3 != "" && $3 != "--") ? " 󰌾" : ""
+            mark = ($1 == cur) ? " [conectado]" : ""
+            if ($1 != "") printf "%s %s%s%s  (%s%%)\n", icon, $1, lock, mark, $2
+        }'
+}
 
-    if [[ -n "$current" ]]; then
-        local details
-        details=$(connection_details)
-        options+="󰈀 $current [conectado]\n"
-        if [[ -n "$details" ]]; then
-            while IFS= read -r line; do
-                options+="   $line\n"
-            done <<< "$details"
+connect_wifi() {
+    local ssid="$1"
+
+    if nmcli -t -f NAME connection show 2>/dev/null | grep -qx "$ssid"; then
+        nmcli connection up "$ssid" 2>/dev/null
+        if [[ $? -eq 0 ]]; then
+            notify "Conectado" "$ssid"
+        else
+            notify "Error" "No se pudo conectar a $ssid"
         fi
-        options+="󰈂 Desconectar\n"
-    else
-        options+="󰈂 Sin conexión\n"
+        return
     fi
 
-    options+="󰑓 Reiniciar red"
+    local security
+    security=$(nmcli -t -f SSID,SECURITY device wifi list 2>/dev/null | grep "^${ssid}:" | head -1 | cut -d: -f2)
 
-    # Add saved profiles (excluding active)
-    local profiles
-    profiles=$(saved_profiles)
-    if [[ -n "$profiles" ]]; then
-        while IFS= read -r name; do
-            [[ -z "$name" ]] && continue
-            [[ "$name" == "$current" ]] && continue
-            options+="\n󰌘 $name"
-        done <<< "$profiles"
+    if [[ -n "$security" && "$security" != "--" ]]; then
+        local pass
+        pass=$(rofi -dmenu -password -p "Contraseña" -theme "$THEME" \
+            -theme-str 'entry { placeholder: "Contraseña para '"$ssid"'..."; }')
+        [[ -z "$pass" ]] && return
+        local tmp_conn
+        tmp_conn=$(mktemp /tmp/nm-wifi.XXXXXX)
+        chmod 600 "$tmp_conn"
+        cat > "$tmp_conn" <<NMCONN
+[connection]
+id=$ssid
+type=wifi
+autoconnect=true
+[wifi]
+mode=infrastructure
+ssid=$ssid
+[wifi-security]
+key-mgmt=wpa-psk
+psk=$pass
+[ipv4]
+method=auto
+[ipv6]
+method=auto
+NMCONN
+        nmcli connection load "$tmp_conn" 2>/dev/null
+        rm -f "$tmp_conn"
+        nmcli connection up "$ssid" 2>/dev/null
+    else
+        nmcli device wifi connect "$ssid" 2>/dev/null
+    fi
+
+    if [[ $? -eq 0 ]]; then
+        notify "Conectado" "$ssid"
+    else
+        notify "Error" "No se pudo conectar a $ssid"
+    fi
+}
+
+# ── Main menu ──
+
+main_menu() {
+    local options=""
+    local eth_conn wifi_conn
+
+    eth_conn=$(active_ethernet)
+    wifi_conn=$(active_wifi)
+
+    # Ethernet section
+    if [[ -n "$eth_conn" ]]; then
+        local iface ip speed
+        iface=$(eth_iface)
+        ip=$(nmcli -t -f IP4.ADDRESS device show "$iface" 2>/dev/null | head -1 | cut -d: -f2)
+        speed=$(cat "/sys/class/net/$iface/speed" 2>/dev/null)
+        [[ -n "$speed" ]] && speed="${speed} Mbps" || speed=""
+        options+="󰈀 Ethernet [conectado]\n"
+        options+="   󰩟  $ip\n"
+        [[ -n "$speed" ]] && options+="   󰓅  $speed\n"
+        options+="󰈂 Desconectar ethernet\n"
+    else
+        options+="󰈂 Ethernet desconectado\n"
+    fi
+
+    # Separator
+    options+="─────────────\n"
+
+    # WiFi section
+    local wifi_on
+    wifi_on=$(wifi_status)
+
+    if [[ "$wifi_on" != "enabled" ]]; then
+        options+="󰤮 Activar WiFi"
+    else
+        if [[ -n "$wifi_conn" ]]; then
+            options+="󰤨 WiFi: $wifi_conn [conectado]\n"
+            options+="󰤭 Desconectar WiFi\n"
+        fi
+        options+="󰤮 Desactivar WiFi\n"
+        options+="󰑓 Escanear redes\n"
+        options+="$(scan_and_list)"
     fi
 
     local choice
@@ -72,44 +149,43 @@ main_menu() {
     [[ -z "$choice" ]] && return
 
     case "$choice" in
-        *"Desconectar"*)
-            nmcli connection down "$current" 2>/dev/null
-            notify "Desconectado" "$current"
-            ;;
-        *"Reiniciar"*)
-            notify "Reiniciando..." "Interfaz de red"
-            local iface
-            iface=$(active_iface)
-            if [[ -n "$iface" ]]; then
-                nmcli device disconnect "$iface" 2>/dev/null
-                sleep 1
-                nmcli device connect "$iface" 2>/dev/null
-                notify "Red reiniciada" "$iface"
-            else
-                nmcli networking off 2>/dev/null
-                sleep 1
-                nmcli networking on 2>/dev/null
-                notify "Red reiniciada" ""
-            fi
-            ;;
-        *"Sin conexión"*)
-            return
-            ;;
-        *"conectado"*)
+        "─"*)
             return
             ;;
         "   "*)
             return
             ;;
+        *"Ethernet desconectado"*)
+            return
+            ;;
+        *"Ethernet"*"conectado"*)
+            return
+            ;;
+        *"Desconectar ethernet"*)
+            nmcli connection down "$eth_conn" 2>/dev/null
+            notify "Desconectado" "$eth_conn"
+            ;;
+        *"Activar WiFi"*)
+            nmcli radio wifi on
+            notify "WiFi" "Activado"
+            ;;
+        *"Desactivar WiFi"*)
+            nmcli radio wifi off
+            notify "WiFi" "Desactivado"
+            ;;
+        *"Desconectar WiFi"*)
+            nmcli connection down "$wifi_conn" 2>/dev/null
+            notify "Desconectado" "$wifi_conn"
+            ;;
+        *"Escanear"*)
+            nmcli device wifi rescan 2>/dev/null
+            sleep 2
+            main_menu
+            ;;
         *)
-            local profile
-            profile=$(echo "$choice" | sed 's/^[^ ]* //')
-            nmcli connection up "$profile" 2>/dev/null
-            if [[ $? -eq 0 ]]; then
-                notify "Conectado" "$profile"
-            else
-                notify "Error" "No se pudo conectar a $profile"
-            fi
+            local ssid
+            ssid=$(echo "$choice" | sed 's/^[^ ]* //;s/ 󰌾//;s/ \[conectado\]//;s/  (.*//')
+            [[ -n "$ssid" ]] && connect_wifi "$ssid"
             ;;
     esac
 }

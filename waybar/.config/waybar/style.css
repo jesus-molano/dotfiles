@@ -70,7 +70,7 @@ window#waybar {
 }
 
 #pulseaudio, #memory, #cpu, #tray, #custom-notification,
-#bluetooth, #network, #network-wifi, #custom-cpu-temp, #custom-gpu-temp,
+#bluetooth, #custom-network, #custom-cpu-temp, #custom-gpu-temp,
 #custom-music, #custom-updates {
     color: @text;
     background: @surface0;
@@ -85,12 +85,8 @@ window#waybar {
 #bluetooth { color: @sapphire; }
 #bluetooth.connected { color: @blue; }
 #bluetooth.off, #bluetooth.disabled { color: @overlay0; }
-#network { color: @teal; }
-#network.disconnected { color: @overlay0; }
-#network.disabled { color: @overlay0; }
-#network-wifi { color: @teal; }
-#network-wifi.disconnected { color: @overlay0; }
-#network-wifi.disabled { color: @overlay0; }
+#custom-network { color: @teal; }
+#custom-network.disconnected { color: @overlay0; }
 #custom-cpu-temp { color: @red; }
 #custom-gpu-temp { color: @yellow; }
 #custom-notification { color: @lavender; }

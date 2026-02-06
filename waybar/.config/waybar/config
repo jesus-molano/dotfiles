@@ -7,7 +7,7 @@
     "margin-right": 10,
     "modules-left": ["hyprland/window"],
     "modules-center": ["hyprland/workspaces"],
-    "modules-right": ["custom/music", "bluetooth", "network", "network#wifi", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
+    "modules-right": ["custom/music", "bluetooth", "custom/network", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
@@ -35,23 +35,12 @@
         "on-click": "~/.config/waybar/scripts/rofi-bluetooth.sh",
         "on-click-right": "bluetoothctl power on"
     },
-    "network": {
-        "interface": "enp*",
-        "format-ethernet": "󰈀",
-        "format-disconnected": "",
-        "format-disabled": "",
-        "tooltip-format-ethernet": "󰈀  {ifname}\n󰩟  {ipaddr}/{cidr}\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
+    "custom/network": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/network-status.sh",
         "interval": 5,
         "on-click": "~/.config/waybar/scripts/rofi-network.sh"
-    },
-    "network#wifi": {
-        "interface": "wl*",
-        "format-wifi": "󰤨",
-        "format-disconnected": "󰤭",
-        "format-disabled": "󰤮",
-        "tooltip-format-wifi": "  {essid}\n󰩟  {ipaddr}/{cidr}\n󰢮  {signalStrength}%\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
-        "interval": 5,
-        "on-click": "~/.config/waybar/scripts/rofi-wifi.sh"
     },
     "tray": {"icon-size": 16, "spacing": 8},
     "custom/cpu-temp": {
