@@ -47,8 +47,8 @@
     "network#wifi": {
         "interface": "wl*",
         "format-wifi": "󰤨",
-        "format-disconnected": "",
-        "format-disabled": "",
+        "format-disconnected": "󰤭",
+        "format-disabled": "󰤮",
         "tooltip-format-wifi": "  {essid}\n󰩟  {ipaddr}/{cidr}\n󰢮  {signalStrength}%\n󰕒  {bandwidthUpBytes}\n󰇚  {bandwidthDownBytes}",
         "interval": 5,
         "on-click": "~/.config/waybar/scripts/rofi-wifi.sh"
