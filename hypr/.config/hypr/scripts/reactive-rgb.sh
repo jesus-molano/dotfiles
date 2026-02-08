@@ -5,6 +5,7 @@ set -euo pipefail
 
 INTERVAL=5
 LAST_COLOR=""
+OPENRGB_DEVICE_COUNT=0
 
 HAS_OPENRGB=false
 HAS_LIQUIDCTL=false
@@ -49,14 +50,12 @@ apply_color() {
     local color=$1
     local applied=false
 
-    # OpenRGB: GPU, motherboard, LED strips
-    if $HAS_OPENRGB; then
-        local device_count
-        device_count=$(openrgb --noautoconnect -l 2>/dev/null | grep -c "^[0-9]*: ")
-        for (( d=0; d<device_count; d++ )); do
+    # OpenRGB: GPU, motherboard, LED strips (device count cached at startup)
+    if $HAS_OPENRGB && (( OPENRGB_DEVICE_COUNT > 0 )); then
+        for (( d=0; d<OPENRGB_DEVICE_COUNT; d++ )); do
             openrgb --noautoconnect -d "$d" -m static -c "$color" &>/dev/null &
         done
-        (( device_count > 0 )) && applied=true
+        applied=true
     fi
 
     # liquidctl: NZXT Smart Device V2 fan LEDs
@@ -71,6 +70,11 @@ apply_color() {
 
 # Wait for OpenRGB server to be ready
 sleep 5
+
+# Cache device count once (server is ready after sleep)
+if $HAS_OPENRGB; then
+    OPENRGB_DEVICE_COUNT=$(openrgb --noautoconnect -l 2>/dev/null | grep -c "^[0-9]*: " || true)
+fi
 
 while true; do
     temp=$(get_cpu_temp)

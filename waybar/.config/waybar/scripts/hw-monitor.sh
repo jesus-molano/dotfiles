@@ -7,6 +7,30 @@ set -euo pipefail
 CACHE_FILE="/tmp/waybar-hw-cache"
 CACHE_TTL=4
 
+# Discover hwmon sysfs paths once at startup
+K10TEMP_PATH=""
+NZXT_FAN2_PATH=""
+NZXT_FAN3_PATH=""
+
+init_hwmon_paths() {
+    local name dir
+    for f in /sys/class/hwmon/hwmon*/name; do
+        dir="$(dirname "$f")"
+        name="$(cat "$f" 2>/dev/null)"
+        case "$name" in
+            k10temp)
+                K10TEMP_PATH="$dir/temp1_input"
+                ;;
+            nzxtsmart*)
+                NZXT_FAN2_PATH="$dir/fan2_input"
+                NZXT_FAN3_PATH="$dir/fan3_input"
+                ;;
+        esac
+    done
+}
+
+init_hwmon_paths
+
 refresh_cache() {
     local now
     now=$(date +%s)
@@ -18,24 +42,20 @@ refresh_cache() {
         fi
     fi
 
-    # Collect sensor data with chip filters to avoid hangs
+    # GPU data (nvidia-smi is already a single call)
     local gpu_out
     gpu_out="$(timeout 2 nvidia-smi --query-gpu=temperature.gpu,fan.speed,power.draw,utilization.gpu --format=csv,noheader,nounits 2>/dev/null || true)"
 
-    # Parse CPU temp (k10temp Tctl) — detect chip dynamically
-    local k10_chip cpu_temp
-    k10_chip="$(sensors -u 2>/dev/null | grep -m1 '^k10temp' | cut -d: -f1 || echo "")"
-    if [[ -n "$k10_chip" ]]; then
-        cpu_temp="$(sensors -u "$k10_chip" 2>/dev/null | awk '/temp1_input/ {printf "%.0f", $2; exit}')"
+    # CPU temp from sysfs (millidegrees → degrees)
+    local cpu_temp=0
+    if [[ -n "$K10TEMP_PATH" && -r "$K10TEMP_PATH" ]]; then
+        cpu_temp=$(( $(cat "$K10TEMP_PATH") / 1000 ))
     fi
 
-    # Parse NZXT fan speeds — filtered by chip
-    local nzxt_chip fan2_rpm fan3_rpm
-    nzxt_chip="$(sensors -u 2>/dev/null | grep -m1 '^nzxtsmart' | cut -d: -f1 || echo "")"
-    if [[ -n "$nzxt_chip" ]]; then
-        fan2_rpm="$(sensors "$nzxt_chip" 2>/dev/null | awk '/^FAN 2:/ {print $3}')"
-        fan3_rpm="$(sensors "$nzxt_chip" 2>/dev/null | awk '/^FAN 3:/ {print $3}')"
-    fi
+    # NZXT fan speeds from sysfs (already in RPM)
+    local fan2_rpm=0 fan3_rpm=0
+    [[ -n "$NZXT_FAN2_PATH" && -r "$NZXT_FAN2_PATH" ]] && fan2_rpm=$(cat "$NZXT_FAN2_PATH")
+    [[ -n "$NZXT_FAN3_PATH" && -r "$NZXT_FAN3_PATH" ]] && fan3_rpm=$(cat "$NZXT_FAN3_PATH")
 
     # Parse GPU data
     local gpu_temp gpu_fan gpu_power gpu_util
