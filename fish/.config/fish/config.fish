@@ -37,3 +37,7 @@ abbr -a gs 'git status'
 abbr -a gd 'git diff'
 abbr -a gl 'git log --oneline -20'
 abbr -a lg 'lazygit'
+
+# bun
+set --export BUN_INSTALL "$HOME/.bun"
+set --export PATH $BUN_INSTALL/bin $PATH
