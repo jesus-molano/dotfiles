@@ -106,5 +106,9 @@
     ]
   },
   "alwaysThinkingEnabled": true,
-  "language": "es"
+  "language": "es",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  }
 }
