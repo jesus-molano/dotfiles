@@ -7,12 +7,11 @@ ROFI_OVERRIDE='window { width: 750px; }'
 
 translate() {
     local text="$1"
-    local result
-    result=$(timeout 10s trans -b :es "$text" 2>/dev/null)
-    if [[ "${result,,}" == "${text,,}" ]]; then
-        result=$(timeout 10s trans -b :en "$text" 2>/dev/null)
+    local target="es"
+    if timeout 5s trans -id "$text" 2>/dev/null | head -1 | grep -qi "español\|spanish"; then
+        target="en"
     fi
-    echo "$result"
+    timeout 10s trans -b :"$target" "$text" 2>/dev/null
 }
 
 if [[ "${1:-}" == "clipboard" ]]; then
