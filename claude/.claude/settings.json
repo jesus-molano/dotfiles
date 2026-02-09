@@ -105,10 +105,13 @@
       }
     ]
   },
-  "alwaysThinkingEnabled": true,
-  "language": "es",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
+  },
+  "language": "es",
+  "alwaysThinkingEnabled": true,
+  "enabledPlugins": {
+    "lua-lsp@claude-plugins-official": true
   }
 }

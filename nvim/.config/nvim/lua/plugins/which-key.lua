@@ -10,7 +10,6 @@ return {
     opts = {
       preset = "helix",
       delay = 100,
-      defer = false,
 
       triggers = {
         { "<auto>", mode = "nxsoc" },
