@@ -1,30 +1,21 @@
 return {
-  -- mini.files as file explorer (lightweight alternative to neo-tree)
+  { "nvim-mini/mini.files", enabled = false },
   {
-    "nvim-mini/mini.files",
+    "nvim-neo-tree/neo-tree.nvim",
     opts = {
-      windows = {
-        preview = true,
-        width_preview = 40,
+      close_if_last_window = true,
+      filesystem = {
+        follow_current_file = { enabled = true },
+        filtered_items = {
+          visible = true,
+          hide_dotfiles = false,
+          hide_gitignored = false,
+          hide_by_name = { ".git", "node_modules", ".nuxt", ".output" },
+        },
       },
-    },
-    keys = {
-      {
-        "<leader>e",
-        function()
-          require("mini.files").open(vim.api.nvim_buf_get_name(0), true)
-        end,
-        desc = "Open mini.files (current file)",
-      },
-      {
-        "<leader>E",
-        function()
-          require("mini.files").open(vim.uv.cwd(), true)
-        end,
-        desc = "Open mini.files (cwd)",
+      window = {
+        width = 35,
       },
     },
   },
-  -- Disable neo-tree since we use mini.files
-  { "nvim-neo-tree/neo-tree.nvim", enabled = false },
 }

@@ -8,6 +8,26 @@ micro/.config/micro/plugins/
 # Font cache
 fonts/.local/share/fonts/.uuid
 
+# Claude Code runtime (keep only stow-managed config)
+claude/.claude/cache/
+claude/.claude/debug/
+claude/.claude/downloads/
+claude/.claude/file-history/
+claude/.claude/ide/
+claude/.claude/paste-cache/
+claude/.claude/plans/
+claude/.claude/plugins/
+claude/.claude/projects/
+claude/.claude/session-env/
+claude/.claude/shell-snapshots/
+claude/.claude/statsig/
+claude/.claude/tasks/
+claude/.claude/telemetry/
+claude/.claude/todos/
+claude/.claude/history.jsonl
+claude/.claude/settings.local.json
+claude/.claude/stats-cache.json
+
 # Secrets
 .env.op
 
