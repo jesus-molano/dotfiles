@@ -44,6 +44,8 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `Hyper + L` | Lock screen |
 | `Hyper + /` | Show keybinds |
 | `Hyper + .` | Claude skills |
+| `Hyper + ,` | Neovim keybinds cheatsheet |
+| `Hyper + T` | Translate en↔es (rofi) |
 
 ### Windows
 
@@ -75,6 +77,7 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `ALT + V` | Smart paste |
 | `ALT + Shift + V` | Clipboard history (rofi) |
 | `ALT + A` | Toggle audio output |
+| `ALT + T` | Translate clipboard en↔es |
 | `Hyper + S` | Screenshot (region select) |
 
 ### Groups/Tabs
@@ -134,7 +137,7 @@ swaync      Notification center
 gtk         GTK-4.0 theme symlinks
 kvantum     Qt5/Qt6 Kvantum theme
 micro       Micro editor settings + colorschemes
-nvim        Neovim (LazyVim) + treesitter + mini.files
+nvim        Neovim (LazyVim) IDE — LSP, formatters, AI (Claude + Copilot)
 gaming      GameMode, MangoHud, vkBasalt
 git         Git config (delta, SSH signing via 1Password)
 npm         npm config
@@ -206,7 +209,10 @@ Fish functions available after stowing `fish`:
 | `super-paste.sh` | Smart paste — detects context (terminal vs GUI) |
 | `keybinds.sh` | Show keybinds cheatsheet in Rofi |
 | `claude-skills.sh` | Show Claude Code skills cheatsheet in Rofi |
+| `nvim-keys.sh` | Show Neovim/LazyVim keybindings cheatsheet in Rofi |
+| `translate.sh` | Translate en↔es via rofi or clipboard (auto-detects language) |
 | `reactive-rgb.sh` | Maps CPU temp to Catppuccin colors via OpenRGB (runs in background) |
+| `wait-monitor.sh` | Monitor hotplug handler |
 
 ### Waybar (`waybar/.config/waybar/scripts/`)
 
