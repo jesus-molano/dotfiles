@@ -4,7 +4,7 @@ vim.g.maplocalleader = "\\"
 -- AI: Habilitar completions de AI en blink.cmp
 vim.g.ai_cmp = true
 
--- Biome tiene prioridad sobre Prettier
+-- Prettier si tiene config, sino Biome
 vim.g.lazyvim_prettier_needs_config = true
 
 -- Overrides de LazyVim defaults

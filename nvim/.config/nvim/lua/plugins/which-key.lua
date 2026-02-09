@@ -10,9 +10,7 @@ return {
     opts = {
       preset = "helix",
       delay = 100,
-      defer = function()
-        return false
-      end,
+      defer = false,
 
       triggers = {
         { "<auto>", mode = "nxsoc" },

@@ -10,7 +10,7 @@ return {
           visible = true,
           hide_dotfiles = false,
           hide_gitignored = false,
-          hide_by_name = { ".git", "node_modules", ".nuxt", ".output" },
+          hide_by_name = { ".git", "node_modules", ".nuxt", ".output", ".next", "dist" },
         },
       },
       window = {

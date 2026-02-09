@@ -65,8 +65,7 @@ return {
         yaml = { "prettier" },
         markdown = { "prettier" },
         scss = { "prettier" },
-        -- Lua
-        lua = { "stylua" },
+        graphql = { "prettier" },
       },
       formatters = {
         prettier = {

@@ -21,6 +21,7 @@ return {
         neotree = true,
         native_lsp = { enabled = true },
         noice = true,
+        mini = { enabled = true },
         snacks = true,
         treesitter = true,
         treesitter_context = true,
