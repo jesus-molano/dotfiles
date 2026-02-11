@@ -42,6 +42,7 @@ return {
         { "<leader>g", group = "git" },
         { "<leader>q", group = "quit/session" },
         { "<leader>s", group = "search" },
+        { "<leader>t", group = "test" },
         { "<leader>u", group = "ui/toggle" },
         { "<leader>w", group = "windows" },
         { "<leader>x", group = "diagnostics/quickfix" },
