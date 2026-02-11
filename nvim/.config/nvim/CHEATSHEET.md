@@ -226,7 +226,33 @@ Tu config tiene una estrategia inteligente de formateo:
 
 ---
 
-## 9. Debugging (DAP)
+## 9. Testing (neotest + vitest)
+
+| Atajo | Accion |
+|-------|--------|
+| `<leader>tr` | Ejecutar test mas cercano al cursor |
+| `<leader>tt` | Ejecutar todos los tests del archivo actual |
+| `<leader>tT` | Ejecutar todos los tests del proyecto (monorepo) |
+| `<leader>tl` | Re-ejecutar ultimo test |
+| `<leader>ta` | Attach al test en ejecucion |
+| `<leader>ts` | Toggle resumen de tests (summary) |
+| `<leader>to` | Mostrar output del test |
+| `<leader>tO` | Toggle output panel |
+| `<leader>tS` | Stop ejecucion del test |
+| `<leader>tw` | Toggle watch mode |
+| `<leader>td` | Debug test mas cercano (con nvim-dap) |
+
+**Config**: neotest-vitest detecta automaticamente `vitest.config.*` o `vite.config.*` en tu proyecto.
+
+**Tips**:
+- `<leader>ts` abre panel lateral con estado de todos los tests (pass/fail/running)
+- `<leader>td` lanza el test en modo debug con breakpoints activos
+- Los diagnosticos de tests fallidos aparecen inline en el editor
+- `<leader>tT` en monorepos: escanea todos los sub-packages con `package.json`
+
+---
+
+## 10. Debugging (DAP)
 
 | Atajo | Accion |
 |-------|--------|
@@ -244,11 +270,21 @@ Tu config tiene una estrategia inteligente de formateo:
 | `<leader>du` | Toggle DAP UI |
 | `<leader>dw` | Widgets |
 
-**Tip**: DAP UI muestra variables, call stack, breakpoints y consola. El virtual text muestra valores inline en el codigo.
+**Configuraciones de debug preconfiguradas** (seleccionables con `<leader>dc`):
+- **Nuxt: dev server** — lanza `nuxi dev` con debugger conectado
+- **Vite: dev server (Chrome)** — abre Chrome con debugger en `localhost:5173`
+- **Node: attach to process** — conectar a proceso Node.js existente
+- **Node: launch current file** — ejecutar archivo actual con debugger
+
+**Tips**:
+- DAP UI muestra variables, call stack, breakpoints y consola
+- El virtual text muestra valores inline en el codigo
+- Para Nuxt: pon breakpoints en `server/api/` y lanza "Nuxt: dev server"
+- Para Vite client: pon breakpoints en components y lanza "Vite: dev server (Chrome)"
 
 ---
 
-## 10. UI y Toggles (`<leader>u`)
+## 11. UI y Toggles (`<leader>u`)
 
 | Atajo | Accion |
 |-------|--------|
@@ -266,7 +302,7 @@ Tu config tiene una estrategia inteligente de formateo:
 
 ---
 
-## 11. Aerial — Outline de Simbolos
+## 12. Aerial — Outline de Simbolos
 
 | Atajo | Accion |
 |-------|--------|
@@ -277,7 +313,7 @@ Tu config tiene una estrategia inteligente de formateo:
 
 ---
 
-## 12. Sesiones (`<leader>q`)
+## 13. Sesiones (`<leader>q`)
 
 | Atajo | Accion |
 |-------|--------|
@@ -291,7 +327,7 @@ Tu config tiene una estrategia inteligente de formateo:
 
 ---
 
-## 13. TODO Comments
+## 14. TODO Comments
 
 | Atajo | Accion |
 |-------|--------|
@@ -304,14 +340,14 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ---
 
-## 14. Autocmds Personalizados
+## 15. Autocmds Personalizados
 
 1. **Trailing whitespace**: se elimina al guardar (excepto markdown)
 2. **Sin auto-comment**: al hacer `o` o `Enter` en una linea con comentario, la nueva linea NO es comentario
 
 ---
 
-## 15. Tips Pro
+## 16. Tips Pro
 
 ### Navegacion rapida
 - `<C-o>` / `<C-i>` — saltar atras/adelante en jump list
@@ -346,7 +382,7 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ---
 
-## 16. Cheatsheet Rapida
+## 17. Cheatsheet Rapida
 
 ```
 NAVEGACION          CODIGO              GIT                 AI
@@ -356,10 +392,11 @@ NAVEGACION          CODIGO              GIT                 AI
 s          flash    <leader>ca actions  <leader>gb blame    <leader>am modelo
 <C-o>      back     <leader>cr rename   <leader>gd diff     Tab copilot
 
-BUFFERS             UI                  DEBUG               BUSCAR
-<S-h/l>   cambiar   <leader>ut context  <leader>db break    <leader>sg grep
-<leader>bd cerrar   <leader>uf format   <leader>dc start    <leader>sr replace
-<leader>bb prev     <leader>ud diags    <leader>di step in  <leader>st todos
+TESTING             BUFFERS             UI                  DEBUG
+<leader>tr nearest  <S-h/l>   cambiar   <leader>ut context  <leader>db break
+<leader>tt file     <leader>bd cerrar   <leader>uf format   <leader>dc start
+<leader>tT all      <leader>bb prev     <leader>ud diags    <leader>di step in
+<leader>td debug    <leader>sr replace  <leader>sg grep     <leader>st todos
 ```
 
 ---
@@ -374,3 +411,5 @@ Para comprobar que todo funciona:
 5. `<leader>ac` — verificar que Claude Code abre panel
 6. `<leader>gg` — verificar que LazyGit funciona
 7. `<leader>ut` — verificar treesitter context toggle
+8. `<leader>tt` en un archivo `.test.ts` — verificar que neotest ejecuta vitest
+9. `<leader>dc` — verificar que aparecen las configuraciones de Nuxt/Vite/Node
