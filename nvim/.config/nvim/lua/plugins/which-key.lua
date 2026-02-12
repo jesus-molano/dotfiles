@@ -46,6 +46,7 @@ return {
         { "<leader>u", group = "ui/toggle" },
         { "<leader>w", group = "windows" },
         { "<leader>x", group = "diagnostics/quickfix" },
+        { "<leader>o", group = "obsidian" },
         { "<leader>y", group = "yank" },
         { "[", group = "prev" },
         { "]", group = "next" },

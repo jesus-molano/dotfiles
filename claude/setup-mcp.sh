@@ -25,6 +25,12 @@ MCP_CONFIG='{
     "command": "npx",
     "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
     "env": {}
+  },
+  "linear": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
+    "env": {}
   }
 }'
 
