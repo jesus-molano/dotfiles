@@ -21,5 +21,5 @@ vim.opt.scrolloff = 8
 vim.opt.splitkeep = "screen"
 vim.opt.pumblend = 0
 
--- Inlay hints (tipos inferidos inline para TypeScript)
-vim.lsp.inlay_hint.enable(true)
+-- Inlay hints desactivados — bug col out of range con Volar
+vim.lsp.inlay_hint.enable(false)

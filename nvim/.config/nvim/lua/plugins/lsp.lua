@@ -50,17 +50,18 @@ return {
     "stevearc/conform.nvim",
     opts = {
       formatters_by_ft = {
-        -- Code: Prettier > Biome
-        vue = { "prettier", "biome", stop_after_first = true },
-        typescript = { "prettier", "biome", stop_after_first = true },
-        javascript = { "prettier", "biome", stop_after_first = true },
-        typescriptreact = { "prettier", "biome", stop_after_first = true },
-        javascriptreact = { "prettier", "biome", stop_after_first = true },
+        -- Vue: Prettier > ESLint (Biome no soporta templates Vue)
+        vue = { "prettier", "eslint_d", stop_after_first = true },
+        -- JS/TS: Prettier > Biome > ESLint
+        typescript = { "prettier", "biome", "eslint_d", stop_after_first = true },
+        javascript = { "prettier", "biome", "eslint_d", stop_after_first = true },
+        typescriptreact = { "prettier", "biome", "eslint_d", stop_after_first = true },
+        javascriptreact = { "prettier", "biome", "eslint_d", stop_after_first = true },
         -- Data/styles: Prettier > Biome
         json = { "prettier", "biome", stop_after_first = true },
         jsonc = { "prettier", "biome", stop_after_first = true },
         css = { "prettier", "biome", stop_after_first = true },
-        -- Prettier only (Biome no soporta)
+        -- Prettier only
         html = { "prettier" },
         yaml = { "prettier" },
         markdown = { "prettier" },
@@ -78,6 +79,12 @@ return {
             return has_config(biome_configs, ctx.dirname)
               and not has_config(prettier_configs, ctx.dirname)
               and not has_config(eslint_configs, ctx.dirname)
+          end,
+        },
+        eslint_d = {
+          condition = function(self, ctx)
+            return has_config(eslint_configs, ctx.dirname)
+              and not has_config(prettier_configs, ctx.dirname)
           end,
         },
       },
