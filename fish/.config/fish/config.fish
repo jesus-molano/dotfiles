@@ -37,6 +37,7 @@ abbr -a gs 'git status'
 abbr -a gd 'git diff'
 abbr -a gl 'git log --oneline -20'
 abbr -a lg 'lazygit'
+abbr -a gscope 'gamescope -W 1920 -H 1080 -r 75 -f --'
 
 # bun
 set --export BUN_INSTALL "$HOME/.bun"

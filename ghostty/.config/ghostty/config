@@ -1,0 +1,21 @@
+# Font
+font-family = JetBrainsMono Nerd Font
+font-size = 12
+
+# Window
+window-padding-x = 10
+window-padding-y = 10
+window-decoration = false
+background-opacity = 0.95
+
+# Behavior
+scrollback-limit = 10000000
+shell-integration = detect
+confirm-close-surface = false
+
+# Cursor
+cursor-style = block
+cursor-style-blink = false
+
+# Theme (built-in en Ghostty 2.0)
+theme = catppuccin-mocha

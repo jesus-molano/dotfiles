@@ -20,3 +20,6 @@ vim.api.nvim_create_autocmd("User", {
 vim.opt.scrolloff = 8
 vim.opt.splitkeep = "screen"
 vim.opt.pumblend = 0
+
+-- Inlay hints (tipos inferidos inline para TypeScript)
+vim.lsp.inlay_hint.enable(true)
