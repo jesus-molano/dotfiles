@@ -18,4 +18,4 @@ cursor-style = block
 cursor-style-blink = false
 
 # Theme (built-in en Ghostty 2.0)
-theme = catppuccin-mocha
+theme = Catppuccin Mocha
