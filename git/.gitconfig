@@ -44,7 +44,7 @@
 	last = log -1 HEAD
 	graph = log --oneline --graph --decorate --all -20
 [commit]
-	gpgsign = true
+	gpgsign = false
 [gpg]
 	format = ssh
 [gpg "ssh"]
