@@ -10,7 +10,7 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | WM | [Hyprland](https://hyprland.org/) |
 | Bar | [Waybar](https://github.com/Alexays/Waybar) |
 | Launcher | [Rofi](https://github.com/davatorium/rofi) (adi1090x themes) |
-| Terminal | [Kitty](https://sw.kovidgoyal.net/kitty/) |
+| Terminal | [Ghostty](https://ghostty.org/) |
 | Shell | [Fish](https://fishshell.com/) + [Starship](https://starship.rs/) |
 | Editor | [Neovim](https://neovim.io/) (LazyVim) — WebStorm as main IDE |
 | Multiplexer | [Zellij](https://zellij.dev/) |
@@ -31,7 +31,7 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | Bind | Action |
 |------|--------|
 | `ALT + Space` | Rofi launcher |
-| `Hyper + Return` | Kitty terminal |
+| `Hyper + Return` | Ghostty terminal |
 | `Hyper + B` | Google Chrome |
 | `Hyper + E` | Yazi (file manager) |
 | `Hyper + C` | WebStorm |
@@ -127,7 +127,7 @@ The interactive installer will:
 hypr        Hyprland config + scripts
 waybar      Status bar config + scripts
 rofi        Rofi launcher (adi1090x themes)
-kitty       Kitty terminal config
+ghostty     Ghostty terminal config
 fish        Fish shell config
 starship    Starship prompt config
 zellij      Zellij multiplexer config
@@ -177,7 +177,7 @@ The installer reads `packages.csv` and lets you pick categories:
 | Category | Examples |
 |----------|----------|
 | core | Hyprland, Waybar, Rofi, SwayNC, hyprlock, hypridle, swww, cliphist |
-| terminal | Kitty, Neovim, Fish, Zsh, Starship, Zellij, zoxide, ripgrep, fzf |
+| terminal | Ghostty, Neovim, Fish, Zsh, Starship, Zellij, zoxide, ripgrep, fzf |
 | keyboard | Kanata |
 | themes | Catppuccin (GTK, cursors, Kvantum), Papirus, Nerd Fonts |
 | gaming | Steam, Lutris, GameMode, MangoHud, vkBasalt, Gamescope, Proton-GE |

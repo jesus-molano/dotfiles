@@ -63,7 +63,7 @@
         "exec": "~/.config/waybar/scripts/check-updates.sh",
         "interval": 3600,
         "signal": 8,
-        "on-click": "kitty -e bash -c 'paru -Syu; echo Done; read'"
+        "on-click": "ghostty -e bash -c 'paru -Syu; echo Done; read'"
     },
     "custom/music": {
         "format": "{}",

@@ -50,7 +50,7 @@ declare -A CAT_KEY=(
 
 declare -A CAT_STOW=(
     [1]="hypr waybar rofi swaync mimeapps"
-    [2]="kitty fish starship zellij shell nvim"
+    [2]="ghostty fish starship zellij shell nvim"
     [3]="kanata"
     [4]="gtk kvantum fonts"
     [5]="gaming"

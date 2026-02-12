@@ -14,7 +14,7 @@ core,xdg-desktop-portal-hyprland,native
 core,xorg-xwayland,native
 core,uwsm,native
 core,jq,native
-terminal,kitty-git,aur
+terminal,ghostty,native
 terminal,neovim,native
 terminal,tree-sitter-cli,native
 terminal,fish,native
