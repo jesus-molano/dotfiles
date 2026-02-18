@@ -7,7 +7,7 @@
     "margin-right": 10,
     "modules-left": ["hyprland/window"],
     "modules-center": ["hyprland/workspaces"],
-    "modules-right": ["custom/music", "bluetooth", "custom/network", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
+    "modules-right": ["custom/music", "bluetooth", "custom/network", "custom/vpn", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
@@ -34,6 +34,14 @@
         "tooltip-format-enumerate-connected-battery": "  {device_alias} ({device_battery_percentage}%)",
         "on-click": "~/.config/waybar/scripts/rofi-bluetooth.sh",
         "on-click-right": "bluetoothctl power on"
+    },
+    "custom/vpn": {
+        "format": "{}",
+        "return-type": "json",
+        "exec": "~/.config/waybar/scripts/vpn-status.sh",
+        "interval": 10,
+        "signal": 9,
+        "on-click": "~/.config/waybar/scripts/vpn-status.sh toggle"
     },
     "custom/network": {
         "format": "{}",

@@ -70,7 +70,7 @@ window#waybar {
 }
 
 #pulseaudio, #memory, #cpu, #tray, #custom-notification,
-#bluetooth, #custom-network, #custom-cpu-temp, #custom-gpu-temp,
+#bluetooth, #custom-network, #custom-vpn, #custom-cpu-temp, #custom-gpu-temp,
 #custom-music, #custom-updates {
     color: @text;
     background: @surface0;
@@ -87,6 +87,8 @@ window#waybar {
 #bluetooth.off, #bluetooth.disabled { color: @overlay0; }
 #custom-network { color: @teal; }
 #custom-network.disconnected { color: @overlay0; }
+#custom-vpn { color: @green; }
+#custom-vpn.disconnected { color: @overlay0; }
 #custom-cpu-temp { color: @red; }
 #custom-gpu-temp { color: @yellow; }
 #custom-notification { color: @lavender; }
