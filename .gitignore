@@ -30,6 +30,8 @@ claude/.claude/stats-cache.json
 
 # Secrets
 .env.op
+claude/secrets.env
+claude/mcp.env
 
 # OS generated
 .DS_Store

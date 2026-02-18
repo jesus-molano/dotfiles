@@ -6,6 +6,15 @@ set -euo pipefail
 # Requires: jq, npx
 
 CLAUDE_JSON="$HOME/.claude.json"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Load credentials from mcp.env (gitignored)
+if [[ -f "$SCRIPT_DIR/mcp.env" ]]; then
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/mcp.env"
+else
+  echo "Warning: $SCRIPT_DIR/mcp.env not found. Copy mcp.env.example and fill in values."
+fi
 
 MCP_CONFIG='{
   "context7": {
@@ -31,6 +40,16 @@ MCP_CONFIG='{
     "command": "npx",
     "args": ["-y", "mcp-remote", "https://mcp.linear.app/mcp"],
     "env": {}
+  },
+  "jira": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "@aashari/mcp-server-atlassian-jira"],
+    "env": {
+      "ATLASSIAN_SITE_NAME": "'"${ATLASSIAN_SITE_NAME:-}"'",
+      "ATLASSIAN_USER_EMAIL": "'"${ATLASSIAN_USER_EMAIL:-}"'",
+      "ATLASSIAN_API_TOKEN": "'"${ATLASSIAN_API_TOKEN:-}"'"
+    }
   }
 }'
 
