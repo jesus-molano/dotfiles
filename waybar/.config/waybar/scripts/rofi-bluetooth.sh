@@ -2,11 +2,23 @@
 set -uo pipefail
 
 # Bluetooth management menu via rofi + bluetoothctl
+# NOTE: bluez 5.86+ broke non-interactive bluetoothctl output.
+# btctl_cmd() wraps commands in interactive mode; busctl queries D-Bus directly.
 
 THEME="$HOME/.config/waybar/scripts/rofi-theme.rasi"
 ROFI="rofi -dmenu -i -theme $THEME"
 
 notify() { notify-send -a "Bluetooth" "$1" "$2"; }
+
+# Strip ANSI escape codes and bluetoothctl prompt noise from interactive output
+strip_ansi() {
+    sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | sed 's/\x1b\[K//g' | sed 's/\r//g'
+}
+
+# Run a single bluetoothctl command interactively (bluez 5.86 compat)
+btctl_cmd() {
+    printf '%s\nquit\n' "$1" | bluetoothctl 2>/dev/null | strip_ansi
+}
 
 # Run bluetoothctl commands via FIFO to keep agent alive during the session
 # Each argument is a command, optionally prefixed with "sleep:N" to wait N seconds
@@ -41,32 +53,33 @@ btctl_session() {
 }
 
 bt_power_status() {
-    bluetoothctl show | grep -q "Powered: yes" && echo "on" || echo "off"
+    busctl get-property org.bluez /org/bluez/hci0 org.bluez.Adapter1 Powered 2>/dev/null \
+        | grep -q "b true" && echo "on" || echo "off"
 }
 
 toggle_power() {
     if [[ "$(bt_power_status)" == "on" ]]; then
-        bluetoothctl power off >/dev/null 2>&1
+        btctl_cmd "power off" >/dev/null
         notify "Bluetooth" "Desactivado"
     else
-        bluetoothctl power on >/dev/null 2>&1
+        btctl_cmd "power on" >/dev/null
         notify "Bluetooth" "Activado"
     fi
 }
 
 get_paired_devices() {
-    bluetoothctl devices Paired 2>/dev/null | while read -r _ mac name; do
+    btctl_cmd "devices Paired" | grep "^Device" | while read -r _ mac name; do
         local connected=""
-        bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes" && connected=" [conectado]"
+        btctl_cmd "info $mac" | grep -q "Connected: yes" && connected=" [conectado]"
         echo "$mac $name$connected"
     done
 }
 
 get_available_devices() {
-    bluetoothctl devices 2>/dev/null | while read -r _ mac name; do
-        if ! bluetoothctl devices Paired 2>/dev/null | grep -q "$mac"; then
-            echo "$mac $name"
-        fi
+    local paired
+    paired=$(btctl_cmd "devices Paired" | grep "^Device" | awk '{print $2}')
+    btctl_cmd "devices" | grep "^Device" | while read -r _ mac name; do
+        echo "$paired" | grep -q "$mac" || echo "$mac $name"
     done
 }
 
@@ -74,7 +87,7 @@ device_menu() {
     local mac="$1"
     local name="$2"
     local is_connected=""
-    bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes" && is_connected="yes"
+    btctl_cmd "info $mac" | grep -q "Connected: yes" && is_connected="yes"
 
     local options=""
     if [[ "$is_connected" == "yes" ]]; then
@@ -91,18 +104,18 @@ device_menu() {
         *"Conectar"*)
             notify "Conectando..." "$name"
             btctl_session "connect $mac" "sleep:3"
-            if bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes"; then
+            if btctl_cmd "info $mac" | grep -q "Connected: yes"; then
                 notify "Conectado" "$name"
             else
                 notify "Error" "No se pudo conectar a $name"
             fi
             ;;
         *"Desconectar"*)
-            bluetoothctl disconnect "$mac" >/dev/null 2>&1
+            btctl_cmd "disconnect $mac" >/dev/null
             notify "Desconectado" "$name"
             ;;
         *"Olvidar"*)
-            bluetoothctl remove "$mac" >/dev/null 2>&1
+            btctl_cmd "remove $mac" >/dev/null
             notify "Eliminado" "$name"
             ;;
     esac
@@ -152,8 +165,8 @@ new_device_menu() {
         "connect $mac" \
         "sleep:3"
 
-    if bluetoothctl info "$mac" 2>/dev/null | grep -q "Paired: yes"; then
-        if bluetoothctl info "$mac" 2>/dev/null | grep -q "Connected: yes"; then
+    if btctl_cmd "info $mac" | grep -q "Paired: yes"; then
+        if btctl_cmd "info $mac" | grep -q "Connected: yes"; then
             notify "Conectado" "$name"
         else
             notify "Emparejado" "$name (conecta manualmente si es necesario)"
@@ -205,7 +218,7 @@ main_menu() {
             local dev_name
             dev_name=$(echo "$choice" | sed 's/^[^ ]* //;s/ \[conectado\]//')
             local mac
-            mac=$(bluetoothctl devices Paired 2>/dev/null | grep "$dev_name" | awk '{print $2}')
+            mac=$(btctl_cmd "devices Paired" | grep "^Device" | grep "$dev_name" | awk '{print $2}')
             [[ -n "$mac" ]] && device_menu "$mac" "$dev_name"
             ;;
     esac
