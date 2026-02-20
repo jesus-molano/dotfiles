@@ -37,10 +37,15 @@ done
 # No project root found — skip
 [[ -z "$project_root" ]] && exit 0
 
-# Format with Biome if configured, otherwise Prettier
+# Format with Biome if config exists, otherwise Prettier if config exists
 if [[ -f "$project_root/biome.json" ]] || [[ -f "$project_root/biome.jsonc" ]]; then
   npx biome format --write "$file_path" 2>/dev/null || true
-elif command -v prettier &>/dev/null || [[ -f "$project_root/node_modules/.bin/prettier" ]]; then
+elif [[ -f "$project_root/.prettierrc" ]] || [[ -f "$project_root/.prettierrc.json" ]] || \
+     [[ -f "$project_root/.prettierrc.js" ]] || [[ -f "$project_root/.prettierrc.cjs" ]] || \
+     [[ -f "$project_root/.prettierrc.mjs" ]] || [[ -f "$project_root/.prettierrc.yml" ]] || \
+     [[ -f "$project_root/.prettierrc.yaml" ]] || [[ -f "$project_root/.prettierrc.toml" ]] || \
+     [[ -f "$project_root/prettier.config.js" ]] || [[ -f "$project_root/prettier.config.cjs" ]] || \
+     [[ -f "$project_root/prettier.config.mjs" ]]; then
   npx prettier --write "$file_path" 2>/dev/null || true
 fi
 

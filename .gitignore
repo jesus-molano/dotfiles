@@ -8,6 +8,11 @@ micro/.config/micro/plugins/
 # Font cache
 fonts/.local/share/fonts/.uuid
 
+# Override global gitignore — dotfiles MUST track these
+!CLAUDE.md
+!claude/.claude/
+!claude/.claude/**
+
 # Claude Code runtime (keep only stow-managed config)
 .claude/settings.local.json
 claude/.claude/cache/

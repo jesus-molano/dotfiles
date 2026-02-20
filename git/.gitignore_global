@@ -22,6 +22,11 @@ Thumbs.db
 *.swo
 *~
 
+# AI
+CLAUDE.md
+.claude/
+docs/session-state.md
+
 # Debug
 npm-debug.log*
 pnpm-debug.log*

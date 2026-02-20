@@ -11,6 +11,9 @@ if test -d "$FNM_PATH"
     fnm env --shell fish | source
 end
 
+# npm global
+fish_add_path -g "$HOME/.npm-global/bin"
+
 # pnpm
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 if not string match -q -- $PNPM_HOME $PATH
