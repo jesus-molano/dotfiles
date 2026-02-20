@@ -33,12 +33,14 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `ALT + Space` | Rofi launcher |
 | `Hyper + Return` | Ghostty terminal |
 | `Hyper + B` | Google Chrome |
-| `Hyper + E` | Yazi (file manager) |
+| `Hyper + E` | Thunar (file manager) |
 | `Hyper + C` | WebStorm |
+| `Hyper + S` | Slack |
 | `Hyper + N` | Notification center |
-| `Hyper + P` | Color picker |
+| `Hyper + P` | Screenshot (region select) |
+| `Hyper + K` | Color picker |
 | `Hyper + M` | YouTube Music |
-| `Hyper + G` | Toggle MangoHud |
+| `Hyper + G` | Steam |
 | `Hyper + D` | Discord |
 | `Hyper + 1` | 1Password |
 | `Hyper + L` | Lock screen |
@@ -54,18 +56,30 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `ALT + H/J/K/L` | Move focus (vim-style) |
 | `ALT + Shift + H/J/K/L` | Move window |
 | `ALT + Ctrl + H/J/K/L` | Resize window |
-| `ALT + W` | Close window |
+| `ALT + X` | Close window |
 | `ALT + M` | Fullscreen |
 | `ALT + F` | Toggle floating |
 | `ALT + Mouse LMB` | Drag move |
 | `ALT + Mouse RMB` | Drag resize |
 
-### Workspaces
+### Workspaces (dual monitor 4+4)
+
+```
+Monitor LEFT (C52) — ALT+Q/W/E/R      Monitor RIGHT (B97) — ALT+U/I/O/P
+  WS 1  󰈹 Browser  (boot)               WS 5  󰆍 Terminal  (boot)
+  WS 2  󰝚 Music    (YT Music auto)      WS 6  󰨞 Code     (WebStorm auto)
+  WS 3  󰙯 Chat     (Discord/Slack)      WS 7  󰭹 Misc
+  WS 4  󰉋 Files                          WS 8  󰊗 Extra/Games
+```
 
 | Bind | Action |
 |------|--------|
-| `ALT + 1-8` | Switch workspace |
-| `ALT + Shift + 1-8` | Move window to workspace |
+| `ALT + Q/W/E/R` | Switch workspace 1-4 (left monitor) |
+| `ALT + U/I/O/P` | Switch workspace 5-8 (right monitor) |
+| `ALT + Shift + Q/W/E/R` | Move window to WS 1-4 |
+| `ALT + Shift + U/I/O/P` | Move window to WS 5-8 |
+| `ALT + S` | Swap workspaces between monitors |
+| `ALT + Tab` | Previous workspace (back and forth) |
 | `ALT + `` ` `` ` | Toggle scratchpad |
 | `ALT + Shift + `` ` `` ` | Move to scratchpad |
 
@@ -78,15 +92,14 @@ CachyOS + Hyprland rice with Catppuccin Mocha theme.
 | `ALT + Shift + V` | Clipboard history (rofi) |
 | `ALT + A` | Toggle audio output |
 | `ALT + T` | Translate clipboard en↔es |
-| `Hyper + S` | Screenshot (region select) |
 
 ### Groups/Tabs
 
 | Bind | Action |
 |------|--------|
 | `ALT + G` | Toggle group |
-| `ALT + Tab` | Next in group |
-| `ALT + Shift + Tab` | Previous in group |
+| `ALT + N` | Next in group |
+| `ALT + Shift + N` | Previous in group |
 
 ### Keyboard Layout
 

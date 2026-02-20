@@ -37,6 +37,13 @@ binds=$(awk '
     else if (action == "resizeactive") desc = "Resize window"
     else if (action == "workspace") desc = "Workspace " parts[4]
     else if (action == "movetoworkspace") desc = "Move to workspace " parts[4]
+    else if (action == "movetoworkspacesilent") desc = "Move to workspace " parts[4]
+    else if (action == "swapactiveworkspaces") desc = "Swap monitors"
+    else if (action == "togglespecialworkspace") desc = "Toggle scratchpad"
+    else if (action == "changegroupactive") desc = "Group " (parts[4] ~ /f/ ? "next" : "prev")
+    else if (action == "togglegroup") desc = "Toggle group"
+    else if (action == "movewindoworgroup") desc = "Move window/group " parts[4]
+    else if (action == "focusworkspaceoncurrentmonitor") desc = "Workspace " parts[4]
     else if (action == "fullscreen") desc = "Fullscreen"
     else if (action == "togglefloating") desc = "Toggle floating"
     else desc = action
