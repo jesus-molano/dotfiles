@@ -134,6 +134,8 @@ system,snapper,native
 system,snap-pac,native
 terminal,fzf,native
 system,brightnessctl,native
+system,thunar-archive-plugin,native
+system,xarchiver,native
 core,hyprsunset,native
 core,cava,native
 core,wttrbar,aur
