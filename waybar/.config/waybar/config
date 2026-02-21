@@ -5,9 +5,9 @@
     "margin-top": 6,
     "margin-left": 10,
     "margin-right": 10,
-    "modules-left": ["hyprland/window"],
+    "modules-left": ["hyprland/window", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp"],
     "modules-center": ["hyprland/workspaces"],
-    "modules-right": ["custom/music", "bluetooth", "custom/network", "custom/vpn", "pulseaudio", "memory", "custom/cpu-temp", "cpu", "custom/gpu-temp",  "custom/updates", "custom/notification", "clock", "tray"],
+    "modules-right": ["custom/cava", "bluetooth", "custom/network", "custom/vpn", "pulseaudio", "custom/updates", "custom/notification", "custom/weather", "clock", "tray"],
     "hyprland/workspaces": {
         "format": "{icon}",
         "on-click": "activate",
@@ -24,7 +24,7 @@
         }
     },
     "hyprland/window": {"format": "{}", "max-length": 40},
-    "clock": {"format": "󰥔 {:%H:%M}", "format-alt": "󰃭 {:%A, %d %B %Y}"},
+    "clock": {"format": "{:%H:%M}", "format-alt": "{:%A, %d %B %Y}"},
     "memory": {"format": "󰍛 {}%", "interval": 5},
     "cpu": {"format": "󰻠 {usage}%", "interval": 5},
     "pulseaudio": {"format": "{icon} {volume}%", "format-muted": "󰝟 silenciado", "format-icons": {"default": ["󰕿","󰖀","󰕾"]}, "on-click": "pavucontrol"},
@@ -79,11 +79,19 @@
         "signal": 8,
         "on-click": "ghostty -e bash -c 'paru -Syu; echo Done; read'"
     },
-    "custom/music": {
+    "custom/cava": {
+        "exec": "~/.config/waybar/scripts/cava-waybar.sh",
+        "format": "{}",
+        "tooltip": false,
+        "on-click": "~/.config/hypr/scripts/raise-or-run.sh com.github.th_ch.youtube_music youtube-music",
+        "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+",
+        "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+    },
+    "custom/weather": {
         "format": "{}",
         "return-type": "json",
-        "exec": "~/.config/waybar/scripts/music-status.sh",
-        "on-click": "~/.config/waybar/scripts/music-toggle.sh",
-        "escape": true
-    }
+        "exec": "wttrbar --location 'Santa Cruz de Tenerife' --main-indicator temp_C",
+        "interval": 1800,
+        "tooltip": true
+    },
 }

@@ -71,7 +71,7 @@ window#waybar {
 
 #pulseaudio, #memory, #cpu, #tray, #custom-notification,
 #bluetooth, #custom-network, #custom-vpn, #custom-cpu-temp, #custom-gpu-temp,
-#custom-music, #custom-updates {
+#custom-updates {
     color: @text;
     background: @surface0;
     border-radius: 10px;
@@ -100,8 +100,23 @@ window#waybar {
 #custom-cpu-temp.critical,
 #custom-gpu-temp.critical { color: @red; background: alpha(@red, 0.15); }
 
-/* Music */
-#custom-music.playing { color: @pink; }
-#custom-music.paused { color: @overlay0; }
+/* CAVA visualizer */
+#custom-cava {
+    color: @pink;
+    background: @surface0;
+    border-radius: 10px;
+    margin: 5px 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+}
+
+/* Weather */
+#custom-weather {
+    color: @sky;
+    background: @surface0;
+    border-radius: 10px;
+    margin: 5px 4px;
+    padding: 4px 12px;
+}
 
 

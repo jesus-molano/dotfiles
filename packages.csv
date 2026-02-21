@@ -4,12 +4,10 @@ core,rofi-wayland,native
 core,swaync-git,aur
 core,hyprpicker-git,aur
 core,swww,native
-core,cliphist,native
+core,clipse,native
 core,wl-clipboard,native
-core,grim,native
-core,slurp,native
-core,swappy,native
-core,polkit-kde-agent,native
+core,hyprshot,native
+core,hyprpolkitagent,native
 core,xdg-desktop-portal-hyprland,native
 core,xorg-xwayland,native
 core,uwsm,native
@@ -136,3 +134,7 @@ system,snapper,native
 system,snap-pac,native
 terminal,fzf,native
 system,brightnessctl,native
+core,hyprsunset,native
+core,cava,native
+core,wttrbar,aur
+core,waypaper,aur
