@@ -83,6 +83,7 @@
         "exec": "~/.config/waybar/scripts/cava-waybar.sh",
         "format": "{}",
         "tooltip": false,
+        "restart-interval": 5,
         "on-click": "~/.config/hypr/scripts/raise-or-run.sh com.github.th_ch.youtube_music youtube-music",
         "on-scroll-up": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+",
         "on-scroll-down": "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"

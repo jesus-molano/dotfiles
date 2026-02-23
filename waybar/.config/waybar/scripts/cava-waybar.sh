@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-cava -p <(cat <<EOF
+
+CAVA_CONFIG="/tmp/cava-waybar.conf"
+
+cat > "$CAVA_CONFIG" <<EOF
 [general]
 bars = 12
 framerate = 30
@@ -17,19 +20,25 @@ data_format = ascii
 ascii_max_range = 7
 bar_delimiter = 59
 EOF
-) | while IFS=';' read -ra values; do
+
+cava -p "$CAVA_CONFIG" | while IFS=';' read -ra values; do
     bars=""
+    silent=true
     for val in "${values[@]}"; do
         case $val in
             0) bars+="▁";;
-            1) bars+="▂";;
-            2) bars+="▃";;
-            3) bars+="▄";;
-            4) bars+="▅";;
-            5) bars+="▆";;
-            6) bars+="▇";;
-            7) bars+="█";;
+            1) bars+="▂"; silent=false;;
+            2) bars+="▃"; silent=false;;
+            3) bars+="▄"; silent=false;;
+            4) bars+="▅"; silent=false;;
+            5) bars+="▆"; silent=false;;
+            6) bars+="▇"; silent=false;;
+            7) bars+="█"; silent=false;;
         esac
     done
-    echo "$bars"
+    if $silent; then
+        echo ""
+    else
+        echo "$bars"
+    fi
 done
