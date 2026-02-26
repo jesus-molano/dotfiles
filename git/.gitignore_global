@@ -18,6 +18,8 @@ Thumbs.db
 
 # IDE
 .idea/
+.postman/
+postman/
 *.swp
 *.swo
 *~

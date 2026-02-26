@@ -77,7 +77,7 @@
         "exec": "~/.config/waybar/scripts/check-updates.sh",
         "interval": 3600,
         "signal": 8,
-        "on-click": "ghostty -e bash -c 'paru -Syu; echo Done; read'"
+        "on-click": "ghostty -e bash -c 'paru -Syu; echo 0 > /tmp/waybar-updates-count; pkill -RTMIN+8 waybar'"
     },
     "custom/cava": {
         "exec": "~/.config/waybar/scripts/cava-waybar.sh",
