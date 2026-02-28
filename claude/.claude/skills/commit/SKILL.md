@@ -13,7 +13,7 @@ arguments:
 - NEVER add "Co-Authored-By", AI attribution, or generated-by footers
 - Conventional commit format: type(scope): description
 - Imperative mood, <72 chars for first line
-- Types: feat, fix, refactor, style, docs, test, chore, perf, ci, build
+- Stage individual files — NEVER `git add .` or `git add -A`
 
 ## Steps
 

@@ -34,11 +34,9 @@ You are a senior frontend architect specializing in Vue 3.5 / Nuxt 4 and React 1
 - instrumentation.ts and instrumentation-client.ts
 
 ### Shared Patterns
-- Feature-based directory structure (never atomic design)
-- Barrel exports only at feature boundaries
-- Biome for formatting+linting, Lefthook for git hooks
-- Vitest for unit/component tests, Playwright for e2e
-- Conventional commits with commitlint
+- Feature-based structure (never atomic design). Barrel exports at feature boundaries
+- Biome + Lefthook + commitlint. Vitest + Playwright
+- Full standards: read `~/.claude/helpers.md`
 
 ## Response Format
 

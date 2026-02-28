@@ -91,6 +91,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/filter-output.sh",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "SessionStart": [
