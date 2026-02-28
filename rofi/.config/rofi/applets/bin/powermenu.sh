@@ -10,8 +10,8 @@ source "$HOME"/.config/rofi/applets/shared/theme.bash
 theme="$type/$style"
 
 # Theme Elements
-prompt="`hostname`"
-mesg="Uptime : `uptime -p | sed -e 's/up //g'`"
+prompt="$(hostname)"
+mesg="Uptime : $(uptime -p | sed -e 's/up //g')"
 
 if [[ ( "$theme" == *'type-1'* ) || ( "$theme" == *'type-3'* ) || ( "$theme" == *'type-5'* ) ]]; then
 	list_col='1'
@@ -22,7 +22,7 @@ elif [[ ( "$theme" == *'type-2'* ) || ( "$theme" == *'type-4'* ) ]]; then
 fi
 
 # Options
-layout=`cat ${theme} | grep 'USE_ICON' | cut -d'=' -f2`
+layout=$(grep 'USE_ICON' "${theme}" | cut -d'=' -f2)
 if [[ "$layout" == 'NO' ]]; then
 	option_1=" Lock"
 	option_2=" Logout"
@@ -51,7 +51,7 @@ rofi_cmd() {
 		-p "$prompt" \
 		-mesg "$mesg" \
 		-markup-rows \
-		-theme ${theme}
+		-theme "${theme}"
 }
 
 # Pass variables to rofi dmenu
@@ -69,7 +69,7 @@ confirm_cmd() {
 		-dmenu \
 		-p 'Confirmation' \
 		-mesg 'Are you Sure?' \
-		-theme ${theme}
+		-theme "${theme}"
 }
 
 # Ask for confirmation
@@ -90,11 +90,11 @@ confirm_run () {
 # Execute Command
 run_cmd() {
 	if [[ "$1" == '--opt1' ]]; then
-		betterlockscreen -l
+		hyprlock
 	elif [[ "$1" == '--opt2' ]]; then
-		confirm_run 'kill -9 -1'
+		confirm_run 'hyprctl dispatch exit'
 	elif [[ "$1" == '--opt3' ]]; then
-		confirm_run 'mpc -q pause' 'amixer set Master mute' 'systemctl suspend'
+		confirm_run 'playerctl -a pause' 'wpctl set-mute @DEFAULT_AUDIO_SINK@ 1' 'systemctl suspend'
 	elif [[ "$1" == '--opt4' ]]; then
 		confirm_run 'systemctl hibernate'
 	elif [[ "$1" == '--opt5' ]]; then

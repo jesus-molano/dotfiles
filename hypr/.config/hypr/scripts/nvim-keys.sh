@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -uo pipefail
 # Show Neovim/LazyVim keybindings cheatsheet in rofi
 
 keys=$(cat <<'EOF'
@@ -135,6 +135,31 @@ Tab                     Aceptar sugerencia de Copilot
 <leader>dt              Terminar sesión
 <leader>du              Toggle DAP UI
 <leader>dw              Widgets
+
+── OBSIDIAN (<leader>o) ────────────────────────────────────────────
+<leader>on              Nueva nota
+<leader>oo              Cambiar rápido entre notas
+<leader>os              Buscar en vault
+<leader>od              Nota diaria de hoy
+<leader>oy              Nota de ayer
+<leader>oT              Nota de mañana
+<leader>ob              Backlinks de la nota actual
+<leader>ol              Todos los links del vault
+<leader>oL              Crear link desde selección (visual)
+<leader>ot              Insertar template
+<leader>op              Pegar imagen en nota
+<leader>or              Renombrar nota
+gf                      Seguir link bajo cursor (en markdown)
+
+── TEST (<leader>t) ───────────────────────────────────────────────
+<leader>tt              Ejecutar test más cercano
+<leader>tT              Ejecutar tests del archivo
+<leader>tr              Ejecutar últimos tests
+<leader>ts              Toggle resumen de tests
+<leader>to              Toggle output del test
+<leader>tS              Stop tests
+<leader>td              Debug test más cercano
+<leader>tw              Toggle watch mode
 
 ── SESIONES (<leader>q) ────────────────────────────────────────────
 <leader>qs              Restaurar sesión (directorio actual)

@@ -28,6 +28,11 @@ postman/
 CLAUDE.md
 .claude/
 docs/session-state.md
+_bmad/
+_bmad-output/
+.bmad
+.bmad-core
+.bmad-method
 
 # Debug
 npm-debug.log*

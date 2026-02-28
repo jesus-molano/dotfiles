@@ -49,13 +49,13 @@ refresh_cache() {
     # CPU temp from sysfs (millidegrees → degrees)
     local cpu_temp=0
     if [[ -n "$K10TEMP_PATH" && -r "$K10TEMP_PATH" ]]; then
-        cpu_temp=$(( $(cat "$K10TEMP_PATH") / 1000 ))
+        cpu_temp=$(( $(timeout 1 cat "$K10TEMP_PATH" 2>/dev/null || echo 0) / 1000 ))
     fi
 
-    # NZXT fan speeds from sysfs (already in RPM)
+    # NZXT fan speeds from sysfs (already in RPM) — timeout guards against driver hangs
     local fan2_rpm=0 fan3_rpm=0
-    [[ -n "$NZXT_FAN2_PATH" && -r "$NZXT_FAN2_PATH" ]] && fan2_rpm=$(cat "$NZXT_FAN2_PATH")
-    [[ -n "$NZXT_FAN3_PATH" && -r "$NZXT_FAN3_PATH" ]] && fan3_rpm=$(cat "$NZXT_FAN3_PATH")
+    [[ -n "$NZXT_FAN2_PATH" && -r "$NZXT_FAN2_PATH" ]] && fan2_rpm=$(timeout 1 cat "$NZXT_FAN2_PATH" 2>/dev/null || echo 0)
+    [[ -n "$NZXT_FAN3_PATH" && -r "$NZXT_FAN3_PATH" ]] && fan3_rpm=$(timeout 1 cat "$NZXT_FAN3_PATH" 2>/dev/null || echo 0)
 
     # Parse GPU data
     local gpu_temp gpu_fan gpu_power gpu_util

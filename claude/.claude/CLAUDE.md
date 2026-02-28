@@ -38,6 +38,11 @@ Vue 3.5 / Nuxt 4 · React 19 / Next.js 16.
 - Tests: use `--reporter=dot` for compact output
 - Builds: pipe through `grep -E 'error|warning'` when output exceeds 50 lines
 
+## Phased Execution
+- When a plan has phases, execute ONE phase at a time. STOP and ask before advancing
+- After /clear or compaction, re-read the plan and resume from the current phase — never restart all phases
+- This rule applies even with auto-accepts enabled
+
 ## Compact Focus
 After compaction, check `docs/project-status.yaml` or `docs/session-state.md` for task continuity.
 Shared standards live in `~/.claude/helpers.md` — re-read when needed.

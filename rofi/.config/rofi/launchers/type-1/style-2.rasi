@@ -10,7 +10,7 @@
 /*****----- Configuration -----*****/
 configuration {
 	modi:                       "drun,run,filebrowser,window";
-    show-icons:                 false;
+    show-icons:                 true;
     display-drun:               "";
     display-run:                "";
     display-filebrowser:        "";
@@ -58,7 +58,7 @@ window {
     location:                    center;
     anchor:                      center;
     fullscreen:                  false;
-    width:                       400px;
+    width:                       550px;
     x-offset:                    0px;
     y-offset:                    0px;
 
@@ -158,10 +158,10 @@ case-indicator {
 listview {
     enabled:                     true;
     columns:                     1;
-    lines:                       12;
+    lines:                       10;
     cycle:                       true;
     dynamic:                     true;
-    scrollbar:                   true;
+    scrollbar:                   false;
     layout:                      vertical;
     reverse:                     false;
     fixed-height:                true;
@@ -236,7 +236,7 @@ element alternate.active {
 element-icon {
     background-color:            transparent;
     text-color:                  inherit;
-    size:                        24px;
+    size:                        28px;
     cursor:                      inherit;
 }
 element-text {

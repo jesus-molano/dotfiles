@@ -10,6 +10,7 @@ CRITICAL REMINDERS:
 5. Conventional commits: type(scope): description — imperative, lowercase, <72 chars
 6. TypeScript strict, no `any` — use `unknown`
 7. Shared standards in ~/.claude/helpers.md — read relevant sections when needed
+8. PHASED PLANS: Execute ONE phase at a time. STOP and ask user before advancing to next phase
 RULES
 
 echo ""
