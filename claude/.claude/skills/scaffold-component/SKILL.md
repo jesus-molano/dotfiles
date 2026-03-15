@@ -2,6 +2,7 @@
 name: scaffold-component
 description: Scaffold a Vue or React component with optional tests and stories
 disable-model-invocation: true
+argument-hint: "<ComponentName> [--with-tests] [--with-story]"
 arguments:
   - name: name
     description: Component name in PascalCase (e.g., UserProfile)

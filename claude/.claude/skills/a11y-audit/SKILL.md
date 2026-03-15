@@ -3,7 +3,7 @@ name: a11y-audit
 description: Audit project for WCAG 2.1 AA accessibility compliance
 disable-model-invocation: true
 context: fork
-agent: Explore
+agent: code-reviewer
 ---
 
 # Accessibility Audit (WCAG 2.1 AA)
@@ -12,7 +12,7 @@ Auto-detect framework and audit accordingly.
 
 ## Steps
 1. Detect framework: look for `nuxt.config.ts` or `next.config.ts`
-2. Read the detailed checklist from `~/.claude/skills/a11y-audit/REFERENCE.md`
+2. Read the detailed checklist from `${CLAUDE_SKILL_DIR}/REFERENCE.md`
 3. Only run the section matching the detected framework + WCAG principles
 4. Scan project files against each checklist item
 5. Report findings grouped by WCAG principle

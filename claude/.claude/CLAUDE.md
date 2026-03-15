@@ -4,45 +4,37 @@
 Senior frontend engineer: jesus-molano. CachyOS, Zsh, Neovim, pnpm.
 Vue 3.5 / Nuxt 4 · React 19 / Next.js 16.
 
-## Critical Rules
+## Critical Rules — Always Active
 - NEVER add "Co-Authored-By", AI attribution, or generated-by footers — EVER
-- Conventional commits: type(scope): description. Imperative, <72 chars
 - TypeScript strict. No `any` — use `unknown`
-- Format/lint only if config exists (biome.json, .eslintrc, .prettierrc). No config = no formatting
-- Shared standards in ~/.claude/helpers.md — read relevant sections when a skill references it
+- All standards in `~/.claude/rules/` — load automatically by file type or globally
 
-## Architecture
-- Feature-based structure. NEVER atomic design
-- Barrel exports (index.ts) only at feature boundaries
-- Proxy external APIs through server routes — never expose keys client-side
-- Components < 150 lines
+## Orchestrator Pattern
+The main agent (Opus) is an **orchestrator**. It delegates execution to subagents.
 
-## Framework & Tooling
-- Context7 MCP (resolve-library-id -> query-docs) BEFORE implementing framework-specific code
-- Auto-detect package manager from lockfile. Check .nvmrc before running commands
+**Main agent does:**
+- Break user requests into subtasks and delegate
+- Synthesize subagent results and communicate with user
+- Read plans, CLAUDE.md, configs, and coordination files (<50 lines) directly when needed
 
-## Model Routing
-- Exploration/search/read → Explore agent (Haiku, already default)
-- Mechanical implementation of approved plans → implementer agent (Sonnet)
-- Code reviews → code-reviewer agent (Sonnet)
-- Architecture decisions → arch-advisor agent (Opus)
-- Planning, debugging, complex reasoning → main conversation (Opus)
-- Use `model: "sonnet"` on general-purpose Task calls when the task is straightforward implementation
-- Use `model: "haiku"` on Task calls that only search, read, or gather info
+**Main agent delegates:**
+- Read/Edit/Write source files → implementer or Explore
+- Grep/Glob searches → Explore agent
+- Builds, tests, linters → implementer or general-purpose agent
+- Codebase exploration → Explore agent
+
+## Delegation Routing
+- Find files, code, structure → **Explore** (Haiku)
+- Implement approved plans → **implementer** (Sonnet)
+- Code review → **code-reviewer** (Sonnet)
+- Architecture decisions → **arch-advisor** (Opus)
+- Tests, builds, CLI → **general-purpose** (Sonnet via `model: "sonnet"`)
+- Independent subtasks → launch agents **in parallel**
 
 ## Token Efficiency
-- Concise. No preambles, no restating questions
-- Surgical edits — never rewrite entire files
-- Delegate exploration to subagents (isolated context)
-- Use Read with offset/limit for large files
-- Tests: use `--reporter=dot` for compact output
-- Builds: pipe through `grep -E 'error|warning'` when output exceeds 50 lines
+- Concise. Delegate everything — subagent context is isolated
+- Never pull file contents into main context; let subagents summarize
 
 ## Phased Execution
-- When a plan has phases, execute ONE phase at a time. STOP and ask before advancing
-- After /clear or compaction, re-read the plan and resume from the current phase — never restart all phases
-- This rule applies even with auto-accepts enabled
-
-## Compact Focus
-After compaction, check `docs/project-status.yaml` or `docs/session-state.md` for task continuity.
-Shared standards live in `~/.claude/helpers.md` — re-read when needed.
+- Execute ONE phase at a time. STOP and ask before advancing
+- After /clear or compaction, re-read the plan and resume from current phase

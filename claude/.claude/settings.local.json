@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:gist.github.com)",
+      "WebFetch(domain:docs.anthropic.com)",
+      "WebFetch(domain:nuxt.com)",
+      "WebFetch(domain:nitro.build)",
+      "WebSearch"
+    ]
+  }
+}

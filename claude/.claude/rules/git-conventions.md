@@ -1,7 +1,5 @@
 ---
 description: Git commit message conventions
-globs:
-  - "**/*"
 ---
 
 # Git Conventions

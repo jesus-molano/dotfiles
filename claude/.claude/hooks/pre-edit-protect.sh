@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block modifications to protected files
-# Returns JSON with decision: "block" or "approve"
+# PreToolUse hook: block modifications to files with dynamic secret patterns
+# Static patterns (.env, lockfiles, certs) are handled by permissions.deny
 
 set -euo pipefail
 
@@ -11,33 +11,11 @@ file_path=$(echo "$input" | jq -r '.tool_input.file_path // empty')
 
 basename=$(basename "$file_path")
 
-# Block lockfiles
-case "$basename" in
-  pnpm-lock.yaml|package-lock.json|yarn.lock|bun.lockb)
-    echo '{"decision":"block","reason":"Lockfiles must not be modified directly. Use pnpm install instead."}'
-    exit 0
-    ;;
-esac
-
-# Block .env files
-case "$basename" in
-  .env|.env.*)
-    echo '{"decision":"block","reason":"Environment files must not be modified by Claude. Edit manually."}'
-    exit 0
-    ;;
-esac
-
-# Block credential/secret files
-case "$basename" in
-  *.pem|*.key|*.cert|*.p12|*.pfx)
-    echo '{"decision":"block","reason":"Credential files must not be modified."}'
-    exit 0
-    ;;
-esac
-
+# Block files with "secret" or "credential" in name (dynamic pattern)
 case "$basename" in
   *secret*|*credential*)
-    echo '{"decision":"block","reason":"Files containing secrets must not be modified."}'
+    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Files containing secrets must not be modified."}}'
+    echo "[$(date -Iseconds)] pre-edit-protect: BLOCKED secret ${file_path}" >&2
     exit 0
     ;;
 esac
@@ -45,9 +23,11 @@ esac
 # Block .git internals
 case "$file_path" in
   */.git/*|.git/*)
-    echo '{"decision":"block","reason":"Git internals must not be modified directly."}'
+    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Git internals must not be modified directly."}}'
+    echo "[$(date -Iseconds)] pre-edit-protect: BLOCKED .git ${file_path}" >&2
     exit 0
     ;;
 esac
 
+echo "[$(date -Iseconds)] pre-edit-protect: allowed ${file_path}" >&2
 exit 0

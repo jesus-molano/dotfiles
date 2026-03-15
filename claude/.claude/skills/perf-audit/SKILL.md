@@ -3,7 +3,7 @@ name: perf-audit
 description: Audit project for performance issues across Vue/Nuxt and React/Next.js
 disable-model-invocation: true
 context: fork
-agent: Explore
+agent: code-reviewer
 ---
 
 # Performance Audit
@@ -12,7 +12,7 @@ Auto-detect framework and audit accordingly.
 
 ## Steps
 1. Detect framework: look for `nuxt.config.ts` (Vue/Nuxt) or `next.config.ts` (React/Next.js)
-2. Read the detailed checklist from `~/.claude/skills/perf-audit/REFERENCE.md`
+2. Read the detailed checklist from `${CLAUDE_SKILL_DIR}/REFERENCE.md`
 3. Only run the section matching the detected framework + Shared Checks
 4. Check memory leaks per `~/.claude/helpers.md#Memory-Leaks`
 5. Scan project files against each checklist item

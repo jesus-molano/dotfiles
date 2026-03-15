@@ -5,6 +5,13 @@ disallowedTools:
   - Write
   - Edit
 model: sonnet
+maxTurns: 15
+background: true
+skills:
+  - perf-audit
+  - a11y-audit
+memory: user
+permissionMode: dontAsk
 ---
 
 # Code Reviewer Agent

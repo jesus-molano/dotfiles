@@ -17,7 +17,7 @@ SEP="${SUB} · ${RST}"
 json=$(cat)
 
 # Extract all fields in one jq call (nested under cost.* and context_window.*)
-IFS=$'\t' read -r model ctx_pct ctx_used ctx_total duration_ms lines_added lines_removed cost_usd cwd < <(
+IFS=$'\t' read -r model ctx_pct ctx_used ctx_total duration_ms lines_added lines_removed cost_usd cwd worktree_name agent_name < <(
   echo "$json" | jq -r '[
     (.model.display_name // "Unknown"),
     (.context_window.used_percentage // 0),
@@ -27,7 +27,9 @@ IFS=$'\t' read -r model ctx_pct ctx_used ctx_total duration_ms lines_added lines
     (.cost.total_lines_added // 0),
     (.cost.total_lines_removed // 0),
     (.cost.total_cost_usd // 0),
-    (.cwd // "")
+    (.cwd // ""),
+    (.worktree.name // ""),
+    (.agent.name // "")
   ] | @tsv' 2>/dev/null
 )
 
@@ -41,6 +43,8 @@ lines_added=${lines_added:-0}
 lines_removed=${lines_removed:-0}
 cost_usd=${cost_usd:-0}
 cwd=${cwd:-$PWD}
+worktree_name=${worktree_name:-}
+agent_name=${agent_name:-}
 
 # Directory name
 dir=$(basename "$cwd")
@@ -99,6 +103,8 @@ fi
 # Build single line — only show elements with actual data
 out="${BLUE} ${model}${RST}"
 out+="${SEP}${TEXT} ${dir}${RST}"
+[[ -n "$worktree_name" ]] && out+="${SEP}${MAUVE} ${worktree_name}${RST}"
+[[ -n "$agent_name" ]] && out+="${SEP}${BLUE} ${agent_name}${RST}"
 [[ -n "$git_info" ]] && out+="${SEP}${git_info}"
 
 # Context: only show bar + percentage when >0%

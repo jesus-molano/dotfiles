@@ -1,13 +1,17 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
-    "SLASH_COMMAND_TOOL_CHAR_BUDGET": "16000",
-    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "80",
-    "MAX_MCP_OUTPUT_TOKENS": "20000"
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "85",
+    "MAX_MCP_OUTPUT_TOKENS": "20000",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1"
   },
   "attribution": {
     "commit": "",
     "pr": ""
   },
+  "includeGitInstructions": false,
+  "autoMemoryEnabled": true,
   "permissions": {
     "allow": [
       "Bash(pnpm *)",
@@ -42,7 +46,6 @@
       "Bash(docker *)",
       "Bash(docker-compose *)",
       "Bash(jq *)",
-      "Bash(curl *)",
       "Bash(stow *)"
     ],
     "deny": [
@@ -57,15 +60,42 @@
       "Bash(git push -f *)",
       "Bash(git reset --hard *)",
       "Bash(git clean -fd*)",
+      "Bash(git clean -f*)",
       "Bash(rm -rf .*)",
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(*/.env)",
-      "Read(*/.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
       "Read(**/.credentials*)",
       "Read(**/*secret*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*.cert)",
+      "Read(**/*_token)",
+      "Read(**/*.token)",
+      "Read(**/*-token.json)",
       "Write(.env)",
-      "Write(.env.*)"
+      "Write(.env.*)",
+      "Write(**/*.pem)",
+      "Write(**/*.key)",
+      "Write(**/*.cert)",
+      "Write(**/pnpm-lock.yaml)",
+      "Write(**/package-lock.json)",
+      "Write(**/yarn.lock)",
+      "Write(**/bun.lockb)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(*/.env)",
+      "Edit(*/.env.*)",
+      "Edit(**/*.pem)",
+      "Edit(**/*.key)",
+      "Edit(**/*.cert)",
+      "Edit(**/pnpm-lock.yaml)",
+      "Edit(**/package-lock.json)",
+      "Edit(**/yarn.lock)",
+      "Edit(**/bun.lockb)",
+      "Read(~/.ssh/**)",
+      "Read(~/.gnupg/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.kube/**)"
     ]
   },
   "hooks": {
@@ -113,14 +143,65 @@
           }
         ]
       }
+    ],
+    "PostCompact": [
+      {
+        "hooks": [{ "type": "command", "command": "~/.claude/hooks/post-compact-context.sh", "timeout": 10 }]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreCompact\",\"additionalContext\":\"CRITICAL: Preserve in summary: current phase, files modified, architectural decisions made, and any pending tasks.\"}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "InstructionsLoaded": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/log-instructions.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "notify-send 'Claude Code' 'Needs attention'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "~/.claude/hooks/verify-on-stop.sh", "timeout": 60 }]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [{ "type": "command", "command": "~/.claude/hooks/session-end-handoff.sh", "timeout": 2 }]
+      }
     ]
   },
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
+  "enableAllProjectMcpServers": false,
   "enabledPlugins": {
-    "lua-lsp@claude-plugins-official": true
+    "lua-lsp@claude-plugins-official": false,
+    "figma@claude-plugins-official": true
   },
   "language": "es",
   "alwaysThinkingEnabled": true

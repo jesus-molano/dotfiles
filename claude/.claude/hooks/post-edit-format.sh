@@ -49,4 +49,5 @@ elif [[ -f "$project_root/.prettierrc" ]] || [[ -f "$project_root/.prettierrc.js
   npx prettier --write "$file_path" 2>/dev/null || true
 fi
 
+echo "[$(date -Iseconds)] post-format: ${file_path}" >&2
 exit 0
