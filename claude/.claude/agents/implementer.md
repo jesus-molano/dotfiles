@@ -5,6 +5,7 @@ model: sonnet
 maxTurns: 30
 permissionMode: acceptEdits
 memory: project
+isolation: worktree
 ---
 
 # Implementation Agent

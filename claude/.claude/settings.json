@@ -1,19 +1,25 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "env": {
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "claude-opus-4-7",
     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "85",
     "MAX_MCP_OUTPUT_TOKENS": "20000",
     "DISABLE_TELEMETRY": "1",
-    "DISABLE_ERROR_REPORTING": "1"
+    "DISABLE_ERROR_REPORTING": "1",
+    "PATH": "/home/jesus_hh/.local/share/fnm/node-versions/v24.14.0/installation/bin:/home/jesus_hh/.local/share/pnpm:/home/jesus_hh/.local/share/fnm:/home/jesus_hh/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
   },
   "attribution": {
     "commit": "",
     "pr": ""
   },
   "includeGitInstructions": false,
-  "autoMemoryEnabled": true,
+  "skipAutoPermissionPrompt": true,
   "permissions": {
+    "defaultMode": "auto",
     "allow": [
+      "Read(**/.env.example)",
+      "Write(**/.env.example)",
+      "Edit(**/.env.example)",
       "Bash(pnpm *)",
       "Bash(npm *)",
       "Bash(npx *)",
@@ -98,6 +104,7 @@
       "Read(~/.kube/**)"
     ]
   },
+  "enableAllProjectMcpServers": false,
   "hooks": {
     "PostToolUse": [
       {
@@ -131,6 +138,16 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/home/jesus_hh/.claude/hooks/log-skill-usage.sh",
+            "timeout": 2
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -146,7 +163,13 @@
     ],
     "PostCompact": [
       {
-        "hooks": [{ "type": "command", "command": "~/.claude/hooks/post-compact-context.sh", "timeout": 10 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/post-compact-context.sh",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PreCompact": [
@@ -185,12 +208,24 @@
     ],
     "Stop": [
       {
-        "hooks": [{ "type": "command", "command": "~/.claude/hooks/verify-on-stop.sh", "timeout": 60 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/verify-on-stop.sh",
+            "timeout": 60
+          }
+        ]
       }
     ],
     "SessionEnd": [
       {
-        "hooks": [{ "type": "command", "command": "~/.claude/hooks/session-end-handoff.sh", "timeout": 2 }]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-end-handoff.sh",
+            "timeout": 2
+          }
+        ]
       }
     ]
   },
@@ -198,11 +233,14 @@
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
-  "enableAllProjectMcpServers": false,
   "enabledPlugins": {
     "lua-lsp@claude-plugins-official": false,
     "figma@claude-plugins-official": true
   },
+  "cleanupPeriodDays": 30,
   "language": "es",
-  "alwaysThinkingEnabled": true
+  "outputStyle": "Concise",
+  "alwaysThinkingEnabled": true,
+  "effortLevel": "xhigh",
+  "autoMemoryEnabled": true
 }

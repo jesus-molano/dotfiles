@@ -8,7 +8,8 @@
       "WebFetch(domain:docs.anthropic.com)",
       "WebFetch(domain:nuxt.com)",
       "WebFetch(domain:nitro.build)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:www.aihero.dev)"
     ]
   }
 }
