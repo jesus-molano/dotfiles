@@ -38,9 +38,20 @@ hl.config({
         inactive_opacity = 0.85,
         fullscreen_opacity = 1,
         blur = {
-            size = 5,
-            passes = 4,
+            size = 3,
+            passes = 2,
             special = true,
         },
     },
+})
+
+hl.layer_rule({
+    name = "noctalia",
+    match = {
+        namespace = "^noctalia-(bar-.+|notification|dock|panel|attached-panel|osd|window-switcher)$",
+    },
+    no_anim = true,
+    ignore_alpha = 0.5,
+    blur = true,
+    blur_popups = true,
 })

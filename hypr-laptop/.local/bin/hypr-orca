@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Focus the existing Orca window; start the app through UWSM only when needed.
 if hyprctl clients -j | jq -e '.[] | select((.class // "" | ascii_downcase) == "orca")' >/dev/null; then
-    exec hyprctl dispatch focuswindow 'class:^(orca)$'
+	exec hyprctl eval 'hl.dispatch(hl.dsp.focus({ window = "class:^[Oo]rca$" }))'
 fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"

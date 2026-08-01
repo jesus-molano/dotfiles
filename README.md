@@ -30,17 +30,9 @@ Los paquetes del sistema y de AUR están declarados en `packages.csv`.
 
 ## Tema Project Atlas
 
-La paleta `ProjectAtlas` de Noctalia es la fuente visual del perfil. Genera los
-colores de Hyprland, GTK 3/4, Qt/KDE, Ghostty, Kitty, Starship, btop, Zellij,
-Micro, bat/delta, Codex y VS Code/VSCodium. Neovim lee la misma paleta al
-iniciar y `orca-safe-settings` registra el tema ANSI en Orca antes de abrir una
-sesión nueva, con copia previa de sus ajustes.
-
-Los adaptadores nativos se seleccionan en `[theme.templates]`; los formatos que
-Noctalia no incluye se renderizan desde `noctalia/.config/noctalia/templates/`.
-VS Code y VSCodium reciben una extensión declarativa local sin código
-ejecutable. Qt usa `Fusion` con los colores generados por Noctalia, por lo que
-Kvantum ya no forma parte del perfil.
+La paleta `ProjectAtlas` genera los temas de Hyprland, GTK, Qt/KDE, Ghostty,
+Kitty, Starship, btop, Zellij, Micro, bat/delta, Codex, Neovim, Orca y
+VS Code/VSCodium.
 
 ## Instalación
 
@@ -60,6 +52,7 @@ una copia de los archivos que vaya a sustituir.
 just list                  # módulos permitidos
 just check workstation     # simulación del perfil completo
 just check hypr-laptop     # simulación de un módulo
+just doctor                # diagnóstico completo de solo lectura
 just apply workstation     # simular y desplegar
 just remove workstation    # simular y retirar enlaces
 ```
@@ -109,8 +102,8 @@ Kanata convierte Caps Lock en:
 | `Hyper + Enter` | Ghostty |
 | `Hyper + B` | Brave |
 | `Hyper + E` | Dolphin |
-| `Hyper + O` | Orca |
-| `Hyper + M` | Spotify |
+| `Hyper + O` | Enfocar o abrir Orca |
+| `Hyper + M` | Enfocar o abrir Spotify |
 | `Hyper + 1` | 1Password |
 | `Alt + Space` | Launcher de Noctalia |
 | `Hyper + N` | Notificaciones |
@@ -157,3 +150,5 @@ nvim/.config/nvim/              editor
 vscode/                         VS Code y VSCodium
 system-etc/                     archivos destinados a /etc
 ```
+
+Orca se instala fuera de Pacman y debe proporcionar `orca-ide` en `PATH`.

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if hyprctl clients -j | jq -e '.[] | select((.class // "" | ascii_downcase) == "spotify")' >/dev/null; then
+	exec hyprctl eval 'hl.dispatch(hl.dsp.focus({ window = "class:^[Ss]potify$" }))'
+fi
+
+exec uwsm app -- spotify-launcher

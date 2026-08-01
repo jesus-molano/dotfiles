@@ -8,4 +8,4 @@ x-scheme-handler/unknown=brave-browser.desktop
 
 [Added Associations]
 text/markdown=nvim.desktop;
-inode/directory=org.kde.dolphin.desktop;thunar.desktop;
+inode/directory=org.kde.dolphin.desktop;

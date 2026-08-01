@@ -100,6 +100,10 @@ remove target:
 status:
     @just --justfile "{{ justfile() }}" check workstation
 
+# Diagnóstico de solo lectura del perfil y del sistema anfitrión.
+doctor:
+    "{{ dotfiles_dir }}/scripts/doctor.sh"
+
 # Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
 atlas-check:
     "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --check
@@ -173,15 +177,15 @@ apply-system module:
     while IFS= read -r -d '' source; do
         relative="${source#"$source_root/"}"
         target="$target_root/$relative"
-        if sudo test -e "$target" && sudo cmp -s "$source" "$target"; then
+        if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
             printf '= %s (sin cambios)\n' "$target"
             continue
         fi
-        if sudo test -e "$target" || sudo test -L "$target"; then
-            sudo cp --archive --parents "$target" "$backup_root"
+        if [[ -e "$target" || -L "$target" ]]; then
+            pkexec /usr/bin/cp --archive --parents "$target" "$backup_root"
         fi
         mode="$(stat -c '%a' "$source")"
-        sudo install -D -m "$mode" "$source" "$target"
+        pkexec /usr/bin/install -D -m "$mode" "$source" "$target"
         printf '✓ %s\n' "$target"
     done < <(find "$source_root" -type f -print0 | sort -z)
 

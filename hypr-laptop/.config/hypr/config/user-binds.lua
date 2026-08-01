@@ -14,20 +14,20 @@ end
 
 -- Vim-style focus, movement and resize.
 local directions = {
-    H = { focus = "left", move = "l", resize = { x = -40, y = 0 } },
-    J = { focus = "down", move = "d", resize = { x = 0, y = 40 } },
-    K = { focus = "up", move = "u", resize = { x = 0, y = -40 } },
-    L = { focus = "right", move = "r", resize = { x = 40, y = 0 } },
+    H = { focus = "left", move = "l", label = "la izquierda", resize = { x = -40, y = 0 } },
+    J = { focus = "down", move = "d", label = "abajo", resize = { x = 0, y = 40 } },
+    K = { focus = "up", move = "u", label = "arriba", resize = { x = 0, y = -40 } },
+    L = { focus = "right", move = "r", label = "la derecha", resize = { x = 40, y = 0 } },
 }
 for key, direction in pairs(directions) do
     bind(alt .. " + " .. key, hl.dsp.focus({ direction = direction.focus }),
-        "Mover foco hacia " .. direction.focus)
+        "Mover foco hacia " .. direction.label)
     bind(alt .. " + SHIFT + " .. key,
         hl.dsp.window.move({ direction = direction.move, group_aware = true }),
-        "Mover ventana hacia " .. direction.focus)
+        "Mover ventana hacia " .. direction.label)
     bind(alt .. " + CONTROL + " .. key,
         hl.dsp.window.resize({ x = direction.resize.x, y = direction.resize.y, relative = true }),
-        "Redimensionar ventana hacia " .. direction.focus, { repeating = true })
+        "Redimensionar ventana hacia " .. direction.label, { repeating = true })
 end
 
 bind(alt .. " + X", hl.dsp.window.close(), "Cerrar la ventana activa")
@@ -61,7 +61,7 @@ bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Abrir Ghostty")
 bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir Brave")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Abrir Dolphin")
 bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Enfocar o abrir Orca")
-bind(hyper .. " + M", hl.dsp.exec_cmd(launch .. "spotify-launcher"), "Abrir Spotify")
+bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Enfocar o abrir Spotify")
 bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Abrir launcher")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Abrir notificaciones")

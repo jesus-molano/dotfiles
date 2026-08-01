@@ -6,7 +6,7 @@ core,xorg-xwayland,native
 core,wl-clipboard,native
 core,hyprpicker,native
 core,satty,native
-core,brave-bin,aur
+core,brave-bin,native
 terminal,ghostty,native
 terminal,fish,native
 terminal,cachyos-fish-config,native
@@ -20,6 +20,7 @@ terminal,fastfetch,native
 terminal,duf,native
 terminal,btop,native
 terminal,yazi,native
+desktop,spotify-launcher,native
 keyboard,kanata-bin,aur
 development,git,native
 development,base-devel,native
@@ -40,6 +41,7 @@ development,shfmt,native
 development,python,native
 development,python-pynvim,native
 files,dolphin,native
+files,ark,native
 files,gvfs,native
 files,gvfs-mtp,native
 files,udiskie,native
@@ -80,3 +82,4 @@ media,ffmpegthumbnailer,native
 media,libdvdcss,native
 development,1password,aur
 development,1password-cli,aur
+development,visual-studio-code-bin,aur

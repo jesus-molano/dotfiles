@@ -2,12 +2,10 @@
 	name = jesus-molano
 	email = jessumolano@gmail.com
 	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOiWj5OG9LuaQVD6MRVguuuP6oR6NyFCuNcRnhGuJtxS
-[credential "https://github.com"]
-	helper =
-	helper = !/usr/bin/gh auth git-credential
-[credential "https://gist.github.com"]
-	helper =
-	helper = !/usr/bin/gh auth git-credential
+[url "git@github.com:"]
+	insteadOf = https://github.com/
+[url "git@gist.github.com:"]
+	insteadOf = https://gist.github.com/
 [init]
 	defaultBranch = main
 [core]

@@ -2,5 +2,7 @@
   "window.autoDetectColorScheme": false,
   "workbench.colorTheme": "Project Atlas",
   "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font",
-  "terminal.integrated.minimumContrastRatio": 1
+  "terminal.integrated.minimumContrastRatio": 1,
+  "gitlens.ai.model": "vscode",
+  "gitlens.ai.vscode.model": "copilotcli:"
 }

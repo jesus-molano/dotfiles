@@ -115,17 +115,16 @@ collect_packages() {
 }
 
 check_packages() {
-	local -a native_packages aur_packages missing
+	local -a native_packages aur_packages
 	mapfile -t native_packages < <(collect_packages native)
 	mapfile -t aur_packages < <(collect_packages aur)
 
 	info "Validando ${#native_packages[@]} paquetes de repositorios..."
-	missing=()
-	local package
-	for package in "${native_packages[@]}"; do
-		pacman -Si "$package" >/dev/null 2>&1 || missing+=("$package")
-	done
-	((${#missing[@]} == 0)) || die "Paquetes nativos no encontrados: ${missing[*]}"
+	local package_metadata
+	if ! package_metadata="$(pacman -Si "${native_packages[@]}" 2>&1)"; then
+		printf '%s\n' "$package_metadata" >&2
+		die "Hay paquetes nativos no disponibles en los repositorios configurados."
+	fi
 
 	printf 'Paquetes nativos: %s\n' "${native_packages[*]}"
 	printf 'Paquetes AUR (revisión de Shelly): %s\n' "${aur_packages[*]}"
