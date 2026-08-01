@@ -1,0 +1,12 @@
+[SddmGreeterTheme]
+Name=Project Atlas
+Description=Project Atlas login theme for Hyprland
+Type=sddm-theme
+Author=jesus-molano
+License=MIT
+Version=1.0
+MainScript=Main.qml
+ConfigFile=theme.conf
+Theme-Id=project-atlas
+Theme-API=2.0
+QtVersion=6
