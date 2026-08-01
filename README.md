@@ -86,7 +86,7 @@ simula Stow antes de escribir y crea una copia reversible. No usa Paru ni aplica
 ajustes delicados del sistema.
 
 ```bash
-git clone https://github.com/jesus-molano/dotfiles.git ~/.dotfiles
+git clone git@github.com:jesus-molano/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
 ./install.sh
 ```
