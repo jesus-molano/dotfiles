@@ -5,7 +5,7 @@ if command -v op &>/dev/null; then
   eval "$(op inject -i ~/.env.op 2>/dev/null)"
 fi
 
-# fnm (Fast Node Manager) — needed for Claude Code
+# fnm (Fast Node Manager)
 export FNM_PATH="$HOME/.local/share/fnm"
 if [[ -d "$FNM_PATH" ]]; then
   export PATH="$FNM_PATH:$PATH"

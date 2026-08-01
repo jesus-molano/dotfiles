@@ -9,7 +9,7 @@ layout {
     tab name="dev" focus=true {
         pane split_direction="vertical" {
             pane size="62%" name="nvim" focus=true
-            pane size="38%" name="claude"
+            pane size="38%" name="codex"
         }
     }
 

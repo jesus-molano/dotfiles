@@ -1,6 +1,6 @@
 # Dotfiles management with GNU Stow
 
-dotfiles_dir := env_var("HOME") / "dotfiles"
+dotfiles_dir := justfile_directory()
 
 # List all stow packages
 list:
@@ -18,11 +18,11 @@ stow *packages:
         for dir in */; do
             pkg="${dir%/}"
             case "$pkg" in [A-Z]*) continue;; esac
-            stow -t ~ "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
+            stow --no-folding -t ~ "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
         done
     else
         for pkg in {{packages}}; do
-            stow -t ~ "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
+            stow --no-folding -t ~ "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
         done
     fi
 
@@ -31,7 +31,7 @@ unstow +packages:
     #!/usr/bin/env bash
     cd {{dotfiles_dir}}
     for pkg in {{packages}}; do
-        stow -t ~ -D "$pkg" && echo "✓ unstowed $pkg" || echo "✗ $pkg"
+        stow --no-folding -t ~ -D "$pkg" && echo "✓ unstowed $pkg" || echo "✗ $pkg"
     done
 
 # Restow packages (unstow + stow) — useful after changes
@@ -42,11 +42,11 @@ restow *packages:
         for dir in */; do
             pkg="${dir%/}"
             case "$pkg" in [A-Z]*) continue;; esac
-            stow -t ~ -R "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
+            stow --no-folding -t ~ -R "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
         done
     else
         for pkg in {{packages}}; do
-            stow -t ~ -R "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
+            stow --no-folding -t ~ -R "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
         done
     fi
 
@@ -59,12 +59,12 @@ check *packages:
             pkg="${dir%/}"
             case "$pkg" in [A-Z]*) continue;; esac
             echo "--- $pkg ---"
-            stow -t ~ -n "$pkg" 2>&1
+            stow --no-folding -t ~ -n "$pkg" 2>&1
         done
     else
         for pkg in {{packages}}; do
             echo "--- $pkg ---"
-            stow -t ~ -n "$pkg" 2>&1
+            stow --no-folding -t ~ -n "$pkg" 2>&1
         done
     fi
 
@@ -79,9 +79,9 @@ status:
     for dir in */; do
         pkg="${dir%/}"
         case "$pkg" in [A-Z]*) continue;; esac
-        if stow -t ~ -n "$pkg" 2>&1 | grep -q "WARNING"; then
+        if stow --no-folding -t ~ -n "$pkg" 2>&1 | grep -q "WARNING"; then
             echo "✗ $pkg (conflicts)"
-        elif [ -L "$HOME/.config/$pkg" ] || stow -t ~ -n "$pkg" 2>&1 | grep -q "^$"; then
+        elif [ -L "$HOME/.config/$pkg" ] || stow --no-folding -t ~ -n "$pkg" 2>&1 | grep -q "^$"; then
             echo "✓ $pkg"
         else
             echo "? $pkg (not stowed)"

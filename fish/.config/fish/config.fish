@@ -25,9 +25,16 @@ if command -q direnv
 end
 
 # 1Password secrets — run `secrets` to load on demand
+if test -S "$HOME/.1password/agent.sock"
+    set -gx SSH_AUTH_SOCK "$HOME/.1password/agent.sock"
+end
 
-zoxide init fish | source
-starship init fish | source
+if command -q zoxide
+    zoxide init fish | source
+end
+if command -q starship
+    starship init fish | source
+end
 fish_add_path -g "$HOME/.local/bin"
 
 # Dev abbreviations
@@ -44,4 +51,3 @@ abbr -a lg 'lazygit'
 # bun
 set --export BUN_INSTALL "$HOME/.bun"
 set --export PATH $BUN_INSTALL/bin $PATH
-

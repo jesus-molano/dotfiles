@@ -26,27 +26,11 @@
 
 ---
 
-## 3. AI — Claude Code + Copilot
+## 3. AI — Codex + Copilot
 
-### Claude Code (`<leader>a`)
-
-| Atajo | Accion |
-|-------|--------|
-| `<leader>ac` | Abrir/cerrar terminal de Claude Code (panel derecho, 35%) |
-| `<leader>af` | Dar foco al panel de Claude |
-| `<leader>ar` | Reanudar conversacion anterior (`--resume`) |
-| `<leader>aC` | Continuar ultima conversacion (`--continue`) |
-| `<leader>am` | Cambiar modelo (Opus/Sonnet/Haiku) |
-| `<leader>ab` | Enviar buffer actual como contexto a Claude |
-| `<leader>as` | **Visual mode**: enviar seleccion a Claude |
-| `<leader>as` | **En neo-tree**: agregar archivo del arbol a Claude |
-| `<leader>aa` | Aceptar diff propuesto por Claude |
-| `<leader>ad` | Rechazar diff propuesto por Claude |
-
-**Tips**:
-- Los diffs de Claude se abren en nueva tab — revisalos antes de aceptar
-- Selecciona codigo en visual mode y `<leader>as` para preguntar sobre un fragmento especifico
-- Usa `<leader>ab` para dar contexto del archivo antes de hacer preguntas
+Codex se ejecuta fuera de Neovim, en una terminal o panel de Zellij, para que
+pueda trabajar sobre el repositorio completo y ejecutar sus validaciones.
+`Hyper + .` abre una terminal nueva con Codex.
 
 ### Copilot (viene con el extra `ai.copilot`)
 
@@ -386,11 +370,11 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ```
 NAVEGACION          CODIGO              GIT                 AI
-<leader>ff files    gd definicion       <leader>gg lazygit  <leader>ac claude
-<leader>fg grep     gr referencias      ]h next hunk        <leader>as enviar
-<leader>e  tree     K  hover            <leader>ghs stage   <leader>ab buffer
-s          flash    <leader>ca actions  <leader>gb blame    <leader>am modelo
-<C-o>      back     <leader>cr rename   <leader>gd diff     Tab copilot
+<leader>ff files    gd definicion       <leader>gg lazygit  Hyper+. Codex
+<leader>fg grep     gr referencias      ]h next hunk        Tab Copilot
+<leader>e  tree     K  hover            <leader>ghs stage
+s          flash    <leader>ca actions  <leader>gb blame
+<C-o>      back     <leader>cr rename   <leader>gd diff
 
 TESTING             BUFFERS             UI                  DEBUG
 <leader>tr nearest  <S-h/l>   cambiar   <leader>ut context  <leader>db break
@@ -408,7 +392,7 @@ Para comprobar que todo funciona:
 2. `:Lazy` — verificar que no hay errores en plugins
 3. `:Mason` — verificar LSP servers instalados
 4. `:LspInfo` en un archivo `.vue`/`.ts` — confirmar que volar/ts_ls estan activos
-5. `<leader>ac` — verificar que Claude Code abre panel
+5. `Hyper + .` — verificar que Codex abre en una terminal independiente
 6. `<leader>gg` — verificar que LazyGit funciona
 7. `<leader>ut` — verificar treesitter context toggle
 8. `<leader>tt` en un archivo `.test.ts` — verificar que neotest ejecuta vitest

@@ -1,21 +1,18 @@
-;; Configuración básica para que el teclado siga funcionando normal
+;; Caps Lock: tap = Escape, hold = Hyper (Ctrl+Alt+Super+Shift).
 (defcfg
   process-unmapped-keys yes
 )
 
-;; Teclas físicas que vamos a interceptar
+;; Keep the source list intentionally small. Unmapped keys pass through.
 (defsrc
   caps a s d f h j k l
 )
 
-;; Alias y Lógica
 (defalias
-  ;; Tap = Esc, Hold = Hyper
-  ;; USAMOS: lctl (Left Ctrl), lalt (Left Alt), lmet (Left Meta/Win), lsft (Left Shift)
+  ;; Preserve the timings from the previous desktop configuration.
   cap (tap-hold 150 200 esc (multi lctl lalt lmet lsft))
 )
 
-;; Capa base
 (deflayer base
   @cap a s d f h j k l
 )

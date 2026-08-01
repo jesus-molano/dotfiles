@@ -24,9 +24,8 @@ postman/
 *.swo
 *~
 
-# AI
-CLAUDE.md
-.claude/
+# AI runtime state
+.codex/
 docs/session-state.md
 _bmad/
 _bmad-output/
