@@ -145,7 +145,34 @@ custom_palette = "ProjectAtlas"
 wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
-builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "qt", "ghostty" ]
+builtin_ids = [ "btop", "ghostty", "gtk3", "gtk4", "hyprland", "kcolorscheme", "kitty", "qt", "starship" ]
+
+[theme.templates.user.bat]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas.tmTheme"
+output_path = "$XDG_CONFIG_HOME/bat/themes/project-atlas.tmTheme"
+post_hook = "bat cache --build"
+
+[theme.templates.user.codex]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas.tmTheme"
+output_path = "~/.codex/themes/project-atlas.tmTheme"
+post_hook = "$HOME/.local/bin/project-atlas-theme-settings codex"
+
+[theme.templates.user.micro]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas.micro"
+output_path = "$XDG_CONFIG_HOME/micro/colorschemes/project-atlas.micro"
+post_hook = "$HOME/.local/bin/project-atlas-theme-settings micro"
+
+[theme.templates.user.vscode]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas-color-theme.json"
+output_path = "~/.vscode/extensions/project-atlas-theme-1.0.0/themes/project-atlas-color-theme.json"
+
+[theme.templates.user.vscodium]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas-color-theme.json"
+output_path = "~/.vscode-oss/extensions/project-atlas-theme-1.0.0/themes/project-atlas-color-theme.json"
+
+[theme.templates.user.zellij]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas-zellij.kdl"
+output_path = "$XDG_CONFIG_HOME/zellij/themes/project-atlas.kdl"
 
 [widget.launcher]
 color = "primary"

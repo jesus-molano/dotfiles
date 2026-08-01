@@ -1,0 +1,42 @@
+color-link default "{{colors.terminal_foreground.default.hex}},{{colors.terminal_background.default.hex}}"
+color-link comment "{{colors.on_surface_variant.default.hex}}"
+
+color-link identifier "{{colors.terminal_normal_blue.default.hex}}"
+color-link identifier.class "{{colors.terminal_normal_blue.default.hex}}"
+color-link identifier.var "{{colors.terminal_normal_blue.default.hex}}"
+
+color-link constant "{{colors.terminal_normal_yellow.default.hex}}"
+color-link constant.number "{{colors.terminal_normal_yellow.default.hex}}"
+color-link constant.string "{{colors.terminal_normal_green.default.hex}}"
+
+color-link symbol "{{colors.terminal_normal_magenta.default.hex}}"
+color-link symbol.brackets "{{colors.secondary.default.hex}}"
+color-link symbol.tag "{{colors.primary.default.hex}}"
+
+color-link type "{{colors.terminal_normal_blue.default.hex}}"
+color-link type.keyword "{{colors.tertiary.default.hex}}"
+
+color-link special "{{colors.terminal_normal_magenta.default.hex}}"
+color-link statement "{{colors.primary.default.hex}}"
+color-link preproc "{{colors.secondary.default.hex}}"
+
+color-link underlined "{{colors.terminal_normal_cyan.default.hex}}"
+color-link error "bold {{colors.error.default.hex}}"
+color-link todo "bold {{colors.tertiary.default.hex}}"
+
+color-link diff-added "{{colors.terminal_normal_green.default.hex}}"
+color-link diff-modified "{{colors.terminal_normal_yellow.default.hex}}"
+color-link diff-deleted "{{colors.error.default.hex}}"
+
+color-link gutter-error "{{colors.error.default.hex}}"
+color-link gutter-warning "{{colors.tertiary.default.hex}}"
+
+color-link statusline "{{colors.on_surface.default.hex}},{{colors.surface.default.hex}}"
+color-link tabbar "{{colors.on_surface.default.hex}},{{colors.surface.default.hex}}"
+color-link indent-char "{{colors.outline.default.hex}}"
+color-link line-number "{{colors.outline.default.hex}}"
+color-link current-line-number "{{colors.primary.default.hex}}"
+
+color-link cursor-line "{{colors.on_surface.default.hex}},{{colors.surface_variant.default.hex}}"
+color-link color-column "{{colors.surface_variant.default.hex}}"
+color-link type.extended "default"

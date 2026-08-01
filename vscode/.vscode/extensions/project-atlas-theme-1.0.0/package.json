@@ -1,0 +1,20 @@
+{
+  "name": "project-atlas-theme",
+  "displayName": "Project Atlas Theme",
+  "description": "Noctalia-generated Project Atlas color theme.",
+  "version": "1.0.0",
+  "publisher": "jesus-molano",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Themes"],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Project Atlas",
+        "uiTheme": "vs-dark",
+        "path": "./themes/project-atlas-color-theme.json"
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "window.autoDetectColorScheme": false,
+  "workbench.colorTheme": "Project Atlas",
+  "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font",
+  "terminal.integrated.minimumContrastRatio": 1
+}

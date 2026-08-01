@@ -22,11 +22,25 @@ Configuración del perfil `workstation`, gestionada con GNU Stow.
 El perfil `workstation` despliega estos módulos:
 
 ```text
-codex fish fonts ghostty git hypr-laptop kanata kvantum mimeapps
-noctalia nvim shell starship zellij
+codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia
+nvim shell starship vscode zellij
 ```
 
 Los paquetes del sistema y de AUR están declarados en `packages.csv`.
+
+## Tema Project Atlas
+
+La paleta `ProjectAtlas` de Noctalia es la fuente visual del perfil. Genera los
+colores de Hyprland, GTK 3/4, Qt/KDE, Ghostty, Kitty, Starship, btop, Zellij,
+Micro, bat/delta, Codex y VS Code/VSCodium. Neovim lee la misma paleta al
+iniciar y `orca-safe-settings` registra el tema ANSI en Orca antes de abrir una
+sesión nueva, con copia previa de sus ajustes.
+
+Los adaptadores nativos se seleccionan en `[theme.templates]`; los formatos que
+Noctalia no incluye se renderizan desde `noctalia/.config/noctalia/templates/`.
+VS Code y VSCodium reciben una extensión declarativa local sin código
+ejecutable. Qt usa `Fusion` con los colores generados por Noctalia, por lo que
+Kvantum ya no forma parte del perfil.
 
 ## Instalación
 
@@ -140,5 +154,6 @@ kanata/.config/kanata/          teclado
 ghostty/.config/ghostty/        terminal
 fish/.config/fish/              shell y funciones
 nvim/.config/nvim/              editor
+vscode/                         VS Code y VSCodium
 system-etc/                     archivos destinados a /etc
 ```

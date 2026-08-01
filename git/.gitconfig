@@ -21,7 +21,7 @@
 	side-by-side = true
 	line-numbers = true
 	hyperlinks = true
-	syntax-theme = Catppuccin Mocha
+	syntax-theme = Project Atlas
 [diff]
 	tool = nvimdiff
 	colorMoved = default

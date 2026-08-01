@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/theme-backups"
+
+backup_and_replace() {
+	local target=$1 tmp=$2 label=$3
+
+	if [[ -f "$target" ]] && cmp -s "$target" "$tmp"; then
+		return 0
+	fi
+
+	mkdir -p "$state_root" "$(dirname "$target")"
+	chmod 700 "$state_root"
+
+	if [[ -f "$target" ]]; then
+		local backup="$state_root/${label}.$(date +%Y%m%d-%H%M%S).bak"
+		install -m 600 "$target" "$backup"
+		printf 'Project Atlas: backup de %s en %s\n' "$label" "$backup"
+	fi
+
+	if [[ -e "$target" || -L "$target" ]]; then
+		cat "$tmp" >"$target"
+	else
+		install -m 600 "$tmp" "$target"
+	fi
+}
+
+apply_codex() {
+	local target="${CODEX_HOME:-$HOME/.codex}/config.toml"
+	local tmp
+	mkdir -p "$state_root"
+	tmp="$(mktemp "$state_root/codex-config.XXXXXX")"
+	trap 'rm -f "$tmp"' RETURN
+
+	if [[ ! -f "$target" ]]; then
+		printf '[tui]\ntheme = "project-atlas"\n' >"$tmp"
+	else
+		awk '
+            function write_theme() {
+                if (in_tui && !theme_written) {
+                    print "theme = \"project-atlas\""
+                    theme_written = 1
+                }
+            }
+
+            /^\[\[?[^]]+\]\]?[[:space:]]*(#.*)?$/ {
+                write_theme()
+                in_tui = ($0 ~ /^\[tui\][[:space:]]*(#.*)?$/)
+                if (in_tui) {
+                    saw_tui = 1
+                    theme_written = 0
+                }
+                print
+                next
+            }
+
+            in_tui && /^[[:space:]]*theme[[:space:]]*=/ {
+                if (!theme_written) {
+                    print "theme = \"project-atlas\""
+                    theme_written = 1
+                }
+                next
+            }
+
+            { print }
+
+            END {
+                write_theme()
+                if (!saw_tui) {
+                    if (NR > 0) print ""
+                    print "[tui]"
+                    print "theme = \"project-atlas\""
+                }
+            }
+        ' "$target" >"$tmp"
+	fi
+
+	backup_and_replace "$target" "$tmp" codex-config
+}
+
+apply_micro() {
+	local config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+	local target="$config_root/micro/settings.json"
+	local tmp
+	mkdir -p "$state_root"
+	tmp="$(mktemp "$state_root/micro-settings.XXXXXX")"
+	trap 'rm -f "$tmp"' RETURN
+
+	if [[ -f "$target" ]]; then
+		jq '.colorscheme = "project-atlas"' "$target" >"$tmp"
+	else
+		printf '{\n  "colorscheme": "project-atlas"\n}\n' >"$tmp"
+	fi
+
+	backup_and_replace "$target" "$tmp" micro-settings
+}
+
+case "${1:-}" in
+codex) apply_codex ;;
+micro) apply_micro ;;
+*)
+	printf 'Uso: project-atlas-theme-settings {codex|micro}\n' >&2
+	exit 2
+	;;
+esac

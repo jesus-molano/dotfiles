@@ -1,0 +1,15 @@
+themes {
+    project-atlas {
+        fg {{colors.terminal_foreground.default.red}} {{colors.terminal_foreground.default.green}} {{colors.terminal_foreground.default.blue}}
+        bg {{colors.terminal_background.default.red}} {{colors.terminal_background.default.green}} {{colors.terminal_background.default.blue}}
+        black {{colors.terminal_normal_black.default.red}} {{colors.terminal_normal_black.default.green}} {{colors.terminal_normal_black.default.blue}}
+        red {{colors.terminal_normal_red.default.red}} {{colors.terminal_normal_red.default.green}} {{colors.terminal_normal_red.default.blue}}
+        green {{colors.terminal_normal_green.default.red}} {{colors.terminal_normal_green.default.green}} {{colors.terminal_normal_green.default.blue}}
+        yellow {{colors.terminal_normal_yellow.default.red}} {{colors.terminal_normal_yellow.default.green}} {{colors.terminal_normal_yellow.default.blue}}
+        blue {{colors.terminal_normal_blue.default.red}} {{colors.terminal_normal_blue.default.green}} {{colors.terminal_normal_blue.default.blue}}
+        magenta {{colors.terminal_normal_magenta.default.red}} {{colors.terminal_normal_magenta.default.green}} {{colors.terminal_normal_magenta.default.blue}}
+        cyan {{colors.terminal_normal_cyan.default.red}} {{colors.terminal_normal_cyan.default.green}} {{colors.terminal_normal_cyan.default.blue}}
+        white {{colors.terminal_normal_white.default.red}} {{colors.terminal_normal_white.default.green}} {{colors.terminal_normal_white.default.blue}}
+        orange {{colors.terminal_bright_yellow.default.red}} {{colors.terminal_bright_yellow.default.green}} {{colors.terminal_bright_yellow.default.blue}}
+    }
+}
