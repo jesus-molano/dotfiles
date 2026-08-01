@@ -1,4 +1,4 @@
--- Personal keyboard workflow layered on top of the vendored CachyOS base.
+-- Personal Alt/Hyper keyboard workflow.
 -- Caps Lock is converted by Kanata: tap = Escape, hold = Hyper.
 
 local alt = "ALT"
@@ -14,25 +14,31 @@ end
 
 -- Vim-style focus, movement and resize.
 local directions = {
-    H = { focus = "left", move = "l", resize = "-40 0" },
-    J = { focus = "down", move = "d", resize = "0 40" },
-    K = { focus = "up", move = "u", resize = "0 -40" },
-    L = { focus = "right", move = "r", resize = "40 0" },
+    H = { focus = "left", move = "l", resize = { x = -40, y = 0 } },
+    J = { focus = "down", move = "d", resize = { x = 0, y = 40 } },
+    K = { focus = "up", move = "u", resize = { x = 0, y = -40 } },
+    L = { focus = "right", move = "r", resize = { x = 40, y = 0 } },
 }
 for key, direction in pairs(directions) do
     bind(alt .. " + " .. key, hl.dsp.focus({ direction = direction.focus }),
         "Mover foco hacia " .. direction.focus)
-    bind(alt .. " + SHIFT + " .. key, hl.dsp.exec_raw("movewindoworgroup", direction.move),
+    bind(alt .. " + SHIFT + " .. key,
+        hl.dsp.window.move({ direction = direction.move, group_aware = true }),
         "Mover ventana hacia " .. direction.focus)
-    bind(alt .. " + CONTROL + " .. key, hl.dsp.exec_raw("resizeactive", direction.resize),
+    bind(alt .. " + CONTROL + " .. key,
+        hl.dsp.window.resize({ x = direction.resize.x, y = direction.resize.y, relative = true }),
         "Redimensionar ventana hacia " .. direction.focus, { repeating = true })
 end
 
 bind(alt .. " + X", hl.dsp.window.close(), "Cerrar la ventana activa")
-bind(alt .. " + M", hl.dsp.window.fullscreen({ mode = 1 }), "Maximizar la ventana activa")
+bind(alt .. " + M", hl.dsp.window.fullscreen({ mode = "maximized" }),
+    "Maximizar la ventana activa")
 bind(alt .. " + F", hl.dsp.window.float({ action = "toggle" }), "Alternar ventana flotante")
+bind(hyper .. " + D", hl.dsp.layout("togglesplit"), "Alternar dirección de la división")
+bind(hyper .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }),
+    "Alternar pantalla completa")
 
--- Eight workspaces on the home row.
+-- Eight workspaces split between both hands on the upper letter row.
 local workspace_keys = { "Q", "W", "E", "R", "U", "I", "O", "P" }
 for workspace, key in ipairs(workspace_keys) do
     bind(alt .. " + " .. key, hl.dsp.focus({ workspace = workspace }),
@@ -50,7 +56,7 @@ bind(alt .. " + G", hl.dsp.group.toggle(), "Alternar grupo de ventanas")
 bind(alt .. " + N", hl.dsp.group.next(), "Ir a la siguiente ventana del grupo")
 bind(alt .. " + SHIFT + N", hl.dsp.group.prev(), "Ir a la anterior ventana del grupo")
 
--- Hyper application and Noctalia layer.
+-- Hyper application, layout and Noctalia layer.
 bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Abrir Ghostty")
 bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir Brave")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Abrir Dolphin")
