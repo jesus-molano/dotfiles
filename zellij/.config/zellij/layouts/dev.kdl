@@ -6,17 +6,9 @@ layout {
         children
     }
 
-    tab name="dev" focus=true {
-        pane split_direction="vertical" {
-            pane size="62%" name="nvim" focus=true
-            pane size="38%" name="codex"
-        }
-    }
-
-    tab name="servers" {
-        pane split_direction="vertical" {
-            pane size="60%" name="dev server"
-            pane size="40%" name="logs"
-        }
+    // Orca owns worktrees and agents. Standalone Zellij starts with one useful
+    // shell and only creates panes or tabs when requested with Alt+Z.
+    tab name="work" focus=true {
+        pane name="shell" focus=true
     }
 }

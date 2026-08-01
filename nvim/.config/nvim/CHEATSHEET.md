@@ -28,9 +28,9 @@
 
 ## 3. AI — Codex + Copilot
 
-Codex se ejecuta fuera de Neovim, en una terminal o panel de Zellij, para que
-pueda trabajar sobre el repositorio completo y ejecutar sus validaciones.
-`Hyper + .` abre una terminal nueva con Codex.
+Codex se ejecuta fuera de Neovim, normalmente en un terminal gestionado por
+Orca, para que pueda trabajar sobre el repositorio completo y ejecutar sus
+validaciones. `Hyper + O` enfoca Orca o lo abre si todavía no está activo.
 
 ### Copilot (viene con el extra `ai.copilot`)
 
@@ -147,16 +147,20 @@ Tu config tiene una estrategia inteligente de formateo:
 | Atajo | Accion |
 |-------|--------|
 | `<leader>gg` | LazyGit (TUI de git completo) |
-| `<leader>gf` | Buscar archivos git |
+| `<leader>gf` | Historial del archivo actual |
 | `<leader>gl` | Log de git |
 | `<leader>gs` | Git status |
 | `<leader>gb` | Git blame (linea actual) |
-| `<leader>gd` | Diff del archivo |
+| `<leader>gd` | Buscar hunks modificados |
 | `]h` / `[h` | Siguiente/anterior hunk (cambio) |
-| `<leader>ghs` | Stage hunk |
-| `<leader>ghr` | Reset hunk |
-| `<leader>ghp` | Preview hunk |
-| `<leader>ghb` | Blame linea |
+| `]H` / `[H` | Ultimo/primer hunk |
+| `ghgh` | Stage del hunk actual con mini.diff |
+| `gHgh` | Restaurar el hunk actual desde el indice |
+| `<leader>go` | Toggle del overlay de mini.diff |
+| `<leader>uG` | Toggle de los indicadores de mini.diff |
+
+En modo visual, `gh` aplica (stage) y `gH` restaura la seleccion. mini.diff
+compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 **Tip**: LazyGit (`<leader>gg`) es un gestor de git completo — puedes hacer commits, push, pull, rebase, cherry-pick, resolver conflictos, todo sin salir de Neovim.
 
@@ -370,9 +374,9 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ```
 NAVEGACION          CODIGO              GIT                 AI
-<leader>ff files    gd definicion       <leader>gg lazygit  Hyper+. Codex
+<leader>ff files    gd definicion       <leader>gg lazygit  Hyper+O Orca
 <leader>fg grep     gr referencias      ]h next hunk        Tab Copilot
-<leader>e  tree     K  hover            <leader>ghs stage
+<leader>e  tree     K  hover            ghgh       stage
 s          flash    <leader>ca actions  <leader>gb blame
 <C-o>      back     <leader>cr rename   <leader>gd diff
 
@@ -392,7 +396,7 @@ Para comprobar que todo funciona:
 2. `:Lazy` — verificar que no hay errores en plugins
 3. `:Mason` — verificar LSP servers instalados
 4. `:LspInfo` en un archivo `.vue`/`.ts` — confirmar que volar/ts_ls estan activos
-5. `Hyper + .` — verificar que Codex abre en una terminal independiente
+5. `Hyper + O` — verificar que Orca se enfoca o abre para gestionar Codex
 6. `<leader>gg` — verificar que LazyGit funciona
 7. `<leader>ut` — verificar treesitter context toggle
 8. `<leader>tt` en un archivo `.test.ts` — verificar que neotest ejecuta vitest

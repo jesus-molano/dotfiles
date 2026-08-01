@@ -1,0 +1,23 @@
+# Preferencias reproducibles. No sustituir config.toml: Orca mantiene allí hooks
+# y hashes específicos de esta máquina.
+model = "gpt-5.6-sol"
+model_reasoning_effort = "medium"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-5.6-terra"
+default_subagent_reasoning_effort = "medium"
+
+[tui]
+theme = "catppuccin-mocha"
+status_line = ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]
+
+# Project Atlas se genera con `just atlas-sync`: Node y el clon requieren rutas
+# absolutas estables, por lo que no se deben copiar literalmente entre equipos.
+# El bloque efectivo conserva esta forma y el perfil core de seis herramientas:
+# [mcp_servers.component-atlas]
+# command = "/ruta/absoluta/al/node-estable"
+# args = ["/ruta/absoluta/project-atlas/packages/mcp/dist/index.js", "--profile", "core"]

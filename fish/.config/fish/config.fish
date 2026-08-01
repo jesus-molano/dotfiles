@@ -1,30 +1,30 @@
 source /usr/share/cachyos-fish-config/cachyos-config.fish
 
-# overwrite greeting
+# Editor común para shell, Git, Codex y comandos elevados.
+set -gx EDITOR nvim
+set -gx VISUAL nvim
+set -gx SUDO_EDITOR nvim
+
+# Sin saludo adicional.
 function fish_greeting
 end
 
 # fnm (Fast Node Manager)
-set -gx FNM_PATH "$HOME/.local/share/fnm"
-if test -d "$FNM_PATH"
-    fish_add_path -g "$FNM_PATH"
-    fnm env --shell fish | source
+set -gx FNM_DIR "$HOME/.local/share/fnm"
+if command -q fnm
+    fnm env --use-on-cd --shell fish | source
 end
 
-# npm global
-fish_add_path -g "$HOME/.npm-global/bin"
-
-# pnpm
+# Binarios globales explícitos de pnpm. La versión de Node la decide fnm.
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
-if not string match -q -- $PNPM_HOME $PATH
-    fish_add_path -g "$PNPM_HOME"
-end
+fish_add_path -g "$PNPM_HOME"
+
 # direnv
 if command -q direnv
     direnv hook fish | source
 end
 
-# 1Password secrets — run `secrets` to load on demand
+# El agente SSH no exporta secretos de aplicación al shell.
 if test -S "$HOME/.1password/agent.sock"
     set -gx SSH_AUTH_SOCK "$HOME/.1password/agent.sock"
 end
@@ -37,17 +37,11 @@ if command -q starship
 end
 fish_add_path -g "$HOME/.local/bin"
 
-# Dev abbreviations
-abbr -a dev 'pnpm dev'
-abbr -a build 'pnpm build'
-abbr -a lint 'pnpm lint'
-abbr -a test 'pnpm test'
+# Abreviaturas sin reemplazar comandos comunes como test, build o lint.
+abbr -a p pnpm
+abbr -a px 'pnpm dlx'
 abbr -a g 'git'
 abbr -a gs 'git status'
 abbr -a gd 'git diff'
 abbr -a gl 'git log --oneline -20'
 abbr -a lg 'lazygit'
-
-# bun
-set --export BUN_INSTALL "$HOME/.bun"
-set --export PATH $BUN_INSTALL/bin $PATH

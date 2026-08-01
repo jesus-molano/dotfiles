@@ -1,0 +1,6 @@
+# Credenciales o referencias locales: nunca se enlazan desde Git.
+\.env.*
+
+# Helper heredado de systemd-boot/Snapper-home; este equipo usa Limine y solo
+# la configuración Snapper root. Se conserva para historia, no se despliega.
+btrfs-snapshots

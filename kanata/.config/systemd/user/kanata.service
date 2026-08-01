@@ -6,7 +6,9 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/kanata --no-wait --emergency-exit-code 1 -c %h/.config/kanata/config.kbd
+# Emergency chord exits cleanly (0), so Restart=on-failure does not immediately
+# undo the user's request. Real crashes still restart after three seconds.
+ExecStart=/usr/bin/kanata --no-wait --emergency-exit-code 0 -c %h/.config/kanata/config.kbd
 Restart=on-failure
 RestartSec=3
 

@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Orca owns this JSON while running. Apply conservative defaults only between
+# sessions so its in-memory state cannot overwrite the change on exit.
+if pgrep -x orca-ide >/dev/null; then
+    exit 0
+fi
+
+readonly profile="${ORCA_PROFILE:-local-default}"
+readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly settings="$config_root/orca/profiles/$profile/orca-data.json"
+
+[[ -f "$settings" ]] || exit 0
+command -v jq >/dev/null || {
+    printf 'orca-safe-settings: jq is required; settings left untouched.\n' >&2
+    exit 1
+}
+
+state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/orca"
+mkdir -p "$state_root"
+chmod 700 "$state_root"
+
+tmp="$(mktemp "$state_root/orca-data.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+
+jq '
+  .settings.telemetry.optedIn = false
+  | .settings.terminalLineHeight = 1.15
+  | .settings.terminalScrollbackRows = 20000
+' "$settings" > "$tmp"
+
+if cmp -s "$settings" "$tmp"; then
+    exit 0
+fi
+
+backup="$state_root/orca-data.$(date +%Y%m%d-%H%M%S).json"
+install -m 600 "$settings" "$backup"
+install -m 600 "$tmp" "$settings"
+printf 'Orca: ajustes seguros aplicados; backup en %s\n' "$backup"

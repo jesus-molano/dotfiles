@@ -1,89 +1,193 @@
-# Dotfiles management with GNU Stow
+# Gestión segura de dotfiles con GNU Stow.
 
 dotfiles_dir := justfile_directory()
+workstation_packages := "codex fish fonts ghostty git hypr-laptop kanata kvantum mimeapps noctalia nvim shell starship zellij"
+system_packages := "udev"
 
-# List all stow packages
+default:
+    @just --justfile "{{ justfile() }}" --list
+
+# Lista el perfil y los módulos permitidos (los paquetes heredados no se despliegan).
 list:
-    @for dir in {{dotfiles_dir}}/*/; do \
-        pkg="$(basename "$dir")"; \
-        case "$pkg" in [A-Z]*|justfile) continue;; esac; \
-        echo "$pkg"; \
+    @printf 'workstation\n'
+    @for package in {{ workstation_packages }}; do printf '  %s\n' "$package"; done
+
+# Simula de forma verbosa un perfil o un módulo permitido.
+check target:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd "{{ dotfiles_dir }}"
+    target={{ quote(target) }}
+    read -r -a allowed <<< "{{ workstation_packages }}"
+
+    if [[ "$target" == workstation ]]; then
+        packages=("${allowed[@]}")
+    else
+        packages=("$target")
+    fi
+
+    for package in "${packages[@]}"; do
+        [[ " ${allowed[*]} " == *" $package "* ]] || {
+            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
+            exit 2
+        }
+        [[ -d "$package" ]] || {
+            printf 'No existe el módulo: %s\n' "$package" >&2
+            exit 2
+        }
     done
 
-# Stow packages (all if none specified)
-stow *packages:
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+
+# Aplica un perfil o módulo permitido; siempre simula antes y requiere destino.
+apply target:
     #!/usr/bin/env bash
-    cd {{dotfiles_dir}}
-    if [ -z "{{packages}}" ]; then
-        for dir in */; do
-            pkg="${dir%/}"
-            case "$pkg" in [A-Z]*) continue;; esac
-            stow --no-folding -t ~ "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
-        done
+    set -euo pipefail
+    cd "{{ dotfiles_dir }}"
+    target={{ quote(target) }}
+    read -r -a allowed <<< "{{ workstation_packages }}"
+
+    if [[ "$target" == workstation ]]; then
+        packages=("${allowed[@]}")
     else
-        for pkg in {{packages}}; do
-            stow --no-folding -t ~ "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
-        done
+        packages=("$target")
     fi
 
-# Unstow packages
-unstow +packages:
-    #!/usr/bin/env bash
-    cd {{dotfiles_dir}}
-    for pkg in {{packages}}; do
-        stow --no-folding -t ~ -D "$pkg" && echo "✓ unstowed $pkg" || echo "✗ $pkg"
+    for package in "${packages[@]}"; do
+        [[ " ${allowed[*]} " == *" $package "* ]] || {
+            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
+            exit 2
+        }
+        [[ -d "$package" ]] || {
+            printf 'No existe el módulo: %s\n' "$package" >&2
+            exit 2
+        }
     done
 
-# Restow packages (unstow + stow) — useful after changes
-restow *packages:
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+
+# Retira enlaces de un perfil o módulo permitido; nunca acepta una llamada vacía.
+remove target:
     #!/usr/bin/env bash
-    cd {{dotfiles_dir}}
-    if [ -z "{{packages}}" ]; then
-        for dir in */; do
-            pkg="${dir%/}"
-            case "$pkg" in [A-Z]*) continue;; esac
-            stow --no-folding -t ~ -R "$pkg" 2>/dev/null && echo "✓ $pkg" || echo "✗ $pkg"
-        done
+    set -euo pipefail
+    cd "{{ dotfiles_dir }}"
+    target={{ quote(target) }}
+    read -r -a allowed <<< "{{ workstation_packages }}"
+
+    if [[ "$target" == workstation ]]; then
+        packages=("${allowed[@]}")
     else
-        for pkg in {{packages}}; do
-            stow --no-folding -t ~ -R "$pkg" && echo "✓ $pkg" || echo "✗ $pkg"
-        done
+        packages=("$target")
     fi
 
-# Dry-run: show what would change
-check *packages:
-    #!/usr/bin/env bash
-    cd {{dotfiles_dir}}
-    if [ -z "{{packages}}" ]; then
-        for dir in */; do
-            pkg="${dir%/}"
-            case "$pkg" in [A-Z]*) continue;; esac
-            echo "--- $pkg ---"
-            stow --no-folding -t ~ -n "$pkg" 2>&1
-        done
-    else
-        for pkg in {{packages}}; do
-            echo "--- $pkg ---"
-            stow --no-folding -t ~ -n "$pkg" 2>&1
-        done
-    fi
+    for package in "${packages[@]}"; do
+        [[ " ${allowed[*]} " == *" $package "* ]] || {
+            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
+            exit 2
+        }
+    done
 
-# Run the full installer
-install:
-    {{dotfiles_dir}}/install.sh
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --simulate --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
 
-# Show stow status (which packages are deployed)
+# Muestra de solo lectura qué cambiaría en el perfil workstation.
 status:
+    @just --justfile "{{ justfile() }}" check workstation
+
+# Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
+atlas-check:
+    "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --check
+
+# Instala copias reales de las skills y registra solo el bloque MCP de Atlas.
+atlas-sync:
+    "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --apply
+
+# Revisa un módulo de sistema permitido sin escribir en /etc.
+check-system module:
     #!/usr/bin/env bash
-    cd {{dotfiles_dir}}
-    for dir in */; do
-        pkg="${dir%/}"
-        case "$pkg" in [A-Z]*) continue;; esac
-        if stow --no-folding -t ~ -n "$pkg" 2>&1 | grep -q "WARNING"; then
-            echo "✗ $pkg (conflicts)"
-        elif [ -L "$HOME/.config/$pkg" ] || stow --no-folding -t ~ -n "$pkg" 2>&1 | grep -q "^$"; then
-            echo "✓ $pkg"
+    set -euo pipefail
+    module={{ quote(module) }}
+    read -r -a allowed <<< "{{ system_packages }}"
+    [[ " ${allowed[*]} " == *" $module "* ]] || {
+        printf 'Módulo de sistema no permitido: %s\n' "$module" >&2
+        exit 2
+    }
+
+    source_root="{{ dotfiles_dir }}/system-etc/$module"
+    target_root="/etc/$module"
+    [[ -d "$source_root" ]] || {
+        printf 'No existe el módulo: %s\n' "$source_root" >&2
+        exit 2
+    }
+
+    while IFS= read -r -d '' source; do
+        relative="${source#"$source_root/"}"
+        target="$target_root/$relative"
+        if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
+            printf '= %s\n' "$target"
+        elif [[ -e "$target" ]]; then
+            printf '~ %s\n' "$target"
+            diff -u --label "$target (actual)" --label "$source (propuesto)" \
+                "$target" "$source" || true
         else
-            echo "? $pkg (not stowed)"
+            printf '+ %s\n' "$target"
         fi
-    done
+    done < <(find "$source_root" -type f -print0 | sort -z)
+
+# Instala copias en /etc con confirmación y backup; no crea enlaces a HOME.
+apply-system module:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    module={{ quote(module) }}
+    read -r -a allowed <<< "{{ system_packages }}"
+    [[ " ${allowed[*]} " == *" $module "* ]] || {
+        printf 'Módulo de sistema no permitido: %s\n' "$module" >&2
+        exit 2
+    }
+
+    source_root="{{ dotfiles_dir }}/system-etc/$module"
+    target_root="/etc/$module"
+    [[ -d "$source_root" ]] || {
+        printf 'No existe el módulo: %s\n' "$source_root" >&2
+        exit 2
+    }
+
+    printf 'Destino exacto: %s\n' "$target_root"
+    printf 'Se copiarán archivos y se respaldarán los existentes. Escribe APLICAR: '
+    read -r confirmation
+    [[ "$confirmation" == APLICAR ]] || {
+        printf 'Cancelado sin cambios.\n'
+        exit 1
+    }
+
+    state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
+    backup_root="$state_root/system-backups/$(date +%Y%m%d-%H%M%S)"
+    mkdir -p "$backup_root"
+
+    while IFS= read -r -d '' source; do
+        relative="${source#"$source_root/"}"
+        target="$target_root/$relative"
+        if sudo test -e "$target" && sudo cmp -s "$source" "$target"; then
+            printf '= %s (sin cambios)\n' "$target"
+            continue
+        fi
+        if sudo test -e "$target" || sudo test -L "$target"; then
+            sudo cp --archive --parents "$target" "$backup_root"
+        fi
+        mode="$(stat -c '%a' "$source")"
+        sudo install -D -m "$mode" "$source" "$target"
+        printf '✓ %s\n' "$target"
+    done < <(find "$source_root" -type f -print0 | sort -z)
+
+    printf '%s\n' "$backup_root" > "$state_root/last-system-backup"
+    printf 'Backup: %s\n' "$backup_root"
+
+# Ejecuta el instalador explícito del perfil workstation.
+install:
+    "{{ dotfiles_dir }}/install.sh" workstation
