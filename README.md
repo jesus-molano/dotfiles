@@ -51,7 +51,7 @@ enviando Escape. El corte de emergencia de Kanata es `Ctrl+Space+Esc`.
 | `Hyper + B` | Brave |
 | `Hyper + E` | Dolphin |
 | `Hyper + O` | Enfocar o abrir Orca |
-| `Hyper + Space` | Launcher de Noctalia |
+| `Alt + Space` | Launcher de Noctalia |
 | `Hyper + 1` | 1Password |
 | `Hyper + N` | Notificaciones |
 | `Hyper + P` | Captura de región |
@@ -74,7 +74,7 @@ la ventana enfocada como texto plano, sin icono ni cápsula. La barra conserva
 reloj, multimedia, privacidad, bandeja, avisos, red, Bluetooth, volumen,
 brillo, perfil energético y batería; el widget multimedia aparece solo cuando
 hay un reproductor MPRIS activo. Búsqueda y sesión permanecen disponibles
-mediante `Hyper + Space` y `Hyper + Q`, sin ocupar espacio permanente. No
+mediante `Alt + Space` y `Hyper + Q`, sin ocupar espacio permanente. No
 sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
 
 La paleta `ProjectAtlas` reproduce los tokens *Waypoint Signal* de

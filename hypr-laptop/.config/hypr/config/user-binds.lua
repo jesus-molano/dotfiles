@@ -55,7 +55,7 @@ bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Abrir Ghostty")
 bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir Brave")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Abrir Dolphin")
 bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Enfocar o abrir Orca")
-bind(hyper .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Abrir launcher")
+bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Abrir launcher")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Abrir notificaciones")
 bind(hyper .. " + P", hl.dsp.exec_cmd(noctalia .. "screenshot-region"), "Capturar una región")
