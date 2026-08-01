@@ -1,120 +1,48 @@
-# CachyOS Acer Aspire VX dotfiles
+# Dotfiles de CachyOS + Hyprland
 
-Configuración personal y reproducible para CachyOS, Hyprland Lua y Noctalia v5
-en un Acer Aspire VX5-591G con pantalla interna `eDP-1`.
+Configuración del perfil `workstation`, gestionada con GNU Stow.
 
-## Perfil actual
+## Stack
 
-| Componente | Elección |
+| Componente | Configuración |
 |---|---|
-| Shell de escritorio | Noctalia v5 (barra, launcher, paneles, avisos y bloqueo) |
-| Compositor | Hyprland Lua sobre la base mantenida por CachyOS |
+| Compositor | Hyprland Lua |
+| Shell de escritorio | Noctalia v5 |
 | Terminal | Ghostty |
 | Shell | Fish + Starship + Zoxide |
 | Archivos | Dolphin |
 | Editor | Neovim/LazyVim |
 | Multiplexor | Zellij |
-| IA | Codex; Claude se retiró del repositorio |
-| Credenciales | 1Password y `gh` |
-| Teclado | Español; Caps al tocar = Esc, mantenida = Hyper |
-| GPU | Intel + NVIDIA Pascal mediante el perfil PRIME 580xx de `chwd` |
+| Teclado | Español + Kanata |
+| Navegador | Brave |
+| Credenciales | 1Password CLI y agente SSH |
 
-No se instalan Steam, Lutris, Discord, WebStorm, Docker, Waybar, Rofi ni SwayNC.
-El instalador tampoco modifica GPU, initramfs, arranque, Btrfs, Snapper, zram o
-firewall: esos elementos se inspeccionan y mantienen con las herramientas de
-CachyOS.
+## Módulos
 
-## Teclado y ventanas
+El perfil `workstation` despliega estos módulos:
 
-`Hyper` significa mantener Caps Lock (`Ctrl+Alt+Super+Shift`). Tocar Caps sigue
-enviando Escape. El corte de emergencia de Kanata es `Ctrl+Space+Esc`.
+```text
+codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia
+nvim shell starship vscode zellij
+```
 
-| Atajo | Acción |
-|---|---|
-| `Alt + H/J/K/L` | Mover el foco |
-| `Alt + Shift + H/J/K/L` | Mover la ventana |
-| `Alt + Ctrl + H/J/K/L` | Redimensionar |
-| `Alt + Q/W/E/R/U/I/O/P` | Espacios 1–8 en la pantalla actual |
-| `Alt + Shift + Q/W/E/R/U/I/O/P` | Enviar ventana al espacio |
-| `Alt + Tab` | Selector de ventanas de Noctalia |
-| `Alt + X` | Cerrar ventana |
-| `Alt + M` | Pantalla completa |
-| `Alt + F` | Flotante |
-| `Alt + S / Shift+S` | Mostrar scratchpad / enviar ventana |
-| `Alt + G / N / Shift+N` | Crear grupo / pestaña siguiente / anterior |
+Los paquetes del sistema y de AUR están declarados en `packages.csv`.
 
-## Capa Hyper
+## Tema Project Atlas
 
-| Atajo | Acción |
-|---|---|
-| `Hyper + Enter` | Ghostty |
-| `Hyper + B` | Brave |
-| `Hyper + E` | Dolphin |
-| `Hyper + O` | Enfocar o abrir Orca |
-| `Hyper + M` | Spotify en el escritorio musical |
-| `Alt + Space` | Launcher de Noctalia |
-| `Hyper + 1` | 1Password |
-| `Hyper + N` | Notificaciones |
-| `Hyper + P` | Captura de región |
-| `Hyper + Q` | Menú de sesión |
-| `Hyper + L` | Bloquear |
-| `Hyper + K` | Seleccionar y copiar un color |
-| `Hyper + C` | Alternar cafeína |
-| `Hyper + 7` (`/` en español) | Ayuda rápida de atajos |
-
-El historial del portapapeles se mantiene en `Super + V`.
-
-## Noctalia
-
-La configuración declarativa está en `noctalia/.config/noctalia/config.toml`.
-La barra compacta para portátil abre con ocho escritorios semánticos sin
-números ni cápsulas: navegador, terminal, código, música, archivos,
-comunicación, documentación y sistema. Sus IDs siguen siendo `1`-`8`, por lo
-que los atajos continúan funcionando igual. A continuación muestra el título de
-la ventana enfocada como texto plano, sin icono ni cápsula. El reproductor
-MPRIS ocupa el centro cuando hay contenido, la fecha se omite y la hora cierra
-el extremo derecho tras la batería. La barra conserva privacidad, bandeja,
-avisos, red, Bluetooth, volumen, brillo y perfil energético. Spotify se abre
-con `Hyper + M` y sus ventanas se enrutan silenciosamente al escritorio
-musical 4. Búsqueda y sesión
-permanecen disponibles mediante `Alt + Space` y `Hyper + Q`, sin ocupar espacio
-permanente. No sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
-
-La paleta `ProjectAtlas` reproduce los tokens *Waypoint Signal* de
-[`project-atlas` en el commit auditado](https://github.com/jesus-molano/project-atlas/blob/2cfc15d4c7508f1f3244cba5f12e3b1682d86529/apps/viewer/app/assets/css/tokens.css):
-grafito `#090a0d`–`#222731`, texto `#f1f3f5`, coral de acción `#ff5b4d` y
-acentos azul, oro, verde y malva. Es la fuente única para las plantillas de
-Hyprland, GTK 3/4, Qt/KDE, Ghostty, Kitty, Starship, btop, Zellij, Micro,
-bat/delta, Codex y VS Code/VSCodium. Neovim carga la misma paleta al iniciar y
-Orca la fusiona de forma segura antes de abrir una sesión nueva.
+La paleta `ProjectAtlas` de Noctalia es la fuente visual del perfil. Genera los
+colores de Hyprland, GTK 3/4, Qt/KDE, Ghostty, Kitty, Starship, btop, Zellij,
+Micro, bat/delta, Codex y VS Code/VSCodium. Neovim lee la misma paleta al
+iniciar y `orca-safe-settings` registra el tema ANSI en Orca antes de abrir una
+sesión nueva, con copia previa de sus ajustes.
 
 Los adaptadores nativos se seleccionan en `[theme.templates]`; los formatos que
-Noctalia no incluye se renderizan desde `noctalia/templates/`. Los archivos
-generados viven en el directorio de cada aplicación; Starship conserva solo un
-bloque marcado que Noctalia puede sustituir sin tocar el formato del prompt.
-VS Code y VSCodium reciben una extensión declarativa local, sin código
-ejecutable, cuyo tema también genera Noctalia.
-
-Validación:
-
-```bash
-noctalia config validate noctalia/.config/noctalia/config.toml
-```
-
-Los cambios hechos desde la interfaz se guardan en
-`~/.local/state/noctalia/settings.toml` y tienen prioridad sobre los dotfiles.
-Para llevarlos al repositorio, exporta la configuración combinada y revísala:
-
-```bash
-noctalia config export > /tmp/noctalia-user.toml
-```
+Noctalia no incluye se renderizan desde `noctalia/.config/noctalia/templates/`.
+VS Code y VSCodium reciben una extensión declarativa local sin código
+ejecutable. Qt usa `Fusion` con los colores generados por Noctalia, por lo que
+Kvantum ya no forma parte del perfil.
 
 ## Instalación
-
-El instalador solo acepta el perfil allowlist `workstation`, usa Shelly para AUR,
-simula Stow de forma verbosa antes de escribir y crea una copia reversible bajo
-`~/.local/state/dotfiles`. No usa Paru ni aplica ajustes delicados del sistema.
-Una llamada sin perfil muestra ayuda y no despliega nada.
 
 ```bash
 git clone git@github.com:jesus-molano/dotfiles.git ~/.dotfiles
@@ -123,129 +51,109 @@ cd ~/.dotfiles
 ./install.sh workstation
 ```
 
-Los módulos principales de este portátil son:
+El instalador usa Pacman y Shelly, comprueba los paquetes, simula Stow y guarda
+una copia de los archivos que vaya a sustituir.
 
-```text
-hypr-laptop noctalia kanata ghostty fish starship zellij nvim
-git codex mimeapps fonts shell vscode
-```
-
-El módulo histórico `gtk` queda fuera del perfil: contiene enlaces absolutos a
-un tema del sistema que Stow rechaza. La configuración GTK activa se conserva
-sin tocar hasta migrarla de forma independiente. `kvantum` también queda fuera:
-Qt 5/6 usa `Fusion` con la paleta que genera Noctalia, evitando que un motor SVG
-secundario vuelva a imponer el Catppuccin histórico.
-
-Gestión manual:
+## Gestión
 
 ```bash
-just check workstation
-just apply workstation
-just check hypr-laptop
-just status
+just list                  # módulos permitidos
+just check workstation     # simulación del perfil completo
+just check hypr-laptop     # simulación de un módulo
+just apply workstation     # simular y desplegar
+just remove workstation    # simular y retirar enlaces
 ```
 
-Stow se ejecuta siempre con `--no-folding` para no convertir directorios
-dinámicos como `~/.codex` o `~/.config/hypr` en un único enlace.
-`system-etc` nunca se trata como paquete de HOME. El único módulo habilitado
-inicialmente es la regla de Kanata, que siempre se inspecciona y confirma:
+La configuración de `/etc` se gestiona por separado. El módulo disponible es
+la regla udev de Kanata:
 
 ```bash
 just check-system udev
 just apply-system udev
 ```
 
-Los archivos `.env*` no se despliegan. Para limitar credenciales de 1Password a
-un proceso, se usa un archivo local de referencias y el wrapper:
+## Teclado
+
+Kanata convierte Caps Lock en:
+
+- pulsación: `Esc`
+- mantenida: `Hyper` (`Ctrl + Alt + Super + Shift`)
+- salida de emergencia: `Ctrl + Space + Esc`
+
+## Atajos
+
+### Ventanas y espacios
+
+| Atajo | Acción |
+|---|---|
+| `Alt + H/J/K/L` | Mover el foco |
+| `Alt + Shift + H/J/K/L` | Mover la ventana |
+| `Alt + Ctrl + H/J/K/L` | Redimensionar la ventana |
+| `Alt + Q/W/E/R/U/I/O/P` | Ir a los espacios 1–8 |
+| `Alt + Shift + Q/W/E/R/U/I/O/P` | Enviar la ventana a un espacio |
+| `Alt + Tab` | Selector de ventanas |
+| `Alt + X` | Cerrar la ventana activa |
+| `Alt + M` | Maximizar |
+| `Alt + F` | Alternar flotante |
+| `Hyper + D` | Alternar la dirección de la división |
+| `Hyper + F` | Alternar pantalla completa |
+| `Alt + S` | Mostrar u ocultar el scratchpad |
+| `Alt + Shift + S` | Enviar al scratchpad |
+| `Alt + G` | Alternar grupo de ventanas |
+| `Alt + N` / `Alt + Shift + N` | Recorrer ventanas del grupo |
+
+### Aplicaciones y sistema
+
+| Atajo | Acción |
+|---|---|
+| `Hyper + Enter` | Ghostty |
+| `Hyper + B` | Brave |
+| `Hyper + E` | Dolphin |
+| `Hyper + O` | Orca |
+| `Hyper + M` | Spotify |
+| `Hyper + 1` | 1Password |
+| `Alt + Space` | Launcher de Noctalia |
+| `Hyper + N` | Notificaciones |
+| `Hyper + P` | Captura de región |
+| `Hyper + K` | Selector de color |
+| `Hyper + C` | Cafeína |
+| `Hyper + L` | Bloquear la sesión |
+| `Hyper + Q` | Menú de sesión |
+| `Hyper + 7` | Ayuda de atajos |
+| `Super + V` | Historial del portapapeles |
+
+`Super` queda reservado para el historial del portapapeles. El archivo
+`hypr-laptop/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
+del sistema y las teclas físicas de calculadora, multimedia y brillo.
+
+## Secretos
+
+`with-secrets` ejecuta un comando con las referencias locales de 1Password:
 
 ```bash
 with-secrets pnpm run deploy
 ```
 
-El wrapper ejecuta `op run`; no inyecta ni conserva secretos en el shell padre.
-El helper histórico `btrfs-snapshots` tampoco forma parte del perfil: fue creado
-para systemd-boot y una configuración Snapper distinta de la instalación real.
-
-Para una tarea gráfica o de cómputo concreta en la NVIDIA híbrida, sin hacerla
-GPU global del escritorio, usa `dgpu comando [argumentos...]`. El wrapper llama
-a `prime-run` y limita las variables de offload al proceso hijo.
-
-## Comprobaciones
+## Validación
 
 ```bash
 Hyprland --verify-config
-hyprctl reload
 hyprctl configerrors
-noctalia config validate
-kanata --check -c ~/.config/kanata/config.kbd
-systemctl --failed
-systemctl --user --failed
-find . -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+noctalia config validate noctalia/.config/noctalia/config.toml
+kanata --check -c kanata/.config/kanata/config.kbd
+just check workstation
+git diff --check
 ```
 
-La guía de instalación y recuperación que originó esta migración está en el
-medio Ventoy del equipo. El estado real del portátil prevalece siempre sobre
-los comandos históricos de esa guía.
+## Rutas principales
 
-## Orca y Codex
-
-`Hyper + O` enfoca la ventana existente o abre Orca mediante UWSM. Antes de un
-arranque nuevo, `orca-safe-settings` conserva una copia local del JSON,
-desactiva telemetría, ajusta el terminal a interlineado 1.15 y 20.000 líneas y
-registra `Project Atlas` como tema ANSI oscuro. La carcasa se fuerza a modo
-oscuro y la barra lateral sigue el fondo del terminal, que son los controles de
-apariencia que Orca expone actualmente.
-No edita el archivo mientras Orca está abierto, porque la aplicación es quien
-lo posee en memoria.
-
-Por preferencia expresa, los agentes iniciados por Orca conservan su modo YOLO
-sin sandbox ni confirmaciones. Codex iniciado directamente mantiene el perfil
-más conservador `workspace-write` + `on-request`; así cada contexto tiene una
-intención clara.
-
-Los perfiles `codex --profile fast` y `codex --profile deep`, el agente de
-revisión web y las skills personales viven en el módulo `codex`. Orca gestiona
-worktrees y terminales; Zellij se reserva para sesiones independientes y SSH.
-`config.template.toml` es una referencia deliberada: no se carga por sí sola ni
-debe sustituir el `config.toml` real, porque ese archivo contiene hooks y datos
-locales de Orca. Sus claves seguras se fusionan manualmente y se comprueban con
-`codex --strict-config doctor --json`.
-
-El modo YOLO de un Codex padre iniciado por Orca también prevalece sobre el
-`sandbox_mode = "read-only"` de sus subagentes. El agente `reviewer-web` mantiene
-la instrucción de no escribir, pero el aislamiento técnico solo existe al
-iniciarlo desde Codex directo sin `--yolo`. Usa ese contexto cuando una revisión
-deba estar forzada por sandbox.
-
-### Project Atlas
-
-Las skills explícitas `$frontend-task`, `$reuse-first` y `$visual-direction`
-están vendorizadas desde `project-atlas` en el commit
-[`2cfc15d`](https://github.com/jesus-molano/project-atlas/tree/2cfc15d4c7508f1f3244cba5f12e3b1682d86529/skills).
-Stow no las enlaza directamente: Atlas exige que sean copias completas o
-enlaces al clon original. La sincronización instala copias reales, respalda los
-tres destinos y conserva el resto de `config.toml`; el helper oficial solo
-registra `[mcp_servers.component-atlas]` con el perfil `core` de seis
-herramientas. Como `dist/` no está controlado por Git en Atlas, antes de ejecutar
-el doctor se verifica también la huella fijada de sus 107 artefactos JavaScript
-first-party.
-
-La huella no sustituye la integridad de dependencias de `node_modules`: ese
-árbol debe proceder de `pnpm install --frozen-lockfile` sobre el commit fijado.
-El sincronizador no lo repara ni lo actualiza automáticamente, para evitar una
-mutación amplia del clon durante el despliegue de dotfiles.
-
-```bash
-just atlas-check             # doctor oficial, solo lectura
-just atlas-sync              # copia + MCP + backup + doctor
+```text
+hypr-laptop/.config/hypr/       Hyprland Lua
+noctalia/.config/noctalia/      Noctalia y paleta
+kanata/.config/kanata/          teclado
+ghostty/.config/ghostty/        terminal
+fish/.config/fish/              shell y funciones
+nvim/.config/nvim/              editor
+vscode/                         VS Code y VSCodium
+system-etc/                     archivos destinados a /etc
 ```
-
-Se espera el clon estable en `~/dev/project-atlas`; puede cambiarse con
-`PROJECT_ATLAS_CHECKOUT=/ruta/al/clon`. `PROJECT_ATLAS_HOME` queda reservado
-para el almacén de datos runtime de Atlas. El script no hace `git pull`, no
-compila y rechaza un clon sucio o distinto del commit vendorizado. Tras cambiar
-skills o MCP, reinicia Codex y abre una tarea nueva para que descubra las
-herramientas.
-El `AGENTS.md` global corrige la ruta operativa para CachyOS (`doctor.sh`) y
-obliga a resolver los scripts desde la propia skill cuando una referencia
-upstream muestre sintaxis PowerShell.
