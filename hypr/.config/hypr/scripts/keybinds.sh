@@ -42,7 +42,6 @@ binds=$(awk '
         if      (cmd ~ /launcher\.sh/)                desc = "App launcher"
         else if (cmd ~ /powermenu\.sh/)                desc = "Power menu"
         else if (cmd ~ /keybinds\.sh/)                 desc = "Keybindings"
-        else if (cmd ~ /claude-skills\.sh/)            desc = "Claude skills"
         else if (cmd ~ /nvim-keys\.sh/)                desc = "Neovim keys"
         else if (cmd ~ /translate\.sh clipboard/)      desc = "Translate clipboard"
         else if (cmd ~ /translate\.sh/)                desc = "Translate"

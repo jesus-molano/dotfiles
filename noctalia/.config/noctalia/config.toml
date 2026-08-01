@@ -1,0 +1,156 @@
+[accessibility]
+ui_scale = 1.0
+
+[bar.default]
+position = "top"
+enabled = true
+reserve_space = true
+smart_auto_hide = false
+margin_edge = 0
+margin_ends = 8
+thickness = 34
+scale = 1.0
+background_opacity = 0.92
+concave_edge_corners = false
+radius = 12
+capsule = true
+capsule_thickness = 0.74
+capsule_radius = 9
+capsule_fill = "surface_variant"
+capsule_opacity = 0.82
+capsule_padding = 7
+start = [ "launcher", "workspaces" ]
+center = [ "clock" ]
+end = [ "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "session" ]
+
+[shell]
+font_family = "Inter"
+clipboard_enabled = true
+launch_apps_as_systemd_services = true
+polkit_agent = true
+settings_show_advanced = true
+external_ip_enabled = false
+telemetry_enabled = false
+
+[shell.animation]
+enabled = true
+speed = 1.05
+
+[shell.panel]
+open_near_click_control_center = true
+session_placement = "floating"
+session_position = "center"
+transparency_mode = "soft"
+borders = true
+
+[shell.screenshot]
+copy_to_clipboard = true
+save_to_file = true
+directory = "~/Pictures/Screenshots"
+filename_pattern = "%Y-%m-%d_%H-%M-%S"
+pipe_to_command = false
+confirm_region = true
+remember_last_region = true
+
+[[shell.session.actions]]
+action = "lock"
+countdown_seconds = 0.0
+enabled = true
+shortcut = "1"
+variant = "default"
+
+[[shell.session.actions]]
+action = "logout"
+countdown_seconds = 0.0
+enabled = true
+shortcut = "2"
+variant = "default"
+
+[[shell.session.actions]]
+action = "lock_and_suspend"
+countdown_seconds = 3.0
+enabled = true
+shortcut = "3"
+variant = "default"
+
+[[shell.session.actions]]
+action = "reboot"
+countdown_seconds = 3.0
+enabled = true
+shortcut = "4"
+variant = "default"
+
+[[shell.session.actions]]
+action = "shutdown"
+countdown_seconds = 3.0
+enabled = true
+shortcut = "5"
+variant = "destructive"
+
+[system.monitor]
+gpu_poll_seconds = 0
+
+[theme]
+mode = "dark"
+source = "wallpaper"
+wallpaper_scheme = "m3-tonal-spot"
+
+[theme.templates]
+builtin_ids = [ "btop", "gtk3", "gtk4", "kcolorscheme", "qt", "ghostty" ]
+
+[widget.launcher]
+color = "primary"
+capsule_fill = "primary"
+
+[widget.workspaces]
+active_pill_size = 2.4
+inactive_pill_size = 1.0
+pill_scale = 0.78
+capsule_fill = "surface_variant"
+
+[widget.clock]
+format = "{:%H:%M}"
+color = "on_primary"
+capsule_fill = "primary"
+capsule_padding = 12
+
+[widget.media]
+hide_when_no_media = true
+title_scroll = "on_hover"
+max_length = 190
+
+[widget.privacy]
+hide_inactive = true
+
+[widget.network]
+show_label = false
+vpn_status = "both"
+
+[widget.bluetooth]
+show_label = false
+hide_when_no_connected_device = true
+
+[widget.volume]
+show_label = false
+
+[widget.brightness]
+show_label = false
+
+[widget.battery]
+type = "battery"
+device = "auto"
+display_mode = "glyph"
+show_label = true
+label_content = "percent"
+
+[widget.power_profile]
+color = "tertiary"
+
+[widget.notifications]
+color = "secondary"
+
+[widget.session]
+color = "error"
+
+[widget.tray]
+capsule = false

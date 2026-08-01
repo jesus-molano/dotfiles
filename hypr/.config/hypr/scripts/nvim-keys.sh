@@ -84,16 +84,8 @@ gK                      Signature help
 <leader>ghp             Preview hunk
 <leader>ghb             Blame línea
 
-── AI (<leader>a) ──────────────────────────────────────────────────
-<leader>ac              Abrir/cerrar terminal Claude Code
-<leader>af              Dar foco al panel de Claude
-<leader>ar              Reanudar conversación anterior (--resume)
-<leader>aC              Continuar última conversación (--continue)
-<leader>am              Cambiar modelo (Opus/Sonnet/Haiku)
-<leader>ab              Enviar buffer como contexto a Claude
-<leader>as              Enviar selección a Claude (visual mode)
-<leader>aa              Aceptar diff de Claude
-<leader>ad              Rechazar diff de Claude
+── AI ──────────────────────────────────────────────────────────────
+Hyper + .               Abrir Codex en una terminal independiente
 Tab                     Aceptar sugerencia de Copilot
 
 ── BUFFERS Y VENTANAS ──────────────────────────────────────────────
