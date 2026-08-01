@@ -52,6 +52,7 @@ system,playerctl,native
 system,pavucontrol,native
 system,translate-shell,native
 system,libnotify,native
+system,gnome-keyring,native
 system,jq,native
 system,networkmanager-openvpn,native
 system,bluez,native
