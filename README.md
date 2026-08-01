@@ -83,8 +83,17 @@ permanente. No sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
 La paleta `ProjectAtlas` reproduce los tokens *Waypoint Signal* de
 [`project-atlas` en el commit auditado](https://github.com/jesus-molano/project-atlas/blob/2cfc15d4c7508f1f3244cba5f12e3b1682d86529/apps/viewer/app/assets/css/tokens.css):
 grafito `#090a0d`–`#222731`, texto `#f1f3f5`, coral de acción `#ff5b4d` y
-acentos azul, oro, verde y malva. También alimenta la plantilla de Ghostty para
-mantener una sola identidad visual.
+acentos azul, oro, verde y malva. Es la fuente única para las plantillas de
+Hyprland, GTK 3/4, Qt/KDE, Ghostty, Kitty, Starship, btop, Zellij, Micro,
+bat/delta, Codex y VS Code/VSCodium. Neovim carga la misma paleta al iniciar y
+Orca la fusiona de forma segura antes de abrir una sesión nueva.
+
+Los adaptadores nativos se seleccionan en `[theme.templates]`; los formatos que
+Noctalia no incluye se renderizan desde `noctalia/templates/`. Los archivos
+generados viven en el directorio de cada aplicación; Starship conserva solo un
+bloque marcado que Noctalia puede sustituir sin tocar el formato del prompt.
+VS Code y VSCodium reciben una extensión declarativa local, sin código
+ejecutable, cuyo tema también genera Noctalia.
 
 Validación:
 
@@ -118,12 +127,14 @@ Los módulos principales de este portátil son:
 
 ```text
 hypr-laptop noctalia kanata ghostty fish starship zellij nvim
-git codex mimeapps fonts kvantum shell
+git codex mimeapps fonts shell vscode
 ```
 
 El módulo histórico `gtk` queda fuera del perfil: contiene enlaces absolutos a
 un tema del sistema que Stow rechaza. La configuración GTK activa se conserva
-sin tocar hasta migrarla de forma independiente.
+sin tocar hasta migrarla de forma independiente. `kvantum` también queda fuera:
+Qt 5/6 usa `Fusion` con la paleta que genera Noctalia, evitando que un motor SVG
+secundario vuelva a imponer el Catppuccin histórico.
 
 Gestión manual:
 
@@ -180,7 +191,10 @@ los comandos históricos de esa guía.
 
 `Hyper + O` enfoca la ventana existente o abre Orca mediante UWSM. Antes de un
 arranque nuevo, `orca-safe-settings` conserva una copia local del JSON,
-desactiva telemetría y ajusta el terminal a interlineado 1.15 y 20.000 líneas.
+desactiva telemetría, ajusta el terminal a interlineado 1.15 y 20.000 líneas y
+registra `Project Atlas` como tema ANSI oscuro. La carcasa se fuerza a modo
+oscuro y la barra lateral sigue el fondo del terminal, que son los controles de
+apariencia que Orca expone actualmente.
 No edita el archivo mientras Orca está abierto, porque la aplicación es quien
 lo posee en memoria.
 

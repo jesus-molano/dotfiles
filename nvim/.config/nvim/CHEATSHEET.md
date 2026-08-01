@@ -1,6 +1,6 @@
 # Guia Completa de tu Neovim Config
 
-> LazyVim + 50 plugins | Catppuccin Mocha | Vue/Nuxt + React/Next stack
+> LazyVim + 50 plugins | Project Atlas sobre Catppuccin | Vue/Nuxt + React/Next stack
 
 ---
 

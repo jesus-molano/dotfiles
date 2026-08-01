@@ -1,7 +1,7 @@
 # Gestión segura de dotfiles con GNU Stow.
 
 dotfiles_dir := justfile_directory()
-workstation_packages := "codex fish fonts ghostty git hypr-laptop kanata kvantum mimeapps noctalia nvim shell starship zellij"
+workstation_packages := "codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia nvim shell starship vscode zellij"
 system_packages := "udev"
 
 default:

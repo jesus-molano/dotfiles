@@ -63,8 +63,6 @@ system,vulkan-tools,native
 system,libva-utils,native
 system,unrar,native
 system,unzip,native
-themes,kvantum,native
-themes,kvantum-qt5,native
 themes,papirus-icon-theme,native
 themes,nwg-look,native
 themes,qt5ct,native

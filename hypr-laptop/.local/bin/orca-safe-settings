@@ -4,17 +4,22 @@ set -euo pipefail
 # Orca owns this JSON while running. Apply conservative defaults only between
 # sessions so its in-memory state cannot overwrite the change on exit.
 if pgrep -x orca-ide >/dev/null; then
-    exit 0
+	exit 0
 fi
 
 readonly profile="${ORCA_PROFILE:-local-default}"
 readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
 readonly settings="$config_root/orca/profiles/$profile/orca-data.json"
+readonly palette="$config_root/noctalia/palettes/ProjectAtlas.json"
 
 [[ -f "$settings" ]] || exit 0
+[[ -f "$palette" ]] || {
+	printf 'orca-safe-settings: ProjectAtlas.json is missing; settings left untouched.\n' >&2
+	exit 1
+}
 command -v jq >/dev/null || {
-    printf 'orca-safe-settings: jq is required; settings left untouched.\n' >&2
-    exit 1
+	printf 'orca-safe-settings: jq is required; settings left untouched.\n' >&2
+	exit 1
 }
 
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/orca"
@@ -24,14 +29,60 @@ chmod 700 "$state_root"
 tmp="$(mktemp "$state_root/orca-data.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 
-jq '
-  .settings.telemetry.optedIn = false
+jq --slurpfile palette "$palette" '
+  ($palette[0].dark) as $atlas
+  | ($atlas.terminal) as $terminal
+  | .settings.telemetry.optedIn = false
   | .settings.terminalLineHeight = 1.15
   | .settings.terminalScrollbackRows = 20000
-' "$settings" > "$tmp"
+  | .settings.theme = "dark"
+  | .settings.leftSidebarAppearanceMode = "match-terminal"
+  | .settings.leftSidebarTintColor = $atlas.mSurface
+  | .settings.leftSidebarTintOpacity = 0.12
+  | .settings.terminalThemeDark = "custom:manual:project-atlas"
+  | .settings.terminalUseSeparateLightTheme = false
+  | .settings.terminalDividerColorDark = $atlas.mOutline
+  | .settings.terminalCustomThemes = (
+      ((.settings.terminalCustomThemes // [])
+        | map(select(.id != "manual:project-atlas")))
+      + [{
+          id: "manual:project-atlas",
+          name: "Project Atlas",
+          source: "manual",
+          sourceLabel: "Noctalia ProjectAtlas",
+          mode: "dark",
+          importedAt: "1970-01-01T00:00:00.000Z",
+          terminal: {
+            foreground: $terminal.foreground,
+            background: $terminal.background,
+            cursor: $terminal.cursor,
+            cursorAccent: $terminal.cursorText,
+            selectionBackground: $terminal.selectionBg,
+            selectionForeground: $terminal.selectionFg,
+            black: $terminal.normal.black,
+            red: $terminal.normal.red,
+            green: $terminal.normal.green,
+            yellow: $terminal.normal.yellow,
+            blue: $terminal.normal.blue,
+            magenta: $terminal.normal.magenta,
+            cyan: $terminal.normal.cyan,
+            white: $terminal.normal.white,
+            brightBlack: $terminal.bright.black,
+            brightRed: $terminal.bright.red,
+            brightGreen: $terminal.bright.green,
+            brightYellow: $terminal.bright.yellow,
+            brightBlue: $terminal.bright.blue,
+            brightMagenta: $terminal.bright.magenta,
+            brightCyan: $terminal.bright.cyan,
+            brightWhite: $terminal.bright.white,
+            bold: $terminal.bright.white
+          }
+        }]
+    )
+' "$settings" >"$tmp"
 
 if cmp -s "$settings" "$tmp"; then
-    exit 0
+	exit 0
 fi
 
 backup="$state_root/orca-data.$(date +%Y%m%d-%H%M%S).json"

@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>name</key>
+  <string>Project Atlas</string>
+  <key>settings</key>
+  <array>
+    <dict>
+      <key>settings</key>
+      <dict>
+        <key>background</key><string>{{colors.terminal_background.default.hex}}</string>
+        <key>caret</key><string>{{colors.terminal_cursor.default.hex}}</string>
+        <key>foreground</key><string>{{colors.terminal_foreground.default.hex}}</string>
+        <key>invisibles</key><string>{{colors.outline.default.hex}}</string>
+        <key>lineHighlight</key><string>{{colors.surface_variant.default.hex}}</string>
+        <key>selection</key><string>{{colors.terminal_selection_bg.default.hex}}</string>
+      </dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Comments</string>
+      <key>scope</key><string>comment, punctuation.definition.comment</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.on_surface_variant.default.hex}}</string><key>fontStyle</key><string>italic</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Keywords</string>
+      <key>scope</key><string>keyword, storage.type, storage.modifier, punctuation.definition.keyword</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.primary.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Strings</string>
+      <key>scope</key><string>string, punctuation.definition.string</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_green.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Numbers and constants</string>
+      <key>scope</key><string>constant.numeric, constant.language, constant.character, constant.other</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_yellow.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Functions</string>
+      <key>scope</key><string>entity.name.function, support.function, meta.function-call</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_blue.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Types and classes</string>
+      <key>scope</key><string>entity.name.type, entity.name.class, support.type, support.class</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.secondary.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Variables and parameters</string>
+      <key>scope</key><string>variable, variable.parameter, support.variable</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_foreground.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Properties and attributes</string>
+      <key>scope</key><string>variable.other.property, entity.other.attribute-name</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_cyan.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Tags</string>
+      <key>scope</key><string>entity.name.tag, punctuation.definition.tag</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_magenta.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Invalid and deleted</string>
+      <key>scope</key><string>invalid, markup.deleted</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.error.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Inserted</string>
+      <key>scope</key><string>markup.inserted</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.terminal_normal_green.default.hex}}</string></dict>
+    </dict>
+    <dict>
+      <key>name</key><string>Changed</string>
+      <key>scope</key><string>markup.changed</string>
+      <key>settings</key><dict><key>foreground</key><string>{{colors.tertiary.default.hex}}</string></dict>
+    </dict>
+  </array>
+  <key>uuid</key>
+  <string>53D4D152-CA80-4D7A-9C38-50524F4A4154</string>
+</dict>
+</plist>

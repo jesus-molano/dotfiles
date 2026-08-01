@@ -67,3 +67,8 @@ require("config.misc")
 require("config.monitors")
 require("config.windowrules")
 require("config.workspaces")
+
+-- Noctalia owns the live palette. Keep the tracked colors above as a fallback
+-- so Hyprland also validates and starts before the generated module exists.
+local has_noctalia_theme, noctalia_theme = pcall(function() return require("noctalia") end)
+if has_noctalia_theme then noctalia_theme.apply_theme() end

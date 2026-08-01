@@ -1,0 +1,153 @@
+{
+  "name": "Project Atlas",
+  "type": "dark",
+  "semanticHighlighting": true,
+  "colors": {
+    "focusBorder": "{{colors.primary.default.hex}}",
+    "foreground": "{{colors.on_surface.default.hex}}",
+    "descriptionForeground": "{{colors.on_surface_variant.default.hex}}",
+    "errorForeground": "{{colors.error.default.hex}}",
+    "icon.foreground": "{{colors.on_surface_variant.default.hex}}",
+    "selection.background": "{{colors.terminal_selection_bg.default.hex}}",
+    "textLink.foreground": "{{colors.secondary.default.hex}}",
+    "textLink.activeForeground": "{{colors.primary.default.hex}}",
+    "button.background": "{{colors.primary.default.hex}}",
+    "button.foreground": "{{colors.on_primary.default.hex}}",
+    "button.hoverBackground": "{{colors.primary_container.default.hex}}",
+    "dropdown.background": "{{colors.surface_variant.default.hex}}",
+    "dropdown.border": "{{colors.outline.default.hex}}",
+    "input.background": "{{colors.terminal_background.default.hex}}",
+    "input.border": "{{colors.outline.default.hex}}",
+    "input.foreground": "{{colors.on_surface.default.hex}}",
+    "input.placeholderForeground": "{{colors.on_surface_variant.default.hex}}",
+    "badge.background": "{{colors.secondary.default.hex}}",
+    "badge.foreground": "{{colors.on_secondary.default.hex}}",
+    "progressBar.background": "{{colors.primary.default.hex}}",
+    "titleBar.activeBackground": "{{colors.terminal_background.default.hex}}",
+    "titleBar.activeForeground": "{{colors.on_surface.default.hex}}",
+    "titleBar.inactiveBackground": "{{colors.surface.default.hex}}",
+    "titleBar.inactiveForeground": "{{colors.on_surface_variant.default.hex}}",
+    "activityBar.background": "{{colors.terminal_background.default.hex}}",
+    "activityBar.foreground": "{{colors.primary.default.hex}}",
+    "activityBar.inactiveForeground": "{{colors.on_surface_variant.default.hex}}",
+    "activityBarBadge.background": "{{colors.primary.default.hex}}",
+    "activityBarBadge.foreground": "{{colors.on_primary.default.hex}}",
+    "sideBar.background": "{{colors.surface.default.hex}}",
+    "sideBar.foreground": "{{colors.on_surface.default.hex}}",
+    "sideBar.border": "{{colors.outline.default.hex}}",
+    "sideBarSectionHeader.background": "{{colors.surface_variant.default.hex}}",
+    "sideBarSectionHeader.foreground": "{{colors.on_surface.default.hex}}",
+    "list.activeSelectionBackground": "{{colors.primary_container.default.hex}}",
+    "list.activeSelectionForeground": "{{colors.on_primary_container.default.hex}}",
+    "list.hoverBackground": "{{colors.hover.default.hex}}",
+    "list.inactiveSelectionBackground": "{{colors.surface_variant.default.hex}}",
+    "editorGroupHeader.tabsBackground": "{{colors.terminal_background.default.hex}}",
+    "tab.activeBackground": "{{colors.surface.default.hex}}",
+    "tab.activeForeground": "{{colors.on_surface.default.hex}}",
+    "tab.activeBorderTop": "{{colors.primary.default.hex}}",
+    "tab.inactiveBackground": "{{colors.terminal_background.default.hex}}",
+    "tab.inactiveForeground": "{{colors.on_surface_variant.default.hex}}",
+    "editor.background": "{{colors.terminal_background.default.hex}}",
+    "editor.foreground": "{{colors.terminal_foreground.default.hex}}",
+    "editor.selectionBackground": "{{colors.terminal_selection_bg.default.hex}}",
+    "editor.selectionForeground": "{{colors.terminal_selection_fg.default.hex}}",
+    "editor.lineHighlightBackground": "{{colors.surface.default.hex}}",
+    "editorCursor.foreground": "{{colors.primary.default.hex}}",
+    "editorLineNumber.foreground": "{{colors.outline.default.hex}}",
+    "editorLineNumber.activeForeground": "{{colors.primary.default.hex}}",
+    "editorWhitespace.foreground": "{{colors.outline.default.hex}}",
+    "editorIndentGuide.background1": "{{colors.surface_variant.default.hex}}",
+    "editorIndentGuide.activeBackground1": "{{colors.outline.default.hex}}",
+    "editor.findMatchBackground": "{{colors.tertiary_container.default.hex}}",
+    "editor.findMatchBorder": "{{colors.tertiary.default.hex}}",
+    "editorBracketMatch.background": "{{colors.surface_variant.default.hex}}",
+    "editorBracketMatch.border": "{{colors.secondary.default.hex}}",
+    "editorError.foreground": "{{colors.error.default.hex}}",
+    "editorWarning.foreground": "{{colors.tertiary.default.hex}}",
+    "editorInfo.foreground": "{{colors.secondary.default.hex}}",
+    "peekView.border": "{{colors.primary.default.hex}}",
+    "peekViewEditor.background": "{{colors.terminal_background.default.hex}}",
+    "peekViewResult.background": "{{colors.surface.default.hex}}",
+    "panel.background": "{{colors.terminal_background.default.hex}}",
+    "panel.border": "{{colors.outline.default.hex}}",
+    "panelTitle.activeBorder": "{{colors.primary.default.hex}}",
+    "statusBar.background": "{{colors.surface_variant.default.hex}}",
+    "statusBar.foreground": "{{colors.on_surface.default.hex}}",
+    "statusBar.debuggingBackground": "{{colors.tertiary.default.hex}}",
+    "statusBar.debuggingForeground": "{{colors.on_tertiary.default.hex}}",
+    "terminal.background": "{{colors.terminal_background.default.hex}}",
+    "terminal.foreground": "{{colors.terminal_foreground.default.hex}}",
+    "terminal.ansiBlack": "{{colors.terminal_normal_black.default.hex}}",
+    "terminal.ansiRed": "{{colors.terminal_normal_red.default.hex}}",
+    "terminal.ansiGreen": "{{colors.terminal_normal_green.default.hex}}",
+    "terminal.ansiYellow": "{{colors.terminal_normal_yellow.default.hex}}",
+    "terminal.ansiBlue": "{{colors.terminal_normal_blue.default.hex}}",
+    "terminal.ansiMagenta": "{{colors.terminal_normal_magenta.default.hex}}",
+    "terminal.ansiCyan": "{{colors.terminal_normal_cyan.default.hex}}",
+    "terminal.ansiWhite": "{{colors.terminal_normal_white.default.hex}}",
+    "terminal.ansiBrightBlack": "{{colors.terminal_bright_black.default.hex}}",
+    "terminal.ansiBrightRed": "{{colors.terminal_bright_red.default.hex}}",
+    "terminal.ansiBrightGreen": "{{colors.terminal_bright_green.default.hex}}",
+    "terminal.ansiBrightYellow": "{{colors.terminal_bright_yellow.default.hex}}",
+    "terminal.ansiBrightBlue": "{{colors.terminal_bright_blue.default.hex}}",
+    "terminal.ansiBrightMagenta": "{{colors.terminal_bright_magenta.default.hex}}",
+    "terminal.ansiBrightCyan": "{{colors.terminal_bright_cyan.default.hex}}",
+    "terminal.ansiBrightWhite": "{{colors.terminal_bright_white.default.hex}}",
+    "gitDecoration.addedResourceForeground": "{{colors.terminal_normal_green.default.hex}}",
+    "gitDecoration.modifiedResourceForeground": "{{colors.tertiary.default.hex}}",
+    "gitDecoration.deletedResourceForeground": "{{colors.error.default.hex}}",
+    "gitDecoration.untrackedResourceForeground": "{{colors.secondary.default.hex}}"
+  },
+  "tokenColors": [
+    {
+      "scope": ["comment", "punctuation.definition.comment"],
+      "settings": { "foreground": "{{colors.on_surface_variant.default.hex}}", "fontStyle": "italic" }
+    },
+    {
+      "scope": ["keyword", "storage.type", "storage.modifier"],
+      "settings": { "foreground": "{{colors.primary.default.hex}}" }
+    },
+    {
+      "scope": ["string", "punctuation.definition.string"],
+      "settings": { "foreground": "{{colors.terminal_normal_green.default.hex}}" }
+    },
+    {
+      "scope": ["constant.numeric", "constant.language", "constant.character"],
+      "settings": { "foreground": "{{colors.terminal_normal_yellow.default.hex}}" }
+    },
+    {
+      "scope": ["entity.name.function", "support.function", "meta.function-call"],
+      "settings": { "foreground": "{{colors.terminal_normal_blue.default.hex}}" }
+    },
+    {
+      "scope": ["entity.name.type", "entity.name.class", "support.type", "support.class"],
+      "settings": { "foreground": "{{colors.secondary.default.hex}}" }
+    },
+    {
+      "scope": ["variable.other.property", "entity.other.attribute-name"],
+      "settings": { "foreground": "{{colors.terminal_normal_cyan.default.hex}}" }
+    },
+    {
+      "scope": ["entity.name.tag", "punctuation.definition.tag"],
+      "settings": { "foreground": "{{colors.terminal_normal_magenta.default.hex}}" }
+    },
+    {
+      "scope": ["invalid", "markup.deleted"],
+      "settings": { "foreground": "{{colors.error.default.hex}}" }
+    },
+    {
+      "scope": "markup.inserted",
+      "settings": { "foreground": "{{colors.terminal_normal_green.default.hex}}" }
+    }
+  ],
+  "semanticTokenColors": {
+    "class": "{{colors.secondary.default.hex}}",
+    "enum": "{{colors.secondary.default.hex}}",
+    "function": "{{colors.terminal_normal_blue.default.hex}}",
+    "method": "{{colors.terminal_normal_blue.default.hex}}",
+    "property": "{{colors.terminal_normal_cyan.default.hex}}",
+    "parameter": "{{colors.terminal_foreground.default.hex}}",
+    "type": "{{colors.secondary.default.hex}}",
+    "variable.readonly": "{{colors.terminal_normal_yellow.default.hex}}"
+  }
+}

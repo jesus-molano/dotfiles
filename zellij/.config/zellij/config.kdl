@@ -123,7 +123,7 @@ web_client {
 }
 
 // Global settings
-theme "catppuccin-mocha"
+theme "project-atlas"
 default_shell "fish"
 default_layout "dev"
 default_mode "locked"
