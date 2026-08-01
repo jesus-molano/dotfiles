@@ -69,11 +69,13 @@ La configuración declarativa está en `noctalia/.config/noctalia/config.toml`.
 La barra compacta para portátil abre con ocho escritorios semánticos sin
 números ni cápsulas: navegador, terminal, código, música, archivos,
 comunicación, documentación y sistema. Sus IDs siguen siendo `1`-`8`, por lo
-que los atajos continúan funcionando igual. La barra conserva reloj,
-multimedia, privacidad, bandeja, avisos, red, Bluetooth, volumen, brillo,
-perfil energético y batería; búsqueda y sesión permanecen disponibles mediante
-`Hyper + Space` y `Hyper + Q`, sin ocupar espacio permanente. No sondea la GPU
-dedicada. Noctalia recarga TOML automáticamente.
+que los atajos continúan funcionando igual. A continuación muestra el título de
+la ventana enfocada como texto plano, sin icono ni cápsula. La barra conserva
+reloj, multimedia, privacidad, bandeja, avisos, red, Bluetooth, volumen,
+brillo, perfil energético y batería; el widget multimedia aparece solo cuando
+hay un reproductor MPRIS activo. Búsqueda y sesión permanecen disponibles
+mediante `Hyper + Space` y `Hyper + Q`, sin ocupar espacio permanente. No
+sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
 
 La paleta `ProjectAtlas` reproduce los tokens *Waypoint Signal* de
 [`project-atlas` en el commit auditado](https://github.com/jesus-molano/project-atlas/blob/2cfc15d4c7508f1f3244cba5f12e3b1682d86529/apps/viewer/app/assets/css/tokens.css):
