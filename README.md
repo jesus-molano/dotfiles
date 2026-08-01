@@ -51,6 +51,7 @@ enviando Escape. El corte de emergencia de Kanata es `Ctrl+Space+Esc`.
 | `Hyper + B` | Brave |
 | `Hyper + E` | Dolphin |
 | `Hyper + O` | Enfocar o abrir Orca |
+| `Hyper + M` | Spotify en el escritorio musical |
 | `Alt + Space` | Launcher de Noctalia |
 | `Hyper + 1` | 1Password |
 | `Hyper + N` | Notificaciones |
@@ -70,12 +71,14 @@ La barra compacta para portátil abre con ocho escritorios semánticos sin
 números ni cápsulas: navegador, terminal, código, música, archivos,
 comunicación, documentación y sistema. Sus IDs siguen siendo `1`-`8`, por lo
 que los atajos continúan funcionando igual. A continuación muestra el título de
-la ventana enfocada como texto plano, sin icono ni cápsula. La barra conserva
-reloj, multimedia, privacidad, bandeja, avisos, red, Bluetooth, volumen,
-brillo, perfil energético y batería; el widget multimedia aparece solo cuando
-hay un reproductor MPRIS activo. Búsqueda y sesión permanecen disponibles
-mediante `Alt + Space` y `Hyper + Q`, sin ocupar espacio permanente. No
-sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
+la ventana enfocada como texto plano, sin icono ni cápsula. El reproductor
+MPRIS ocupa el centro cuando hay contenido, la fecha se omite y la hora cierra
+el extremo derecho tras la batería. La barra conserva privacidad, bandeja,
+avisos, red, Bluetooth, volumen, brillo y perfil energético. Spotify se abre
+con `Hyper + M` y sus ventanas se enrutan silenciosamente al escritorio
+musical 4. Búsqueda y sesión
+permanecen disponibles mediante `Alt + Space` y `Hyper + Q`, sin ocupar espacio
+permanente. No sondea la GPU dedicada. Noctalia recarga TOML automáticamente.
 
 La paleta `ProjectAtlas` reproduce los tokens *Waypoint Signal* de
 [`project-atlas` en el commit auditado](https://github.com/jesus-molano/project-atlas/blob/2cfc15d4c7508f1f3244cba5f12e3b1682d86529/apps/viewer/app/assets/css/tokens.css):

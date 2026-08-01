@@ -22,8 +22,8 @@ capsule_padding = 6
 padding = 8
 widget_spacing = 4
 start = [ "workspaces", "active_window" ]
-center = [ "clock", "date" ]
-end = [ "group:resources", "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery" ]
+center = [ "media" ]
+end = [ "group:resources", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -187,13 +187,13 @@ format = "{:%H:%M}"
 color = "on_primary"
 capsule_fill = "primary"
 capsule_padding = 12
-anchor = true
 
 [widget.date]
 type = "clock"
 format = "{:%a %d %b}"
 
 [widget.media]
+anchor = true
 hide_when_no_media = true
 title_scroll = "on_hover"
 max_length = 190
