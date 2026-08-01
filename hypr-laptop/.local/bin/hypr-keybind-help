@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+summary='Atajos del escritorio'
+body=$'Caps: Esc / Hyper\nAlt+H J K L: foco\nAlt+Shift+H J K L: mover\nAlt+Ctrl+H J K L: redimensionar\nAlt+Q W E R U I O P: workspaces 1–8\nHyper+Enter/B/E/O: terminal, web, archivos, Orca\nHyper+Space/K/N/P: launcher, color, notificaciones, captura\nSuper+V: historial del portapapeles\nHyper+C/L/Q: cafeína, bloqueo, sesión'
+
+exec noctalia msg notification-show "$summary" -- "$body"

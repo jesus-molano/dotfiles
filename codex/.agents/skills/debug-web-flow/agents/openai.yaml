@@ -1,0 +1,4 @@
+interface:
+  display_name: "Depurar flujo web"
+  short_description: "Reproduce y aísla fallos web completos"
+  default_prompt: "Usa $debug-web-flow para reproducir este fallo web, localizar su causa y verificar la corrección."

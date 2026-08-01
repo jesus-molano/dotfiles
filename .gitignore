@@ -8,12 +8,23 @@ micro/.config/micro/plugins/
 # Font cache
 fonts/.local/share/fonts/.uuid
 
-# Codex runtime state. Only codex/.codex/AGENTS.md is versioned.
+# Codex runtime state. Version only durable, secret-free configuration.
 codex/.codex/*
 !codex/.codex/AGENTS.md
+!codex/.codex/config.template.toml
+!codex/.codex/fast.config.toml
+!codex/.codex/deep.config.toml
+!codex/.codex/agents/
+codex/.codex/agents/*
+!codex/.codex/agents/reviewer-web.toml
 
-# Secrets
-.env.op
+# Secrets and local 1Password reference files (at any depth).
+.env
+.env.*
+!.env.example
+!.env.*.example
+!.env.template
+!.env.*.template
 
 # OS generated
 .DS_Store

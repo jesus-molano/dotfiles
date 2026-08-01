@@ -1,10 +1,21 @@
 function proj --description "Quick project switcher with fzf"
-    set -l search_dirs ~/projects ~/work ~/dotfiles
+    set -l search_dirs "$HOME/projects" "$HOME/work" "$HOME/.dotfiles" "$HOME/orca/workspaces"
 
     # Direct match via zoxide
     if test (count $argv) -gt 0
-        z $argv
-        return
+        if test (count $argv) -eq 1; and test -d "$argv[1]"
+            cd "$argv[1]"
+            return
+        end
+        if command -q zoxide
+            set -l match (zoxide query -- $argv 2>/dev/null)
+            if test -n "$match"
+                cd "$match"
+                return
+            end
+        end
+        echo "Project not found: $argv" >&2
+        return 1
     end
 
     # Collect existing search dirs
@@ -19,8 +30,8 @@ function proj --description "Quick project switcher with fzf"
     end
 
     # Interactive fzf selection
-    set -l selection (find $existing_dirs -maxdepth 2 -name '.git' -type d 2>/dev/null | \
-        string replace '/.git' '' | sort | \
+    set -l selection (find $existing_dirs -maxdepth 4 -name '.git' \( -type d -o -type f \) 2>/dev/null | \
+        string replace -r '/\.git$' '' | sort -u | \
         fzf --prompt="Project > " --preview="ls --color=always -la {}" --height=40%)
 
     if test -n "$selection"

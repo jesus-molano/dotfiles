@@ -7,25 +7,37 @@ enabled = true
 reserve_space = true
 smart_auto_hide = false
 margin_edge = 0
-margin_ends = 8
+margin_ends = 6
 thickness = 34
 scale = 1.0
 background_opacity = 0.92
 concave_edge_corners = false
 radius = 12
 capsule = true
-capsule_thickness = 0.74
+capsule_thickness = 0.72
 capsule_radius = 9
 capsule_fill = "surface_variant"
 capsule_opacity = 0.82
-capsule_padding = 7
-start = [ "launcher", "workspaces" ]
-center = [ "clock" ]
-end = [ "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "session" ]
+capsule_padding = 6
+padding = 8
+widget_spacing = 4
+start = [ "launcher", "workspaces", "active_window" ]
+center = [ "clock", "date" ]
+end = [ "group:resources", "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "session" ]
+
+[[bar.default.capsule_group]]
+id = "resources"
+members = [ "cpu", "ram" ]
+fill = "surface_variant"
+padding = 5.0
+opacity = 0.82
+enabled = true
 
 [shell]
 font_family = "Inter"
 clipboard_enabled = true
+clipboard_confirm_clear_history = true
+clipboard_history_max_entries = 100
 launch_apps_as_systemd_services = true
 polkit_agent = true
 settings_show_advanced = true
@@ -89,10 +101,47 @@ variant = "destructive"
 
 [system.monitor]
 gpu_poll_seconds = 0
+cpu_poll_seconds = 3
+memory_poll_seconds = 3
+
+[idle]
+behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
+pre_action_fade_seconds = 2.0
+
+[idle.behavior.lock]
+action = "lock"
+command = ""
+enabled = true
+resume_command = ""
+timeout = 600.0
+
+[idle.behavior.screen-off]
+action = "screen_off"
+command = ""
+enabled = true
+resume_command = ""
+timeout = 660.0
+
+[idle.behavior.lock-and-suspend]
+action = "lock_and_suspend"
+command = ""
+# Gate de seguridad: habilitar solo tras tres ciclos físicos correctos de
+# suspensión/reanudación, incluyendo uno con monitor externo.
+enabled = false
+resume_command = ""
+timeout = 1800.0
+
+[weather]
+enabled = false
+
+[plugins]
+auto_update = false
+enabled = []
 
 [theme]
 mode = "dark"
-source = "wallpaper"
+source = "custom"
+custom_palette = "ProjectAtlas"
 wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
@@ -108,16 +157,37 @@ inactive_pill_size = 1.0
 pill_scale = 0.78
 capsule_fill = "surface_variant"
 
+[widget.active_window]
+type = "active_window"
+icon_size = 14.0
+min_length = 60.0
+max_length = 160.0
+title_scroll = "on_hover"
+
+[widget.cpu]
+type = "sysmon"
+stat = "cpu_usage"
+
+[widget.ram]
+type = "sysmon"
+stat = "ram_used"
+
 [widget.clock]
 format = "{:%H:%M}"
 color = "on_primary"
 capsule_fill = "primary"
 capsule_padding = 12
+anchor = true
+
+[widget.date]
+type = "clock"
+format = "{:%a %d %b}"
 
 [widget.media]
 hide_when_no_media = true
 title_scroll = "on_hover"
 max_length = 190
+min_length = 60.0
 
 [widget.privacy]
 hide_inactive = true

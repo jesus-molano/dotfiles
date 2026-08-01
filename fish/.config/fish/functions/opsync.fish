@@ -1,10 +1,5 @@
-function opsync --description "Load 1Password env vars into environment"
-    if not command -q op
-        echo "1Password CLI not installed"
-        return 1
-    end
-
-    op inject -i ~/.env.op | source
-    and echo "1Password env loaded"
-    or echo "Failed to load env"
+function opsync --description "Deprecated: use with-secrets for one command"
+    echo "opsync no longer exports secrets to the whole shell." >&2
+    echo "Use: with-secrets <command> [arguments...]" >&2
+    return 2
 end

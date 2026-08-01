@@ -1,76 +1,51 @@
 function dotf --description "Manage dotfiles with GNU Stow"
-    set -l dotfiles_dir ~/dotfiles
+    set -l dotfiles_dir "$HOME/.dotfiles"
+    set -l justfile "$dotfiles_dir/justfile"
 
     if test (count $argv) -eq 0
-        echo "Usage: dotf <command> [packages...]"
+        echo "Usage: dotf <command> [workstation|module]"
         echo ""
         echo "Commands:"
-        echo "  stow, s    [pkg...]  Stow packages (all if none specified)"
-        echo "  unstow, u  <pkg...>  Unstow packages"
-        echo "  restow, r  <pkg...>  Restow packages (unstow + stow)"
-        echo "  list, l              List available packages"
-        echo "  edit, e              Open dotfiles in editor"
-        echo "  check, c   [pkg...]  Dry-run (show what would change)"
+        echo "  apply, a   <target>  Simulate and apply an allowed target"
+        echo "  remove, u  <target>  Remove links for an allowed target"
+        echo "  check, c   <target>  Verbose dry-run"
+        echo "  status               Check the workstation profile"
+        echo "  list, l              List allowed targets"
+        echo "  edit, e              Open dotfiles in the editor"
         return 0
     end
 
+    if not test -f "$justfile"
+        echo "Dotfiles justfile not found: $justfile" >&2
+        return 1
+    end
+
     switch $argv[1]
-        case stow s
-            if test (count $argv) -lt 2
-                for pkg in (dotf list)
-                    stow -d $dotfiles_dir -t ~ $pkg 2>/dev/null
-                    and echo "  $pkg"
-                    or echo "  $pkg"
-                end
-            else
-                for pkg in $argv[2..]
-                    stow -d $dotfiles_dir -t ~ $pkg
-                    and echo "  $pkg"
-                    or echo "  $pkg"
-                end
+        case apply a stow s restow r
+            if test (count $argv) -ne 2
+                echo "Usage: dotf apply <workstation|module>" >&2
+                return 2
             end
-        case unstow u
-            for pkg in $argv[2..]
-                stow -d $dotfiles_dir -t ~ -D $pkg
-                and echo "  $pkg"
-                or echo "  $pkg"
+            command just --justfile "$justfile" apply "$argv[2]"
+        case remove unstow u
+            if test (count $argv) -ne 2
+                echo "Usage: dotf remove <workstation|module>" >&2
+                return 2
             end
-        case restow r
-            if test (count $argv) -lt 2
-                for pkg in (dotf list)
-                    stow -d $dotfiles_dir -t ~ -R $pkg 2>/dev/null
-                    and echo "  $pkg"
-                    or echo "  $pkg"
-                end
-            else
-                for pkg in $argv[2..]
-                    stow -d $dotfiles_dir -t ~ -R $pkg
-                    and echo "  $pkg"
-                    or echo "  $pkg"
-                end
-            end
+            command just --justfile "$justfile" remove "$argv[2]"
         case list l
-            for item in $dotfiles_dir/*/
-                set -l name (basename $item)
-                # Skip non-package dirs
-                string match -rq '^[A-Z]' $name; and continue
-                echo $name
-            end
+            command just --justfile "$justfile" list
         case edit e
-            cd $dotfiles_dir
-            and $EDITOR .
+            cd "$dotfiles_dir"
+            and command $EDITOR .
         case check c
-            if test (count $argv) -lt 2
-                for pkg in (dotf list)
-                    echo "--- $pkg ---"
-                    stow -d $dotfiles_dir -t ~ -n $pkg 2>&1
-                end
-            else
-                for pkg in $argv[2..]
-                    echo "--- $pkg ---"
-                    stow -d $dotfiles_dir -t ~ -n $pkg 2>&1
-                end
+            if test (count $argv) -ne 2
+                echo "Usage: dotf check <workstation|module>" >&2
+                return 2
             end
+            command just --justfile "$justfile" check "$argv[2]"
+        case status
+            command just --justfile "$justfile" status
         case '*'
             echo "Unknown command: $argv[1]"
             dotf

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Revisar PR web"
+  short_description: "Revisa PRs web por riesgo y cobertura"
+  default_prompt: "Usa $review-web-pr para revisar esta rama frente a su base y priorizar riesgos reales."

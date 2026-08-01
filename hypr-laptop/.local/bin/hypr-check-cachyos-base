@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly package='cachyos-hypr-noctalia'
+readonly expected_version='1.2.3-1'
+readonly upstream='/etc/skel/.config/hypr/config'
+readonly config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+readonly manifest="$config_home/hypr/cachyos-base.sha256"
+
+if ! installed_version=$(pacman -Q "$package" 2>/dev/null | awk '{ print $2 }'); then
+    printf 'No está instalado %s.\n' "$package" >&2
+    exit 2
+fi
+
+if [[ ! -d "$upstream" || ! -f "$manifest" ]]; then
+    printf 'Falta la base upstream (%s) o el manifiesto (%s).\n' "$upstream" "$manifest" >&2
+    exit 2
+fi
+
+printf 'CachyOS instalado: %s; base importada: %s\n' "$installed_version" "$expected_version"
+if [[ "$installed_version" != "$expected_version" ]]; then
+    printf 'La versión cambió; revisa los módulos que no coincidan antes de portar novedades.\n' >&2
+fi
+
+(cd "${upstream%/config}" && sha256sum --check "$manifest")

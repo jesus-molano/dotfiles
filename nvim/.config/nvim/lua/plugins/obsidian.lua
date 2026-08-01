@@ -1,3 +1,11 @@
+local vault_path = vim.fn.expand("~/vaults/work")
+
+-- Do not register Obsidian for every Markdown buffer on machines where the
+-- configured vault is absent.
+if vim.fn.isdirectory(vault_path) == 0 then
+  return {}
+end
+
 return {
   {
     "obsidian-nvim/obsidian.nvim",
@@ -11,7 +19,7 @@ return {
       workspaces = {
         {
           name = "work",
-          path = "~/vaults/work",
+          path = vault_path,
         },
       },
 
