@@ -12,7 +12,7 @@ BACKUP_DIR="$STATE_DIR/backups/workstation-$(date +%Y%m%d-%H%M%S)"
 readonly BACKUP_DIR
 readonly -a WORKSTATION_MODULES=(
 	codex fish fonts ghostty git hypr-laptop kanata mimeapps
-	noctalia nvim shell starship vscode zellij
+	noctalia nvim qutebrowser shell starship vscode zellij
 )
 
 CHECK_ONLY=0
