@@ -2,6 +2,12 @@
 	name = jesus-molano
 	email = jessumolano@gmail.com
 	signingkey = ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOiWj5OG9LuaQVD6MRVguuuP6oR6NyFCuNcRnhGuJtxS
+[credential "https://github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+	helper =
+	helper = !/usr/bin/gh auth git-credential
 [init]
 	defaultBranch = main
 [core]
@@ -44,7 +50,7 @@
 	last = log -1 HEAD
 	graph = log --oneline --graph --decorate --all -20
 [commit]
-	gpgsign = false
+	gpgsign = true
 [gpg]
 	format = ssh
 [gpg "ssh"]
