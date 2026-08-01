@@ -58,7 +58,7 @@ bind(alt .. " + SHIFT + N", hl.dsp.group.prev(), "Ir a la anterior ventana del g
 
 -- Hyper application, layout and Noctalia layer.
 bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Abrir Ghostty")
-bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir Brave")
+bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir qutebrowser")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Abrir Dolphin")
 bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Enfocar o abrir Orca")
 bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Enfocar o abrir Spotify")

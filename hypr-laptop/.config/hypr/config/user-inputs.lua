@@ -2,7 +2,7 @@
 -- Kanata only remaps Caps Lock; every other key keeps this layout.
 TERMINAL = "ghostty"
 FILE_MANAGER = "dolphin"
-BROWSER = "brave"
+BROWSER = "qutebrowser"
 EDITOR = "ghostty -e nvim"
 
 hl.config({

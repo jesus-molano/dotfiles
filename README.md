@@ -14,7 +14,7 @@ Configuración del perfil `workstation`, gestionada con GNU Stow.
 | Editor | Neovim/LazyVim |
 | Multiplexor | Zellij |
 | Teclado | Español + Kanata |
-| Navegador | Brave |
+| Navegador | qutebrowser + Brave como respaldo |
 | Credenciales | 1Password CLI y agente SSH |
 
 ## Módulos
@@ -23,7 +23,7 @@ El perfil `workstation` despliega estos módulos:
 
 ```text
 codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia
-nvim shell starship vscode zellij
+nvim qutebrowser shell starship vscode zellij
 ```
 
 Los paquetes del sistema y de AUR están declarados en `packages.csv`.
@@ -100,7 +100,7 @@ Kanata convierte Caps Lock en:
 | Atajo | Acción |
 |---|---|
 | `Hyper + Enter` | Ghostty |
-| `Hyper + B` | Brave |
+| `Hyper + B` | qutebrowser |
 | `Hyper + E` | Dolphin |
 | `Hyper + O` | Enfocar o abrir Orca |
 | `Hyper + M` | Enfocar o abrir Spotify |
@@ -118,6 +118,24 @@ Kanata convierte Caps Lock en:
 `Super` queda reservado para el historial del portapapeles. El archivo
 `hypr-laptop/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
 del sistema y las teclas físicas de calculadora, multimedia y brillo.
+
+### qutebrowser
+
+La configuración usa la paleta Project Atlas, navegación Vim y bloqueo ABP +
+hosts. Además de los atajos nativos (`f`, `F`, `o`, `t`, `J`, `K`, `d`, `u`):
+
+| Atajo | Acción |
+|---|---|
+| `,a` | Alternar el bloqueo temporalmente para el dominio actual |
+| `,A` | Alternar el bloqueo globalmente durante la sesión |
+| `,u` | Actualizar todas las listas de bloqueo |
+| `,B` | Abrir la página actual en Brave |
+| `;B` | Elegir mediante hints un enlace para abrirlo en Brave |
+| `,e` | Editar la configuración en Neovim |
+| `,r` | Recargar la configuración |
+
+Los buscadores rápidos disponibles son `aw` (ArchWiki), `g` (Google), `gh`
+(GitHub) y `yt` (YouTube); por ejemplo, `t aw qutebrowser`.
 
 ## Secretos
 

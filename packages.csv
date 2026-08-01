@@ -7,6 +7,8 @@ core,wl-clipboard,native
 core,hyprpicker,native
 core,satty,native
 core,brave-bin,native
+browser,qutebrowser,native
+browser,python-adblock,native
 terminal,ghostty,native
 terminal,fish,native
 terminal,cachyos-fish-config,native
