@@ -21,9 +21,9 @@ capsule_opacity = 0.82
 capsule_padding = 6
 padding = 8
 widget_spacing = 4
-start = [ "launcher", "workspaces", "active_window" ]
+start = [ "workspaces" ]
 center = [ "clock", "date" ]
-end = [ "group:resources", "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "session" ]
+end = [ "group:resources", "media", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -152,10 +152,18 @@ color = "primary"
 capsule_fill = "primary"
 
 [widget.workspaces]
-active_pill_size = 2.4
-inactive_pill_size = 1.0
-pill_scale = 0.78
-capsule_fill = "surface_variant"
+style = "minimal"
+display = "name"
+font_family = "FontAwesome"
+max_label_chars = 1
+labels_only_when_occupied = false
+hide_when_empty = false
+focused_color = "primary"
+occupied_color = "on_surface"
+empty_color = "on_surface_variant"
+urgent_color = "error"
+change_color_on_hover = false
+capsule = false
 
 [widget.active_window]
 type = "active_window"
