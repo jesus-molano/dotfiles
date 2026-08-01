@@ -59,7 +59,7 @@ c.editor.command = [
 
 
 # Search prefixes are intentionally short enough to use from normal mode with
-# `o`, `O` or `t`, for example: `t gh qutebrowser`.
+# `o` or `O`, for example: `O gh qutebrowser`.
 c.url.default_page = "https://start.duckduckgo.com/"
 c.url.start_pages = ["https://start.duckduckgo.com/"]
 c.url.searchengines = {

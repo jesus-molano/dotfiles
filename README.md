@@ -135,7 +135,7 @@ hosts. Además de los atajos nativos (`f`, `F`, `o`, `t`, `J`, `K`, `d`, `u`):
 | `,r` | Recargar la configuración |
 
 Los buscadores rápidos disponibles son `aw` (ArchWiki), `g` (Google), `gh`
-(GitHub) y `yt` (YouTube); por ejemplo, `t aw qutebrowser`.
+(GitHub) y `yt` (YouTube); por ejemplo, `O aw qutebrowser`.
 
 ## Secretos
 
