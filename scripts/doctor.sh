@@ -3,6 +3,20 @@ set -uo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly repo_root
+profile=${1:-}
+if [[ -z "$profile" ]]; then
+	active_monitors="$(readlink -f "$HOME/.config/hypr/config/monitors.lua" 2>/dev/null || true)"
+	case "$active_monitors" in
+	"$repo_root/hypr-desktop"/*) profile=desktop ;;
+	"$repo_root/hypr-laptop"/*) profile=workstation ;;
+	*) profile=workstation ;;
+	esac
+fi
+[[ "$profile" == workstation || "$profile" == desktop ]] || {
+	printf 'Perfil no válido: %s\n' "$profile" >&2
+	exit 2
+}
+readonly profile
 failures=0
 warnings=0
 
@@ -58,8 +72,7 @@ check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 check "Base CachyOS" "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
 
 printf '\nDespliegue\n'
-check "Stow workstation" just --justfile "$repo_root/justfile" check workstation
-check "Stow desktop" just --justfile "$repo_root/justfile" check desktop
+check "Stow $profile" just --justfile "$repo_root/justfile" check "$profile"
 check "Whitespace Git" git -C "$repo_root" diff --check
 
 printf '\nSistema\n'

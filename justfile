@@ -121,8 +121,8 @@ status:
     @just --justfile "{{ justfile() }}" check workstation
 
 # Diagnóstico de solo lectura del perfil y del sistema anfitrión.
-doctor:
-    "{{ dotfiles_dir }}/scripts/doctor.sh"
+doctor profile="":
+    "{{ dotfiles_dir }}/scripts/doctor.sh" "{{ profile }}"
 
 # Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
 atlas-check:

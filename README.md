@@ -72,7 +72,8 @@ just list                  # módulos permitidos
 just check workstation     # simulación del perfil completo
 just check desktop         # simulación del perfil de sobremesa
 just check hypr-desktop    # simulación de un módulo de hardware
-just doctor                # diagnóstico completo de solo lectura
+just doctor                # diagnóstico; autodetecta el perfil desplegado
+just doctor desktop        # diagnóstico explícito del sobremesa
 just apply workstation     # simular y desplegar
 just apply desktop         # simular y desplegar desktop
 just remove workstation    # simular y retirar enlaces
