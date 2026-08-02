@@ -2,7 +2,6 @@
 Description=Kanata Keyboard Remapper
 Documentation=https://github.com/jtroo/kanata
 After=graphical-session-pre.target
-PartOf=graphical-session.target
 
 [Service]
 Type=simple
