@@ -23,6 +23,14 @@ terminal,duf,native
 terminal,btop,native
 terminal,yazi,native
 desktop,spotify-launcher,native
+gaming,cachyos-gaming-meta,native
+gaming,steam,native
+gaming,gamescope,native
+gaming,mangohud,native
+gaming,lib32-mangohud,native
+gaming,heroic-games-launcher-bin,native
+gaming,lutris,native
+gaming,faugus-launcher,native
 keyboard,kanata-bin,aur
 development,git,native
 development,base-devel,native

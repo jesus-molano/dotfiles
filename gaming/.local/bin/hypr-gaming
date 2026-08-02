@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Focus only the Steam launcher; steam_app_* game windows remain untouched.
+if hyprctl clients -j | jq -e '.[] | select((.class // "" | ascii_downcase) == "steam")' >/dev/null; then
+	exec hyprctl eval 'hl.dispatch(hl.dsp.focus({ window = "class:^[Ss]team$" }))'
+fi
+
+exec uwsm app -- steam

@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' 'Uso: game-run [--hud] [--gamescope] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
+}
+
+hud=false
+use_gamescope=false
+dry_run=false
+
+while (($#)); do
+	case "$1" in
+	--hud)
+		hud=true
+		;;
+	--gamescope)
+		use_gamescope=true
+		;;
+	--dry-run)
+		dry_run=true
+		;;
+	--help | -h)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	-*)
+		printf 'Opción desconocida: %s\n' "$1" >&2
+		usage >&2
+		exit 2
+		;;
+	*)
+		break
+		;;
+	esac
+	shift
+done
+
+if (($# == 0)); then
+	printf '%s\n' 'Falta el comando del juego.' >&2
+	usage >&2
+	exit 2
+fi
+
+game_command=("$@")
+launch_command=(game-performance)
+
+if [[ "$use_gamescope" == true ]]; then
+	launch_command+=(gamescope -W 1920 -H 1080 -r 75 -f)
+	if [[ "$hud" == true ]]; then
+		launch_command+=(--mangoapp)
+	fi
+	launch_command+=(-- "${game_command[@]}")
+elif [[ "$hud" == true ]]; then
+	launch_command+=(mangohud "${game_command[@]}")
+else
+	launch_command+=("${game_command[@]}")
+fi
+
+if [[ "$dry_run" == true ]]; then
+	printf 'Comando:'
+	printf ' %q' "${launch_command[@]}"
+	printf '\n'
+	exit 0
+fi
+
+require_command() {
+	command -v "$1" >/dev/null || {
+		printf 'No se encuentra el comando requerido: %s\n' "$1" >&2
+		exit 127
+	}
+}
+
+require_command game-performance
+if [[ "$use_gamescope" == true ]]; then
+	require_command gamescope
+elif [[ "$hud" == true ]]; then
+	require_command mangohud
+fi
+
+exec "${launch_command[@]}"

@@ -8,3 +8,9 @@ hl.config({
         repeat_rate = 40,
     },
 })
+
+-- Runtime identifier reported by `hyprctl devices -j` for the M720 mouse.
+hl.device({
+    name = "logitech-m720-triathlon-multi-device-mouse-1",
+    accel_profile = "flat",
+})

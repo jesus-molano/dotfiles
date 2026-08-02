@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Bootstrap reproducible para CachyOS/Noctalia.
-# No modifica GPU, initramfs, arranque, Btrfs, zram, firewall ni /etc.
+# No despliega system-etc ni cambia explícitamente GPU, arranque o almacenamiento.
 
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOTFILES_DIR
@@ -17,6 +17,7 @@ PROFILE=''
 BACKUP_DIR=''
 
 CHECK_ONLY=0
+LIST_PACKAGES=0
 
 info() { printf '\033[1;34m[INFO]\033[0m %s\n' "$*"; }
 ok() { printf '\033[1;32m[OK]\033[0m %s\n' "$*"; }
@@ -29,11 +30,13 @@ die() {
 usage() {
 	cat <<'EOF'
 Uso:
-  ./install.sh {workstation|desktop} [--check]
+  ./install.sh {workstation|desktop} [--check|--list-packages]
 
   workstation  módulos comunes y hardware del portátil
-  desktop      módulos comunes y hardware del sobremesa inspeccionado
+  desktop      módulos comunes, hardware del sobremesa y gaming
   --check      valida paquetes y simula Stow sin modificar el sistema ni HOME
+  --list-packages
+               lista un paquete por línea sin modificar el sistema ni HOME
 
 Los módulos de system-etc se gestionan aparte con just check-system/apply-system.
 EOF
@@ -54,6 +57,9 @@ parse_args() {
 		--check)
 			CHECK_ONLY=1
 			;;
+		--list-packages)
+			LIST_PACKAGES=1
+			;;
 		-h | --help)
 			usage
 			exit 0
@@ -66,7 +72,14 @@ parse_args() {
 	done
 
 	[[ -n "$PROFILE" ]] || die "Especifica el perfil workstation o desktop."
-	PROFILE_MODULES=("${COMMON_MODULES[@]}" "hypr-$([[ "$PROFILE" == desktop ]] && printf desktop || printf laptop)")
+	if ((CHECK_ONLY && LIST_PACKAGES)); then
+		die "--check y --list-packages no se pueden combinar."
+	fi
+	if [[ "$PROFILE" == desktop ]]; then
+		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-desktop gaming)
+	else
+		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-laptop)
+	fi
 	BACKUP_DIR="$STATE_DIR/backups/$PROFILE-$(date +%Y%m%d-%H%M%S)"
 }
 
@@ -76,12 +89,12 @@ check_prerequisites() {
 	command -v git >/dev/null || die "Instala primero git y base-devel con Pacman o Shelly."
 	command -v stow >/dev/null || die "Instala primero GNU Stow con Pacman o Shelly."
 	command -v shelly >/dev/null || die "Shelly no está instalado; usa el paquete oficial de CachyOS."
-	[[ -f "$PACKAGES_CSV" ]] || die "No existe $PACKAGES_CSV."
 }
 
 validate_manifest() {
 	local invalid=0
 	local category package source extra
+	[[ -f "$PACKAGES_CSV" ]] || die "No existe $PACKAGES_CSV."
 
 	while IFS=, read -r category package source extra; do
 		[[ -n "$category" && -n "$package" && -n "$source" && -z "${extra:-}" ]] || {
@@ -93,18 +106,16 @@ validate_manifest() {
 			warn "Origen no permitido para $package: $source"
 			invalid=1
 		}
-		[[ "$category" != gaming ]] || {
-			warn "La categoría gaming no pertenece al perfil workstation."
-			invalid=1
-		}
-		if [[ "$package" =~ (^|-)nvidia($|-) || "$package" =~ ^(steam|lutris|heroic|gamescope) ]]; then
-			warn "Paquete excluido del bootstrap (GPU/gaming): $package"
+		if [[ "$package" =~ (^|-)nvidia($|-) ]]; then
+			warn "Paquete GPU administrado por CHWD y excluido del bootstrap: $package"
 			invalid=1
 		fi
 	done <"$PACKAGES_CSV"
 
 	((invalid == 0)) || die "Corrige packages.csv antes de continuar."
+}
 
+validate_profile_modules() {
 	local module
 	for module in "${PROFILE_MODULES[@]}"; do
 		[[ "$module" != system-etc ]] || die "system-etc nunca puede desplegarse en HOME."
@@ -114,7 +125,16 @@ validate_manifest() {
 
 collect_packages() {
 	local source=$1
-	awk -F, -v source="$source" '$3 == source { print $2 }' "$PACKAGES_CSV" | sort -u
+	awk -F, -v profile="$PROFILE" -v source="$source" \
+		'$3 == source && (profile == "desktop" || $1 != "gaming") { print $2 }' \
+		"$PACKAGES_CSV" | sort -u
+}
+
+list_packages() {
+	{
+		collect_packages native
+		collect_packages aur
+	} | sort -u
 }
 
 check_packages() {
@@ -143,7 +163,14 @@ install_packages() {
 		pacman -Q "$package" >/dev/null 2>&1 || missing_native+=("$package")
 	done
 	if ((${#missing_native[@]})); then
-		shelly install standard "${missing_native[@]}"
+		if command -v pkexec >/dev/null 2>&1 &&
+			[[ -n "${WAYLAND_DISPLAY:-}${DISPLAY:-}" ]]; then
+			info "Polkit instalará los paquetes nativos que faltan."
+			pkexec /usr/bin/shelly install standard --no-confirm "${missing_native[@]}"
+		else
+			warn "Polkit gráfico no está disponible; Shelly solicitará sudo en la terminal."
+			shelly install standard "${missing_native[@]}"
+		fi
 	else
 		info "Todos los paquetes nativos ya están instalados."
 	fi
@@ -154,6 +181,7 @@ install_packages() {
 				info "Paquete AUR ya instalado: $package"
 				continue
 			fi
+			warn "El AUR se compila como usuario; Shelly puede solicitar sudo solo para instalar el paquete construido."
 			info "Instalando paquete AUR: $package"
 			shelly install aur "$package" || die "Falló la instalación AUR de $package."
 		done
@@ -314,8 +342,14 @@ deploy_dotfiles() {
 
 main() {
 	parse_args "$@"
-	check_prerequisites
 	validate_manifest
+	if ((LIST_PACKAGES)); then
+		list_packages
+		exit 0
+	fi
+
+	check_prerequisites
+	validate_profile_modules
 	check_packages
 
 	if ((CHECK_ONLY)); then
@@ -325,7 +359,8 @@ main() {
 	fi
 
 	printf '\nPerfil: %s\nDestino dotfiles: %s\n' "$PROFILE" "$HOME"
-	printf 'No se tocarán /etc, GPU, arranque, Btrfs ni zram. ¿Continuar? [s/N] '
+	printf '%s\n' 'Shelly modificará los paquetes globales; ese cambio no forma parte del backup de HOME.'
+	printf 'No se desplegará system-etc ni se cambiarán explícitamente GPU, arranque, Btrfs o zram. ¿Continuar? [s/N] '
 	read -r answer
 	[[ "$answer" =~ ^[sS]$ ]] || exit 0
 

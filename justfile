@@ -3,8 +3,8 @@
 dotfiles_dir := justfile_directory()
 common_packages := "codex fish fonts ghostty git hypr-common kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij"
 workstation_packages := common_packages + " hypr-laptop"
-desktop_packages := common_packages + " hypr-desktop"
-home_packages := common_packages + " hypr-laptop hypr-desktop"
+desktop_packages := common_packages + " hypr-desktop gaming"
+home_packages := common_packages + " hypr-laptop hypr-desktop gaming"
 system_packages := "sddm udev"
 
 default:
@@ -54,6 +54,11 @@ apply target:
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
     read -r -a allowed <<< "{{ home_packages }}"
+
+    [[ "$target" != gaming ]] || {
+        printf 'El módulo gaming solo se aplica con el perfil desktop: usa just apply desktop.\n' >&2
+        exit 2
+    }
 
     [[ "$target" != hypr-common && "$target" != hypr-laptop && "$target" != hypr-desktop ]] || {
         printf 'Los módulos Hyprland se aplican juntos: usa workstation o desktop.\n' >&2
@@ -226,4 +231,8 @@ apply-system module:
 
 # Ejecuta el instalador explícito de un perfil permitido.
 install profile="workstation":
-    "{{ dotfiles_dir }}/install.sh" "{{ profile }}"
+    "{{ dotfiles_dir }}/install.sh" {{ quote(profile) }}
+
+# Lista, sin modificar nada, los paquetes seleccionados para un perfil.
+packages profile:
+    @"{{ dotfiles_dir }}/install.sh" {{ quote(profile) }} --list-packages

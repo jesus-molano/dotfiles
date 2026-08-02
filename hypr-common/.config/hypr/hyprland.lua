@@ -12,6 +12,14 @@ if profile_dir and profile_dir ~= "" then
     package.path = profile_dir .. "/?.lua;" .. profile_dir .. "/?/init.lua;" .. package.path
 end
 
+local function require_optional(module)
+    local loaded, result = pcall(require, module)
+    if loaded then return result end
+
+    local not_found = "module '" .. module .. "' not found:"
+    if not tostring(result):find(not_found, 1, true) then error(result) end
+end
+
 -- Register every key once and always expose a description to Hyprland tools.
 -- Normalising modifiers catches aliases such as Hyper already containing Shift.
 local registered_binds = {}
@@ -72,6 +80,9 @@ require("config.misc")
 require("config.monitors")
 require("config.windowrules")
 require("config.workspaces")
+-- The desktop-only gaming module contributes this file. Removing that Stow
+-- module also removes its bind and window rules on the next Hyprland reload.
+require_optional("config.gaming")
 
 -- Noctalia owns the live palette. Keep the tracked colors above as a fallback
 -- so Hyprland also validates and starts before the generated module exists.
