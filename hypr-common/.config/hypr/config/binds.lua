@@ -1,6 +1,6 @@
--- Hardware controls and the few global shortcuts outside the personal
--- Alt/Hyper workflow. All bindings pass through HYPR_BIND so duplicates fail
--- config validation instead of silently shadowing one another.
+-- Global shortcuts and hardware controls shared by laptop and desktop. All
+-- bindings pass through HYPR_BIND so duplicates fail config validation instead
+-- of silently shadowing one another. Display brightness stays in each profile.
 local main = "SUPER"
 local noctalia = "noctalia msg "
 local launch = "uwsm app -- "
@@ -54,14 +54,4 @@ HYPR_BIND("XF86AudioNext", hl.dsp.exec_cmd(noctalia .. "media next"), {
 HYPR_BIND("XF86AudioPrev", hl.dsp.exec_cmd(noctalia .. "media previous"), {
     description = "Pista anterior",
     locked = true,
-})
-HYPR_BIND("XF86MonBrightnessUp", hl.dsp.exec_cmd(noctalia .. "brightness-up"), {
-    description = "Subir brillo",
-    locked = true,
-    repeating = true,
-})
-HYPR_BIND("XF86MonBrightnessDown", hl.dsp.exec_cmd(noctalia .. "brightness-down"), {
-    description = "Bajar brillo",
-    locked = true,
-    repeating = true,
 })

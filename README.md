@@ -1,6 +1,8 @@
 # Dotfiles de CachyOS + Hyprland
 
-Configuración del perfil `workstation`, gestionada con GNU Stow.
+Configuración de los perfiles `workstation` y `desktop`, gestionada con GNU
+Stow. Ambos reutilizan los mismos módulos comunes y solo separan el hardware de
+Hyprland.
 
 ## Stack
 
@@ -17,14 +19,27 @@ Configuración del perfil `workstation`, gestionada con GNU Stow.
 | Navegador | qutebrowser + Brave como respaldo |
 | Credenciales | 1Password CLI y agente SSH |
 
-## Módulos
+## Perfiles y módulos
 
-El perfil `workstation` despliega estos módulos:
+Módulos compartidos:
 
 ```text
-codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia
+codex fish fonts ghostty git hypr-common kanata mimeapps noctalia
 nvim qutebrowser shell starship vscode zellij
 ```
+
+Cada perfil añade exactamente un módulo de hardware:
+
+| Perfil | Módulo | Hardware |
+|---|---|---|
+| `workstation` | `hypr-laptop` | eDP, touchpad, entrada y brillo del portátil |
+| `desktop` | `hypr-desktop` | dos Philips 273V7 por HDMI y entrada Keychron/Logitech |
+
+El módulo Hyprland de `desktop` no configura touchpad ni teclas de brillo porque
+el informe real de este equipo no detectó touchpad, batería interna ni
+backlight. Los widgets adaptativos de Noctalia siguen compartidos y detectan los
+dispositivos disponibles. GPU, CHWD, initramfs, arranque, Btrfs, ZRAM, `/etc` y
+servicios quedan fuera de ambos perfiles.
 
 Los paquetes del sistema y de AUR están declarados en `packages.csv`.
 
@@ -41,6 +56,10 @@ git clone git@github.com:jesus-molano/dotfiles.git ~/.dotfiles
 cd ~/.dotfiles
 ./install.sh workstation --check
 ./install.sh workstation
+
+# Sobremesa inspeccionado (simular antes de aplicar)
+./install.sh desktop --check
+./install.sh desktop
 ```
 
 El instalador usa Pacman y Shelly, comprueba los paquetes, simula Stow y guarda
@@ -51,11 +70,17 @@ una copia de los archivos que vaya a sustituir.
 ```bash
 just list                  # módulos permitidos
 just check workstation     # simulación del perfil completo
-just check hypr-laptop     # simulación de un módulo
+just check desktop         # simulación del perfil de sobremesa
+just check hypr-desktop    # simulación de un módulo de hardware
 just doctor                # diagnóstico completo de solo lectura
 just apply workstation     # simular y desplegar
+just apply desktop         # simular y desplegar desktop
 just remove workstation    # simular y retirar enlaces
 ```
+
+Los módulos `hypr-common`, `hypr-laptop` y `hypr-desktop` se pueden comprobar
+por separado, pero `just apply` obliga a usar un perfil completo. Para cambiar
+de hardware, retira primero el perfil anterior y revisa la simulación del nuevo.
 
 La configuración de `/etc` se gestiona por separado. El módulo disponible es
 la regla udev de Kanata:
@@ -116,8 +141,9 @@ Kanata convierte Caps Lock en:
 | `Super + V` | Historial del portapapeles |
 
 `Super` queda reservado para el historial del portapapeles. El archivo
-`hypr-laptop/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
-del sistema y las teclas físicas de calculadora, multimedia y brillo.
+`hypr-common/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
+del sistema y las teclas físicas de calculadora y multimedia. Las teclas de
+brillo viven solo en `hypr-laptop`.
 
 ### qutebrowser
 
@@ -148,18 +174,24 @@ with-secrets pnpm run deploy
 ## Validación
 
 ```bash
-Hyprland --verify-config
+HYPR_PROFILE_DIR="$PWD/hypr-laptop/.config/hypr" \
+  Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
+HYPR_PROFILE_DIR="$PWD/hypr-desktop/.config/hypr" \
+  Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
 hyprctl configerrors
 noctalia config validate noctalia/.config/noctalia/config.toml
 kanata --check -c kanata/.config/kanata/config.kbd
 just check workstation
+just check desktop
 git diff --check
 ```
 
 ## Rutas principales
 
 ```text
-hypr-laptop/.config/hypr/       Hyprland Lua
+hypr-common/.config/hypr/       configuración compartida de Hyprland
+hypr-laptop/.config/hypr/       hardware del portátil
+hypr-desktop/.config/hypr/      hardware del sobremesa
 noctalia/.config/noctalia/      Noctalia y paleta
 kanata/.config/kanata/          teclado
 ghostty/.config/ghostty/        terminal

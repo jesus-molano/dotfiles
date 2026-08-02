@@ -7,6 +7,10 @@ local source = debug.getinfo(1, "S").source
 local config_file = source:sub(1, 1) == "@" and source:sub(2) or source
 local hypr_config = config_file:match("^(.*[/\\])") or "./"
 package.path = hypr_config .. "?.lua;" .. hypr_config .. "?/init.lua;" .. package.path
+local profile_dir = os.getenv("HYPR_PROFILE_DIR")
+if profile_dir and profile_dir ~= "" then
+    package.path = profile_dir .. "/?.lua;" .. profile_dir .. "/?/init.lua;" .. package.path
+end
 
 -- Register every key once and always expose a description to Hyprland tools.
 -- Normalising modifiers catches aliases such as Hyper already containing Shift.
@@ -62,6 +66,7 @@ require("config.environment")
 require("config.inputs")
 require("config.user-inputs")
 require("config.binds")
+require("config.hardware-binds")
 require("config.user-binds")
 require("config.misc")
 require("config.monitors")

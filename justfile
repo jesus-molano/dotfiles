@@ -1,7 +1,10 @@
 # Gestión segura de dotfiles con GNU Stow.
 
 dotfiles_dir := justfile_directory()
-workstation_packages := "codex fish fonts ghostty git hypr-laptop kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij"
+common_packages := "codex fish fonts ghostty git hypr-common kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij"
+workstation_packages := common_packages + " hypr-laptop"
+desktop_packages := common_packages + " hypr-desktop"
+home_packages := common_packages + " hypr-laptop hypr-desktop"
 system_packages := "sddm udev"
 
 default:
@@ -11,6 +14,8 @@ default:
 list:
     @printf 'workstation\n'
     @for package in {{ workstation_packages }}; do printf '  %s\n' "$package"; done
+    @printf 'desktop\n'
+    @for package in {{ desktop_packages }}; do printf '  %s\n' "$package"; done
 
 # Simula de forma verbosa un perfil o un módulo permitido.
 check target:
@@ -18,10 +23,12 @@ check target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ workstation_packages }}"
+    read -r -a allowed <<< "{{ home_packages }}"
 
     if [[ "$target" == workstation ]]; then
-        packages=("${allowed[@]}")
+        read -r -a packages <<< "{{ workstation_packages }}"
+    elif [[ "$target" == desktop ]]; then
+        read -r -a packages <<< "{{ desktop_packages }}"
     else
         packages=("$target")
     fi
@@ -37,7 +44,7 @@ check target:
         }
     done
 
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
+    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --adopt --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
 
 # Aplica un perfil o módulo permitido; siempre simula antes y requiere destino.
@@ -46,10 +53,21 @@ apply target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ workstation_packages }}"
+    read -r -a allowed <<< "{{ home_packages }}"
+
+    [[ "$target" != hypr-common && "$target" != hypr-laptop && "$target" != hypr-desktop ]] || {
+        printf 'Los módulos Hyprland se aplican juntos: usa workstation o desktop.\n' >&2
+        exit 2
+    }
+
+    if [[ "$target" == workstation || "$target" == desktop ]]; then
+        exec "{{ dotfiles_dir }}/install.sh" "$target"
+    fi
 
     if [[ "$target" == workstation ]]; then
-        packages=("${allowed[@]}")
+        read -r -a packages <<< "{{ workstation_packages }}"
+    elif [[ "$target" == desktop ]]; then
+        read -r -a packages <<< "{{ desktop_packages }}"
     else
         packages=("$target")
     fi
@@ -76,10 +94,12 @@ remove target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ workstation_packages }}"
+    read -r -a allowed <<< "{{ home_packages }}"
 
     if [[ "$target" == workstation ]]; then
-        packages=("${allowed[@]}")
+        read -r -a packages <<< "{{ workstation_packages }}"
+    elif [[ "$target" == desktop ]]; then
+        read -r -a packages <<< "{{ desktop_packages }}"
     else
         packages=("$target")
     fi
@@ -192,6 +212,6 @@ apply-system module:
     printf '%s\n' "$backup_root" > "$state_root/last-system-backup"
     printf 'Backup: %s\n' "$backup_root"
 
-# Ejecuta el instalador explícito del perfil workstation.
-install:
-    "{{ dotfiles_dir }}/install.sh" workstation
+# Ejecuta el instalador explícito de un perfil permitido.
+install profile="workstation":
+    "{{ dotfiles_dir }}/install.sh" "{{ profile }}"

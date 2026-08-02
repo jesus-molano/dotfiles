@@ -44,7 +44,10 @@ check_empty() {
 }
 
 printf 'Configuración\n'
-check "Hyprland" Hyprland --verify-config -c "$repo_root/hypr-laptop/.config/hypr/hyprland.lua"
+check "Hyprland workstation" env HYPR_PROFILE_DIR="$repo_root/hypr-laptop/.config/hypr" \
+	Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
+check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
+	Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
 if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
 	check_empty "Hyprland sin errores activos" hyprctl configerrors
 else
@@ -52,10 +55,11 @@ else
 fi
 check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
 check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
-check "Base CachyOS" "$repo_root/hypr-laptop/.local/bin/hypr-check-cachyos-base"
+check "Base CachyOS" "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
 
 printf '\nDespliegue\n'
 check "Stow workstation" just --justfile "$repo_root/justfile" check workstation
+check "Stow desktop" just --justfile "$repo_root/justfile" check desktop
 check "Whitespace Git" git -C "$repo_root" diff --check
 
 printf '\nSistema\n'

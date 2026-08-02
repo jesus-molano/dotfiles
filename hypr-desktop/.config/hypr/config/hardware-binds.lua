@@ -1,0 +1,2 @@
+-- No internal backlight was present in the desktop hardware report. Volume and
+-- media controls remain in the shared bindings; brightness keys are omitted.

@@ -8,12 +8,13 @@ DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOTFILES_DIR
 readonly PACKAGES_CSV="$DOTFILES_DIR/packages.csv"
 readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-BACKUP_DIR="$STATE_DIR/backups/workstation-$(date +%Y%m%d-%H%M%S)"
-readonly BACKUP_DIR
-readonly -a WORKSTATION_MODULES=(
-	codex fish fonts ghostty git hypr-laptop kanata mimeapps
+readonly -a COMMON_MODULES=(
+	codex fish fonts ghostty git hypr-common kanata mimeapps
 	noctalia nvim qutebrowser shell starship vscode zellij
 )
+declare -a PROFILE_MODULES=()
+PROFILE=''
+BACKUP_DIR=''
 
 CHECK_ONLY=0
 
@@ -28,9 +29,10 @@ die() {
 usage() {
 	cat <<'EOF'
 Uso:
-  ./install.sh workstation [--check]
+  ./install.sh {workstation|desktop} [--check]
 
-  workstation  instala exclusivamente el perfil de trabajo permitido
+  workstation  módulos comunes y hardware del portátil
+  desktop      módulos comunes y hardware del sobremesa inspeccionado
   --check      valida paquetes y simula Stow sin modificar el sistema ni HOME
 
 Los módulos de system-etc se gestionan aparte con just check-system/apply-system.
@@ -43,12 +45,11 @@ parse_args() {
 		exit 2
 	}
 
-	local profile=''
 	while (($#)); do
 		case "$1" in
-		workstation)
-			[[ -z "$profile" ]] || die "Solo se admite un perfil."
-			profile=$1
+		workstation | desktop)
+			[[ -z "$PROFILE" ]] || die "Solo se admite un perfil."
+			PROFILE=$1
 			;;
 		--check)
 			CHECK_ONLY=1
@@ -64,7 +65,9 @@ parse_args() {
 		shift
 	done
 
-	[[ "$profile" == workstation ]] || die "Especifica el perfil workstation."
+	[[ -n "$PROFILE" ]] || die "Especifica el perfil workstation o desktop."
+	PROFILE_MODULES=("${COMMON_MODULES[@]}" "hypr-$([[ "$PROFILE" == desktop ]] && printf desktop || printf laptop)")
+	BACKUP_DIR="$STATE_DIR/backups/$PROFILE-$(date +%Y%m%d-%H%M%S)"
 }
 
 check_prerequisites() {
@@ -103,7 +106,7 @@ validate_manifest() {
 	((invalid == 0)) || die "Corrige packages.csv antes de continuar."
 
 	local module
-	for module in "${WORKSTATION_MODULES[@]}"; do
+	for module in "${PROFILE_MODULES[@]}"; do
 		[[ "$module" != system-etc ]] || die "system-etc nunca puede desplegarse en HOME."
 		[[ -d "$DOTFILES_DIR/$module" ]] || die "No existe el módulo Stow: $module"
 	done
@@ -145,9 +148,13 @@ install_packages() {
 }
 
 check_dotfiles() {
-	info "Simulación verbosa de Stow para workstation..."
-	stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
-		--dir "$DOTFILES_DIR" --target "$HOME" "${WORKSTATION_MODULES[@]}"
+	validate_target_safety
+	report_backup_targets
+	info "Simulación verbosa de Stow para $PROFILE (los destinos listados se respaldarían)..."
+	# --adopt solo permite modelar los destinos que el despliegue moverá al backup.
+	# --simulate garantiza que ni HOME ni las fuentes del repositorio cambian.
+	stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --adopt --simulate --verbose=2 \
+		--dir "$DOTFILES_DIR" --target "$HOME" "${PROFILE_MODULES[@]}"
 }
 
 is_private_env_path() {
@@ -171,12 +178,9 @@ is_stow_ignored_path() {
 	return 1
 }
 
-tracked_module_sources() {
-	local module=$1 tracked source
-	while IFS= read -r -d '' tracked; do
-		source="$DOTFILES_DIR/$tracked"
-		[[ -f "$source" || -L "$source" ]] && printf '%s\0' "$source"
-	done < <(git -C "$DOTFILES_DIR" ls-files -z -- "$module")
+module_sources() {
+	local module=$1
+	find "$DOTFILES_DIR/$module" \( -type f -o -type l \) -print0
 }
 
 target_is_managed_dotfile() {
@@ -199,13 +203,10 @@ target_has_symlink_parent() {
 	return 1
 }
 
-backup_targets() {
-	mkdir -p "$BACKUP_DIR"
+validate_target_safety() {
 	local module source relative target
-	local backed_up=0
-
 	# No atraviesa enlaces de directorio: mover un hijo modificaría su origen real.
-	for module in "${WORKSTATION_MODULES[@]}"; do
+	for module in "${PROFILE_MODULES[@]}"; do
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
@@ -215,10 +216,32 @@ backup_targets() {
 			if target_has_symlink_parent "$target"; then
 				die "Destino bajo un directorio enlazado; revísalo manualmente: $target"
 			fi
-		done < <(tracked_module_sources "$module")
+		done < <(module_sources "$module")
 	done
+}
 
-	for module in "${WORKSTATION_MODULES[@]}"; do
+report_backup_targets() {
+	local module source relative target
+	for module in "${PROFILE_MODULES[@]}"; do
+		while IFS= read -r -d '' source; do
+			relative=${source#"$DOTFILES_DIR/$module/"}
+			is_stow_ignored_path "$module" "$relative" && continue
+			target="$HOME/$relative"
+			[[ -e "$target" || -L "$target" ]] || continue
+			target_is_managed_dotfile "$target" && continue
+			printf 'BACKUP: %s\n' "$target"
+		done < <(module_sources "$module")
+	done
+}
+
+backup_targets() {
+	mkdir -p "$BACKUP_DIR"
+	local module source relative target
+	local backed_up=0
+
+	validate_target_safety
+
+	for module in "${PROFILE_MODULES[@]}"; do
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
@@ -233,7 +256,7 @@ backup_targets() {
 			mv "$target" "$BACKUP_DIR/$relative"
 			printf '%s\n' "$relative" >>"$BACKUP_DIR/manifest.txt"
 			backed_up=1
-		done < <(tracked_module_sources "$module")
+		done < <(module_sources "$module")
 	done
 
 	if ((backed_up)); then
@@ -263,17 +286,17 @@ restore_backup() {
 deploy_dotfiles() {
 	info "Simulando de nuevo tras crear la copia reversible..."
 	if ! stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
-		--dir "$DOTFILES_DIR" --target "$HOME" "${WORKSTATION_MODULES[@]}"; then
+		--dir "$DOTFILES_DIR" --target "$HOME" "${PROFILE_MODULES[@]}"; then
 		restore_backup
 		die "La simulación de Stow falló; no se desplegaron dotfiles."
 	fi
 
 	if ! stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --verbose=2 \
-		--dir "$DOTFILES_DIR" --target "$HOME" "${WORKSTATION_MODULES[@]}"; then
+		--dir "$DOTFILES_DIR" --target "$HOME" "${PROFILE_MODULES[@]}"; then
 		restore_backup
 		die "Stow falló y se intentó restaurar la copia previa."
 	fi
-	ok "Dotfiles desplegados: ${WORKSTATION_MODULES[*]}"
+	ok "Dotfiles desplegados ($PROFILE): ${PROFILE_MODULES[*]}"
 }
 
 main() {
@@ -288,7 +311,7 @@ main() {
 		exit 0
 	fi
 
-	printf '\nPerfil: workstation\nDestino dotfiles: %s\n' "$HOME"
+	printf '\nPerfil: %s\nDestino dotfiles: %s\n' "$PROFILE" "$HOME"
 	printf 'No se tocarán /etc, GPU, arranque, Btrfs ni zram. ¿Continuar? [s/N] '
 	read -r answer
 	[[ "$answer" =~ ^[sS]$ ]] || exit 0
