@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly watcher='org.kde.StatusNotifierWatcher'
+
+command -v shelly-notifications >/dev/null 2>&1 || exit 0
+
+# Shelly registra un StatusNotifierItem una sola vez. Esperar a Noctalia evita
+# perder el icono si ambos procesos compiten durante el inicio de la sesión.
+for ((attempt = 0; attempt < 40; attempt++)); do
+	busctl --user --quiet status "$watcher" >/dev/null 2>&1 && break
+	sleep 0.25
+done
+
+busctl --user --quiet status "$watcher" >/dev/null 2>&1 || exit 0
+
+# El propio servicio usa un nombre D-Bus único y descarta duplicados.
+exec uwsm app -- shelly-notifications
