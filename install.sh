@@ -142,8 +142,16 @@ install_packages() {
 		shelly install standard "${native_packages[@]}"
 	fi
 	if ((${#aur_packages[@]})); then
-		warn "Shelly mostrará la procedencia de los paquetes AUR antes de instalarlos."
-		shelly install aur "${aur_packages[@]}"
+		warn "Shelly mostrará la procedencia de cada paquete AUR antes de instalarlo."
+		local package
+		for package in "${aur_packages[@]}"; do
+			if pacman -Q "$package" >/dev/null 2>&1; then
+				info "Paquete AUR ya instalado: $package"
+				continue
+			fi
+			info "Instalando paquete AUR: $package"
+			shelly install aur "$package" || die "Falló la instalación AUR de $package."
+		done
 	fi
 }
 
