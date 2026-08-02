@@ -15,7 +15,7 @@ Hyprland.
 | Archivos | Dolphin |
 | Editor | Neovim/LazyVim |
 | Multiplexor | Zellij |
-| Teclado | Español + Kanata |
+| Teclado | US/ES + Kanata |
 | Navegador | qutebrowser + Brave como respaldo |
 | Credenciales | 1Password CLI y agente SSH |
 
@@ -48,6 +48,9 @@ Los paquetes del sistema y de AUR están declarados en `packages.csv`.
 La paleta `ProjectAtlas` genera los temas de Hyprland, GTK, Qt/KDE, Ghostty,
 Kitty, Starship, btop, Zellij, Micro, bat/delta, Codex, Neovim, Orca y
 VS Code/VSCodium.
+
+`orca-safe-settings` actualiza con backup el tema de terminal de Orca antes de
+abrir la aplicación; Hyprland lo ejecuta una vez al comenzar cada sesión.
 
 ## Instalación
 
@@ -83,12 +86,14 @@ Los módulos `hypr-common`, `hypr-laptop` y `hypr-desktop` se pueden comprobar
 por separado, pero `just apply` obliga a usar un perfil completo. Para cambiar
 de hardware, retira primero el perfil anterior y revisa la simulación del nuevo.
 
-La configuración de `/etc` se gestiona por separado. El módulo disponible es
-la regla udev de Kanata:
+La configuración de `/etc` se gestiona por separado. Los módulos disponibles
+son la regla udev de Kanata y el tema Project Atlas de SDDM:
 
 ```bash
 just check-system udev
 just apply-system udev
+just check-system sddm
+just apply-system sddm
 ```
 
 ## Teclado
@@ -98,6 +103,26 @@ Kanata convierte Caps Lock en:
 - pulsación: `Esc`
 - mantenida: `Hyper` (`Ctrl + Alt + Super + Shift`)
 - salida de emergencia: `Ctrl + Space + Esc`
+
+En el perfil `desktop`, el layout inicial es US para el Keychron ANSI y
+`Super + Space` alterna entre US y español.
+
+Los espacios del sobremesa se agrupan por mano: `Q/W/E/R` pertenecen a la
+pantalla izquierda y `U/I/O/P` a la principal situada a la derecha. Q y U son
+los espacios iniciales. Sus funciones son terminal, directorios, música, chat,
+navegador, código, juegos y sistema, respectivamente.
+
+La primera instalación de Kanata requiere cargar `uinput`, añadir el usuario al
+grupo `input`, aplicar el módulo udev y habilitar el servicio. Usa Polkit y vuelve
+a iniciar sesión para que systemd herede el grupo:
+
+```bash
+pkexec /usr/bin/modprobe uinput
+pkexec /usr/bin/usermod -aG input "$USER"
+just apply-system udev
+systemctl --user daemon-reload
+systemctl --user enable kanata.service
+```
 
 ## Atajos
 
@@ -139,9 +164,10 @@ Kanata convierte Caps Lock en:
 | `Hyper + L` | Bloquear la sesión |
 | `Hyper + Q` | Menú de sesión |
 | `Hyper + 7` | Ayuda de atajos |
+| `Super + Space` | Alternar teclado US/ES (`desktop`) |
 | `Super + V` | Historial del portapapeles |
 
-`Super` queda reservado para el historial del portapapeles. El archivo
+`Super` se limita al historial del portapapeles y al cambio de layout. El archivo
 `hypr-common/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
 del sistema y las teclas físicas de calculadora y multimedia. Las teclas de
 brillo viven solo en `hypr-laptop`.

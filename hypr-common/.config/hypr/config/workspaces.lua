@@ -11,12 +11,22 @@ local workspace_icons = {
     "", -- 8: system / miscellaneous
 }
 
--- Persistent workspaces are not pinned to connector names, so an external
--- display can be attached or removed without invalidating the layout.
+-- Hardware profiles can override presentation and monitor ownership without
+-- duplicating the shared workspace rules. The desktop profile groups them by
+-- hand: Q/W/E/R on the left display and U/I/O/P on the right.
 for workspace = 1, NUM_WORKSPACES do
-    hl.workspace_rule({
+    local rule = {
         workspace = tostring(workspace),
         persistent = true,
-        default_name = workspace_icons[workspace],
-    })
+        default_name = (WORKSPACE_ICON_OVERRIDES or {})[workspace] or workspace_icons[workspace],
+    }
+
+    if WORKSPACE_MONITORS and WORKSPACE_MONITORS[workspace] then
+        rule.monitor = WORKSPACE_MONITORS[workspace]
+    end
+    if WORKSPACE_DEFAULTS and WORKSPACE_DEFAULTS[workspace] then
+        rule.default = true
+    end
+
+    hl.workspace_rule(rule)
 end

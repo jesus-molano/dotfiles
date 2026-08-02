@@ -21,7 +21,7 @@ hl.window_rule({ match = { class = "^(dev\\.)?(noctalia\\.Noctalia(\\.Settings)?
 hl.window_rule({
     name = "route-spotify-to-music",
     match = { initial_class = "^[Ss]potify$" },
-    workspace = "4 silent",
+    workspace = tostring(MUSIC_WORKSPACE or 4) .. " silent",
 })
 
 -- Opacity Overrides

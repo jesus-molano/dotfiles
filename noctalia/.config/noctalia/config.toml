@@ -138,6 +138,17 @@ enabled = false
 auto_update = false
 enabled = []
 
+[wallpaper]
+enabled = true
+fill_mode = "crop"
+fill_color = "surface"
+directory = "/home/jesus-molano/Pictures"
+transition = [ "fade" ]
+transition_duration = 900
+
+[wallpaper.default]
+path = "/home/jesus-molano/Pictures/wallhaven-2ero7g_2560x1440.png"
+
 [theme]
 mode = "dark"
 source = "custom"

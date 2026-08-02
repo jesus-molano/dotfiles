@@ -1,6 +1,6 @@
 -- Hardware report: two Philips 273V7 panels at 1920x1080@60, side by side.
--- Serial-independent connector rules keep this reversible if either panel is
--- replaced while preserving the observed layout.
+-- HDMI-A-1 is physically left; HDMI-A-2 is the primary display on the right.
+-- Workspace ownership is declared separately in user-inputs.lua.
 hl.monitor({
     output = "HDMI-A-1",
     mode = "1920x1080@60",
