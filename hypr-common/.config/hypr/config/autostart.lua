@@ -6,6 +6,9 @@ hl.on("hyprland.start", function ()
     -- terminal palette before the app can restore or open a window.
     hl.exec_cmd("orca-safe-settings")
     hl.exec_cmd("uwsm app -- noctalia")
+    -- Shelly expone las actualizaciones de repositorios, AUR y backends
+    -- opcionales en el tray una vez que Noctalia publica su watcher.
+    hl.exec_cmd("ensure-shelly-tray")
     -- Wait for Noctalia's StatusNotifierWatcher before starting 1Password;
     -- Electron does not re-register its tray item if it wins the startup race.
     hl.exec_cmd("ensure-1password-tray")
