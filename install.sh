@@ -134,16 +134,21 @@ check_packages() {
 }
 
 install_packages() {
-	local -a native_packages aur_packages
+	local -a native_packages aur_packages missing_native=()
 	mapfile -t native_packages < <(collect_packages native)
 	mapfile -t aur_packages < <(collect_packages aur)
 
-	if ((${#native_packages[@]})); then
-		shelly install standard "${native_packages[@]}"
+	local package
+	for package in "${native_packages[@]}"; do
+		pacman -Q "$package" >/dev/null 2>&1 || missing_native+=("$package")
+	done
+	if ((${#missing_native[@]})); then
+		shelly install standard "${missing_native[@]}"
+	else
+		info "Todos los paquetes nativos ya están instalados."
 	fi
 	if ((${#aur_packages[@]})); then
 		warn "Shelly mostrará la procedencia de cada paquete AUR antes de instalarlo."
-		local package
 		for package in "${aur_packages[@]}"; do
 			if pacman -Q "$package" >/dev/null 2>&1; then
 				info "Paquete AUR ya instalado: $package"
