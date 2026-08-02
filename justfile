@@ -152,7 +152,11 @@ check-system module:
 
     while IFS= read -r -d '' source; do
         relative="${source#"$source_root/"}"
-        target="$target_root/$relative"
+        if [[ "$module" == sddm && "$relative" == conf.d/* ]]; then
+            target="/etc/sddm.conf.d/${relative#conf.d/}"
+        else
+            target="$target_root/$relative"
+        fi
         if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
             printf '= %s\n' "$target"
         elif [[ -e "$target" ]]; then
@@ -182,7 +186,11 @@ apply-system module:
         exit 2
     }
 
-    printf 'Destino exacto: %s\n' "$target_root"
+    if [[ "$module" == sddm ]]; then
+        printf 'Destinos exactos: /etc/sddm.conf.d y /etc/sddm/themes\n'
+    else
+        printf 'Destino exacto: %s\n' "$target_root"
+    fi
     printf 'Se copiarán archivos y se respaldarán los existentes. Escribe APLICAR: '
     read -r confirmation
     [[ "$confirmation" == APLICAR ]] || {
@@ -196,7 +204,11 @@ apply-system module:
 
     while IFS= read -r -d '' source; do
         relative="${source#"$source_root/"}"
-        target="$target_root/$relative"
+        if [[ "$module" == sddm && "$relative" == conf.d/* ]]; then
+            target="/etc/sddm.conf.d/${relative#conf.d/}"
+        else
+            target="$target_root/$relative"
+        fi
         if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
             printf '= %s (sin cambios)\n' "$target"
             continue

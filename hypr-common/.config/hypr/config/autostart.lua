@@ -6,7 +6,7 @@ hl.on("hyprland.start", function ()
     -- terminal palette before the app can restore or open a window.
     hl.exec_cmd("orca-safe-settings")
     hl.exec_cmd("uwsm app -- noctalia")
-    -- Keep 1Password resident as a StatusNotifierItem without opening its main
-    -- window. Noctalia exposes it through the inline tray on the bar.
-    hl.exec_cmd("uwsm app -- 1password --silent")
+    -- Wait for Noctalia's StatusNotifierWatcher before starting 1Password;
+    -- Electron does not re-register its tray item if it wins the startup race.
+    hl.exec_cmd("ensure-1password-tray")
 end)
