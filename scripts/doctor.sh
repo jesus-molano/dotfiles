@@ -76,17 +76,19 @@ check "Stow $profile" just --justfile "$repo_root/justfile" check "$profile"
 check "Whitespace Git" git -C "$repo_root" diff --check
 
 printf '\nSistema\n'
-if systemctl --failed --quiet; then
+system_failed="$(systemctl --failed --no-legend --plain 2>/dev/null || true)"
+if [[ -z "$system_failed" ]]; then
 	ok "Sin unidades del sistema fallidas"
 else
 	fail "Hay unidades del sistema fallidas"
-	systemctl --failed --no-pager
+	printf '%s\n' "$system_failed"
 fi
-if systemctl --user --failed --quiet; then
+user_failed="$(systemctl --user --failed --no-legend --plain 2>/dev/null || true)"
+if [[ -z "$user_failed" ]]; then
 	ok "Sin unidades de usuario fallidas"
 else
 	fail "Hay unidades de usuario fallidas"
-	systemctl --user --failed --no-pager
+	printf '%s\n' "$user_failed"
 fi
 
 if systemctl is-enabled --quiet btrfs-scrub@-.timer; then
