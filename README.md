@@ -51,6 +51,8 @@ VS Code/VSCodium.
 
 `orca-safe-settings` actualiza con backup el tema de terminal de Orca antes de
 abrir la aplicación; Hyprland lo ejecuta una vez al comenzar cada sesión.
+1Password arranca de forma silenciosa en la misma sesión y permanece accesible
+como icono inline en la bandeja de Noctalia.
 
 ## Instalación
 

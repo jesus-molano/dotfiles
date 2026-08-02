@@ -272,3 +272,5 @@ color = "error"
 
 [widget.tray]
 capsule = false
+drawer = false
+hidden = []
