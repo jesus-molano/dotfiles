@@ -129,7 +129,7 @@ check_gaming_scheduler() {
 }
 
 check_gaming_monitors() {
-	local monitor_json monitor_summary
+	local monitor_json workspace_json monitor_summary workspace_summary desktop_monitor_count
 
 	if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
 		info "Monitor gaming no comprobado: Hyprland no está accesible"
@@ -139,24 +139,48 @@ check_gaming_monitors() {
 		fail "No se pudieron consultar los monitores activos"
 		return
 	fi
-	if jq -e '
+	if ! workspace_json="$(hyprctl -j workspaces 2>/dev/null)"; then
+		fail "No se pudieron consultar los workspaces activos"
+		return
+	fi
+	if jq -e --argjson workspaces "$workspace_json" '
 		type == "array" and
-		(. as $monitors |
-			["HDMI-A-1", "HDMI-A-2"] |
-			all(.[]; . as $expected |
-				any($monitors[];
-					.name == $expected and
-					.refreshRate >= 74.8 and .refreshRate <= 75.1 and
-					.vrr == false)))
+		([.[] | select(.name == "HDMI-A-1" or .name == "HDMI-A-2")] as $monitors |
+			($monitors | length) >= 1 and ($monitors | length) <= 2 and
+			all($monitors[];
+				.refreshRate >= 74.8 and .refreshRate <= 75.1 and .vrr == false) and
+			if ($monitors | length) == 2 then
+				all(range(1; 5); . as $id |
+					any($workspaces[]; .id == $id and .monitor == "HDMI-A-1")) and
+				all(range(5; 9); . as $id |
+					any($workspaces[]; .id == $id and .monitor == "HDMI-A-2"))
+			else
+				($monitors[0].name) as $only |
+				all(range(1; 9); . as $id |
+					any($workspaces[]; .id == $id and .monitor == $only))
+			end)
 	' >/dev/null 2>&1 <<<"$monitor_json"; then
-		ok "HDMI-A-1 y HDMI-A-2 a 74.97/75 Hz con VRR desactivado"
+		desktop_monitor_count="$(
+			jq '[.[] | select(.name == "HDMI-A-1" or .name == "HDMI-A-2")] | length' \
+				<<<"$monitor_json"
+		)"
+		if [[ "$desktop_monitor_count" -eq 1 ]]; then
+			ok "Ocho workspaces en el único monitor activo a 74.97/75 Hz, VRR desactivado"
+		else
+			ok "Workspaces 1-4 a la izquierda y 5-8 a la derecha, 74.97/75 Hz, VRR desactivado"
+		fi
 	else
 		monitor_summary="$(
 			jq -r '.[] | "\(.name): \(.refreshRate) Hz, VRR=\(.vrr)"' \
 				<<<"$monitor_json" 2>/dev/null || true
 		)"
+		workspace_summary="$(
+			jq -r '.[] | select(.id >= 1 and .id <= 8) | "workspace \(.id): \(.monitor)"' \
+				<<<"$workspace_json" 2>/dev/null || true
+		)"
 		[[ -z "$monitor_summary" ]] || printf '%s\n' "$monitor_summary" >&2
-		fail "HDMI-A-1/2 no coinciden con 74.97/75 Hz y VRR desactivado"
+		[[ -z "$workspace_summary" ]] || printf '%s\n' "$workspace_summary" >&2
+		fail "La topología de monitores y workspaces del desktop no coincide con la política adaptativa"
 	fi
 }
 

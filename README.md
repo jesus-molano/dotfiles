@@ -34,7 +34,7 @@ Cada perfil añade sus módulos específicos:
 | Perfil | Módulos | Hardware |
 |---|---|---|
 | `workstation` | `hypr-laptop` | eDP, touchpad, entrada y brillo del portátil |
-| `desktop` | `hypr-desktop gaming` | dos Philips 273V7 a 74.97 Hz, RTX 3060 Ti y entrada Keychron/Logitech |
+| `desktop` | `hypr-desktop gaming` | uno o dos Philips 273V7 a 74.97 Hz, RTX 3060 Ti y entrada Keychron/Logitech |
 
 El módulo Hyprland de `desktop` no configura touchpad ni teclas de brillo porque
 el informe real de este equipo no detectó touchpad, batería interna ni
@@ -250,10 +250,13 @@ Kanata convierte Caps Lock en:
 En el perfil `desktop`, el layout inicial es US para el Keychron ANSI y
 `Super + Space` alterna entre US y español.
 
-Los espacios del sobremesa se agrupan por mano: `Q/W/E/R` pertenecen a la
-pantalla izquierda y `U/I/O/P` a la principal situada a la derecha. Q y U son
-los espacios iniciales. Sus funciones son terminal, directorios, música, chat,
-navegador, código, juegos y sistema, respectivamente.
+Con los dos monitores conectados, los espacios del sobremesa se agrupan por
+mano: `Q/W/E/R` pertenecen a la pantalla izquierda y `U/I/O/P` a la principal
+situada a la derecha. Q y U son los espacios iniciales. Si solo permanece
+`HDMI-A-1` o `HDMI-A-2`, los ocho espacios persistentes se muestran en esa
+pantalla. Hyprland recalcula la distribución al conectar o desconectar una
+salida, sin cambiar los atajos. Sus funciones son terminal, directorios, música,
+chat, navegador, código, juegos y sistema, respectivamente.
 
 La primera instalación de Kanata requiere cargar `uinput`, añadir el usuario al
 grupo `input`, aplicar el módulo udev y habilitar el servicio. Usa Polkit y vuelve

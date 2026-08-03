@@ -108,9 +108,11 @@ Steam, valida un juego y conserva una copia hasta comprobar los datos.
 
 ## Pantallas y mando
 
-Los dos Philips 273V7 están configurados a `1920x1080@74.97` y con VRR
-desactivado. Gamescope solicita 75 Hz para coincidir con esa señal. No se habilita
-HDR, VRR ni tearing porque los paneles inspeccionados no justifican esos cambios.
+Los Philips 273V7 están configurados a `1920x1080@74.97` y con VRR desactivado.
+Con ambos activos, los workspaces 1-4 pertenecen al izquierdo y 5-8 al derecho;
+con solo uno, ese monitor recibe automáticamente los ocho. Gamescope solicita
+75 Hz para coincidir con la señal. No se habilita HDR, VRR ni tearing porque los
+paneles inspeccionados no justifican esos cambios.
 
 El DualSense funciona mediante `hid-playstation`, por USB o Bluetooth. Su
 ausencia en `just doctor desktop` es informativa, nunca un fallo. Decide Steam

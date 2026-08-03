@@ -5,19 +5,14 @@ FILE_MANAGER = "dolphin"
 BROWSER = "qutebrowser"
 EDITOR = "ghostty -e nvim"
 
--- Group workspaces by the hand that reaches them: Q/W/E/R stay on the left
--- display and U/I/O/P stay on the primary display on the right.
-WORKSPACE_MONITORS = {
-    [1] = "HDMI-A-1",
-    [2] = "HDMI-A-1",
-    [3] = "HDMI-A-1",
-    [4] = "HDMI-A-1",
-    [5] = "HDMI-A-2",
-    [6] = "HDMI-A-2",
-    [7] = "HDMI-A-2",
-    [8] = "HDMI-A-2",
+-- With both Philips connected, Q/W/E/R stay on the left and U/I/O/P on the
+-- primary display on the right. The shared workspace module collapses all
+-- eight onto whichever display remains when either output is disconnected.
+WORKSPACE_MONITOR_POLICY = {
+    left = "HDMI-A-1",
+    right = "HDMI-A-2",
+    split_after = 4,
 }
-WORKSPACE_DEFAULTS = { [1] = true, [5] = true }
 WORKSPACE_ICON_OVERRIDES = {
     [1] = "", -- Q: terminal
     [2] = "", -- W: files / directories
