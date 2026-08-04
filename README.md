@@ -10,7 +10,7 @@ el perfil gaming, mientras `workstation` conserva la configuración del portáti
 |---|---|
 | Compositor | Hyprland Lua |
 | Shell de escritorio | Noctalia v5 |
-| Terminal | Ghostty |
+| Terminal | Ghostty + Fish, Yazi y Television |
 | Shell | Fish + Starship + Zoxide + Atuin |
 | Archivos | Dolphin |
 | Editor | Neovim/LazyVim |
@@ -18,8 +18,8 @@ el perfil gaming, mientras `workstation` conserva la configuración del portáti
 | Teclado | US/ES + Kanata |
 | Navegador | qutebrowser + Brave como respaldo |
 | Credenciales | 1Password CLI y agente SSH |
-| Toolchain | mise, pnpm, uv, Ruff, watchexec e hyperfine |
-| Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, ProtonPlus, Gamescope y MangoHud |
+| Toolchain | mise, pnpm, uv, Ruff, Difftastic, watchexec e hyperfine |
+| Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, ProtonPlus, Gamescope, MangoHud y benchmarker CachyOS |
 | Backup (`desktop`) | Ludusavi + Restic + rclone, con timers desactivados por defecto |
 
 ## Perfiles y módulos
@@ -271,10 +271,10 @@ mano: `Q/W/E/R` pertenecen a la pantalla izquierda y `U/I/O/P` a la principal
 situada a la derecha. Q y U son los espacios iniciales. Si solo permanece
 `HDMI-A-1` o `HDMI-A-2`, los ocho espacios persistentes se muestran en esa
 pantalla. Hyprland recalcula la distribución al conectar o desconectar una
-salida, sin cambiar los atajos. Sus funciones son navegador, terminal, código,
-música, archivos, comunicación, documentación y sistema, respectivamente. El
-workspace 3 usa el layout `scrolling`: `Hyper + ,/.` cambia de columna y
-`Hyper + ;` recorre anchos 1/3, 1/2, 2/3 y completo.
+salida, sin cambiar los atajos. En el desktop sus funciones son terminal,
+archivos, música, comunicación, navegador, código, juegos y miscelánea. El
+workspace 6 (`I`, código) usa el layout `scrolling`: `Hyper + ,/.` cambia de
+columna y `Hyper + ;` recorre anchos 1/3, 1/2, 2/3 y completo.
 
 La primera instalación de Kanata requiere cargar `uinput`, añadir el usuario al
 grupo `input`, aplicar el módulo udev y habilitar el servicio. Usa Polkit y vuelve
@@ -298,6 +298,7 @@ o una superficie Gamescope de 1920x1080 a 75 Hz por juego:
 game-run -- juego
 game-run --hud -- juego
 game-run --gamescope --hud -- juego
+game-run --dlss --hud -- juego
 
 # Opciones de lanzamiento de Steam
 game-run -- %command%
@@ -341,6 +342,7 @@ rollback seguro, limitaciones y fuentes.
 | `Hyper + Enter` | Ghostty |
 | `Hyper + B` | qutebrowser |
 | `Hyper + E` | Dolphin |
+| `Hyper + Y` | Yazi en Ghostty |
 | `Hyper + O` | Enfocar o abrir Orca |
 | `Hyper + M` | Enfocar o abrir Spotify |
 | `Hyper + G` | Enfocar o abrir Steam (`desktop`) |
@@ -378,6 +380,13 @@ hosts. Además de los atajos nativos (`f`, `F`, `o`, `t`, `J`, `K`, `d`, `u`):
 
 Los buscadores rápidos disponibles son `aw` (ArchWiki), `g` (Google), `gh`
 (GitHub) y `yt` (YouTube); por ejemplo, `O aw qutebrowser`.
+
+El launcher admite proveedores persistentes: `/proj` registra un repositorio en
+Orca o abre Ghostty en su directorio, `/ssh` abre un alias de `~/.ssh/config`,
+`/game` reúne launchers y SCX Manager solo en `desktop`, y `/cmd` ofrece
+acciones locales acotadas. Las rutas nunca se interpolan directamente en el
+shell: el proveedor solo entrega identificadores que `desktop-launcher` vuelve
+a resolver.
 
 ## Secretos
 
@@ -442,6 +451,12 @@ La migración valida primero el Node de mise, retira solo el paquete `fnm`,
 reregistra `[mcp_servers.component-atlas]` y trata de reinstalar `fnm` si la
 validación final falla.
 
+Yazi queda integrado como función `y`: al salir cambia Fish al directorio
+seleccionado. Television se prueba con `tv`, `tvg` (repositorios Git) y `tvt`
+(contenido), sin apropiarse de `Ctrl + R`, que continúa siendo de Atuin.
+Delta conserva el `git diff` lineal y Difftastic queda disponible bajo demanda
+con `git dft`, `git dshow`, `git dlog` o `git difftool`.
+
 ### Codex y Orca
 
 El repositorio añade un revisor Linux de solo lectura, la skill local
@@ -456,6 +471,10 @@ just codex-check
 just codex-sync
 just codex-clean-rules
 ```
+
+La sincronización activa también `features.memories`. Es memoria auxiliar local
+generada por Codex; `AGENTS.md` continúa siendo la fuente canónica de
+instrucciones y el estado generado bajo `~/.codex/memories` no se versiona.
 
 Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
 radar upstream y auditoría mensual Restic— nacen desactivadas. Revísalas con

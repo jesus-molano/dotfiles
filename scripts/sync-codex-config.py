@@ -16,6 +16,9 @@ import tomllib
 
 DESIRED_TOP = {"notify": '["codex-notify"]'}
 DESIRED_SECTIONS = {
+    "features": {
+        "memories": "true",
+    },
     "agents": {
         "enabled": "true",
         "max_concurrent_threads_per_session": "3",
@@ -101,6 +104,7 @@ def render(original: str) -> str:
 def desired_state(document: dict) -> bool:
     return (
         document.get("notify") == ["codex-notify"]
+        and document.get("features", {}).get("memories") is True
         and document.get("agents", {}).get("enabled") is True
         and document.get("agents", {}).get("max_concurrent_threads_per_session") == 3
         and document.get("agents", {}).get("default_subagent_model") == "gpt-5.6-terra"

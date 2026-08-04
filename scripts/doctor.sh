@@ -123,6 +123,7 @@ check_nvidia_stack() {
 check_gaming_scheduler() {
 	local ananicy_active=0
 	local gamemode_present=0
+	local power_profile sched_ext_state
 
 	if systemctl is-active --quiet ananicy-cpp.service; then
 		ananicy_active=1
@@ -145,6 +146,65 @@ check_gaming_scheduler() {
 		ok "game-performance disponible"
 	else
 		fail "game-performance no está disponible"
+	fi
+
+	if power_profile="$(powerprofilesctl get 2>/dev/null)"; then
+		case "$power_profile" in
+		balanced) ok "Perfil base balanced; game-performance eleva solo cada juego" ;;
+		performance) warn "Perfil base performance; balanced evita consumo constante fuera del juego" ;;
+		*) info "Perfil energético actual: $power_profile" ;;
+		esac
+	else
+		fail "No se pudo consultar el perfil energético"
+	fi
+
+	sched_ext_state="$(cat /sys/kernel/sched_ext/state 2>/dev/null || true)"
+	if [[ "$sched_ext_state" == enabled ]]; then
+		ok "sched-ext activo; conserva el resultado solo si supera el benchmark base"
+	else
+		info "sched-ext sin scheduler activo; el kernel base sigue como referencia"
+	fi
+}
+
+check_gaming_firmware_state() {
+	local memory_info bar_total bar_amount bar_unit board bios
+
+	if memory_info="$(inxi -mxxx --no-host --filter --color 0 2>/dev/null)"; then
+		if grep -Fq 'part-no: KF3200C16D4/16GX' <<<"$memory_info"; then
+			if grep -Fq 'speed: 3200 MT/s' <<<"$memory_info"; then
+				ok "DDR4 Kingston funcionando a 3200 MT/s"
+			else
+				warn "DDR4-3200 funcionando por debajo de 3200 MT/s; DOCP sigue pendiente"
+			fi
+		else
+			info "RAM distinta de la auditada; revisa su perfil nominal antes de usar DOCP"
+		fi
+	else
+		info "No se pudo leer la velocidad efectiva de la RAM"
+	fi
+
+	bar_total="$(nvidia-smi -q 2>/dev/null | awk '
+		/BAR1 Memory Usage/ { in_bar = 1; next }
+		in_bar && /Total/ { print $(NF - 1), $NF; exit }
+	')"
+	read -r bar_amount bar_unit <<<"$bar_total"
+	if [[ "$bar_amount" =~ ^[0-9]+$ ]]; then
+		if [[ "$bar_unit" == GiB || "$bar_unit" == TiB ||
+			("$bar_unit" == MiB && "$bar_amount" -gt 256) ]]; then
+			ok "BAR1 NVIDIA ampliada: $bar_total"
+		else
+			warn "BAR1 NVIDIA limitada a $bar_total; ReBAR sigue pendiente"
+		fi
+	else
+		info "No se pudo determinar el tamaño BAR1 de NVIDIA"
+	fi
+
+	board="$(cat /sys/class/dmi/id/board_name 2>/dev/null || true)"
+	bios="$(cat /sys/class/dmi/id/bios_version 2>/dev/null || true)"
+	if [[ "$board" == 'TUF GAMING B550-PLUS (WI-FI)' && "$bios" == 3636 ]]; then
+		ok "UEFI ASUS 3636, base auditada para las pruebas de firmware"
+	elif [[ -n "$board$bios" ]]; then
+		info "UEFI detectada: ${board:-placa desconocida}, BIOS ${bios:-desconocida}"
 	fi
 }
 
@@ -330,6 +390,7 @@ check_gaming() {
 	check_gaming_packages
 	check_nvidia_stack
 	check_gaming_scheduler
+	check_gaming_firmware_state
 	check_gaming_monitors
 	check_steam_filesystems
 	check_dualsense
@@ -389,6 +450,8 @@ if [[ "$mode" != live ]]; then
 	check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
 		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
 	check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
+	check "Noctalia gaming desktop" noctalia config validate \
+		"$repo_root/gaming/.config/noctalia/gaming.toml"
 	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
 	if [[ "$mode" == config ]]; then

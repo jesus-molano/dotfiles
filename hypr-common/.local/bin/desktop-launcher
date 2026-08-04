@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|ssh|commands} [selección]'
+}
+
+notify_error() {
+	if command -v noctalia >/dev/null 2>&1; then
+		noctalia msg notification-show 'Launcher' -- "$1" >/dev/null 2>&1 || true
+	else
+		notify-send 'Launcher' "$1" >/dev/null 2>&1 || true
+	fi
+}
+
+project_roots() {
+	printf '%s\0' \
+		"$HOME/projects" \
+		"$HOME/work" \
+		"$HOME/.dotfiles" \
+		"$HOME/orca/workspaces"
+}
+
+projects() {
+	local root resolved git_marker project
+	while IFS= read -r -d '' root; do
+		[[ -e "$root" ]] || continue
+		resolved="$(readlink -f -- "$root" 2>/dev/null || true)"
+		[[ -d "$resolved" ]] || continue
+		if [[ -e "$resolved/.git" ]]; then
+			printf '%s\0' "$resolved"
+		fi
+		while IFS= read -r -d '' git_marker; do
+			project=${git_marker%/.git}
+			printf '%s\0' "$project"
+		done < <(find -H "$resolved" -mindepth 2 -maxdepth 5 -name .git \
+			\( -type d -o -type f \) -print0 2>/dev/null)
+	done < <(project_roots) | sort -zu
+}
+
+project_token() {
+	local action=$1 path=$2 slug digest
+	slug="$(basename -- "$path" | LC_ALL=C tr -cs '[:alnum:]_-' '_' | cut -c1-28)"
+	slug=${slug##_}
+	slug=${slug%%_}
+	[[ -n "$slug" ]] || slug=project
+	digest="$(printf '%s' "$path" | sha256sum | cut -c1-12)"
+	printf '%s_%s_%s' "$action" "$slug" "$digest"
+}
+
+safe_display() {
+	local value=${1/#"$HOME"/\~}
+	printf '%s' "$value" | LC_ALL=C tr -c '[:alnum:]_./~ -' '_'
+}
+
+list_projects() {
+	local path display
+	while IFS= read -r -d '' path; do
+		display="$(safe_display "$path")"
+		printf '%s\tOrca - %s\n' "$(project_token orca "$path")" "$display"
+		printf '%s\tGhostty - %s\n' "$(project_token term "$path")" "$display"
+	done < <(projects)
+}
+
+find_project() {
+	local selection=$1 action path
+	action=${selection%%_*}
+	[[ "$action" == orca || "$action" == term ]] || return 1
+	while IFS= read -r -d '' path; do
+		[[ "$(project_token "$action" "$path")" == "$selection" ]] || continue
+		printf '%s' "$path"
+		return 0
+	done < <(projects)
+	return 1
+}
+
+ssh_hosts() {
+	local -a files=()
+	local file host
+	[[ -f "$HOME/.ssh/config" ]] && files+=("$HOME/.ssh/config")
+	if [[ -d "$HOME/.ssh/config.d" ]]; then
+		while IFS= read -r -d '' file; do files+=("$file"); done < <(
+			find "$HOME/.ssh/config.d" -maxdepth 1 -type f -print0 2>/dev/null | sort -z
+		)
+	fi
+	((${#files[@]})) || return 0
+	awk 'tolower($1) == "host" {
+		for (field = 2; field <= NF; field++)
+			if ($field ~ /^[A-Za-z0-9._-]+$/) print $field
+	}' "${files[@]}" | sort -u
+}
+
+list_ssh() {
+	local host
+	while IFS= read -r host; do
+		[[ -n "$host" ]] && printf '%s\tSSH - %s\n' "$host" "$host"
+	done < <(ssh_hosts)
+}
+
+list_commands() {
+	printf '%s\n' \
+		$'doctor_host\tAuditar el host actual' \
+		$'system_monitor\tbtop en Ghostty' \
+		$'noctalia_settings\tAbrir ajustes de Noctalia' \
+		$'power_balanced\tPerfil energetico balanced' \
+		$'power_performance\tPerfil energetico performance'
+}
+
+run_project() {
+	local selection=$1 action path
+	path="$(find_project "$selection")" || {
+		notify_error 'El proyecto seleccionado ya no está disponible.'
+		return 1
+	}
+	action=${selection%%_*}
+	if [[ "$action" == term ]]; then
+		exec uwsm app -- ghostty --working-directory="$path"
+	fi
+	command -v orca-ide >/dev/null 2>&1 || {
+		notify_error 'orca-ide no está disponible en PATH.'
+		return 127
+	}
+	local repo_json
+	if ! repo_json="$(orca-ide repo list --json 2>/dev/null)" ||
+		! jq -e --arg path "$path" \
+			'.ok == true and any(.result.repos[]?; .path == $path)' \
+			>/dev/null <<<"$repo_json"; then
+		if ! orca-ide repo add --path "$path" --json >/dev/null 2>&1; then
+			notify_error 'Orca no pudo registrar el proyecto; se abrirá igualmente.'
+		fi
+	fi
+	exec hypr-orca
+}
+
+run_ssh() {
+	local selection=$1 host
+	host=${selection%%[[:space:]]*}
+	[[ "$host" =~ ^[A-Za-z0-9._-]+$ ]] || return 2
+	ssh_hosts | grep -Fxq -- "$host" || {
+		notify_error 'El alias SSH seleccionado ya no existe.'
+		return 1
+	}
+	exec uwsm app -- ghostty -e ssh "$host"
+}
+
+run_command() {
+	local dotfiles_root
+	case "$1" in
+	doctor_host)
+		dotfiles_root="$(readlink -f -- "$HOME/.dotfiles" 2>/dev/null || true)"
+		[[ -d "$dotfiles_root" ]] || return 1
+		# $1 debe expandirse dentro del Bash hijo, no en este proceso.
+		# shellcheck disable=SC2016
+		exec uwsm app -- ghostty -e bash -lc \
+			'cd -- "$1"; just doctor-live; printf "\nPulsa Enter para cerrar... "; read -r _' \
+			bash "$dotfiles_root"
+		;;
+	system_monitor) exec uwsm app -- ghostty -e btop ;;
+	noctalia_settings) exec noctalia msg settings-open ;;
+	power_balanced) exec powerprofilesctl set balanced ;;
+	power_performance) exec powerprofilesctl set performance ;;
+	*) return 2 ;;
+	esac
+}
+
+(($# >= 2)) || {
+	usage >&2
+	exit 2
+}
+mode=$1
+category=$2
+selection=${3:-}
+
+case "$mode:$category" in
+list:projects) list_projects ;;
+list:ssh) list_ssh ;;
+list:commands) list_commands ;;
+run:projects) [[ -n "$selection" ]] && run_project "$selection" ;;
+run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
+run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

@@ -19,6 +19,8 @@ La categoría `gaming` de `packages.csv` instala:
 | `gamescope` | Microcompositor opcional por juego |
 | `mangohud`, `lib32-mangohud` | Métricas Vulkan/OpenGL de 64 y 32 bits |
 | `protonplus` | Instala y actualiza runners alternativos por launcher |
+| `cachyos-settings` | `game-performance` y wrappers DLSS mantenidos por CachyOS |
+| `cachyos-benchmarker` | Comparativa extensa de CPU, memoria y schedulers |
 | `ludusavi-bin` | Staging de partidas antes del backup Restic |
 
 El perfil añade además:
@@ -46,13 +48,16 @@ game-run -- juego argumentos
 game-run --hud -- juego argumentos
 game-run --gamescope -- juego argumentos
 game-run --gamescope --hud -- juego argumentos
+game-run --dlss --hud -- juego argumentos
 game-run --bench cyberpunk --duration 120 -- juego argumentos
 game-run --dry-run --gamescope --hud -- juego argumentos
 ```
 
 `--gamescope` presenta una superficie virtual de 1920x1080 a 75 Hz. Cuando se
 combina con `--hud`, `game-run` usa `gamescope --mangoapp`; sin Gamescope usa
-`mangohud`. `--dry-run` imprime el comando escapado y no lanza nada.
+`mangohud`. `--dlss` añade el wrapper oficial `dlss-swapper` de CachyOS para
+actualizar y seleccionar presets NGX. `--dry-run` imprime el comando escapado y
+no lanza nada.
 
 Integración recomendada:
 
@@ -78,6 +83,11 @@ No combines `gamemoderun` con este flujo. `game-run` usa la utilidad
 `game-performance` de CachyOS y el host ya ejecuta `ananicy-cpp`; GameMode y
 Ananicy pueden competir al cambiar la prioridad del mismo proceso.
 
+Usa `--dlss` únicamente en un título NVIDIA compatible, nunca como variable
+global. Compara imagen, estabilidad y rendimiento y, si el updater NGX da
+problemas, prueba el wrapper `dlss-swapper-dll` recomendado por CachyOS o vuelve
+a `game-run -- %command%`. No descargues DLL sueltas de fuentes no verificadas.
+
 ## Benchmarks repetibles
 
 `--bench NOMBRE` activa el log de MangoHud durante 120 segundos por defecto y
@@ -94,6 +104,25 @@ game-bench-report cyberpunk
 
 El informe exige tres CSV antes de invocar `mangoplot`. MangoHud tiene las
 subidas desactivadas (`permit_upload=0`), así que los datos permanecen locales.
+
+Para evaluar sched-ext, conserva primero una pasada sin scheduler y usa después
+el mismo directorio y nombre descriptivo para cada candidato. La suite descarga
+activos, requiere más de 8 GB libres y puede tardar más de una hora:
+
+```bash
+mkdir -p ~/.local/state/gaming/scx-benchmarks
+cachyos-benchmarker ~/.local/state/gaming/scx-benchmarks  # base del kernel
+scxctl start --sched flash --mode gaming                  # Polkit
+cachyos-benchmarker ~/.local/state/gaming/scx-benchmarks  # nombre: flash-gaming
+scxctl stop                                               # vuelve al scheduler del kernel
+```
+
+Repite solo con candidatos concretos (`flash`, `lavd` o `p2dq`) y añade tres
+pasadas MangoHud del mismo juego. SCX Manager también está en `/game`. No
+habilites `scx_loader.service` al arranque hasta que un candidato mejore tanto
+la latencia como los percentiles del juego sin introducir stalls. Ananicy suele
+coexistir correctamente; si hay bloqueos, desactivarlo es una prueba de
+diagnóstico separada, no parte del cambio por defecto.
 
 ## Proton, Wine y launchers
 
@@ -137,6 +166,12 @@ con solo uno, ese monitor recibe automáticamente los ocho. Gamescope solicita
 75 Hz para coincidir con la señal. No se habilita HDR, VRR ni tearing porque los
 paneles inspeccionados no justifican esos cambios.
 
+La mejora física prioritaria es sustituir la pantalla principal por un panel de
+27 pulgadas, 2560x1440, 144–180 Hz y Adaptive Sync conectado por DisplayPort,
+conservando un Philips como secundario. Hasta conocer el conector y los modos
+reales del panel nuevo, la regla genérica `preferred,auto,1` mantiene una ruta de
+arranque segura; después se medirá su nombre exacto con `hyprctl monitors all`.
+
 El DualSense funciona mediante `hid-playstation`, por USB o Bluetooth. Su
 ausencia en `just doctor desktop` es informativa, nunca un fallo. Decide Steam
 Input por juego: algunos títulos ofrecen mejores iconos, giroscopio o hápticos
@@ -147,7 +182,7 @@ ambas comprobaciones.
 
 ## Auditoría de firmware pendiente
 
-Estado leído el 02-08-2026; no se modificó el firmware:
+Estado revalidado el 04-08-2026; no se modificó el firmware:
 
 - placa ASUS TUF GAMING B550-PLUS (WI-FI), BIOS 3636 del 04-01-2026;
 - 32 GiB mediante dos Kingston KF3200C16D4/16GX en A2/B2;
@@ -155,11 +190,21 @@ Estado leído el 02-08-2026; no se modificó el firmware:
 - la RTX 3060 Ti admite una región física redimensionable de hasta 8 GiB, pero
   BAR1 es de 256 MiB: ReBAR está desactivado.
 
-DOCP y ReBAR son posibles mejoras posteriores de firmware, no tareas de estos
-dotfiles. Si se evalúan, cambia una sola opción cada vez, registra antes una
-medición repetible, prueba estabilidad de memoria/juegos y conserva la ruta de
-reversión de la UEFI. No crees parámetros de kernel ni configuración de sistema
-para simular ninguno de los dos.
+La ruta segura es secuencial:
+
+1. Guarda una base de tres pasadas MangoHud y una ejecución del benchmarker.
+2. Activa solo D.O.C.P. en UEFI, arranca y confirma `3200 MT/s` con
+   `inxi -mxxx --no-host --filter --color 0`; después prueba memoria y juegos.
+3. Cuando D.O.C.P. sea estable, activa `Above 4G Decoding` y `Re-Size BAR` en
+   `Auto`, vuelve a arrancar y comprueba que BAR1 supera 256 MiB con
+   `nvidia-smi -q`.
+4. Repite exactamente las mediciones base y conserva el cambio solo si es
+   estable. Para volver atrás, restaura primero ReBAR y luego D.O.C.P. a `Auto`.
+
+No actualices el VBIOS de la RTX 3060 Ti sin identificar antes fabricante,
+modelo y revisión exactos, y no crees parámetros de kernel para simular ninguno
+de los dos cambios. El doctor muestra ambos estados como avisos hasta que las
+comprobaciones físicas pasen.
 
 El kernel actual también puede registrar:
 
@@ -180,7 +225,8 @@ just check gaming
 ```
 
 El bloque gaming del doctor comprueba paquetes, CHWD, `nvidia-smi`, runtimes
-NVIDIA/Vulkan de 32 bits, `game-performance`, Ananicy, GameMode coexistente,
+NVIDIA/Vulkan de 32 bits, `game-performance`, perfil base, sched-ext, estado
+auditable de D.O.C.P./ReBAR, Ananicy, GameMode coexistente,
 monitores activos, bibliotecas Steam, driver/conectividad DualSense y las
 variables de caché. Tras desplegar `environment.d`, cierra la sesión y vuelve a
 entrar si el doctor aún no las ve cargadas en la sesión o el gestor de usuario.
@@ -202,9 +248,10 @@ nuevo el perfil `desktop` después de su simulación.
 
 ## Fuentes
 
-Fuentes oficiales y upstream consultadas el 02-08-2026:
+Fuentes oficiales y upstream revalidadas el 04-08-2026:
 
 - [Gaming with CachyOS](https://wiki.cachyos.org/configuration/gaming/)
+- [CachyOS: sched-ext y cachyos-benchmarker](https://wiki.cachyos.org/configuration/sched-ext/)
 - [CHWD](https://wiki.cachyos.org/features/chwd/chwd/)
 - [Valve Proton](https://github.com/ValveSoftware/Proton)
 - [Proton-CachyOS](https://github.com/CachyOS/proton-cachyos)

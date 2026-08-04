@@ -6,6 +6,9 @@ approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 notify = ["codex-notify"]
 
+[features]
+memories = true
+
 [agents]
 enabled = true
 max_concurrent_threads_per_session = 3

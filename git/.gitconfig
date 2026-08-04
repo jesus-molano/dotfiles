@@ -21,8 +21,14 @@
 	hyperlinks = true
 	syntax-theme = Project Atlas
 [diff]
-	tool = nvimdiff
+	tool = difftastic
 	colorMoved = default
+[difftool]
+	prompt = false
+[difftool "difftastic"]
+	cmd = difft "$MERGED" "$LOCAL" "0000000" "100644" "$REMOTE" "0000000" "100644"
+[pager]
+	difftool = true
 [merge]
 	tool = nvimdiff
 	conflictstyle = diff3
@@ -47,6 +53,9 @@
 	unstage = reset HEAD --
 	last = log -1 HEAD
 	graph = log --oneline --graph --decorate --all -20
+	dft = -c diff.external=difft diff
+	dshow = -c diff.external=difft show --ext-diff
+	dlog = -c diff.external=difft log --ext-diff
 [commit]
 	gpgsign = true
 [gpg]

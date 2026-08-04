@@ -22,6 +22,7 @@ terminal,fastfetch,native
 terminal,duf,native
 terminal,btop,native
 terminal,yazi,native
+terminal,television,native
 desktop,spotify-launcher,native
 gaming,cachyos-gaming-meta,native
 gaming,steam,native
@@ -32,6 +33,8 @@ gaming,heroic-games-launcher-bin,native
 gaming,lutris,native
 gaming,faugus-launcher,native
 gaming,protonplus,native
+gaming,cachyos-settings,native
+gaming,cachyos-benchmarker,native
 gaming,ludusavi-bin,aur
 keyboard,kanata-bin,aur
 development,git,native
@@ -44,6 +47,7 @@ development,tree-sitter-cli,native
 development,stylua,native
 development,lazygit,native
 development,git-delta,native
+development,difftastic,native
 development,direnv,native
 development,mise,native
 development,pnpm,native

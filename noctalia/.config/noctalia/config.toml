@@ -48,6 +48,30 @@ telemetry_enabled = false
 enabled = true
 speed = 1.05
 
+[shell.launcher.dmenu.entry.projects]
+command = "desktop-launcher list projects"
+label = "Proyectos"
+prefix = "proj"
+glyph = "code"
+global = false
+exec = "desktop-launcher run projects {selection}"
+
+[shell.launcher.dmenu.entry.ssh]
+command = "desktop-launcher list ssh"
+label = "SSH"
+prefix = "ssh"
+glyph = "server"
+global = false
+exec = "desktop-launcher run ssh {selection}"
+
+[shell.launcher.dmenu.entry.commands]
+command = "desktop-launcher list commands"
+label = "Comandos"
+prefix = "cmd"
+glyph = "terminal"
+global = false
+exec = "desktop-launcher run commands {selection}"
+
 [shell.panel]
 open_near_click_control_center = true
 session_placement = "floating"

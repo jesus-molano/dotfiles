@@ -23,6 +23,7 @@ WORKSPACE_ICON_OVERRIDES = {
     [7] = "", -- O: games
 }
 MUSIC_WORKSPACE = 3
+SCROLLING_WORKSPACE = 6
 
 hl.config({
     input = {

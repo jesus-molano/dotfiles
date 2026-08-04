@@ -10,6 +10,7 @@ local workspace_icons = {
     "", -- 7: documentation
     "", -- 8: system / miscellaneous
 }
+local scrolling_workspace = SCROLLING_WORKSPACE or 3
 
 local function resolve_workspace_layout()
     if not WORKSPACE_MONITOR_POLICY then
@@ -66,7 +67,7 @@ local function apply_workspace_rules()
 
         -- El workspace de código usa la cinta nativa de Hyprland. El resto
         -- conserva dwindle para no cambiar la memoria muscular global.
-        if workspace == 3 then
+        if workspace == scrolling_workspace then
             rule.layout = "scrolling"
             rule.layout_opts = { direction = "right" }
         end

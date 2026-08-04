@@ -3,11 +3,12 @@ set -euo pipefail
 
 usage() {
 	printf '%s\n' \
-		'Uso: game-run [--hud] [--gamescope] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
+		'Uso: game-run [--hud] [--gamescope] [--dlss] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
 }
 
 hud=false
 use_gamescope=false
+use_dlss=false
 dry_run=false
 benchmark_name=''
 benchmark_duration=120
@@ -19,6 +20,9 @@ while (($#)); do
 		;;
 	--gamescope)
 		use_gamescope=true
+		;;
+	--dlss)
+		use_dlss=true
 		;;
 	--dry-run)
 		dry_run=true
@@ -83,6 +87,9 @@ fi
 
 game_command=("$@")
 launch_command=(game-performance)
+if [[ "$use_dlss" == true ]]; then
+	launch_command+=(dlss-swapper)
+fi
 
 if [[ "$use_gamescope" == true ]]; then
 	launch_command+=(gamescope -W 1920 -H 1080 -r 75 -f)
@@ -115,6 +122,9 @@ require_command() {
 }
 
 require_command game-performance
+if [[ "$use_dlss" == true ]]; then
+	require_command dlss-swapper
+fi
 if [[ "$use_gamescope" == true ]]; then
 	require_command gamescope
 elif [[ "$hud" == true ]]; then
@@ -129,6 +139,7 @@ if [[ -n "$benchmark_name" ]]; then
 		printf 'kernel=%s\n' "$(uname -r)"
 		printf 'programa=%s\n' "${game_command[0]##*/}"
 		printf 'duracion=%s\n' "$benchmark_duration"
+		printf 'dlss_swapper=%s\n' "$use_dlss"
 		nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || true
 	} >"$benchmark_run/metadata.txt"
 	printf 'Benchmark MangoHud: %s\n' "$benchmark_run"
