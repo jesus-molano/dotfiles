@@ -150,8 +150,8 @@ c.colors.statusbar.insert.bg = green
 c.colors.statusbar.insert.fg = background
 c.colors.statusbar.passthrough.bg = secondary
 c.colors.statusbar.passthrough.fg = background
-c.colors.statusbar.private.bg = surface_variant
-c.colors.statusbar.private.fg = secondary
+c.colors.statusbar.private.bg = primary
+c.colors.statusbar.private.fg = on_primary
 c.colors.statusbar.progress.bg = primary
 c.colors.statusbar.url.fg = foreground
 c.colors.statusbar.url.error.fg = error
@@ -184,6 +184,7 @@ config.bind(",d", "config-cycle -t -u *://{url:host}/* colors.webpage.darkmode.e
 config.bind(",u", "adblock-update")
 config.bind(",e", "config-edit")
 config.bind(",r", "config-source")
+config.bind(",p", "open --private")
 config.bind(",B", "spawn brave {url}")
 config.bind(";B", "hint links spawn brave {hint-url}")
 config.bind("<Ctrl-Shift-J>", "tab-move +")

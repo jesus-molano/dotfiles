@@ -303,8 +303,8 @@ game-run --dlss --hud -- juego
 # Opciones de lanzamiento de Steam
 game-run -- %command%
 
-# Arma Reforger en este desktop: limita la cola DX12 y evita el fallo de follaje
-VKD3D_FRAME_RATE=75 game-run -- %command%
+# Arma Reforger en este desktop: evita el fallo de follaje en Linux/NVIDIA
+VKD3D_SWAPCHAIN_LATENCY_FRAMES=1 game-run -- %command%
 ```
 
 Steam conserva Proton oficial de Valve como valor global; Proton-CachyOS SLR se
@@ -376,6 +376,7 @@ hosts. Además de los atajos nativos (`f`, `F`, `o`, `t`, `J`, `K`, `d`, `u`):
 | `,a` | Alternar el bloqueo temporalmente para el dominio actual |
 | `,A` | Alternar el bloqueo globalmente durante la sesión |
 | `,u` | Actualizar todas las listas de bloqueo |
+| `,p` | Abrir una ventana de navegación privada |
 | `,B` | Abrir la página actual en Brave |
 | `;B` | Elegir mediante hints un enlace para abrirlo en Brave |
 | `,e` | Editar la configuración en Neovim |

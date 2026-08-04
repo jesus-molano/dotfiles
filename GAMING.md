@@ -112,14 +112,15 @@ Validado el 04-08-2026 con Arma Reforger 1.7, Proton Experimental, Ryzen 5
 queda limitada a este juego; no conviertas estas variables en valores globales:
 
 ```bash
-VKD3D_FRAME_RATE=75 game-run -- %command%
+VKD3D_SWAPCHAIN_LATENCY_FRAMES=1 game-run -- %command%
 ```
 
 El preset probado conserva 1920x1080, escala de render 100 %, VSync desactivado,
-texturas y antialiasing existentes. Usa objetos y geometría en High, sombras
-cercanas y lejanas en Medium, reflejos bajos y contact shadows desactivadas. La
-hierba permanece en Low/100 m: Medium/150 m no corrigió el fallo visual y redujo
-los percentiles. El modo `FULLSCREEN` y 1920x1080 se guardaron en
+texturas High, filtrado High, antialiasing 2x/FXAA High y HBAO Medium. Usa objetos
+en High, geometría en Medium, sombras cercanas y lejanas en Medium, reflejos
+Medium y contact shadows desactivadas. La hierba permanece en High/100 m:
+aumentar su distancia a 150 m no corrigió el fallo visual y redujo los
+percentiles. El modo `FULLSCREEN` y 1920x1080 se guardaron en
 `ReforgerEngineSettings.conf`; ese archivo vive en el prefijo de Steam y no lo
 gestiona Stow. Antes de editarlo se conservó una copia `.bak-20260804-1640` en
 el mismo directorio.
@@ -131,15 +132,15 @@ recorrido y conducción más variables, dieron de media 76,53 FPS, 53,32 FPS de
 1 % low, 44,75 FPS de 0,1 % low y 18,80 ms p99. Frente a la base son +4,1 %,
 +6,1 %, +10,7 % y un p99 5,6 % menor, respectivamente.
 
-En Linux/NVIDIA 1.7 puede hacer que el follaje aparezca, desaparezca o se
-desplace en bucle. En este host `VKD3D_SWAPCHAIN_LATENCY_FRAMES=1` lo corrigió,
-pero perdió alrededor del 18 % de rendimiento; el valor 2 recuperó rendimiento
-y reprodujo el fallo. `VKD3D_FRAME_RATE=75` eliminó el defecto en dos arranques,
-mejoró los percentiles y se conserva. MangoHud puede mostrar cifras puntuales
-superiores a 75, así que se trata como mitigación de presentación medida, no
-como garantía de un tope visual exacto. Si una actualización de Reforger,
-Proton o NVIDIA resuelve el defecto, repite una pasada sin la variable antes de
-retirarla.
+En Linux/NVIDIA 1.7 el follaje puede aparecer, desaparecer o desplazarse en
+bucle. En este host `VKD3D_SWAPCHAIN_LATENCY_FRAMES=1` corrigió el defecto en
+dos comprobaciones visuales separadas, pero perdió alrededor del 18 % de
+rendimiento; se acepta ese coste para obtener estabilidad visual. El valor 2
+recuperó rendimiento y reprodujo el fallo. `VKD3D_FRAME_RATE=75` mejoró los
+percentiles y pareció corregirlo durante dos arranques, pero el defecto regresó
+sin cambiar la configuración y por eso se descarta como solución. Si una
+actualización de Reforger, Proton o NVIDIA resuelve el defecto, prueba una sola
+sesión sin la variable antes de retirarla.
 
 Para evaluar sched-ext, conserva primero una pasada sin scheduler y usa después
 el mismo directorio y nombre descriptivo para cada candidato. La suite descarga
@@ -311,7 +312,8 @@ Fuentes comunitarias e independientes, con sus límites metodológicos:
 
 - [Fallo de follaje de Arma Reforger en CachyOS/NVIDIA](https://www.reddit.com/r/cachyos/comments/1s4fj9t/cachyos_arma_reforger_foliage_flickering/),
   contrastado con mediciones propias; sus flags antiguos `DXVK_FRAME_RATE` no
-  se copiaron porque VKD3D-Proton 3.0.1 conserva `VKD3D_FRAME_RATE`;
+  se copiaron y el limitador `VKD3D_FRAME_RATE` tampoco resultó una solución
+  fiable para este defecto;
 - [Reporte de julio de 2026 sobre follaje que aparece y desaparece en Linux](https://www.reddit.com/r/ArmaReforger/comments/1uzz6m3/linux_foilage_bug/),
   útil para identificar el defecto, no como sustituto del benchmark local;
 - [Debate reciente de r/cachyos sobre RTX 3060 Ti, input lag y launch flags](https://www.reddit.com/r/cachyos/comments/1snzhnj/my_problem_with_cachyos_and_nvidia/),
