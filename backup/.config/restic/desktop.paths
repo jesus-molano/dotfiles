@@ -1,0 +1,8 @@
+# Una ruta por línea. Se expanden ~/ y las rutas relativas contra HOME.
+~/.dotfiles
+~/Documents
+~/Pictures
+~/Projects
+~/projects
+~/Work
+~/work

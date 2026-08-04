@@ -14,9 +14,8 @@ export EDITOR=nvim
 export VISUAL=nvim
 export SUDO_EDITOR=nvim
 
-export FNM_DIR="$HOME/.local/share/fnm"
-if command -v fnm >/dev/null 2>&1; then
-	eval "$(fnm env --use-on-cd --shell bash)"
+if command -v mise >/dev/null 2>&1; then
+	eval "$(mise activate bash)"
 fi
 
 export PNPM_HOME="$HOME/.local/share/pnpm"
@@ -40,6 +39,9 @@ fi
 if command -v direnv >/dev/null 2>&1; then
 	eval "$(direnv hook bash)"
 fi
+if command -v atuin >/dev/null 2>&1; then
+	eval "$(atuin init bash --disable-ai)"
+fi
 
 alias p='pnpm'
 alias px='pnpm dlx'
@@ -50,18 +52,5 @@ alias gl='git log --oneline -20'
 alias lg='lazygit'
 
 with-secrets() {
-	if (($# == 0)); then
-		printf 'Uso: with-secrets <comando> [argumentos...]\n' >&2
-		return 2
-	fi
-	command -v op >/dev/null 2>&1 || {
-		printf '1Password CLI no está instalado.\n' >&2
-		return 1
-	}
-	local env_file="$HOME/.env.op"
-	[[ -f "$env_file" ]] || {
-		printf 'No existe el archivo de referencias: %s\n' "$env_file" >&2
-		return 1
-	}
-	command op run --env-file "$env_file" -- "$@"
+	command "$HOME/.local/bin/with-secrets" "$@"
 }

@@ -9,6 +9,7 @@ micro/.config/micro/plugins/
 fonts/.local/share/fonts/.uuid
 
 # Codex runtime state. Version only durable, secret-free configuration.
+!codex/.codex/
 codex/.codex/*
 !codex/.codex/AGENTS.md
 !codex/.codex/config.template.toml
@@ -17,6 +18,13 @@ codex/.codex/*
 !codex/.codex/agents/
 codex/.codex/agents/*
 !codex/.codex/agents/reviewer-web.toml
+!codex/.codex/agents/reviewer-linux.toml
+
+# Política ExecPolicy específica de este repositorio (la exclusión global de
+# ~/.codex no debe ocultar la capa local confiable).
+!/.codex/
+!/.codex/rules/
+!/.codex/rules/host-audit.rules
 
 # Secrets and local 1Password reference files (at any depth).
 .env

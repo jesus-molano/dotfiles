@@ -104,6 +104,50 @@ gpu_poll_seconds = 0
 cpu_poll_seconds = 3
 memory_poll_seconds = 3
 
+[brightness]
+enable_ddcutil = true
+ignore_mmids = []
+minimum_brightness = 0.05
+sync_all_monitors = false
+
+[location]
+address = ""
+auto_locate = false
+custom_schedule = true
+sunrise = "07:30"
+sunset = "20:30"
+
+[nightlight]
+enabled = true
+force = false
+temperature_day = 6500
+temperature_night = 4000
+
+[control_center]
+hidden_tabs = []
+show_shortcut_labels = true
+sidebar = "compact"
+sidebar_section = "compact"
+width = 700
+
+[[control_center.shortcuts]]
+type = "wifi"
+
+[[control_center.shortcuts]]
+type = "bluetooth"
+
+[[control_center.shortcuts]]
+type = "caffeine"
+
+[[control_center.shortcuts]]
+type = "nightlight"
+
+[[control_center.shortcuts]]
+type = "noctalia/screen_recorder:toggle"
+
+[[control_center.shortcuts]]
+type = "power_profile"
+
 [idle]
 behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
 pre_action_fade_seconds = 2.0
@@ -136,7 +180,28 @@ enabled = false
 
 [plugins]
 auto_update = false
-enabled = []
+enabled = [ "noctalia/screen_recorder" ]
+
+[plugin_settings."noctalia/screen_recorder"]
+audio_bitrate = 0
+audio_codec = "opus"
+audio_source = "default_output"
+color_range = "limited"
+copy_to_clipboard = false
+directory = "~/Videos/Recordings"
+filename_pattern = "recording_%Y%m%d_%H%M%S"
+frame_rate = 60
+hide_inactive = false
+replay_duration = 90
+replay_enabled = true
+replay_filename_pattern = "replay_%Y%m%d_%H%M%S"
+replay_storage = "ram"
+resolution = "1920x1080"
+restore_portal = true
+show_cursor = true
+video_codec = "h264"
+video_qp = 25
+video_source = "focused"
 
 [wallpaper]
 enabled = true

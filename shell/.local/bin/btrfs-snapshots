@@ -34,19 +34,27 @@ cmd_list() {
 
     if [[ -z "$config" ]]; then
         echo -e "${CYAN}${BOLD}── root snapshots (/):${NC}"
-        snapper -c root list
-        echo ""
-        echo -e "${CYAN}${BOLD}── home snapshots (/home):${NC}"
-        snapper -c home list
+        pkexec /usr/bin/snapper -c root list
+        if [[ -r /etc/snapper/configs/home ]]; then
+            echo ""
+            echo -e "${CYAN}${BOLD}── home snapshots (/home):${NC}"
+            pkexec /usr/bin/snapper -c home list
+        else
+            echo -e "${YELLOW}No hay configuración Snapper separada para /home.${NC}"
+        fi
     else
         case "$config" in
             root)
                 echo -e "${CYAN}${BOLD}── root snapshots (/):${NC}"
-                snapper -c root list
+                pkexec /usr/bin/snapper -c root list
                 ;;
             home)
+                [[ -r /etc/snapper/configs/home ]] || {
+                    echo -e "${RED}No existe /etc/snapper/configs/home.${NC}"
+                    exit 1
+                }
                 echo -e "${CYAN}${BOLD}── home snapshots (/home):${NC}"
-                snapper -c home list
+                pkexec /usr/bin/snapper -c home list
                 ;;
             *)
                 echo -e "${RED}Unknown config: $config${NC} (use 'root' or 'home')"
@@ -72,7 +80,7 @@ cmd_create() {
         desc="manual snapshot"
     fi
 
-    sudo snapper -c "$config" create --description "$desc" --cleanup-algorithm number --print-number
+    pkexec /usr/bin/snapper -c "$config" create --description "$desc" --cleanup-algorithm number --print-number
     echo -e "${GREEN}Snapshot created on '$config' config.${NC}"
 }
 
@@ -87,7 +95,7 @@ cmd_diff() {
     fi
 
     echo -e "${CYAN}${BOLD}── Changes in snapshot #$num ($config):${NC}"
-    snapper -c "$config" status "$num..0"
+    pkexec /usr/bin/snapper -c "$config" status "$num..0"
 }
 
 cmd_rollback() {
@@ -106,12 +114,12 @@ cmd_rollback() {
 
     # Show what will change
     echo -e "${CYAN}Files that will be modified:${NC}"
-    snapper -c "$config" status "$num..0"
+    pkexec /usr/bin/snapper -c "$config" status "$num..0"
     echo ""
 
     read -rp "Proceed with rollback? [s/N]: " confirm
     if [[ "$confirm" =~ ^[sS]$ ]]; then
-        sudo snapper -c "$config" undochange "$num..0"
+        pkexec /usr/bin/snapper -c "$config" undochange "$num..0"
         echo -e "${GREEN}Rollback complete. Changes from snapshot #$num have been restored.${NC}"
         echo -e "${YELLOW}Note: A reboot may be needed for some changes to take effect.${NC}"
     else

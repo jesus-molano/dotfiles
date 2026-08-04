@@ -18,6 +18,8 @@ La categoría `gaming` de `packages.csv` instala:
 | `faugus-launcher` | Lanzador sencillo basado en UMU |
 | `gamescope` | Microcompositor opcional por juego |
 | `mangohud`, `lib32-mangohud` | Métricas Vulkan/OpenGL de 64 y 32 bits |
+| `protonplus` | Instala y actualiza runners alternativos por launcher |
+| `ludusavi-bin` | Staging de partidas antes del backup Restic |
 
 El perfil añade además:
 
@@ -44,6 +46,7 @@ game-run -- juego argumentos
 game-run --hud -- juego argumentos
 game-run --gamescope -- juego argumentos
 game-run --gamescope --hud -- juego argumentos
+game-run --bench cyberpunk --duration 120 -- juego argumentos
 game-run --dry-run --gamescope --hud -- juego argumentos
 ```
 
@@ -75,12 +78,32 @@ No combines `gamemoderun` con este flujo. `game-run` usa la utilidad
 `game-performance` de CachyOS y el host ya ejecuta `ananicy-cpp`; GameMode y
 Ananicy pueden competir al cambiar la prioridad del mismo proceso.
 
+## Benchmarks repetibles
+
+`--bench NOMBRE` activa el log de MangoHud durante 120 segundos por defecto y
+guarda CSV más metadatos de kernel, programa, GPU y driver bajo
+`~/.local/state/gaming/benchmarks/NOMBRE/fecha`. El nombre está restringido para
+que nunca escape de ese directorio y la duración admite de 10 a 3600 segundos.
+
+Haz al menos tres pasadas de cada escenario, con la misma zona/ajustes y una
+pasada de calentamiento que no cuente. Después:
+
+```bash
+game-bench-report cyberpunk
+```
+
+El informe exige tres CSV antes de invocar `mangoplot`. MangoHud tiene las
+subidas desactivadas (`permit_upload=0`), así que los datos permanecen locales.
+
 ## Proton, Wine y launchers
 
 En Steam conserva como valor global Proton estable de Valve o Proton
 Experimental. Selecciona `proton-cachyos-slr` únicamente por juego cuando haya
 una corrección o función concreta que lo justifique. No establezcas globalmente
 `PROTON_ENABLE_WAYLAND`, `DXVK_HDR`, `PROTON_NO_NTSYNC` ni una versión GE.
+
+ProtonPlus queda como interfaz para instalar una versión GE cuando un título la
+necesite; no convierte ningún runner alternativo en valor global.
 
 Heroic, Lutris y Faugus deben preferir UMU con `proton-cachyos-slr` para juegos
 Windows. `wine-cachyos-opt` queda disponible para aplicaciones que realmente

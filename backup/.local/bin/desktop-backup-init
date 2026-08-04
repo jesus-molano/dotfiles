@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ ${DOTFILES_RESTIC_ENV:-0} != 1 ]]; then
+	exec "$HOME/.local/bin/with-secrets" env DOTFILES_RESTIC_ENV=1 "$0" "$@"
+fi
+
+command -v restic >/dev/null 2>&1 || exit 127
+[[ -n ${RESTIC_REPOSITORY:-} ]] || {
+	printf '%s\n' 'RESTIC_REPOSITORY no está definido mediante with-secrets.' >&2
+	exit 2
+}
+[[ -n ${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}${RESTIC_PASSWORD_COMMAND:-} ]] || {
+	printf '%s\n' 'Falta un método de contraseña Restic en with-secrets.' >&2
+	exit 2
+}
+
+if restic snapshots >/dev/null 2>&1; then
+	printf '%s\n' 'El repositorio Restic ya existe y las credenciales funcionan.'
+	exit 0
+fi
+
+printf '%s\n' 'Destino exacto: el RESTIC_REPOSITORY inyectado por 1Password (valor oculto).'
+printf 'Se creará un repositorio cifrado nuevo. Escribe INICIALIZAR: '
+read -r confirmation
+[[ "$confirmation" == INICIALIZAR ]] || {
+	printf '%s\n' 'Cancelado sin cambios.'
+	exit 1
+}
+
+restic init
+printf '%s\n' 'Repositorio Restic inicializado.'

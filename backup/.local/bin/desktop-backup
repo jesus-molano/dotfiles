@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+notify() {
+	"$HOME/.local/bin/desktop-notify" "Backup" "$1" || true
+}
+status=0
+trap 'status=$?; notify "Falló el backup Restic (código $status)"; exit "$status"' ERR
+
+if [[ ${DOTFILES_RESTIC_ENV:-0} != 1 ]]; then
+	exec "$HOME/.local/bin/with-secrets" env DOTFILES_RESTIC_ENV=1 "$0" "$@"
+fi
+
+command -v restic >/dev/null 2>&1 || {
+	printf '%s\n' 'restic no está instalado.' >&2
+	exit 127
+}
+[[ -n ${RESTIC_REPOSITORY:-} ]] || {
+	printf '%s\n' 'RESTIC_REPOSITORY no está definido mediante with-secrets.' >&2
+	exit 2
+}
+[[ -n ${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}${RESTIC_PASSWORD_COMMAND:-} ]] || {
+	printf '%s\n' 'Falta un método de contraseña Restic en with-secrets.' >&2
+	exit 2
+}
+export RESTIC_HOST="${RESTIC_HOST:-$(hostname)}"
+
+config_root="${XDG_CONFIG_HOME:-$HOME/.config}/restic"
+paths_config="$config_root/desktop.paths"
+exclude_config="$config_root/desktop.excludes"
+[[ -r "$paths_config" && -r "$exclude_config" ]] || {
+	printf 'Falta configuración Restic bajo %s.\n' "$config_root" >&2
+	exit 2
+}
+
+staging_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/ludusavi"
+mkdir -p -- "$staging_root"
+if command -v ludusavi >/dev/null 2>&1; then
+	ludusavi backup --force --no-cloud-sync --path "$staging_root"
+else
+	printf '%s\n' 'Aviso: Ludusavi no está instalado; se omite el staging de partidas.' >&2
+fi
+
+canary="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-backup/canary.txt"
+canary_value='dotfiles-restic-restore-canary-v1'
+mkdir -p -- "$(dirname -- "$canary")"
+if [[ ! -e "$canary" ]]; then
+	printf '%s\n' "$canary_value" >"$canary"
+elif [[ ! -f "$canary" || -L "$canary" || "$(<"$canary")" != "$canary_value" ]]; then
+	printf 'Canario local inesperado; no se sobrescribirá: %s\n' "$canary" >&2
+	exit 1
+fi
+
+runtime_root=${XDG_RUNTIME_DIR:-/tmp}
+paths_file="$(mktemp --tmpdir="$runtime_root" desktop-restic-paths.XXXXXX)"
+trap 'rm -f -- "$paths_file"' EXIT
+
+while IFS= read -r configured || [[ -n "$configured" ]]; do
+	[[ -n "$configured" && "$configured" != \#* ]] || continue
+	case "$configured" in
+	[~]/*) path="$HOME/${configured:2}" ;;
+	/*) path=$configured ;;
+	*) path="$HOME/$configured" ;;
+	esac
+	if [[ -e "$path" || -L "$path" ]]; then
+		printf '%s\n' "$path" >>"$paths_file"
+	else
+		printf 'Ruta ausente, omitida: %s\n' "$path" >&2
+	fi
+done <"$paths_config"
+
+# Ludusavi respeta XDG_STATE_HOME, que no tiene por qué estar bajo ~/.local/state.
+if [[ -e "$staging_root" ]] && ! grep -Fxq -- "$staging_root" "$paths_file"; then
+	printf '%s\n' "$staging_root" >>"$paths_file"
+fi
+if ! grep -Fxq -- "$canary" "$paths_file"; then
+	printf '%s\n' "$canary" >>"$paths_file"
+fi
+
+[[ -s "$paths_file" ]] || {
+	printf '%s\n' 'No hay ninguna ruta existente que respaldar.' >&2
+	exit 2
+}
+
+restic backup \
+	--tag desktop \
+	--files-from "$paths_file" \
+	--exclude-file "$exclude_config"
+restic forget \
+	--tag desktop \
+	--keep-daily 7 \
+	--keep-weekly 5 \
+	--keep-monthly 12
+
+trap - ERR
+notify 'Backup Restic completado'

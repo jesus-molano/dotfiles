@@ -251,6 +251,11 @@ else
 	rollback "$status"
 fi
 [[ -n "$stable_node" ]] || rollback 1
+if [[ "$stable_node" == *'/fnm/'* || "$stable_node" == *'/fnm_multishells/'* ]]; then
+	printf 'Atlas sigue resolviendo Node mediante fnm: %s\n' "$stable_node" >&2
+	printf '%s\n' 'Completa primero just toolchain-migrate; no se reescribirá el MCP con una ruta obsoleta.' >&2
+	rollback 1
+fi
 config_touched=1
 "$stable_node" "$atlas_root/frontend-codex-kit/register-codex-mcp.mjs" \
 	--config "$codex_config" \

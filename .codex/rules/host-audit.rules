@@ -1,0 +1,60 @@
+# Comandos estrictamente de lectura usados por la auditoría del host. Los tests
+# inline impiden ampliar accidentalmente cada prefijo en futuras ediciones.
+prefix_rule(
+    pattern = ["systemctl", ["is-active", "is-enabled", "list-timers", "status", "--failed"]],
+    decision = "allow",
+    justification = "Consultas de solo lectura a systemd para auditar el host",
+    match = [
+        "systemctl --failed --no-legend --plain",
+        "systemctl is-enabled btrfs-scrub@-.timer",
+        "systemctl status smartd.service --no-pager",
+    ],
+    not_match = [
+        "systemctl enable --now smartd.service",
+        "systemctl restart smartd.service",
+    ],
+)
+
+prefix_rule(
+    pattern = ["systemctl", "--user", ["is-active", "is-enabled", "list-timers", "status", "--failed"]],
+    decision = "allow",
+    justification = "Consultas de solo lectura a unidades del usuario actual",
+    match = [
+        "systemctl --user --failed --no-legend --plain",
+        "systemctl --user is-enabled restic-backup.timer",
+        "systemctl --user list-timers restic-maintenance.timer --no-pager",
+    ],
+    not_match = [
+        "systemctl --user enable --now restic-backup.timer",
+        "systemctl --user restart restic-backup.service",
+    ],
+)
+
+prefix_rule(
+    pattern = ["pacman", ["-Q", "-Qq", "-Qdtq", "-Si"]],
+    decision = "allow",
+    justification = "Consultas de paquetes sin instalar ni retirar software",
+    match = [
+        "pacman -Qq restic",
+        "pacman -Qdtq",
+        "pacman -Si mise",
+    ],
+    not_match = [
+        "pacman -S restic",
+        "pacman -Rns fnm",
+    ],
+)
+
+prefix_rule(
+    pattern = ["nvidia-smi", ["--query-gpu=name,driver_version", "--query-gpu=name,driver_version,vbios_version,pstate,power.limit,memory.total,temperature.gpu"]],
+    decision = "allow",
+    justification = "Telemetría de solo lectura de la GPU NVIDIA",
+    match = [
+        "nvidia-smi --query-gpu=name,driver_version --format=csv,noheader",
+        "nvidia-smi --query-gpu=name,driver_version,vbios_version,pstate,power.limit,memory.total,temperature.gpu --format=csv,noheader",
+    ],
+    not_match = [
+        "nvidia-smi -pl 180",
+        "nvidia-smi --gpu-reset",
+    ],
+)

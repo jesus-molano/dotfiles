@@ -9,13 +9,12 @@ set -gx SUDO_EDITOR nvim
 function fish_greeting
 end
 
-# fnm (Fast Node Manager)
-set -gx FNM_DIR "$HOME/.local/share/fnm"
-if command -q fnm
-    fnm env --use-on-cd --shell fish | source
+# mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
+if command -q mise
+    mise activate fish | source
 end
 
-# Binarios globales explícitos de pnpm. La versión de Node la decide fnm.
+# Binarios globales explícitos de pnpm. La versión de Node la decide mise.
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 fish_add_path -g "$PNPM_HOME"
 
@@ -34,6 +33,9 @@ if command -q zoxide
 end
 if command -q starship
     starship init fish | source
+end
+if status is-interactive; and command -q atuin
+    atuin init fish --disable-ai | source
 end
 fish_add_path -g "$HOME/.local/bin"
 

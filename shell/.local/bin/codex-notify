@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -u
+
+payload=${1:-}
+[[ -n "$payload" ]] || exit 0
+command -v jq >/dev/null 2>&1 || exit 0
+
+event_type="$(jq -r 'if type == "object" then (.type // "") else "" end' \
+	<<<"$payload" 2>/dev/null)" || exit 0
+[[ "$event_type" == agent-turn-complete ]] || exit 0
+
+# No se incluye prompt, respuesta, cwd, identificadores ni otro contenido del
+# evento: la notificación solo revela que terminó un turno.
+exec "${HOME}/.local/bin/desktop-notify" 'Codex' 'Turno completado'

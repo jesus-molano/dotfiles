@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if (($# != 1)) || [[ ! "$1" =~ ^[[:alnum:]_.-]+$ || "$1" == . || "$1" == .. ]]; then
+	printf '%s\n' 'Uso: game-bench-report NOMBRE' >&2
+	exit 2
+fi
+
+benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks/$1"
+[[ -d "$benchmark_root" ]] || {
+	printf 'No existe el benchmark: %s\n' "$benchmark_root" >&2
+	exit 1
+}
+
+mapfile -t logs < <(find "$benchmark_root" -type f -name '*.csv' -print | sort)
+if ((${#logs[@]} < 3)); then
+	printf 'Hay %d ejecución(es); realiza al menos 3 para comparar.\n' "${#logs[@]}" >&2
+	exit 1
+fi
+
+printf 'Benchmark: %s\nEjecuciones CSV: %d\n' "$1" "${#logs[@]}"
+printf 'Directorio: %s\n' "$benchmark_root"
+printf '%s\n' "${logs[@]}"
+
+if command -v mangoplot >/dev/null 2>&1; then
+	printf '%s\n' 'Generando comparativa con mangoplot...'
+	exec mangoplot "$benchmark_root"
+fi
+
+printf '%s\n' 'mangoplot no está disponible; conserva los CSV para analizarlos manualmente.' >&2

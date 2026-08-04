@@ -1,0 +1,4 @@
+interface:
+  display_name: "Auditoría de host CachyOS"
+  short_description: "Audita CachyOS e Hyprland sin escribir"
+  default_prompt: "Usa $cachyos-host-audit para auditar este host CachyOS de forma segura y entregar hallazgos priorizados."
