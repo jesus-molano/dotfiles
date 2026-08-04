@@ -31,7 +31,10 @@ node_path="$node_root/bin/node"
 
 if ! pacman -Qq fnm >/dev/null 2>&1; then
 	printf '✓ mise usa %s y fnm ya no está instalado.\n' "$node_path"
-	exec mise exec "node@$node_version" -- "$repo_root/scripts/sync-project-atlas.sh" --check
+	# Una sesión iniciada con fnm conserva sus directorios en PATH incluso tras
+	# retirar el paquete. Fuerza delante el Node estable que acabamos de validar.
+	exec env PATH="$node_root/bin:$PATH" \
+		"$repo_root/scripts/sync-project-atlas.sh" --check
 fi
 
 if [[ "$mode" == check ]]; then
@@ -65,7 +68,7 @@ trap rollback ERR INT TERM
 pkexec /usr/bin/shelly remove standard --no-confirm fnm
 fnm_removed=1
 
-mise exec "node@$node_version" -- \
+env PATH="$node_root/bin:$PATH" \
 	"$repo_root/scripts/sync-project-atlas.sh" --apply
 
 fnm_removed=0
