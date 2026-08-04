@@ -67,11 +67,32 @@ local function apply_workspace_rules()
         if monitors[workspace] then rule.monitor = monitors[workspace] end
         hl.workspace_rule(rule)
     end
+
+    -- Outputs can appear one by one during startup. Hyprland may create the
+    -- next free workspace (9) before the persistent 5-8 rules reach the right
+    -- monitor. Replace only that unmanaged fallback; preserve any deliberate
+    -- selection inside the configured 1-8 range. The workspace dispatcher is
+    -- compatible with icon-renamed workspaces; restore the original focus when
+    -- repairing a different monitor.
+    for default_workspace, enabled in pairs(defaults) do
+        local monitor_name = monitors[default_workspace]
+        local monitor = monitor_name and hl.get_monitor(monitor_name)
+        local active = monitor and monitor.active_workspace
+        if enabled and active and (active.id < 1 or active.id > NUM_WORKSPACES) then
+            local focused_monitor = hl.get_active_monitor()
+            local focused_workspace = focused_monitor and focused_monitor.active_workspace
+            hl.dispatch(hl.dsp.focus({ workspace = default_workspace }))
+            if focused_monitor and focused_monitor ~= monitor and focused_workspace then
+                hl.dispatch(hl.dsp.focus({ workspace = focused_workspace }))
+            end
+        end
+    end
 end
 
 apply_workspace_rules()
 
 -- Hyprland emits this after an output is added, removed or rearranged. Updating
--- the persistent rules creates missing empty workspaces and moves existing ones
--- without changing the currently focused workspace or any key binding.
+-- the persistent rules creates missing empty workspaces and moves existing ones.
+-- An unmanaged startup fallback is replaced with the monitor default without
+-- changing the focused monitor or any key binding.
 if WORKSPACE_MONITOR_POLICY then hl.on("monitor.layout_changed", apply_workspace_rules) end

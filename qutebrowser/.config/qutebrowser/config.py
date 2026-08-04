@@ -180,6 +180,7 @@ c.statusbar.padding = {"bottom": 5, "left": 8, "right": 8, "top": 5}
 # Local leader: comma never conflicts with qutebrowser's default bindings.
 config.bind(",a", "config-cycle -t -u *://{url:host}/* content.blocking.enabled true false ;; reload")
 config.bind(",A", "config-cycle -t content.blocking.enabled true false ;; reload")
+config.bind(",d", "config-cycle -t -u *://{url:host}/* colors.webpage.darkmode.enabled true false ;; reload")
 config.bind(",u", "adblock-update")
 config.bind(",e", "config-edit")
 config.bind(",r", "config-source")

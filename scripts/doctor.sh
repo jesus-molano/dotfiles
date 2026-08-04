@@ -153,11 +153,17 @@ check_gaming_monitors() {
 				all(range(1; 5); . as $id |
 					any($workspaces[]; .id == $id and .monitor == "HDMI-A-1")) and
 				all(range(5; 9); . as $id |
-					any($workspaces[]; .id == $id and .monitor == "HDMI-A-2"))
+					any($workspaces[]; .id == $id and .monitor == "HDMI-A-2")) and
+				($monitors | any(.name == "HDMI-A-1" and
+					.activeWorkspace.id >= 1 and .activeWorkspace.id <= 4)) and
+				($monitors | any(.name == "HDMI-A-2" and
+					.activeWorkspace.id >= 5 and .activeWorkspace.id <= 8))
 			else
 				($monitors[0].name) as $only |
 				all(range(1; 9); . as $id |
-					any($workspaces[]; .id == $id and .monitor == $only))
+					any($workspaces[]; .id == $id and .monitor == $only)) and
+				($monitors[0].activeWorkspace.id >= 1 and
+					$monitors[0].activeWorkspace.id <= 8)
 			end)
 	' >/dev/null 2>&1 <<<"$monitor_json"; then
 		desktop_monitor_count="$(
