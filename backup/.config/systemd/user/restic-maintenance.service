@@ -5,6 +5,10 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
+LoadCredentialEncrypted=restic-password:%h/.local/share/systemd/credentials/restic-password.cred
+Environment=DOTFILES_RESTIC_ENV=1
+Environment=RESTIC_REPOSITORY=/mnt/backups/restic-desktop
+Environment=RESTIC_PASSWORD_FILE=%d/restic-password
 ExecStart=%h/.local/bin/desktop-backup-maintenance
 Nice=15
 IOSchedulingClass=idle

@@ -401,6 +401,7 @@ install -m 600 .env.op.example ~/.env.op
 micro ~/.env.op
 desktop-backup-init
 desktop-backup
+desktop-backup-credential-init
 just apply-user-timers
 ```
 
@@ -409,7 +410,11 @@ just apply-user-timers
 dotfiles y el staging de partidas de Ludusavi; omite cachés, dependencias y
 objetos Git. La retención es 7 diarios, 5 semanales y 12 mensuales. Cada mes se
 ejecutan `restic check --read-data-subset=5%`, `prune` y una restauración del
-canario. Ningún timer se habilita durante Stow.
+canario. `desktop-backup-credential-init` convierte la contraseña inyectada por
+1Password en una credencial cifrada y ligada al usuario/equipo mediante
+`systemd-creds`; los timers la descifran solo dentro de cada unidad, por lo que
+no dependen de que 1Password esté desbloqueado de madrugada. Ningún timer se
+habilita durante Stow.
 La retención y `restore latest` quedan además acotados al hostname que creó el
 snapshot, incluso si varios equipos comparten el mismo repositorio.
 

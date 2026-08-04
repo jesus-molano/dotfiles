@@ -352,6 +352,11 @@ check_backup_runtime() {
 	else
 		warn "Backup: falta ~/.env.op; configura referencias Restic en 1Password"
 	fi
+	if [[ -f "$HOME/.local/share/systemd/credentials/restic-password.cred" ]]; then
+		ok "Backup: credencial cifrada de systemd presente (contenido no leído)"
+	else
+		warn "Backup: falta la credencial cifrada para ejecución desatendida"
+	fi
 	if systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer; then
 		ok "Timers Restic de usuario activos"
 	else
