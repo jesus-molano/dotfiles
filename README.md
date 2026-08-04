@@ -245,6 +245,8 @@ just check-system sddm
 just apply-system sddm
 just check-system snapper
 just apply-system snapper
+just check-system systemd       # automount de /mnt/backups en desktop
+just apply-system systemd
 ```
 
 El último comando muestra la diferencia, identifica `/etc/snapper/configs/root`

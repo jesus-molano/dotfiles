@@ -5,7 +5,7 @@ common_packages := "codex fish fonts ghostty git hypr-common kanata mimeapps noc
 workstation_packages := common_packages + " hypr-laptop"
 desktop_packages := common_packages + " hypr-desktop gaming backup"
 home_packages := common_packages + " hypr-laptop hypr-desktop gaming backup"
-system_packages := "sddm udev snapper"
+system_packages := "sddm udev snapper systemd"
 
 default:
     @just --justfile "{{ justfile() }}" --list

@@ -1,0 +1,10 @@
+[Unit]
+Description=Automount del disco interno de backups
+Documentation=man:systemd.automount(5)
+
+[Automount]
+Where=/mnt/backups
+TimeoutIdleSec=10min
+
+[Install]
+WantedBy=multi-user.target
