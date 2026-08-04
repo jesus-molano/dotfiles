@@ -1,0 +1,12 @@
+[Unit]
+Description=Check, prune y restauración canario de Restic
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/desktop-backup-maintenance
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+TimeoutStartSec=12h

@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+notify() {
+	"$HOME/.local/bin/desktop-notify" "Backup" "$1" || true
+}
+cleanup() {
+	[[ -n ${restore_root:-} ]] || return 0
+	case "$restore_root" in
+	"${XDG_RUNTIME_DIR:-/tmp}"/desktop-restic-restore.*) rm -rf -- "$restore_root" ;;
+	*)
+		printf 'Se rechazó limpiar una ruta inesperada: %s\n' "$restore_root" >&2
+		return 1
+		;;
+	esac
+}
+status=0
+trap 'status=$?; cleanup; notify "Falló la comprobación Restic (código $status)"; exit "$status"' ERR
+
+if [[ ${DOTFILES_RESTIC_ENV:-0} != 1 ]]; then
+	exec "$HOME/.local/bin/with-secrets" env DOTFILES_RESTIC_ENV=1 "$0" "$@"
+fi
+
+command -v restic >/dev/null 2>&1 || exit 127
+[[ -n ${RESTIC_REPOSITORY:-} ]] || exit 2
+[[ -n ${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}${RESTIC_PASSWORD_COMMAND:-} ]] || exit 2
+export RESTIC_HOST="${RESTIC_HOST:-$(hostname)}"
+
+restic check --read-data-subset=5%
+restic prune
+
+canary="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-backup/canary.txt"
+[[ -r "$canary" ]] || {
+	printf 'No existe el canario local: %s\n' "$canary" >&2
+	exit 2
+}
+restore_root="$(mktemp -d --tmpdir="${XDG_RUNTIME_DIR:-/tmp}" desktop-restic-restore.XXXXXX)"
+restic restore latest --tag desktop --target "$restore_root" \
+	--include '**/dotfiles-backup/canary.txt'
+mapfile -t restored_files < <(find "$restore_root" -type f -print)
+if ((${#restored_files[@]} != 1)); then
+	printf 'La restauración canario produjo %d archivos; se esperaba exactamente uno.\n' \
+		"${#restored_files[@]}" >&2
+	exit 1
+fi
+cmp -- "$canary" "${restored_files[0]}"
+
+cleanup
+restore_root=''
+trap - ERR
+notify 'Check, prune y restauración canario correctos'

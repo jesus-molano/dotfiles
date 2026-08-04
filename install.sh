@@ -76,7 +76,7 @@ parse_args() {
 		die "--check y --list-packages no se pueden combinar."
 	fi
 	if [[ "$PROFILE" == desktop ]]; then
-		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-desktop gaming)
+		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-desktop gaming backup)
 	else
 		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-laptop)
 	fi
@@ -126,7 +126,7 @@ validate_profile_modules() {
 collect_packages() {
 	local source=$1
 	awk -F, -v profile="$PROFILE" -v source="$source" \
-		'$3 == source && (profile == "desktop" || $1 != "gaming") { print $2 }' \
+		'$3 == source && (profile == "desktop" || ($1 != "gaming" && $1 != "desktop" && $1 != "backup")) { print $2 }' \
 		"$PACKAGES_CSV" | sort -u
 }
 

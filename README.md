@@ -11,14 +11,16 @@ el perfil gaming, mientras `workstation` conserva la configuración del portáti
 | Compositor | Hyprland Lua |
 | Shell de escritorio | Noctalia v5 |
 | Terminal | Ghostty |
-| Shell | Fish + Starship + Zoxide |
+| Shell | Fish + Starship + Zoxide + Atuin |
 | Archivos | Dolphin |
 | Editor | Neovim/LazyVim |
 | Multiplexor | Zellij |
 | Teclado | US/ES + Kanata |
 | Navegador | qutebrowser + Brave como respaldo |
 | Credenciales | 1Password CLI y agente SSH |
-| Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, Gamescope y MangoHud |
+| Toolchain | mise, pnpm, uv, Ruff, watchexec e hyperfine |
+| Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, ProtonPlus, Gamescope y MangoHud |
+| Backup (`desktop`) | Ludusavi + Restic + rclone, con timers desactivados por defecto |
 
 ## Perfiles y módulos
 
@@ -42,8 +44,8 @@ backlight. Los widgets adaptativos de Noctalia siguen compartidos y detectan los
 dispositivos disponibles. GPU, CHWD, initramfs, arranque, Btrfs, ZRAM, `/etc` y
 servicios quedan fuera de ambos perfiles.
 
-`gaming` es exclusivo del sobremesa y solo gestiona archivos en `HOME`. CHWD
-continúa siendo el propietario del controlador NVIDIA.
+`gaming` y `backup` son exclusivos del sobremesa y solo gestionan archivos en
+`HOME`. CHWD continúa siendo el propietario del controlador NVIDIA.
 
 Los paquetes del sistema y de AUR están declarados en `packages.csv`.
 
@@ -213,12 +215,15 @@ inverso usa `just remove desktop` y después valida y aplica `workstation`.
 ```bash
 just list                  # módulos permitidos
 just packages desktop      # paquetes efectivos, sin modificar nada
+just lint desktop          # validación hermética de la rama
+just plan desktop          # simulación contra el HOME real
 just check workstation     # simulación del perfil completo
 just check desktop         # simulación del perfil de sobremesa
 just check gaming          # simulación aislada de los dotfiles gaming
 just check hypr-desktop    # simulación de un módulo de hardware
 just doctor                # diagnóstico; autodetecta el perfil desplegado
 just doctor desktop        # diagnóstico explícito del sobremesa
+just doctor-live desktop   # solo estado del host ya desplegado
 just apply workstation     # simular y desplegar
 just apply desktop         # simular y desplegar desktop
 just remove workstation    # simular y retirar enlaces
@@ -230,14 +235,23 @@ por separado, pero `just apply` obliga a usar un perfil completo. Para cambiar
 de hardware, retira primero el perfil anterior y revisa la simulación del nuevo.
 
 La configuración de `/etc` se gestiona por separado. Los módulos disponibles
-son la regla udev de Kanata y el tema Project Atlas de SDDM:
+son la regla udev de Kanata, el tema Project Atlas de SDDM y la retención
+acotada de Snapper para `root`:
 
 ```bash
 just check-system udev
 just apply-system udev
 just check-system sddm
 just apply-system sddm
+just check-system snapper
+just apply-system snapper
 ```
+
+El último comando muestra la diferencia, identifica `/etc/snapper/configs/root`
+como destino y crea una copia antes de sustituirlo. Los servicios siguen una
+guarda distinta: `just check-maintenance` no escribe y `just apply-maintenance`
+activa únicamente `btrfs-scrub@-.timer` y `smartd.service` tras confirmar su
+nombre. El rollback se imprime antes de aplicar.
 
 ## Teclado
 
@@ -255,8 +269,10 @@ mano: `Q/W/E/R` pertenecen a la pantalla izquierda y `U/I/O/P` a la principal
 situada a la derecha. Q y U son los espacios iniciales. Si solo permanece
 `HDMI-A-1` o `HDMI-A-2`, los ocho espacios persistentes se muestran en esa
 pantalla. Hyprland recalcula la distribución al conectar o desconectar una
-salida, sin cambiar los atajos. Sus funciones son terminal, directorios, música,
-chat, navegador, código, juegos y sistema, respectivamente.
+salida, sin cambiar los atajos. Sus funciones son navegador, terminal, código,
+música, archivos, comunicación, documentación y sistema, respectivamente. El
+workspace 3 usa el layout `scrolling`: `Hyper + ,/.` cambia de columna y
+`Hyper + ;` recorre anchos 1/3, 1/2, 2/3 y completo.
 
 La primera instalación de Kanata requiere cargar `uinput`, añadir el usuario al
 grupo `input`, aplicar el módulo udev y habilitar el servicio. Usa Polkit y vuelve
@@ -363,15 +379,94 @@ Los buscadores rápidos disponibles son `aw` (ArchWiki), `g` (Google), `gh`
 
 ## Secretos
 
-`with-secrets` ejecuta un comando con las referencias locales de 1Password:
+`with-secrets` ejecuta un comando con las referencias locales de 1Password sin
+exportarlas a la sesión padre. No lee un `.env` con valores: `~/.env.op` contiene
+solo referencias `op://` y nunca se versiona.
 
 ```bash
 with-secrets pnpm run deploy
 ```
 
+### Backup cifrado del desktop
+
+El módulo `backup` prepara Ludusavi, Restic y rclone, pero no inventa un destino
+remoto ni habilita timers. Crea primero un ítem de 1Password con la URL de
+repositorio Restic y su contraseña; después copia la plantilla y sustituye solo
+los nombres de referencia:
+
+```bash
+install -m 600 .env.op.example ~/.env.op
+micro ~/.env.op
+desktop-backup-init
+desktop-backup
+just apply-user-timers
+```
+
+`desktop-backup-init` muestra el destino de forma oculta y exige
+`INICIALIZAR`. El backup diario guarda el canario, documentos/proyectos,
+dotfiles y el staging de partidas de Ludusavi; omite cachés, dependencias y
+objetos Git. La retención es 7 diarios, 5 semanales y 12 mensuales. Cada mes se
+ejecutan `restic check --read-data-subset=5%`, `prune` y una restauración del
+canario. Ningún timer se habilita durante Stow.
+La retención y `restore latest` quedan además acotados al hostname que creó el
+snapshot, incluso si varios equipos comparten el mismo repositorio.
+
+Revisa el estado con:
+
+```bash
+just check-user-timers
+systemctl --user status restic-backup.service restic-maintenance.service
+```
+
+### Toolchain y shell
+
+`mise` fija Node 26.5.1, `uv` y Ruff cubren Python, y Atuin reemplaza la búsqueda
+de historial sin sincronización ni IA. Su filtro excluye comandos con
+`with-secrets`, `op`, contraseñas, tokens o claves. Tras desplegar esta rama,
+migra Atlas fuera de `fnm` en una transacción separada:
+
+```bash
+just toolchain-check
+just toolchain-migrate
+just atlas-check
+```
+
+La migración valida primero el Node de mise, retira solo el paquete `fnm`,
+reregistra `[mcp_servers.component-atlas]` y trata de reinstalar `fnm` si la
+validación final falla.
+
+### Codex y Orca
+
+El repositorio añade un revisor Linux de solo lectura, la skill local
+`$cachyos-host-audit` y el flujo de ingeniería formado por
+`systematic-debugging`, `test-driven-development` y
+`verification-before-completion`. También incorpora reglas de auditoría
+estrechas y notificaciones que nunca incluyen el prompt ni la respuesta. La
+configuración viva se fusiona para conservar trusts, hooks de Orca y MCP:
+
+```bash
+just codex-check
+just codex-sync
+just codex-clean-rules
+```
+
+Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
+radar upstream y auditoría mensual Restic— nacen desactivadas. Revísalas con
+`orca automations list --json` antes de habilitar cualquiera desde Orca.
+
+### Escritorio y captura
+
+Noctalia usa un horario privado local para luz nocturna, brillo DDC/CI para los
+dos Philips y el plugin oficial `noctalia/screen_recorder`. Este se materializa
+desde la fuente oficial al arrancar la configuración desplegada y usa
+`gpu-screen-recorder`: 1080p60 H.264, audio de salida y replay de 90 segundos en
+RAM. El acceso está en el centro de control. No se ejecuta `hyprsunset` en
+paralelo.
+
 ## Validación
 
 ```bash
+just lint desktop
 HYPR_PROFILE_DIR="$PWD/hypr-laptop/.config/hypr" \
   Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
 HYPR_PROFILE_DIR="$PWD/hypr-desktop/.config/hypr" \
@@ -382,6 +477,7 @@ kanata --check -c kanata/.config/kanata/config.kbd
 just check desktop
 just check gaming
 just doctor desktop
+just doctor-live desktop
 git diff --check
 ```
 
@@ -392,6 +488,7 @@ hypr-common/.config/hypr/       configuración compartida de Hyprland
 hypr-laptop/.config/hypr/       hardware del portátil
 hypr-desktop/.config/hypr/      hardware del sobremesa
 gaming/                         wrappers y configuración gaming del sobremesa
+backup/                         Restic, Ludusavi y timers de usuario del sobremesa
 noctalia/.config/noctalia/      Noctalia y paleta
 kanata/.config/kanata/          teclado
 ghostty/.config/ghostty/        terminal

@@ -4,6 +4,7 @@ model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 approval_policy = "on-request"
 sandbox_mode = "workspace-write"
+notify = ["codex-notify"]
 
 [agents]
 enabled = true
@@ -14,6 +15,7 @@ default_subagent_reasoning_effort = "medium"
 [tui]
 theme = "project-atlas"
 status_line = ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]
+notifications = ["agent-turn-complete", "approval-requested"]
 
 # Project Atlas se genera con `just atlas-sync`: Node y el clon requieren rutas
 # absolutas estables, por lo que no se deben copiar literalmente entre equipos.

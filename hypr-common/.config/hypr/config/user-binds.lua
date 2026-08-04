@@ -35,6 +35,12 @@ bind(alt .. " + M", hl.dsp.window.fullscreen({ mode = "maximized" }),
     "Maximizar la ventana activa")
 bind(alt .. " + F", hl.dsp.window.float({ action = "toggle" }), "Alternar ventana flotante")
 bind(hyper .. " + D", hl.dsp.layout("togglesplit"), "Alternar dirección de la división")
+bind(hyper .. " + comma", hl.dsp.layout("move -col"),
+    "Desplazar una columna a la izquierda en el layout scrolling")
+bind(hyper .. " + period", hl.dsp.layout("move +col"),
+    "Desplazar una columna a la derecha en el layout scrolling")
+bind(hyper .. " + semicolon", hl.dsp.layout("colresize +conf"),
+    "Alternar el ancho de columna en el layout scrolling")
 bind(hyper .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }),
     "Alternar pantalla completa")
 

@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup Restic diario del desktop
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+Persistent=true
+RandomizedDelaySec=45m
+Unit=restic-backup.service
+
+[Install]
+WantedBy=timers.target

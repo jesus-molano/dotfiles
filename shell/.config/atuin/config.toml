@@ -1,0 +1,19 @@
+auto_sync = false
+update_check = false
+style = "compact"
+inline_height = 24
+show_help = true
+enter_accept = true
+filter_mode = "global"
+search_mode = "fuzzy"
+history_filter = [
+  "^with-secrets(\\s|$)",
+  "^op(\\s|$)",
+  "(?i).*(--password|--token|api[_-]?key|secret)[=\\s].*",
+]
+
+[ai]
+enabled = false
+
+[dotfiles]
+enabled = false

@@ -3,9 +3,9 @@
 dotfiles_dir := justfile_directory()
 common_packages := "codex fish fonts ghostty git hypr-common kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij"
 workstation_packages := common_packages + " hypr-laptop"
-desktop_packages := common_packages + " hypr-desktop gaming"
-home_packages := common_packages + " hypr-laptop hypr-desktop gaming"
-system_packages := "sddm udev"
+desktop_packages := common_packages + " hypr-desktop gaming backup"
+home_packages := common_packages + " hypr-laptop hypr-desktop gaming backup"
+system_packages := "sddm udev snapper"
 
 default:
     @just --justfile "{{ justfile() }}" --list
@@ -55,8 +55,8 @@ apply target:
     target={{ quote(target) }}
     read -r -a allowed <<< "{{ home_packages }}"
 
-    [[ "$target" != gaming ]] || {
-        printf 'El módulo gaming solo se aplica con el perfil desktop: usa just apply desktop.\n' >&2
+    [[ "$target" != gaming && "$target" != backup ]] || {
+        printf 'Los módulos gaming y backup solo se aplican con el perfil desktop: usa just apply desktop.\n' >&2
         exit 2
     }
 
@@ -129,6 +129,18 @@ status:
 doctor profile="":
     "{{ dotfiles_dir }}/scripts/doctor.sh" "{{ profile }}"
 
+# Valida la rama en un HOME temporal, sin depender del despliegue activo.
+lint profile="desktop":
+    "{{ dotfiles_dir }}/scripts/doctor.sh" {{ quote(profile) }} --config-only
+
+# Simula el despliegue contra el HOME real sin escribir.
+plan profile="desktop":
+    @just --justfile "{{ justfile() }}" check {{ quote(profile) }}
+
+# Audita solo el estado vivo del host ya desplegado.
+doctor-live profile="desktop":
+    "{{ dotfiles_dir }}/scripts/doctor.sh" {{ quote(profile) }} --live-only
+
 # Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
 atlas-check:
     "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --check
@@ -136,6 +148,66 @@ atlas-check:
 # Instala copias reales de las skills y registra solo el bloque MCP de Atlas.
 atlas-sync:
     "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --apply
+
+# Comprueba las preferencias duraderas sin leer ni reemplazar hooks o MCP.
+codex-check:
+    "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
+    "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
+
+# Sincroniza preferencias Codex con destino exacto, confirmación y backup.
+codex-sync:
+    "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --apply
+
+# Retira solo las reglas temporales exactas detectadas durante la investigación.
+codex-clean-rules:
+    "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --apply
+
+# Prepara Node en mise y muestra si fnm/Atlas siguen pendientes de migración.
+toolchain-check:
+    "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --check
+
+# Retira fnm solo tras validar mise; reconfigura y prueba Atlas con rollback.
+toolchain-migrate:
+    "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --apply
+
+# Revisa los timers de usuario de backup sin activarlos.
+check-user-timers:
+    @systemctl --user is-enabled restic-backup.timer restic-maintenance.timer || true
+    @systemctl --user list-timers restic-backup.timer restic-maintenance.timer --no-pager
+
+# Activa únicamente los dos timers Restic tras desplegar y configurar secretos.
+apply-user-timers:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    printf '%s\n' 'Unidades exactas: restic-backup.timer y restic-maintenance.timer (usuario actual).'
+    printf 'Escribe ACTIVAR: '
+    read -r confirmation
+    [[ "$confirmation" == ACTIVAR ]] || {
+        printf '%s\n' 'Cancelado sin cambios.'
+        exit 1
+    }
+    systemctl --user daemon-reload
+    systemctl --user enable --now restic-backup.timer restic-maintenance.timer
+
+# Revisa el mantenimiento físico existente sin cambiar servicios.
+check-maintenance:
+    @systemctl is-enabled btrfs-scrub@-.timer smartd.service || true
+    @systemctl list-timers btrfs-scrub@-.timer --no-pager
+    @just --justfile "{{ justfile() }}" check-system snapper
+
+# Activa solo las unidades inspeccionadas; la configuración Snapper se aplica aparte.
+apply-maintenance:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    printf '%s\n' 'Unidades exactas: btrfs-scrub@-.timer y smartd.service.'
+    printf '%s\n' 'Rollback: pkexec systemctl disable --now btrfs-scrub@-.timer smartd.service'
+    printf 'Escribe ACTIVAR: '
+    read -r confirmation
+    [[ "$confirmation" == ACTIVAR ]] || {
+        printf '%s\n' 'Cancelado sin cambios.'
+        exit 1
+    }
+    pkexec /usr/bin/systemctl enable --now btrfs-scrub@-.timer smartd.service
 
 # Revisa un módulo de sistema permitido sin escribir en /etc.
 check-system module:

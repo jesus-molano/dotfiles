@@ -64,6 +64,13 @@ local function apply_workspace_rules()
             default_name = (WORKSPACE_ICON_OVERRIDES or {})[workspace] or workspace_icons[workspace],
         }
 
+        -- El workspace de código usa la cinta nativa de Hyprland. El resto
+        -- conserva dwindle para no cambiar la memoria muscular global.
+        if workspace == 3 then
+            rule.layout = "scrolling"
+            rule.layout_opts = { direction = "right" }
+        end
+
         if monitors[workspace] then rule.monitor = monitors[workspace] end
         hl.workspace_rule(rule)
     end

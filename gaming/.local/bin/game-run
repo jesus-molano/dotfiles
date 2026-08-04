@@ -2,12 +2,15 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: game-run [--hud] [--gamescope] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
+	printf '%s\n' \
+		'Uso: game-run [--hud] [--gamescope] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
 }
 
 hud=false
 use_gamescope=false
 dry_run=false
+benchmark_name=''
+benchmark_duration=120
 
 while (($#)); do
 	case "$1" in
@@ -19,6 +22,22 @@ while (($#)); do
 		;;
 	--dry-run)
 		dry_run=true
+		;;
+	--bench)
+		(($# >= 2)) || {
+			printf '%s\n' 'Falta el nombre del benchmark.' >&2
+			exit 2
+		}
+		benchmark_name=$2
+		shift
+		;;
+	--duration)
+		(($# >= 2)) || {
+			printf '%s\n' 'Falta la duración del benchmark.' >&2
+			exit 2
+		}
+		benchmark_duration=$2
+		shift
 		;;
 	--help | -h)
 		usage
@@ -46,6 +65,22 @@ if (($# == 0)); then
 	exit 2
 fi
 
+if [[ -n "$benchmark_name" ]]; then
+	[[ "$benchmark_name" =~ ^[[:alnum:]_.-]+$ && "$benchmark_name" != . && "$benchmark_name" != .. ]] || {
+		printf '%s\n' 'El nombre admite letras, números, punto, guion y guion bajo; no puede ser uno o dos puntos.' >&2
+		exit 2
+	}
+	if [[ ! "$benchmark_duration" =~ ^[0-9]+$ ]] ||
+		((benchmark_duration < 10 || benchmark_duration > 3600)); then
+		printf '%s\n' 'La duración debe ser un entero entre 10 y 3600 segundos.' >&2
+		exit 2
+	fi
+	hud=true
+	benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks/$benchmark_name"
+	benchmark_run="$benchmark_root/$(date +%Y%m%d-%H%M%S)"
+	benchmark_config="autostart_log=1,log_duration=$benchmark_duration,log_interval=100,output_folder=$benchmark_run,permit_upload=0,benchmark_percentiles=97+AVG+1+0.1"
+fi
+
 game_command=("$@")
 launch_command=(game-performance)
 
@@ -62,6 +97,10 @@ else
 fi
 
 if [[ "$dry_run" == true ]]; then
+	if [[ -n "$benchmark_name" ]]; then
+		printf 'MANGOHUD_CONFIG=%q\n' "$benchmark_config"
+		printf 'Benchmark: %q\n' "$benchmark_run"
+	fi
 	printf 'Comando:'
 	printf ' %q' "${launch_command[@]}"
 	printf '\n'
@@ -80,6 +119,19 @@ if [[ "$use_gamescope" == true ]]; then
 	require_command gamescope
 elif [[ "$hud" == true ]]; then
 	require_command mangohud
+fi
+
+if [[ -n "$benchmark_name" ]]; then
+	mkdir -p -- "$benchmark_run"
+	export MANGOHUD_CONFIG="${MANGOHUD_CONFIG:+$MANGOHUD_CONFIG,}$benchmark_config"
+	{
+		printf 'fecha=%s\n' "$(date --iso-8601=seconds)"
+		printf 'kernel=%s\n' "$(uname -r)"
+		printf 'programa=%s\n' "${game_command[0]##*/}"
+		printf 'duracion=%s\n' "$benchmark_duration"
+		nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || true
+	} >"$benchmark_run/metadata.txt"
+	printf 'Benchmark MangoHud: %s\n' "$benchmark_run"
 fi
 
 exec "${launch_command[@]}"

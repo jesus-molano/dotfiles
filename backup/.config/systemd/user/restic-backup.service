@@ -1,0 +1,14 @@
+[Unit]
+Description=Backup cifrado del desktop con Ludusavi y Restic
+Documentation=file:%h/.config/restic/desktop.paths
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/desktop-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+CPUSchedulingPolicy=batch
+TimeoutStartSec=6h

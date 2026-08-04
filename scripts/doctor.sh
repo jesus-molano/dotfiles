@@ -3,7 +3,26 @@ set -uo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly repo_root
-profile=${1:-}
+profile=''
+mode=all
+for argument in "$@"; do
+	case "$argument" in
+	desktop | workstation)
+		[[ -z "$profile" ]] || {
+			printf 'Solo se admite un perfil.\n' >&2
+			exit 2
+		}
+		profile=$argument
+		;;
+	--config-only) mode=config ;;
+	--live-only) mode=live ;;
+	'') ;;
+	*)
+		printf 'Argumento no válido: %s\n' "$argument" >&2
+		exit 2
+		;;
+	esac
+done
 if [[ -z "$profile" ]]; then
 	active_monitors="$(readlink -f "$HOME/.config/hypr/config/monitors.lua" 2>/dev/null || true)"
 	case "$active_monitors" in
@@ -17,6 +36,7 @@ fi
 	exit 2
 }
 readonly profile
+readonly mode
 failures=0
 warnings=0
 
@@ -317,61 +337,115 @@ check_gaming() {
 	check_ignored_nvidia_parameter
 }
 
-printf 'Configuración\n'
-check "Hyprland workstation" env HYPR_PROFILE_DIR="$repo_root/hypr-laptop/.config/hypr" \
-	Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
-check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
-	Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
-if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-	check_empty "Hyprland sin errores activos" hyprctl configerrors
-else
-	warn "Hyprland no está disponible en esta sesión"
-fi
-check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
-check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
-check "Base CachyOS" "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
+check_backup_runtime() {
+	local package
+	for package in restic rclone ludusavi-bin; do
+		if pacman -Qq "$package" >/dev/null 2>&1; then
+			ok "Backup: paquete $package instalado"
+		else
+			fail "Backup: falta el paquete $package"
+		fi
+	done
 
-printf '\nDespliegue\n'
-check "Stow $profile" just --justfile "$repo_root/justfile" check "$profile"
-check "Whitespace Git" git -C "$repo_root" diff --check
+	if [[ -f "$HOME/.env.op" ]]; then
+		ok "Backup: fichero local de referencias presente (contenido no leído)"
+	else
+		warn "Backup: falta ~/.env.op; configura referencias Restic en 1Password"
+	fi
+	if systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer; then
+		ok "Timers Restic de usuario activos"
+	else
+		warn "Timers Restic de usuario todavía desactivados"
+	fi
+}
 
-printf '\nSistema\n'
-system_failed="$(systemctl --failed --no-legend --plain 2>/dev/null || true)"
-if [[ -z "$system_failed" ]]; then
-	ok "Sin unidades del sistema fallidas"
-else
-	fail "Hay unidades del sistema fallidas"
-	printf '%s\n' "$system_failed"
-fi
-user_failed="$(systemctl --user --failed --no-legend --plain 2>/dev/null || true)"
-if [[ -z "$user_failed" ]]; then
-	ok "Sin unidades de usuario fallidas"
-else
-	fail "Hay unidades de usuario fallidas"
-	printf '%s\n' "$user_failed"
+check_desktop_runtime() {
+	if command -v ddcutil >/dev/null 2>&1; then
+		if ddcutil detect --brief >/dev/null 2>&1; then
+			ok "DDC/CI responde para gestionar brillo externo"
+		else
+			warn "ddcutil no detectó una pantalla DDC/CI accesible"
+		fi
+	else
+		fail "ddcutil no está instalado"
+	fi
+	if command -v gpu-screen-recorder >/dev/null 2>&1; then
+		ok "gpu-screen-recorder disponible"
+	else
+		fail "gpu-screen-recorder no está instalado"
+	fi
+	check_backup_runtime
+}
+
+if [[ "$mode" != live ]]; then
+	printf 'Configuración reproducible\n'
+	check "Hyprland workstation" env HYPR_PROFILE_DIR="$repo_root/hypr-laptop/.config/hypr" \
+		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
+	check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
+		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
+	check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
+	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
+	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
+	if [[ "$mode" == config ]]; then
+		check "Stow hermético $profile" "$repo_root/scripts/stow-lint.sh" "$profile"
+	else
+		check "Stow desplegado $profile" just --justfile "$repo_root/justfile" check "$profile"
+	fi
+	check "Whitespace Git" git -C "$repo_root" diff --check
 fi
 
-if systemctl is-enabled --quiet btrfs-scrub@-.timer; then
-	ok "Scrub Btrfs periódico activo"
-else
-	warn "Scrub Btrfs periódico desactivado"
-fi
+if [[ "$mode" != config ]]; then
+	printf '\nHost vivo\n'
+	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+		check_empty "Hyprland sin errores activos" hyprctl configerrors
+	else
+		warn "Hyprland no está disponible en esta sesión"
+	fi
+	check "Base CachyOS" "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
 
-if journalctl -b --no-pager 2>/dev/null | grep -q 'Timed out waiting for device /dev/tpm'; then
-	warn "El arranque esperó por un dispositivo TPM inexistente"
-else
-	ok "Sin timeout TPM en este arranque"
-fi
+	system_failed="$(systemctl --failed --no-legend --plain 2>/dev/null || true)"
+	if [[ -z "$system_failed" ]]; then
+		ok "Sin unidades del sistema fallidas"
+	else
+		fail "Hay unidades del sistema fallidas"
+		printf '%s\n' "$system_failed"
+	fi
+	user_failed="$(systemctl --user --failed --no-legend --plain 2>/dev/null || true)"
+	if [[ -z "$user_failed" ]]; then
+		ok "Sin unidades de usuario fallidas"
+	else
+		fail "Hay unidades de usuario fallidas"
+		printf '%s\n' "$user_failed"
+	fi
 
-mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
-if ((${#orphans[@]})); then
-	warn "Paquetes huérfanos: ${orphans[*]}"
-else
-	ok "Sin paquetes huérfanos"
-fi
+	if systemctl is-enabled --quiet btrfs-scrub@-.timer; then
+		ok "Scrub Btrfs periódico activo"
+	else
+		warn "Scrub Btrfs periódico desactivado"
+	fi
+	if systemctl is-enabled --quiet smartd.service; then
+		ok "SMART periódico activo"
+	else
+		warn "smartd.service desactivado"
+	fi
 
-if [[ "$profile" == desktop ]]; then
-	check_gaming
+	if journalctl -b --no-pager 2>/dev/null | grep -q 'Timed out waiting for device /dev/tpm'; then
+		warn "El arranque esperó por un dispositivo TPM inexistente"
+	else
+		ok "Sin timeout TPM en este arranque"
+	fi
+
+	mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
+	if ((${#orphans[@]})); then
+		warn "Paquetes huérfanos: ${orphans[*]}"
+	else
+		ok "Sin paquetes huérfanos"
+	fi
+
+	if [[ "$profile" == desktop ]]; then
+		check_desktop_runtime
+		check_gaming
+	fi
 fi
 
 printf '\nResultado: %d fallo(s), %d aviso(s)\n' "$failures" "$warnings"
