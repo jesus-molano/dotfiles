@@ -302,6 +302,9 @@ game-run --dlss --hud -- juego
 
 # Opciones de lanzamiento de Steam
 game-run -- %command%
+
+# Arma Reforger en este desktop: limita la cola DX12 y evita el fallo de follaje
+VKD3D_FRAME_RATE=75 game-run -- %command%
 ```
 
 Steam conserva Proton oficial de Valve como valor global; Proton-CachyOS SLR se
@@ -487,7 +490,8 @@ dos Philips y el plugin oficial `noctalia/screen_recorder`. Este se materializa
 desde la fuente oficial al arrancar la configuración desplegada y usa
 `gpu-screen-recorder`: 1080p60 H.264, audio de salida y replay de 90 segundos en
 RAM. El acceso está en el centro de control. No se ejecuta `hyprsunset` en
-paralelo.
+paralelo. La cápsula de recursos muestra uso de CPU, temperatura de CPU, RAM y
+temperatura de la GPU; las temperaturas se actualizan cada tres segundos.
 
 ## Validación
 

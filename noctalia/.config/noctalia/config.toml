@@ -27,7 +27,7 @@ end = [ "group:resources", "privacy", "tray", "notifications", "network", "bluet
 
 [[bar.default.capsule_group]]
 id = "resources"
-members = [ "cpu", "ram" ]
+members = [ "cpu", "cpu_temp", "ram", "gpu_temp" ]
 fill = "surface_variant"
 padding = 5.0
 opacity = 0.82
@@ -124,7 +124,7 @@ shortcut = "5"
 variant = "destructive"
 
 [system.monitor]
-gpu_poll_seconds = 0
+gpu_poll_seconds = 3
 cpu_poll_seconds = 3
 memory_poll_seconds = 3
 
@@ -305,9 +305,17 @@ title_scroll = "on_hover"
 type = "sysmon"
 stat = "cpu_usage"
 
+[widget.cpu_temp]
+type = "sysmon"
+stat = "cpu_temp"
+
 [widget.ram]
 type = "sysmon"
 stat = "ram_used"
+
+[widget.gpu_temp]
+type = "sysmon"
+stat = "gpu_temp"
 
 [widget.clock]
 format = "{:%H:%M}"

@@ -105,6 +105,42 @@ game-bench-report cyberpunk
 El informe exige tres CSV antes de invocar `mangoplot`. MangoHud tiene las
 subidas desactivadas (`permit_upload=0`), así que los datos permanecen locales.
 
+### Caso validado: Arma Reforger
+
+Validado el 04-08-2026 con Arma Reforger 1.7, Proton Experimental, Ryzen 5
+5600X, RTX 3060 Ti y los dos Philips a 75 Hz. La opción normal de lanzamiento
+queda limitada a este juego; no conviertas estas variables en valores globales:
+
+```bash
+VKD3D_FRAME_RATE=75 game-run -- %command%
+```
+
+El preset probado conserva 1920x1080, escala de render 100 %, VSync desactivado,
+texturas y antialiasing existentes. Usa objetos y geometría en High, sombras
+cercanas y lejanas en Medium, reflejos bajos y contact shadows desactivadas. La
+hierba permanece en Low/100 m: Medium/150 m no corrigió el fallo visual y redujo
+los percentiles. El modo `FULLSCREEN` y 1920x1080 se guardaron en
+`ReforgerEngineSettings.conf`; ese archivo vive en el prefijo de Steam y no lo
+gestiona Stow. Antes de editarlo se conservó una copia `.bak-20260804-1640` en
+el mismo directorio.
+
+Tres bases de 240 segundos útiles —se descartaron los primeros 60 segundos de
+cada arranque— dieron 73,53 FPS medios, 50,24 FPS de 1 % low, 40,41 FPS de
+0,1 % low y 19,91 ms de frametime p99. Dos sesiones finales, incluida una con
+recorrido y conducción más variables, dieron de media 76,53 FPS, 53,32 FPS de
+1 % low, 44,75 FPS de 0,1 % low y 18,80 ms p99. Frente a la base son +4,1 %,
++6,1 %, +10,7 % y un p99 5,6 % menor, respectivamente.
+
+En Linux/NVIDIA 1.7 puede hacer que el follaje aparezca, desaparezca o se
+desplace en bucle. En este host `VKD3D_SWAPCHAIN_LATENCY_FRAMES=1` lo corrigió,
+pero perdió alrededor del 18 % de rendimiento; el valor 2 recuperó rendimiento
+y reprodujo el fallo. `VKD3D_FRAME_RATE=75` eliminó el defecto en dos arranques,
+mejoró los percentiles y se conserva. MangoHud puede mostrar cifras puntuales
+superiores a 75, así que se trata como mitigación de presentación medida, no
+como garantía de un tope visual exacto. Si una actualización de Reforger,
+Proton o NVIDIA resuelve el defecto, repite una pasada sin la variable antes de
+retirarla.
+
 Para evaluar sched-ext, conserva primero una pasada sin scheduler y usa después
 el mismo directorio y nombre descriptivo para cada candidato. La suite descarga
 activos, requiere más de 8 GB libres y puede tardar más de una hora:
@@ -180,26 +216,30 @@ mandos Xbox y no forma parte de este perfil. El doctor también comprueba que el
 driver esté disponible y que Bluetooth esté activo; en el host desplegado pasan
 ambas comprobaciones.
 
-## Auditoría de firmware pendiente
+## Firmware validado
 
-Estado revalidado el 04-08-2026; no se modificó el firmware:
+Estado revalidado el 04-08-2026 después de modificar únicamente D.O.C.P. y
+ReBAR desde UEFI:
 
 - placa ASUS TUF GAMING B550-PLUS (WI-FI), BIOS 3636 del 04-01-2026;
 - 32 GiB mediante dos Kingston KF3200C16D4/16GX en A2/B2;
-- el kit DDR4-3200 funciona a 2400 MT/s: DOCP está desactivado;
-- la RTX 3060 Ti admite una región física redimensionable de hasta 8 GiB, pero
-  BAR1 es de 256 MiB: ReBAR está desactivado.
+- el kit DDR4-3200 funciona a 3200 MT/s con D.O.C.P. activo;
+- ReBAR está activo y NVIDIA expone BAR1 de 8192 MiB;
+- `stress-ng` verificó 24 GiB durante 10 minutos con cuatro trabajadores, cero
+  fallos, sin errores MCE/EDAC/OOM y un máximo observado de CPU de 64,5 °C pese
+  al calor ambiental de agosto;
+- tres pasadas base y las variantes de Arma anteriores no registraron Xid,
+  throttling ni agotamiento de VRAM.
 
-La ruta segura es secuencial:
+La secuencia aplicada y validada fue:
 
-1. Guarda una base de tres pasadas MangoHud y una ejecución del benchmarker.
-2. Activa solo D.O.C.P. en UEFI, arranca y confirma `3200 MT/s` con
-   `inxi -mxxx --no-host --filter --color 0`; después prueba memoria y juegos.
-3. Cuando D.O.C.P. sea estable, activa `Above 4G Decoding` y `Re-Size BAR` en
-   `Auto`, vuelve a arrancar y comprueba que BAR1 supera 256 MiB con
-   `nvidia-smi -q`.
-4. Repite exactamente las mediciones base y conserva el cambio solo si es
-   estable. Para volver atrás, restaura primero ReBAR y luego D.O.C.P. a `Auto`.
+1. Activar D.O.C.P., confirmar 3200 MT/s y probar memoria.
+2. Activar `Above 4G Decoding` y `Re-Size BAR`, confirmar BAR1 de 8192 MiB.
+3. Medir el mismo juego, temperaturas y errores del kernel.
+
+No se aplicó overclock de GPU: el límite continúa en los 200 W de fábrica. Para
+volver atrás, restaura primero ReBAR y luego D.O.C.P. a `Auto`. No cambies ambos
+a la vez durante una investigación de estabilidad.
 
 No actualices el VBIOS de la RTX 3060 Ti sin identificar antes fabricante,
 modelo y revisión exactos, y no crees parámetros de kernel para simular ninguno
@@ -259,6 +299,9 @@ Fuentes oficiales y upstream revalidadas el 04-08-2026:
 - [Gamescope](https://github.com/ValveSoftware/gamescope)
 - [ArchWiki: Gamescope y límites de CAP_SYS_NICE](https://wiki.archlinux.org/title/Gamescope)
 - [MangoHud](https://github.com/flightlessmango/MangoHud)
+- [Arma Reforger: ajustes de vídeo](https://community.bistudio.com/wiki/Arma_Reforger%3AVideo_Settings)
+  y [parámetros de arranque](https://community.bistudio.com/wiki/Arma_Reforger%3AStartup_Parameters)
+- [VKD3D-Proton: variables y limitador de FPS](https://github.com/HansKristian-Work/vkd3d-proton)
 - [Hyprland: monitores](https://wiki.hypr.land/Configuring/Monitors/) y
   [VRR](https://wiki.hypr.land/Configuring/Basics/Variables/)
 - [Omarchy 3.8.4](https://github.com/basecamp/omarchy/releases/tag/v3.8.4),
@@ -266,6 +309,11 @@ Fuentes oficiales y upstream revalidadas el 04-08-2026:
 
 Fuentes comunitarias e independientes, con sus límites metodológicos:
 
+- [Fallo de follaje de Arma Reforger en CachyOS/NVIDIA](https://www.reddit.com/r/cachyos/comments/1s4fj9t/cachyos_arma_reforger_foliage_flickering/),
+  contrastado con mediciones propias; sus flags antiguos `DXVK_FRAME_RATE` no
+  se copiaron porque VKD3D-Proton 3.0.1 conserva `VKD3D_FRAME_RATE`;
+- [Reporte de julio de 2026 sobre follaje que aparece y desaparece en Linux](https://www.reddit.com/r/ArmaReforger/comments/1uzz6m3/linux_foilage_bug/),
+  útil para identificar el defecto, no como sustituto del benchmark local;
 - [Debate reciente de r/cachyos sobre RTX 3060 Ti, input lag y launch flags](https://www.reddit.com/r/cachyos/comments/1snzhnj/my_problem_with_cachyos_and_nvidia/),
   17-04-2026; experiencias contradictorias que apoyan empezar sin flags globales,
   usar `game-performance` y añadir cambios solo tras medir un juego;
