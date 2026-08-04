@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Noctalia consulta DDC al arrancar. En NVIDIA, Hyprland puede publicar la
+# sesión antes de que todas las salidas externas respondan, dejando una de
+# ellas como no controlable hasta reiniciar el proceso.
+noctalia msg status >/dev/null 2>&1 && exit 0
+
+readonly earliest_start=$((SECONDS + 3))
+readonly deadline=$((SECONDS + 20))
+
+while ((SECONDS < deadline)); do
+	outputs=$(hyprctl monitors -j 2>/dev/null | jq -r '.[].name' 2>/dev/null | sort -u || true)
+	if [[ -z $outputs ]] || ((SECONDS < earliest_start)); then
+		sleep 0.5
+		continue
+	fi
+
+	external_outputs=$(grep -E '^(DP|HDMI)' <<<"$outputs" || true)
+	if [[ -z $external_outputs ]]; then
+		break
+	fi
+
+	ddc_outputs=$(
+		timeout 3 ddcutil --noconfig detect --brief 2>/dev/null |
+			sed -nE 's/^[[:space:]]*DRM[_ ]connector:[[:space:]]*(card[0-9]+-)?(.*)$/\2/p' |
+			sort -u || true
+	)
+
+	all_ready=true
+	while IFS= read -r output; do
+		grep -Fxq "$output" <<<"$ddc_outputs" || all_ready=false
+	done <<<"$external_outputs"
+
+	$all_ready && break
+	sleep 0.5
+done
+
+exec noctalia

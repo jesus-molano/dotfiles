@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly package='cachyos-hypr-noctalia'
-readonly expected_version='1.2.3-1'
+readonly expected_version='1.2.4-1'
 readonly upstream='/etc/skel/.config/hypr/config'
 readonly config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 readonly manifest="$config_home/hypr/cachyos-base.sha256"

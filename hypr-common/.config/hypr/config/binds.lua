@@ -19,6 +19,31 @@ HYPR_BIND("XF86Calculator", hl.dsp.exec_cmd(launch .. CALCULATOR), {
     description = "Abrir la calculadora",
 })
 
+-- Zoom de accesibilidad portado de cachyos-hypr-noctalia 1.2.4. Se limita al
+-- intervalo admitido por Hyprland y conserva tanto la fila principal como el
+-- teclado numérico.
+local function change_zoom(delta)
+    local current = hl.get_config("cursor:zoom_factor")
+    local target = math.max(1.0, math.min(3.0, current + delta))
+    hl.config({ cursor = { zoom_factor = target } })
+end
+HYPR_BIND(main .. " + Minus", function() change_zoom(-0.3) end, {
+    description = "Reducir el zoom",
+    repeating = true,
+})
+HYPR_BIND(main .. " + Plus", function() change_zoom(0.3) end, {
+    description = "Aumentar el zoom",
+    repeating = true,
+})
+HYPR_BIND(main .. " + code:82", function() change_zoom(-0.3) end, {
+    description = "Reducir el zoom con teclado numérico",
+    repeating = true,
+})
+HYPR_BIND(main .. " + code:86", function() change_zoom(0.3) end, {
+    description = "Aumentar el zoom con teclado numérico",
+    repeating = true,
+})
+
 -- Hardware controls remain available while the session is locked. Volume and
 -- brightness repeat while their key is held.
 HYPR_BIND("XF86AudioRaiseVolume", hl.dsp.exec_cmd(noctalia .. "volume-up"), {

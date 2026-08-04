@@ -493,6 +493,10 @@ desde la fuente oficial al arrancar la configuración desplegada y usa
 RAM. El acceso está en el centro de control. No se ejecuta `hyprsunset` en
 paralelo. La cápsula de recursos muestra uso de CPU, temperatura de CPU, RAM y
 temperatura de la GPU; las temperaturas se actualizan cada tres segundos.
+`start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
+espera hasta veinte segundos a que todas las salidas externas activas aparezcan
+en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
+por una carrera de detección durante el arranque.
 
 ## Validación
 
