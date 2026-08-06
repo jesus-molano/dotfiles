@@ -1,10 +1,6 @@
 # Gestión segura de dotfiles con GNU Stow.
 
 dotfiles_dir := justfile_directory()
-common_packages := "codex fish fonts ghostty git hypr-common kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij"
-workstation_packages := common_packages + " hypr-laptop"
-desktop_packages := common_packages + " hypr-desktop gaming backup"
-home_packages := common_packages + " hypr-laptop hypr-desktop gaming backup"
 system_packages := "sddm udev snapper systemd"
 
 default:
@@ -12,10 +8,13 @@ default:
 
 # Lista el perfil y los módulos permitidos (los paquetes heredados no se despliegan).
 list:
-    @printf 'workstation\n'
-    @for package in {{ workstation_packages }}; do printf '  %s\n' "$package"; done
-    @printf 'desktop\n'
-    @for package in {{ desktop_packages }}; do printf '  %s\n' "$package"; done
+    #!/usr/bin/env bash
+    set -euo pipefail
+    source "{{ dotfiles_dir }}/profiles.sh"
+    for profile in workstation desktop; do
+        printf '%s\n' "$profile"
+        while IFS= read -r package; do printf '  %s\n' "$package"; done < <(profile_modules "$profile")
+    done
 
 # Simula de forma verbosa un perfil o un módulo permitido.
 check target:
@@ -23,21 +22,18 @@ check target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ home_packages }}"
+    source "{{ dotfiles_dir }}/profiles.sh"
 
-    if [[ "$target" == workstation ]]; then
-        read -r -a packages <<< "{{ workstation_packages }}"
-    elif [[ "$target" == desktop ]]; then
-        read -r -a packages <<< "{{ desktop_packages }}"
-    else
+    if profile_is_valid "$target"; then
+        mapfile -t packages < <(profile_modules "$target")
+    elif home_module_is_allowed "$target"; then
         packages=("$target")
+    else
+        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
+        exit 2
     fi
 
     for package in "${packages[@]}"; do
-        [[ " ${allowed[*]} " == *" $package "* ]] || {
-            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
-            exit 2
-        }
         [[ -d "$package" ]] || {
             printf 'No existe el módulo: %s\n' "$package" >&2
             exit 2
@@ -53,7 +49,11 @@ apply target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ home_packages }}"
+    source "{{ dotfiles_dir }}/profiles.sh"
+
+    if profile_is_valid "$target"; then
+        exec "{{ dotfiles_dir }}/install.sh" "$target"
+    fi
 
     [[ "$target" != gaming && "$target" != backup ]] || {
         printf 'Los módulos gaming y backup solo se aplican con el perfil desktop: usa just apply desktop.\n' >&2
@@ -65,23 +65,13 @@ apply target:
         exit 2
     }
 
-    if [[ "$target" == workstation || "$target" == desktop ]]; then
-        exec "{{ dotfiles_dir }}/install.sh" "$target"
-    fi
-
-    if [[ "$target" == workstation ]]; then
-        read -r -a packages <<< "{{ workstation_packages }}"
-    elif [[ "$target" == desktop ]]; then
-        read -r -a packages <<< "{{ desktop_packages }}"
-    else
-        packages=("$target")
-    fi
+    home_module_is_allowed "$target" || {
+        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
+        exit 2
+    }
+    packages=("$target")
 
     for package in "${packages[@]}"; do
-        [[ " ${allowed[*]} " == *" $package "* ]] || {
-            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
-            exit 2
-        }
         [[ -d "$package" ]] || {
             printf 'No existe el módulo: %s\n' "$package" >&2
             exit 2
@@ -99,31 +89,25 @@ remove target:
     set -euo pipefail
     cd "{{ dotfiles_dir }}"
     target={{ quote(target) }}
-    read -r -a allowed <<< "{{ home_packages }}"
+    source "{{ dotfiles_dir }}/profiles.sh"
 
-    if [[ "$target" == workstation ]]; then
-        read -r -a packages <<< "{{ workstation_packages }}"
-    elif [[ "$target" == desktop ]]; then
-        read -r -a packages <<< "{{ desktop_packages }}"
-    else
+    if profile_is_valid "$target"; then
+        mapfile -t packages < <(profile_modules "$target")
+    elif home_module_is_allowed "$target"; then
         packages=("$target")
+    else
+        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
+        exit 2
     fi
-
-    for package in "${packages[@]}"; do
-        [[ " ${allowed[*]} " == *" $package "* ]] || {
-            printf 'Módulo no permitido para HOME: %s\n' "$package" >&2
-            exit 2
-        }
-    done
 
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
 
-# Muestra de solo lectura qué cambiaría en el perfil workstation.
-status:
-    @just --justfile "{{ justfile() }}" check workstation
+# Muestra de solo lectura qué cambiaría en el perfil indicado.
+status profile:
+    @just --justfile "{{ justfile() }}" check {{ quote(profile) }}
 
 # Diagnóstico de solo lectura del perfil y del sistema anfitrión.
 doctor profile="":

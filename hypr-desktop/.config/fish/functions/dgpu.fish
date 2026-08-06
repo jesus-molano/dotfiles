@@ -8,8 +8,8 @@ function dgpu --description "Run one command on the NVIDIA PRIME GPU"
         return 1
     end
 
-    # Keep offload variables scoped to this process. The desktop remains on the
-    # Intel GPU, while an explicitly selected compute/render task uses NVIDIA.
+    # Keep every NVIDIA offload variable scoped to this process. On systems
+    # without PRIME the function exits before changing the environment.
     if test -f /usr/share/glvnd/egl_vendor.d/10_nvidia.json
         set -lx __EGL_VENDOR_LIBRARY_FILENAMES /usr/share/glvnd/egl_vendor.d/10_nvidia.json
     end

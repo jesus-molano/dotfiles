@@ -17,6 +17,7 @@ el perfil gaming, mientras `workstation` conserva la configuración del portáti
 | Multiplexor | Zellij |
 | Teclado | US/ES + Kanata |
 | Navegador | qutebrowser + Brave como respaldo |
+| Aplicaciones comunes | Spotify, LocalSend, Micro, calculadora y Stremio (`flathub/stable`) |
 | Credenciales | 1Password CLI y agente SSH |
 | Toolchain | mise, pnpm, uv, Ruff, Difftastic, watchexec e hyperfine |
 | Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, ProtonPlus, Gamescope, MangoHud y benchmarker CachyOS |
@@ -36,7 +37,7 @@ Cada perfil añade sus módulos específicos:
 | Perfil | Módulos | Hardware |
 |---|---|---|
 | `workstation` | `hypr-laptop` | eDP, touchpad, entrada y brillo del portátil |
-| `desktop` | `hypr-desktop gaming` | uno o dos Philips 273V7 a 74.97 Hz, RTX 3060 Ti y entrada Keychron/Logitech |
+| `desktop` | `hypr-desktop gaming backup` | uno o dos Philips 273V7 a 74.97 Hz, RTX 3060 Ti y entrada Keychron/Logitech |
 
 El módulo Hyprland de `desktop` no configura touchpad ni teclas de brillo porque
 el informe real de este equipo no detectó touchpad, batería interna ni
@@ -47,7 +48,10 @@ servicios quedan fuera de ambos perfiles.
 `gaming` y `backup` son exclusivos del sobremesa y solo gestionan archivos en
 `HOME`. CHWD continúa siendo el propietario del controlador NVIDIA.
 
-Los paquetes del sistema y de AUR están declarados en `packages.csv`.
+La arquitectura completa está documentada en [PROFILES.md](PROFILES.md).
+`profiles.sh` es la fuente única de módulos; `packages.csv` declara paquetes
+Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
+`flatpak-remotes.csv` declara las aplicaciones Flatpak y su procedencia.
 
 ## Tema Project Atlas
 
@@ -125,9 +129,10 @@ just packages desktop
 ./install.sh desktop --check
 ```
 
-Para el portátil, sustituye `desktop` por `workstation`. `--check` valida el
-manifiesto y la disponibilidad de los paquetes nativos, muestra los paquetes AUR
-para revisión y después simula Stow sin instalar ni escribir en `HOME`. Revisa
+Para el portátil, sustituye `desktop` por `workstation`. `--check` valida los
+manifiestos y la disponibilidad de paquetes nativos y Flatpak cuando el remoto
+ya existe, muestra los paquetes AUR para revisión y después simula Stow sin
+instalar ni escribir en `HOME`. Revisa
 especialmente cualquier línea `BACKUP:`: identifica un archivo existente que el
 despliegue moverá a una copia de seguridad. La disponibilidad AUR se confirma al
 aplicar, cuando Shelly presenta su procedencia antes de cada instalación.
@@ -145,13 +150,15 @@ just apply desktop
 
 Para el portátil usa `just apply workstation`. El comando vuelve a mostrar el
 perfil y el destino, espera una confirmación `s`, instala solo los paquetes que
-falten mediante Shelly —con diálogo Polkit para los nativos—, crea la copia
+falten mediante Shelly —con diálogo Polkit para los nativos—, añade los remotos
+y aplicaciones Flatpak declarados para el usuario, crea la copia
 reversible de los conflictos en `HOME` y finalmente ejecuta Stow. Los paquetes
 AUR se compilan como usuario y Shelly puede solicitar `sudo` únicamente al
 instalar el artefacto construido; elevar toda la compilación no es apropiado.
 También se puede invocar directamente como `./install.sh desktop`. La
 transacción de paquetes modifica el sistema global y no se revierte mediante el
-backup de Stow.
+backup de Stow. Las aplicaciones Flatpak tampoco forman parte de ese backup;
+su rollback exacto está documentado en [PROFILES.md](PROFILES.md).
 
 Cuando existen conflictos en `HOME`, sus backups se guardan bajo:
 
@@ -188,7 +195,8 @@ La secuencia completa de cada perfil queda, por tanto:
 
 ### Qué cambia y qué queda fuera
 
-El instalador gestiona paquetes globales y enlaces en `HOME`. No despliega
+El instalador gestiona paquetes globales, aplicaciones Flatpak del usuario y
+enlaces en `HOME`. No despliega
 `system-etc`, no cambia explícitamente el controlador NVIDIA, CHWD, initramfs,
 arranque, Btrfs, ZRAM o firmware, ni habilita servicios. Pacman/Shelly sí pueden
 instalar archivos, hooks o unidades proporcionados por sus paquetes; esa parte
@@ -214,7 +222,7 @@ inverso usa `just remove desktop` y después valida y aplica `workstation`.
 
 ```bash
 just list                  # módulos permitidos
-just packages desktop      # paquetes efectivos, sin modificar nada
+just packages desktop      # paquetes y app IDs efectivos, sin modificar nada
 just lint desktop          # validación hermética de la rama
 just plan desktop          # simulación contra el HOME real
 just check workstation     # simulación del perfil completo
@@ -229,6 +237,9 @@ just apply desktop         # simular y desplegar desktop
 just remove workstation    # simular y retirar enlaces
 just remove gaming         # retirar solo enlaces gaming, nunca datos de juegos
 ```
+
+`dotf status` también exige el perfil (`dotf status desktop` o
+`dotf status workstation`) para no asumir el hardware del equipo actual.
 
 Los módulos `hypr-common`, `hypr-laptop` y `hypr-desktop` se pueden comprobar
 por separado, pero `just apply` obliga a usar un perfil completo. Para cambiar
@@ -502,6 +513,9 @@ por una carrera de detección durante el arranque.
 
 ```bash
 just lint desktop
+just lint workstation
+./install.sh desktop --list-packages
+./install.sh workstation --list-packages
 HYPR_PROFILE_DIR="$PWD/hypr-laptop/.config/hypr" \
   Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
 HYPR_PROFILE_DIR="$PWD/hypr-desktop/.config/hypr" \
@@ -520,6 +534,10 @@ git diff --check
 
 ```text
 hypr-common/.config/hypr/       configuración compartida de Hyprland
+profiles.sh                     composición canónica de módulos Stow
+packages.csv                    paquetes Pacman/AUR por ámbito
+flatpaks.csv                    aplicaciones Flatpak por remoto y rama
+flatpak-remotes.csv             URLs canónicas de remotos Flatpak
 hypr-laptop/.config/hypr/       hardware del portátil
 hypr-desktop/.config/hypr/      hardware del sobremesa
 gaming/                         wrappers y configuración gaming del sobremesa

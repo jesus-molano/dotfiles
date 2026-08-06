@@ -7,7 +7,7 @@ globales, que pueden aportar sus propios archivos y unidades del sistema.
 
 ## Stack gestionado
 
-La categoría `gaming` de `packages.csv` instala:
+El ámbito `desktop` y la categoría `gaming` de `packages.csv` instalan:
 
 | Componente | Función |
 |---|---|

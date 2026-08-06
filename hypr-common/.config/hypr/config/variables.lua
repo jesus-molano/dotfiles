@@ -1,9 +1,9 @@
 -- Hyprland default apps
 
-TERMINAL     = "kitty"
+TERMINAL     = "ghostty"
 FILE_MANAGER = "dolphin"
-BROWSER      = "firefox"
-EDITOR       = "gnome-text-editor --new-window"
+BROWSER      = "qutebrowser"
+EDITOR       = "ghostty -e nvim"
 CALCULATOR   = "gnome-calculator"
 
 -- Workspaces

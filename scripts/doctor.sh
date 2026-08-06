@@ -83,7 +83,8 @@ check_gaming_packages() {
 	local package
 
 	mapfile -t required_packages < <(
-		awk -F, '$1 == "gaming" { print $2 }' "$repo_root/packages.csv" | sort -u
+		awk -F, '$1 == "desktop" && $2 == "gaming" { print $3 }' \
+			"$repo_root/packages.csv" | sort -u
 	)
 	if ((${#required_packages[@]} == 0)); then
 		fail "El manifiesto no declara paquetes gaming"

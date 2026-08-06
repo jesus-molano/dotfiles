@@ -1,7 +1,7 @@
 """Project Atlas: qutebrowser keyboard-first configuration."""
 
 # Keep per-site permissions and temporary changes made with :set, while this
-# file remains the canonical source for the workstation defaults.
+# file remains the canonical source for the shared profile defaults.
 config.load_autoconfig()
 
 

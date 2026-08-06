@@ -7,11 +7,16 @@ set -euo pipefail
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly DOTFILES_DIR
 readonly PACKAGES_CSV="$DOTFILES_DIR/packages.csv"
+readonly FLATPAKS_CSV="$DOTFILES_DIR/flatpaks.csv"
+readonly FLATPAK_REMOTES_CSV="$DOTFILES_DIR/flatpak-remotes.csv"
 readonly STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-readonly -a COMMON_MODULES=(
-	codex fish fonts ghostty git hypr-common kanata mimeapps
-	noctalia nvim qutebrowser shell starship vscode zellij
-)
+readonly PROFILES_FILE="$DOTFILES_DIR/profiles.sh"
+[[ -f "$PROFILES_FILE" ]] || {
+	printf 'No existe la definición de perfiles: %s\n' "$PROFILES_FILE" >&2
+	exit 1
+}
+# shellcheck source=profiles.sh
+source "$PROFILES_FILE"
 declare -a PROFILE_MODULES=()
 PROFILE=''
 BACKUP_DIR=''
@@ -34,9 +39,9 @@ Uso:
 
   workstation  módulos comunes y hardware del portátil
   desktop      módulos comunes, hardware del sobremesa y gaming
-  --check      valida paquetes y simula Stow sin modificar el sistema ni HOME
+  --check      valida manifiestos/paquetes y simula Stow sin modificar el sistema ni HOME
   --list-packages
-               lista un paquete por línea sin modificar el sistema ni HOME
+               lista un paquete o app ID por línea sin modificar el sistema ni HOME
 
 Los módulos de system-etc se gestionan aparte con just check-system/apply-system.
 EOF
@@ -75,11 +80,7 @@ parse_args() {
 	if ((CHECK_ONLY && LIST_PACKAGES)); then
 		die "--check y --list-packages no se pueden combinar."
 	fi
-	if [[ "$PROFILE" == desktop ]]; then
-		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-desktop gaming backup)
-	else
-		PROFILE_MODULES=("${COMMON_MODULES[@]}" hypr-laptop)
-	fi
+	mapfile -t PROFILE_MODULES < <(profile_modules "$PROFILE")
 	BACKUP_DIR="$STATE_DIR/backups/$PROFILE-$(date +%Y%m%d-%H%M%S)"
 }
 
@@ -91,16 +92,26 @@ check_prerequisites() {
 	command -v shelly >/dev/null || die "Shelly no está instalado; usa el paquete oficial de CachyOS."
 }
 
-validate_manifest() {
+scope_is_valid() {
+	[[ "${1:-}" == common || "${1:-}" == desktop || "${1:-}" == workstation ]]
+}
+
+validate_package_manifest() {
 	local invalid=0
-	local category package source extra
+	local scope category package source extra duplicates
 	[[ -f "$PACKAGES_CSV" ]] || die "No existe $PACKAGES_CSV."
 
-	while IFS=, read -r category package source extra; do
-		[[ -n "$category" && -n "$package" && -n "$source" && -z "${extra:-}" ]] || {
-			warn "Fila inválida en packages.csv: ${category:-?},${package:-?},${source:-?}"
+	while IFS=, read -r scope category package source extra; do
+		[[ -n "$scope" && "$category" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ &&
+			"$package" =~ ^[A-Za-z0-9][A-Za-z0-9@+._-]*$ &&
+			-n "$source" && -z "${extra:-}" ]] || {
+			warn "Fila inválida en packages.csv: ${scope:-?},${category:-?},${package:-?},${source:-?}"
 			invalid=1
 			continue
+		}
+		scope_is_valid "$scope" || {
+			warn "Ámbito no permitido para $package: $scope"
+			invalid=1
 		}
 		[[ "$source" == native || "$source" == aur ]] || {
 			warn "Origen no permitido para $package: $source"
@@ -112,7 +123,65 @@ validate_manifest() {
 		fi
 	done <"$PACKAGES_CSV"
 
+	duplicates="$(cut -d, -f3 "$PACKAGES_CSV" | sort | uniq -d)"
+	if [[ -n "$duplicates" ]]; then
+		warn "Paquetes duplicados en packages.csv: ${duplicates//$'\n'/ }"
+		invalid=1
+	fi
 	((invalid == 0)) || die "Corrige packages.csv antes de continuar."
+}
+
+validate_flatpak_manifests() {
+	local invalid=0
+	local remote url remote_extra scope category app_id branch app_extra duplicates duplicate_remotes
+	[[ -f "$FLATPAK_REMOTES_CSV" ]] || die "No existe $FLATPAK_REMOTES_CSV."
+	[[ -f "$FLATPAKS_CSV" ]] || die "No existe $FLATPAKS_CSV."
+
+	while IFS=, read -r remote url remote_extra; do
+		[[ "$remote" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ &&
+			"$url" =~ ^https:// && -z "${remote_extra:-}" ]] || {
+			warn "Remoto Flatpak inválido: ${remote:-?},${url:-?}"
+			invalid=1
+		}
+	done <"$FLATPAK_REMOTES_CSV"
+	duplicate_remotes="$(cut -d, -f1 "$FLATPAK_REMOTES_CSV" | sort | uniq -d)"
+	if [[ -n "$duplicate_remotes" ]]; then
+		warn "Remotos duplicados en flatpak-remotes.csv: ${duplicate_remotes//$'\n'/ }"
+		invalid=1
+	fi
+
+	while IFS=, read -r scope category app_id remote branch app_extra; do
+		[[ -n "$scope" && -n "$category" &&
+			"$app_id" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ &&
+			"$remote" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ &&
+			"$branch" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ &&
+			-z "${app_extra:-}" ]] || {
+			warn "Aplicación Flatpak inválida: ${scope:-?},${category:-?},${app_id:-?},${remote:-?},${branch:-?}"
+			invalid=1
+			continue
+		}
+		scope_is_valid "$scope" || {
+			warn "Ámbito Flatpak no permitido para $app_id: $scope"
+			invalid=1
+		}
+		awk -F, -v requested="$remote" '$1 == requested { found = 1 } END { exit !found }' \
+			"$FLATPAK_REMOTES_CSV" || {
+			warn "Remoto Flatpak no declarado para $app_id: $remote"
+			invalid=1
+		}
+	done <"$FLATPAKS_CSV"
+
+	duplicates="$(cut -d, -f3 "$FLATPAKS_CSV" | sort | uniq -d)"
+	if [[ -n "$duplicates" ]]; then
+		warn "Aplicaciones duplicadas en flatpaks.csv: ${duplicates//$'\n'/ }"
+		invalid=1
+	fi
+	((invalid == 0)) || die "Corrige los manifiestos Flatpak antes de continuar."
+}
+
+validate_manifest() {
+	validate_package_manifest
+	validate_flatpak_manifests
 }
 
 validate_profile_modules() {
@@ -126,15 +195,54 @@ validate_profile_modules() {
 collect_packages() {
 	local source=$1
 	awk -F, -v profile="$PROFILE" -v source="$source" \
-		'$3 == source && (profile == "desktop" || ($1 != "gaming" && $1 != "desktop" && $1 != "backup")) { print $2 }' \
+		'$4 == source && ($1 == "common" || $1 == profile) { print $3 }' \
 		"$PACKAGES_CSV" | sort -u
+}
+
+collect_flatpaks() {
+	awk -F, -v profile="$PROFILE" \
+		'$1 == "common" || $1 == profile { print $3 "," $4 "," $5 }' \
+		"$FLATPAKS_CSV" | sort -u
+}
+
+flatpak_remote_url() {
+	local requested=$1
+	awk -F, -v requested="$requested" '$1 == requested { print $2; exit }' \
+		"$FLATPAK_REMOTES_CSV"
 }
 
 list_packages() {
 	{
 		collect_packages native
 		collect_packages aur
+		collect_flatpaks | cut -d, -f1
 	} | sort -u
+}
+
+check_flatpaks() {
+	local -a flatpaks=()
+	mapfile -t flatpaks < <(collect_flatpaks)
+	((${#flatpaks[@]})) || return 0
+
+	printf 'Aplicaciones Flatpak declaradas: %s\n' "${#flatpaks[@]}"
+	if ! command -v flatpak >/dev/null 2>&1; then
+		warn "Flatpak aún no está instalado; su paquete nativo se instalará antes que las aplicaciones."
+		return 0
+	fi
+
+	local spec app_id remote branch metadata
+	for spec in "${flatpaks[@]}"; do
+		IFS=, read -r app_id remote branch <<<"$spec"
+		if ! flatpak remotes --columns=name 2>/dev/null | grep -Fxq -- "$remote"; then
+			warn "El remoto $remote no está configurado; se añadirá para el usuario al aplicar."
+			continue
+		fi
+		if ! metadata="$(flatpak remote-info "$remote" "$app_id//$branch" 2>&1)"; then
+			printf '%s\n' "$metadata" >&2
+			die "Flatpak no disponible: $app_id//$branch en $remote."
+		fi
+		info "Flatpak disponible: $app_id//$branch ($remote)"
+	done
 }
 
 check_packages() {
@@ -151,6 +259,7 @@ check_packages() {
 
 	printf 'Paquetes nativos: %s\n' "${native_packages[*]}"
 	printf 'Paquetes AUR (revisión de Shelly): %s\n' "${aur_packages[*]}"
+	check_flatpaks
 }
 
 install_packages() {
@@ -188,8 +297,32 @@ install_packages() {
 	fi
 }
 
+install_flatpaks() {
+	local -a flatpaks=()
+	mapfile -t flatpaks < <(collect_flatpaks)
+	((${#flatpaks[@]})) || return 0
+	command -v flatpak >/dev/null 2>&1 || die "Flatpak no quedó instalado tras la transacción de paquetes nativos."
+
+	local spec app_id remote branch remote_url
+	for spec in "${flatpaks[@]}"; do
+		IFS=, read -r app_id remote branch <<<"$spec"
+		remote_url="$(flatpak_remote_url "$remote")"
+		[[ -n "$remote_url" ]] || die "No hay URL declarada para el remoto Flatpak $remote."
+		flatpak remote-add --user --if-not-exists "$remote" "$remote_url" ||
+			die "No se pudo configurar el remoto Flatpak $remote para el usuario."
+		if flatpak info --user "$app_id//$branch" >/dev/null 2>&1; then
+			info "Flatpak ya instalado para el usuario: $app_id//$branch"
+			continue
+		fi
+		info "Instalando Flatpak para el usuario: $app_id//$branch ($remote)"
+		flatpak install --user --noninteractive --assumeyes "$remote" "$app_id//$branch" ||
+			die "Falló la instalación Flatpak de $app_id//$branch."
+	done
+}
+
 check_dotfiles() {
 	validate_target_safety
+	report_legacy_targets
 	report_backup_targets
 	info "Simulación verbosa de Stow para $PROFILE (los destinos listados se respaldarían)..."
 	# --adopt solo permite modelar los destinos que el despliegue moverá al backup.
@@ -201,6 +334,19 @@ check_dotfiles() {
 is_private_env_path() {
 	local relative=$1
 	[[ "$relative" == .env* || "$relative" == */.env* ]]
+}
+
+legacy_dgpu_target_is_managed() {
+	local target="$HOME/.config/fish/functions/dgpu.fish" link
+	[[ -L "$target" ]] || return 1
+	link="$(readlink "$target")"
+	[[ "$link" == */fish/.config/fish/functions/dgpu.fish ]]
+}
+
+report_legacy_targets() {
+	legacy_dgpu_target_is_managed || return 0
+	printf 'BACKUP: %s (migración NVIDIA a desktop)\n' \
+		"$HOME/.config/fish/functions/dgpu.fish"
 }
 
 is_vendored_atlas_skill() {
@@ -281,6 +427,14 @@ backup_targets() {
 	local backed_up=0
 
 	validate_target_safety
+	if legacy_dgpu_target_is_managed; then
+		relative=.config/fish/functions/dgpu.fish
+		target="$HOME/$relative"
+		mkdir -p "$BACKUP_DIR/$(dirname "$relative")"
+		mv "$target" "$BACKUP_DIR/$relative"
+		printf '%s\n' "$relative" >>"$BACKUP_DIR/manifest.txt"
+		backed_up=1
+	fi
 
 	for module in "${PROFILE_MODULES[@]}"; do
 		while IFS= read -r -d '' source; do
@@ -359,12 +513,13 @@ main() {
 	fi
 
 	printf '\nPerfil: %s\nDestino dotfiles: %s\n' "$PROFILE" "$HOME"
-	printf '%s\n' 'Shelly modificará los paquetes globales; ese cambio no forma parte del backup de HOME.'
+	printf '%s\n' 'Shelly modificará paquetes globales y Flatpak gestionará aplicaciones del usuario; esos cambios no forman parte del backup de HOME.'
 	printf 'No se desplegará system-etc ni se cambiarán explícitamente GPU, arranque, Btrfs o zram. ¿Continuar? [s/N] '
 	read -r answer
 	[[ "$answer" =~ ^[sS]$ ]] || exit 0
 
 	install_packages
+	install_flatpaks
 	mkdir -p "$STATE_DIR"
 	backup_targets
 	deploy_dotfiles

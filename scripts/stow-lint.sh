@@ -3,16 +3,14 @@ set -euo pipefail
 
 repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 profile=${1:-}
-common=(codex fish fonts ghostty git hypr-common kanata mimeapps noctalia nvim qutebrowser shell starship vscode zellij)
 
-case "$profile" in
-workstation) packages=("${common[@]}" hypr-laptop) ;;
-desktop) packages=("${common[@]}" hypr-desktop gaming backup) ;;
-*)
+# shellcheck source=profiles.sh
+source "$repo_root/profiles.sh"
+if ! profile_is_valid "$profile"; then
 	printf 'Perfil no válido: %s\n' "$profile" >&2
 	exit 2
-	;;
-esac
+fi
+mapfile -t packages < <(profile_modules "$profile")
 
 runtime_root=${XDG_RUNTIME_DIR:-/tmp}
 target="$(mktemp -d --tmpdir="$runtime_root" dotfiles-stow-lint.XXXXXX)"
