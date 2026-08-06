@@ -18,6 +18,14 @@ end
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 fish_add_path -g "$PNPM_HOME"
 
+# Android SDK local: exporta rutas solo en equipos que lo tengan instalado.
+if test -d "$HOME/.local/share/android-sdk"
+    set -gx ANDROID_HOME "$HOME/.local/share/android-sdk"
+    set -gx ANDROID_SDK_ROOT "$ANDROID_HOME"
+    set -gx ANDROID_AVD_HOME "$HOME/.config/.android/avd"
+    fish_add_path -g "$ANDROID_HOME/platform-tools" "$ANDROID_HOME/cmdline-tools/latest/bin"
+end
+
 # direnv
 if command -q direnv
     direnv hook fish | source

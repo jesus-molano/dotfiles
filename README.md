@@ -456,6 +456,11 @@ de historial sin sincronización ni IA. Su filtro excluye comandos con
 `with-secrets`, `op`, contraseñas, tokens o claves. Tras desplegar esta rama,
 migra Atlas fuera de `fnm` en una transacción separada:
 
+Fish detecta el Android SDK local en `~/.local/share/android-sdk`, exporta
+`ANDROID_HOME`, `ANDROID_SDK_ROOT` y `ANDROID_AVD_HOME`, y añade
+`platform-tools` y `cmdline-tools/latest/bin` al `PATH`. El perfil `desktop`
+publica las mismas rutas Android en la sesión gráfica para Orca.
+
 ```bash
 just toolchain-check
 just toolchain-migrate
