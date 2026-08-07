@@ -68,6 +68,25 @@ Integración recomendada:
 - Faugus puede ejecutar el juego con UMU; añade el wrapper por título solo si
   su versión expone esa opción.
 
+Al iniciar un juego, `game-run` activa **No molestar** en Noctalia antes de
+ejecutar `game-performance`. Así ningún toast de notificación interfiere con el
+fullscreen o la captura del ratón. Al terminar, incluso si el juego devuelve un
+error, restaura exactamente el estado DND anterior. El perfil `performance` lo
+mantiene CachyOS durante toda la vida del proceso del juego y no depende del
+foco de la ventana.
+
+Para **Project Zomboid**, usa la ruta estable sin Gamescope ni variables extra:
+
+```bash
+game-run -- %command%
+```
+
+MangoHud es opcional para una sesión de medición:
+
+```bash
+game-run --hud -- %command%
+```
+
 MangoHud y Gamescope son herramientas optativas, no mejoras automáticas. Activa
 el HUD para medir y Gamescope cuando haga falta aislar resolución, escalado o
 frame pacing. No se fuerzan globalmente HDR, tearing, Wine Wayland, DXVK ni un

@@ -145,4 +145,27 @@ if [[ -n "$benchmark_name" ]]; then
 	printf 'Benchmark MangoHud: %s\n' "$benchmark_run"
 fi
 
-exec "${launch_command[@]}"
+dnd_restore=''
+# Invoked by the EXIT trap below.
+# shellcheck disable=SC2329
+restore_gaming_session() {
+	if [[ -n "$dnd_restore" ]]; then
+		noctalia msg notification-dnd-set "$dnd_restore" >/dev/null 2>&1 || true
+	fi
+}
+trap restore_gaming_session EXIT
+
+if command -v noctalia >/dev/null 2>&1; then
+	if dnd_status=$(noctalia msg notification-dnd-status 2>/dev/null) &&
+		[[ "$dnd_status" == off ]] &&
+		noctalia msg notification-dnd-set on >/dev/null 2>&1; then
+		dnd_restore=off
+	fi
+fi
+
+if "${launch_command[@]}"; then
+	game_status=0
+else
+	game_status=$?
+fi
+exit "$game_status"

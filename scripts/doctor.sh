@@ -453,6 +453,8 @@ if [[ "$mode" != live ]]; then
 	check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
 	check "Noctalia gaming desktop" noctalia config validate \
 		"$repo_root/gaming/.config/noctalia/gaming.toml"
+	check "Sesión gaming sin notificaciones" \
+		"$repo_root/scripts/tests/test_game_run_dnd.sh"
 	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
 	if [[ "$mode" == config ]]; then
