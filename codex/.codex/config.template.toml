@@ -26,3 +26,12 @@ notifications = ["agent-turn-complete", "approval-requested"]
 # [mcp_servers.component-atlas]
 # command = "/ruta/absoluta/al/node-estable"
 # args = ["/ruta/absoluta/project-atlas/packages/mcp/dist/index.js", "--profile", "core"]
+
+# Integración personal opcional. OAuth no se versiona. El servidor habitual es
+# técnicamente read-only; el de escritura permanece deshabilitado en la base.
+# [mcp_servers.linear]
+# url = "https://mcp.linear.app/mcp/readonly"
+#
+# [mcp_servers.linear-write]
+# url = "https://mcp.linear.app/mcp"
+# enabled = false

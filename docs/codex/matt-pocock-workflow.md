@@ -39,7 +39,8 @@ continúa mandando sobre comandos, riesgos y despliegue.
 | --- | --- | --- |
 | Aclarar una idea | `grill-with-docs` | Explícita; entrevista una decisión cada vez y devuelve un ledger con alcance, alternativas y aceptación. |
 | Formalizar alcance | `to-spec` | Explícita; produce una especificación verificable, sin publicarla por su cuenta. |
-| Dividir el trabajo | `to-tickets` | Explícita; devuelve tickets Markdown locales y dependencias, sin presuponer GitHub Issues o Linear. |
+| Dividir el trabajo | `to-tickets` | Explícita; devuelve primero tickets Markdown locales y dependencias. Una publicación posterior requiere `$linear`. |
+| Consultar o actualizar el tracker | `linear` | Explícita; lee primero y solo crea o modifica objetos tras previsualizar el lote y recibir autorización concreta. |
 | Ejecutar un cambio | `engineering-flow` / `implement-ticket` | Explícita; conserva cambios ajenos, valida y pide confirmación inmediatamente antes de cualquier commit. Nunca hace push, deploy o apply por iniciativa propia. |
 | Mantener calidad | `test-driven-development` y `systematic-debugging` | Disciplinas automáticas ya existentes, ampliadas con feedback de diseño y evidencia segura; no se instalaron duplicados `tdd` o `diagnosing-bugs`. |
 | Diseñar límites | `domain-modeling` / `codebase-design` | Explícitas; profundizan en vocabulario, invariantes, módulos y contratos solo cuando la complejidad lo justifica. |
@@ -52,15 +53,17 @@ corrección pequeña puede saltar directamente a TDD o diagnóstico; una idea
 ambigua debe resolver primero sus decisiones. La separación entre skills
 explícitas y automáticas evita que una conversación normal publique documentos
 o ejecute una cadena completa sin que se solicite. El diseño, la revisión doble y
-las notas de continuidad también son opt-in; TDD, diagnóstico e investigación
-primaria conservan activación contextual porque no publican ni despliegan estado.
+las notas de continuidad y Linear también son opt-in; TDD, diagnóstico e
+investigación primaria conservan activación contextual porque no publican ni
+despliegan estado.
 
 ## Qué se omitió y por qué
 
 - `setup-matt-pocock-skills`, `ask-matt` y el router completo: esta configuración
   ya tiene alcance global, reglas locales y un flujo pequeño conocido.
-- `triage` e integraciones de tracker: la decisión es empezar con Markdown local;
-  no se inventan etiquetas, permisos ni estados de GitHub/Linear.
+- `triage` autónomo y automatizaciones masivas del tracker: Linear se integra de
+  forma estrecha y explícita, pero no se inventan etiquetas, permisos, equipos ni
+  estados, ni se publica un borrador sin una confirmación inmediatamente previa.
 - `code-review` literal: se conserva la idea de dos ejes, pero se adapta a una
   skill de revisión y dos agentes Codex de solo lectura.
 - Copias nuevas de `tdd` y `diagnosing-bugs`: se fusionaron las ideas útiles en
@@ -76,6 +79,60 @@ La existencia de una carpeta no demuestra que una skill esté lista: debe tener
 metadatos válidos, instrucciones terminadas, una política de invocación adecuada
 y una prueba de consumo representativa. El repositorio lo comprueba con
 `just codex-skills-check`.
+
+## Linear: asociación sin automatismo peligroso
+
+La skill local `$linear` adapta la
+[`linear` oficial de OpenAI](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/linear)
+fijada al commit `49f948faa9258a0c61caceaf225e179651397431` y conserva su
+licencia Apache-2.0. La conexión usa el
+[MCP oficial de Linear](https://linear.app/docs/mcp) con OAuth; no hay tokens ni
+identificadores del workspace en el repositorio.
+
+El servidor `linear` usa `/mcp/readonly`, de modo que una sesión normal carece de
+herramientas de mutación. `linear-write` usa `/mcp` porque el objetivo incluye
+publicar tickets autorizados, pero queda deshabilitado en la configuración base.
+Cuando se activa expresamente para una sesión, el gate de la skill vuelve a ser
+una salvaguarda de procedimiento y por eso su alcance debe limitarse al lote ya
+revisado.
+
+La configuración personal se añade al `config.toml` vivo, que Orca también usa:
+
+```bash
+codex mcp add linear --url https://mcp.linear.app/mcp/readonly
+codex mcp login linear
+codex mcp add linear-write --url https://mcp.linear.app/mcp
+codex mcp login linear-write
+codex mcp list
+```
+
+Después del alta OAuth, el bloque `[mcp_servers.linear-write]` se deja con
+`enabled = false`. Hay que iniciar una sesión nueva de Codex para que descubra el
+MCP y la skill desplegada. `just codex-config-sync` conserva las secciones
+`mcp_servers.*`; `just codex-check` ejecuta una regresión que cubre expresamente
+los dos servidores Linear y Component Atlas. `config.template.toml` contiene
+solo un ejemplo comentado, no credenciales ni una instalación automática.
+
+El flujo efectivo separa permisos:
+
+1. `$to-tickets` genera y permite revisar borradores locales.
+2. `$linear` consulta el equipo, proyecto, estados y posibles duplicados vivos.
+3. La sesión de lectura prepara un preview provisional, pero no pide ni conserva
+   la autorización final.
+4. Para publicar se abre una sesión efímeramente capaz de escribir:
+   `codex -c 'mcp_servers.linear-write.enabled=true'`. El override no persiste.
+5. La sesión nueva recibe el preview, relee los objetos, reconcilia cambios,
+   muestra el lote actualizado y pide una confirmación fresca.
+6. `$linear` crea o actualiza solo el lote recién confirmado, relee los IDs
+   resultantes y comunica cualquier éxito parcial.
+7. `$implement-ticket JRL-123` puede leer ese issue como contrato, pero no cambia
+   su estado ni publica comentarios por haber implementado, validado o hecho
+   commit. Esas mutaciones requieren otra autorización.
+
+Si está habilitada la
+[integración GitHub de Linear](https://linear.app/docs/github-integration), incluir
+la clave del issue en la rama o en el título de la PR permite asociarlos. Esto no
+autoriza crear rama, commit, push o PR, y el vínculo debe comprobarse después.
 
 ## Actualización, caché y trazabilidad
 
@@ -121,7 +178,8 @@ fuente primaria equivalente.
 3. Lee siempre el `AGENTS.md` aplicable antes de escribir y conserva sus
    validaciones como autoridad.
 4. Usa `$to-spec` y `$to-tickets` solo cuando el tamaño lo justifique; los
-   borradores permanecen locales salvo autorización expresa.
+   borradores permanecen locales. Invoca `$linear` para consultar o preparar su
+   publicación y confirma el lote exacto inmediatamente antes de escribir.
 5. En cambios grandes, invoca explícitamente `$domain-modeling`,
    `$codebase-design` o `$spec-and-standards-review` solo para la fase que lo
    necesite.

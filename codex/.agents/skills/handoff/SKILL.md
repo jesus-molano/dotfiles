@@ -11,6 +11,8 @@ Lead with the objective, scope, authority boundaries, current status, and
 definition of done. Include decisions and rationale; files and relevant paths;
 completed work; exact validation run and outcomes; remaining steps in order;
 blockers and open questions; risks, rollback, and external state changes.
+When Linear is in scope, include only verified issue IDs or links and their
+current status, plus any proposed tracker action that still needs authorization.
 Separate verified facts from assumptions and questions. Point to canonical
 artifacts rather than pasting long logs, and omit all secrets or environment-file
 contents.

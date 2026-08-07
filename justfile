@@ -137,9 +137,14 @@ atlas-sync:
 codex-skills-check:
     "{{ dotfiles_dir }}/scripts/check-codex-skills.py"
 
-# Comprueba skills y preferencias duraderas sin leer ni reemplazar hooks o MCP.
+# Ejecuta las regresiones del tooling Codex sin generar bytecode en el repositorio.
+codex-tests:
+    env PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s "{{ dotfiles_dir }}/scripts/tests" -p 'test_*.py'
+
+# Comprueba skills, regresiones y preferencias sin reemplazar hooks o MCP.
 codex-check:
     @just --justfile "{{ justfile() }}" codex-skills-check
+    @just --justfile "{{ justfile() }}" codex-tests
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
 

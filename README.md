@@ -479,15 +479,18 @@ con `git dft`, `git dshow`, `git dlog` o `git difftool`.
 
 ### Codex y Orca
 
-El repositorio añade revisores especializados de solo lectura, la skill local
-`$cachyos-host-audit` y un flujo componible de entrevista, especificación,
-tickets, diseño, TDD, diagnóstico, implementación, revisión e intercambio de
-contexto. También incorpora reglas de auditoría estrechas y notificaciones que
-nunca incluyen el prompt ni la respuesta. La configuración viva se fusiona para
-conservar trusts, hooks de Orca y MCP:
+El repositorio añade revisores especializados de solo lectura, las skills locales
+`$cachyos-host-audit` y `$linear`, y un flujo componible de entrevista,
+especificación, tickets, diseño, TDD, diagnóstico, implementación, revisión e
+intercambio de contexto. Linear es opt-in: consulta primero y exige autorización
+inmediatamente antes de cualquier escritura. También incorpora reglas de
+auditoría estrechas y notificaciones que nunca incluyen el prompt ni la
+respuesta. La configuración viva se fusiona para conservar trusts, hooks de Orca
+y MCP:
 
 ```bash
 just codex-skills-check
+just codex-tests
 just codex-check
 just codex-config-sync
 just codex-upstream-check
@@ -496,13 +499,33 @@ just codex-clean-rules
 ```
 
 `just codex-skills-check` valida sin escribir la estructura y los metadatos de
-las skills y agentes versionados. `just codex-check` añade la comprobación de
-configuración y reglas gestionadas.
+las skills y agentes versionados. `just codex-tests` ejecuta las regresiones del
+tooling sin dejar `__pycache__`; `just codex-check` reúne ambas comprobaciones y
+añade la configuración y las reglas gestionadas.
 
 `just codex-config-sync` muestra el destino de `config.toml` y requiere escribir
 `APLICAR`; con backup, solo sincroniza `notify`, `features.memories`, las
 preferencias de agentes y las notificaciones TUI gestionadas. Conserva hooks,
 trusts, MCP y las demás claves existentes.
+
+Linear se conecta personalmente, sin versionar OAuth ni sustituir la
+configuración que mantiene Orca. El servidor habitual es técnicamente de solo
+lectura y el servidor capaz de escribir queda deshabilitado:
+
+```bash
+codex mcp add linear --url https://mcp.linear.app/mcp/readonly
+codex mcp login linear
+codex mcp add linear-write --url https://mcp.linear.app/mcp
+codex mcp login linear-write
+# En ~/.codex/config.toml: [mcp_servers.linear-write] enabled = false
+```
+
+Tras autenticar, abre una sesión nueva de Codex. `$to-tickets` sigue creando
+borradores locales y `$implement-ticket JRL-123` puede leer un issue como
+contrato sin comentarlo ni cambiarlo. Prepara el borrador del lote en lectura y
+abre `codex -c 'mcp_servers.linear-write.enabled=true'`; esa sesión relee Linear,
+muestra el preview actualizado y pide una confirmación nueva justo antes de
+escribir. El permiso de capacidad no persiste ni la autorización cruza sesiones.
 
 El upstream se mantiene separado: `just codex-upstream-check` valida sin escribir
 el caché existente y `just codex-upstream-refresh` actualiza, sin ejecutar su
@@ -522,9 +545,9 @@ especificación, tickets, implementación, revisión y handoff— consulta
 [el workflow de Codex](docs/codex/matt-pocock-workflow.md). La adopción es local
 y revisable: solo el caché de consulta sigue el `main` actual cuando se invoca
 `just codex-upstream-refresh`; las skills adaptadas nunca se sobrescriben
-automáticamente y no se presupone un tracker. Para repetir la evaluación desde
-cero en otro equipo o repositorio, usa el
-[prompt de auditoría de solo lectura](docs/prompts/audit-matt-pocock-codex.md).
+automáticamente. Linear es una integración opcional y explícita, no un requisito
+del flujo. Para repetir la evaluación desde cero en otro equipo o repositorio,
+usa el [prompt de auditoría de solo lectura](docs/prompts/audit-matt-pocock-codex.md).
 
 Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
 radar upstream y auditoría mensual Restic— nacen desactivadas. Revísalas con
