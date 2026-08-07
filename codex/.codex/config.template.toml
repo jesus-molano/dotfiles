@@ -3,11 +3,16 @@
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 approval_policy = "on-request"
+approvals_reviewer = "user"
 sandbox_mode = "workspace-write"
 notify = ["codex-notify"]
 
 [features]
+hooks = true
 memories = true
+
+[sandbox_workspace_write]
+network_access = false
 
 [agents]
 enabled = true

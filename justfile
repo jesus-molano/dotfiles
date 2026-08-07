@@ -183,14 +183,6 @@ codex-check:
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
 
-# Comprueba el caché de referencia de Matt Pocock sin escribir.
-codex-upstream-check:
-    "{{ dotfiles_dir }}/scripts/sync-matt-pocock-skills.py" --check
-
-# Actualiza solo el caché de referencia upstream; no toca la configuración ni las skills locales.
-codex-upstream-refresh:
-    "{{ dotfiles_dir }}/scripts/sync-matt-pocock-skills.py" --apply
-
 # Sincroniza solo las preferencias gestionadas de Codex con confirmación y backup.
 codex-config-sync:
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --apply

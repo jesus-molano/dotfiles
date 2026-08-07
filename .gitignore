@@ -15,6 +15,7 @@ codex/.codex/*
 !codex/.codex/config.template.toml
 !codex/.codex/fast.config.toml
 !codex/.codex/deep.config.toml
+!codex/.codex/ultra.config.toml
 !codex/.codex/agents/
 codex/.codex/agents/*
 !codex/.codex/agents/reviewer-web.toml
@@ -41,3 +42,7 @@ codex/.codex/agents/*
 *.swp
 *.swo
 *~
+
+# Python bytecode and interpreter caches
+__pycache__/
+*.pyc

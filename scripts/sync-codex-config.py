@@ -14,10 +14,21 @@ from pathlib import Path
 
 import tomllib
 
-DESIRED_TOP = {"notify": '["codex-notify"]'}
+DESIRED_TOP = {
+    "model": '"gpt-5.6-sol"',
+    "model_reasoning_effort": '"medium"',
+    "approval_policy": '"on-request"',
+    "approvals_reviewer": '"user"',
+    "sandbox_mode": '"workspace-write"',
+    "notify": '["codex-notify"]',
+}
 DESIRED_SECTIONS = {
     "features": {
+        "hooks": "true",
         "memories": "true",
+    },
+    "sandbox_workspace_write": {
+        "network_access": "false",
     },
     "agents": {
         "enabled": "true",
@@ -26,6 +37,7 @@ DESIRED_SECTIONS = {
         "default_subagent_reasoning_effort": '"medium"',
     },
     "tui": {
+        "status_line": '["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]',
         "notifications": '["agent-turn-complete", "approval-requested"]',
     },
 }
@@ -49,16 +61,18 @@ def parse_args() -> argparse.Namespace:
 
 
 def section_bounds(lines: list[str], name: str | None) -> tuple[int, int] | None:
-    table = re.compile(r"^\s*\[([^]]+)]\s*(?:#.*)?$")
+    table = re.compile(
+        r"^\s*(?:\[\[([^\[\]]+)\]\]|\[([^\[\]]+)\])\s*(?:#.*)?$"
+    )
     starts = [
-        (index, match.group(1))
+        (index, match.group(1) or match.group(2), match.group(1) is not None)
         for index, line in enumerate(lines)
         if (match := table.match(line))
     ]
     if name is None:
         return 0, starts[0][0] if starts else len(lines)
-    for position, (start, found_name) in enumerate(starts):
-        if found_name == name:
+    for position, (start, found_name, is_array) in enumerate(starts):
+        if found_name == name and not is_array:
             end = starts[position + 1][0] if position + 1 < len(starts) else len(lines)
             return start + 1, end
     return None
@@ -97,13 +111,22 @@ def render(original: str) -> str:
         for key, value in values.items():
             set_key(lines, section, key, value)
     rendered = "".join(lines)
-    tomllib.loads(rendered)
+    document = tomllib.loads(rendered)
+    if not desired_state(document):
+        raise ValueError("la configuración renderizada no contiene la política gestionada")
     return rendered
 
 
 def desired_state(document: dict) -> bool:
     return (
-        document.get("notify") == ["codex-notify"]
+        document.get("model") == "gpt-5.6-sol"
+        and document.get("model_reasoning_effort") == "medium"
+        and document.get("approval_policy") == "on-request"
+        and document.get("approvals_reviewer") == "user"
+        and document.get("sandbox_mode") == "workspace-write"
+        and document.get("notify") == ["codex-notify"]
+        and document.get("sandbox_workspace_write", {}).get("network_access") is False
+        and document.get("features", {}).get("hooks") is True
         and document.get("features", {}).get("memories") is True
         and document.get("agents", {}).get("enabled") is True
         and document.get("agents", {}).get("max_concurrent_threads_per_session") == 3
@@ -112,6 +135,8 @@ def desired_state(document: dict) -> bool:
         == "medium"
         and document.get("tui", {}).get("notifications")
         == ["agent-turn-complete", "approval-requested"]
+        and document.get("tui", {}).get("status_line")
+        == ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]
     )
 
 

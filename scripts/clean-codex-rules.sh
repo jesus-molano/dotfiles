@@ -14,7 +14,13 @@ rules_file="${CODEX_HOME:-$HOME/.codex}/rules/default.rules"
 	exit 1
 }
 
-runtime_root=${XDG_RUNTIME_DIR:-/tmp}
+runtime_root=${XDG_RUNTIME_DIR:-}
+if [[ -z "$runtime_root" || ! -d "$runtime_root" || ! -w "$runtime_root" ]]; then
+	runtime_root=${TMPDIR:-/tmp}
+fi
+if [[ ! -d "$runtime_root" || ! -w "$runtime_root" ]]; then
+	runtime_root=/tmp
+fi
 filtered="$(mktemp --tmpdir="$runtime_root" codex-rules.XXXXXX)"
 trap 'rm -f -- "$filtered"' EXIT
 
