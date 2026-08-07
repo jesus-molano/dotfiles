@@ -514,6 +514,13 @@ espera hasta veinte segundos a que todas las salidas externas activas aparezcan
 en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
 por una carrera de detección durante el arranque.
 
+En el perfil `desktop`, `ensure-main-hdmi-audio` selecciona al iniciar el primer
+perfil HDMI de la NVIDIA (`hdmi-stereo`), que corresponde al Philips principal
+de la derecha. Ese monitor aporta el jack de audio; el perfil `hdmi-stereo-extra1`
+del Philips izquierdo no se usa como salida predeterminada. El helper espera a
+PipeWire durante un máximo de veinte segundos y mueve también las aplicaciones
+que hayan abierto un stream antes de que aparezca el monitor.
+
 ## Validación
 
 ```bash
