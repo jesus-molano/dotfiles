@@ -40,6 +40,13 @@ check target:
         }
     done
 
+    for package in "${packages[@]}"; do
+        if [[ "$package" == codex ]]; then
+            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
+            break
+        fi
+    done
+
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --adopt --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
 
@@ -78,10 +85,18 @@ apply target:
         }
     done
 
+    if [[ "$target" == codex ]]; then
+        "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
+    fi
+
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+
+    if [[ "$target" == codex ]]; then
+        "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --apply
+    fi
 
 # Retira enlaces de un perfil o módulo permitido; nunca acepta una llamada vacía.
 remove target:

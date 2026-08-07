@@ -39,8 +39,8 @@ continúa mandando sobre comandos, riesgos y despliegue.
 | --- | --- | --- |
 | Aclarar una idea | `grill-with-docs` | Explícita; entrevista una decisión cada vez y devuelve un ledger con alcance, alternativas y aceptación. |
 | Formalizar alcance | `to-spec` | Explícita; produce una especificación verificable, sin publicarla por su cuenta. |
-| Dividir el trabajo | `to-tickets` | Explícita; devuelve primero tickets Markdown locales y dependencias. Una publicación posterior requiere `$linear`. |
-| Consultar o actualizar el tracker | `linear` | Explícita; lee primero y solo crea o modifica objetos tras previsualizar el lote y recibir autorización concreta. |
+| Dividir el trabajo | `to-tickets` | Explícita; devuelve primero tickets Markdown locales y dependencias. Una publicación posterior requiere `$linear-workflow`. |
+| Consultar o actualizar el tracker | `linear-workflow` | Explícita; lee primero y solo crea o modifica objetos tras previsualizar el lote y recibir autorización concreta. |
 | Ejecutar un cambio | `engineering-flow` / `implement-ticket` | Explícita; conserva cambios ajenos, valida y pide confirmación inmediatamente antes de cualquier commit. Nunca hace push, deploy o apply por iniciativa propia. |
 | Mantener calidad | `test-driven-development` y `systematic-debugging` | Disciplinas automáticas ya existentes, ampliadas con feedback de diseño y evidencia segura; no se instalaron duplicados `tdd` o `diagnosing-bugs`. |
 | Diseñar límites | `domain-modeling` / `codebase-design` | Explícitas; profundizan en vocabulario, invariantes, módulos y contratos solo cuando la complejidad lo justifica. |
@@ -82,7 +82,8 @@ y una prueba de consumo representativa. El repositorio lo comprueba con
 
 ## Linear: asociación sin automatismo peligroso
 
-La skill local `$linear` adapta la
+La skill local `$linear-workflow` evita colisionar con otras integraciones de
+nombre `$linear` y adapta la
 [`linear` oficial de OpenAI](https://github.com/openai/skills/tree/49f948faa9258a0c61caceaf225e179651397431/skills/.curated/linear)
 fijada al commit `49f948faa9258a0c61caceaf225e179651397431` y conserva su
 licencia Apache-2.0. La conexión usa el
@@ -116,14 +117,15 @@ solo un ejemplo comentado, no credenciales ni una instalación automática.
 El flujo efectivo separa permisos:
 
 1. `$to-tickets` genera y permite revisar borradores locales.
-2. `$linear` consulta el equipo, proyecto, estados y posibles duplicados vivos.
+2. `$linear-workflow` consulta el equipo, proyecto, estados y posibles duplicados
+   vivos.
 3. La sesión de lectura prepara un preview provisional, pero no pide ni conserva
    la autorización final.
 4. Para publicar se abre una sesión efímeramente capaz de escribir:
    `codex -c 'mcp_servers.linear-write.enabled=true'`. El override no persiste.
 5. La sesión nueva recibe el preview, relee los objetos, reconcilia cambios,
    muestra el lote actualizado y pide una confirmación fresca.
-6. `$linear` crea o actualiza solo el lote recién confirmado, relee los IDs
+6. `$linear-workflow` crea o actualiza solo el lote recién confirmado, relee los IDs
    resultantes y comunica cualquier éxito parcial.
 7. `$implement-ticket JRL-123` puede leer ese issue como contrato, pero no cambia
    su estado ni publica comentarios por haber implementado, validado o hecho
@@ -178,8 +180,9 @@ fuente primaria equivalente.
 3. Lee siempre el `AGENTS.md` aplicable antes de escribir y conserva sus
    validaciones como autoridad.
 4. Usa `$to-spec` y `$to-tickets` solo cuando el tamaño lo justifique; los
-   borradores permanecen locales. Invoca `$linear` para consultar o preparar su
-   publicación y confirma el lote exacto inmediatamente antes de escribir.
+   borradores permanecen locales. Invoca `$linear-workflow` para consultar o
+   preparar su publicación y confirma el lote exacto inmediatamente antes de
+   escribir.
 5. En cambios grandes, invoca explícitamente `$domain-modeling`,
    `$codebase-design` o `$spec-and-standards-review` solo para la fase que lo
    necesite.

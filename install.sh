@@ -331,6 +331,14 @@ check_dotfiles() {
 		--dir "$DOTFILES_DIR" --target "$HOME" "${PROFILE_MODULES[@]}"
 }
 
+profile_has_module() {
+	local requested=$1 module
+	for module in "${PROFILE_MODULES[@]}"; do
+		[[ "$module" != "$requested" ]] || return 0
+	done
+	return 1
+}
+
 is_private_env_path() {
 	local relative=$1
 	[[ "$relative" == .env* || "$relative" == */.env* ]]
@@ -491,6 +499,9 @@ deploy_dotfiles() {
 		restore_backup
 		die "Stow falló y se intentó restaurar la copia previa."
 	fi
+	if profile_has_module codex; then
+		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply
+	fi
 	ok "Dotfiles desplegados ($PROFILE): ${PROFILE_MODULES[*]}"
 }
 
@@ -505,6 +516,9 @@ main() {
 	check_prerequisites
 	validate_profile_modules
 	check_packages
+	if profile_has_module codex; then
+		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
+	fi
 
 	if ((CHECK_ONLY)); then
 		check_dotfiles

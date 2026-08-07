@@ -9,7 +9,7 @@ description: Implement one software ticket safely by confirming its contract, ma
 2. Locate the owning code path and existing tests; resolve material ambiguity before implementation.
 3. Make one coherent change. For behavior changes, use `$test-driven-development`; for failures, use `$systematic-debugging`.
 4. Verify every acceptance criterion with focused checks, then required project checks. Inspect the final diff for scope drift.
-5. Report changed files, evidence, migration/rollout effects, and follow-ups. Use `$linear` for any proposed tracker mutation and pass its preview and authorization gate.
+5. Report changed files, evidence, migration/rollout effects, and follow-ups. Use `$linear-workflow` for any proposed tracker mutation and pass its preview and authorization gate.
 
 Do not fold unrelated cleanup into the ticket. Preserve other worktree changes
 and never include secrets in logs or summaries. After validation, show the

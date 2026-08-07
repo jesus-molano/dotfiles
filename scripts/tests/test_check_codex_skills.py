@@ -95,7 +95,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_accepts_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "linear")
+            skills, agents, skill = roots(Path(temporary), "linear-workflow")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)

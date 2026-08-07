@@ -480,10 +480,10 @@ con `git dft`, `git dshow`, `git dlog` o `git difftool`.
 ### Codex y Orca
 
 El repositorio añade revisores especializados de solo lectura, las skills locales
-`$cachyos-host-audit` y `$linear`, y un flujo componible de entrevista,
+`$cachyos-host-audit` y `$linear-workflow`, y un flujo componible de entrevista,
 especificación, tickets, diseño, TDD, diagnóstico, implementación, revisión e
-intercambio de contexto. Linear es opt-in: consulta primero y exige autorización
-inmediatamente antes de cualquier escritura. También incorpora reglas de
+intercambio de contexto. `$linear-workflow` es opt-in: consulta primero y exige
+autorización inmediatamente antes de cualquier escritura. También incorpora reglas de
 auditoría estrechas y notificaciones que nunca incluyen el prompt ni la
 respuesta. La configuración viva se fusiona para conservar trusts, hooks de Orca
 y MCP:
@@ -522,10 +522,11 @@ codex mcp login linear-write
 
 Tras autenticar, abre una sesión nueva de Codex. `$to-tickets` sigue creando
 borradores locales y `$implement-ticket JRL-123` puede leer un issue como
-contrato sin comentarlo ni cambiarlo. Prepara el borrador del lote en lectura y
-abre `codex -c 'mcp_servers.linear-write.enabled=true'`; esa sesión relee Linear,
-muestra el preview actualizado y pide una confirmación nueva justo antes de
-escribir. El permiso de capacidad no persiste ni la autorización cruza sesiones.
+contrato sin comentarlo ni cambiarlo. Prepara el borrador del lote en lectura con
+`$linear-workflow` y abre `codex -c 'mcp_servers.linear-write.enabled=true'`; esa
+sesión relee Linear, muestra el preview actualizado y pide una confirmación nueva
+justo antes de escribir. El permiso de capacidad no persiste ni la autorización
+cruza sesiones.
 
 El upstream se mantiene separado: `just codex-upstream-check` valida sin escribir
 el caché existente y `just codex-upstream-refresh` actualiza, sin ejecutar su
@@ -535,6 +536,11 @@ backup recuperable del caché anterior. Ninguno de los dos comandos instala el
 upstream como skills o plugins, sustituye las adaptaciones locales ni modifica la
 configuración de Codex. `just codex-clean-rules` es la acción independiente que
 retira reglas temporales detectadas y también conserva una copia previa.
+
+Al aplicar el módulo `codex`, la migración de `$linear` a `$linear-workflow`
+retira únicamente los cuatro enlaces heredados que todavía apunten a la fuente
+canónica antigua y los mueve a una copia reversible bajo el estado de dotfiles.
+Si encuentra contenido ajeno o inesperado, lo conserva y detiene la operación.
 
 La sincronización de configuración activa `features.memories`. Es memoria
 auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica

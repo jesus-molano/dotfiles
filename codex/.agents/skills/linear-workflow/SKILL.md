@@ -1,9 +1,9 @@
 ---
-name: linear
-description: Read Linear context and, with explicit authorization, create or update issues, comments, and workflow fields through the official Linear MCP. Use when work must be associated with Linear.
+name: linear-workflow
+description: Read Linear context and, with explicit authorization, create or update issues, comments, and workflow fields through the official Linear MCP. Use when work must be associated with Linear through the local safety workflow rather than another Linear integration.
 ---
 
-# Linear
+# Linear Workflow
 
 Use the official Linear MCP as the tracker boundary. The normal `linear` server
 must use the `/mcp/readonly` endpoint. A separate `linear-write` server may use
@@ -74,8 +74,8 @@ codex -c 'mcp_servers.linear-write.enabled=true'
 ```
 
 The override does not persist. The opening prompt must explicitly invoke
-`$linear` and carry the draft preview, but not claim that a prior session's
-authorization remains valid.
+`$linear-workflow` and carry the draft preview, but not claim that a prior
+session's authorization remains valid.
 
 This local adaptation is based on an official OpenAI skill. See
 [source and modification notice](SOURCE.md) and the bundled

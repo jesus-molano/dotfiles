@@ -15,7 +15,7 @@ every unresolved decision. Do not create duplicate tickets for one cohesive
 change or hide cross-ticket coupling.
 
 Always produce and review local drafts first. Publishing to Linear is a separate
-phase owned by explicit `$linear`: map the approved drafts to a verified team,
+phase owned by explicit `$linear-workflow`: map the approved drafts to a verified team,
 project, statuses, labels, and other live fields, preview the exact batch, then
 obtain authorization immediately before the tracker writes. Decomposing a spec
 never authorizes creating its tickets.

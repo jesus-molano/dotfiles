@@ -1,0 +1,6 @@
+interface:
+  display_name: "Linear Workflow"
+  short_description: "Consulta y actualiza Linear con autorización"
+  default_prompt: "Usa $linear-workflow para consultar Linear o preparar una actualización explícitamente autorizada."
+policy:
+  allow_implicit_invocation: false

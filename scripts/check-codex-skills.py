@@ -22,7 +22,7 @@ EXPLICIT_SKILLS = {
     "grill-with-docs",
     "handoff",
     "implement-ticket",
-    "linear",
+    "linear-workflow",
     "spec-and-standards-review",
     "to-spec",
     "to-tickets",
