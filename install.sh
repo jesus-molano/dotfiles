@@ -357,18 +357,16 @@ report_legacy_targets() {
 		"$HOME/.config/fish/functions/dgpu.fish"
 }
 
-is_vendored_atlas_skill() {
+is_copied_or_linked_codex_skill() {
 	local relative=$1
-	[[ "$relative" == .agents/skills/frontend-task/* ||
-		"$relative" == .agents/skills/reuse-first/* ||
-		"$relative" == .agents/skills/visual-direction/* ]]
+	[[ "$relative" == .agents/skills/* ]]
 }
 
 is_stow_ignored_path() {
 	local module=$1 relative=$2
 	is_private_env_path "$relative" && return 0
 	[[ "${relative##*/}" == .stow-local-ignore ]] && return 0
-	[[ "$module" == codex ]] && is_vendored_atlas_skill "$relative" && return 0
+	[[ "$module" == codex ]] && is_copied_or_linked_codex_skill "$relative" && return 0
 	[[ "$module" == shell && "$relative" == .local/bin/btrfs-snapshots ]] && return 0
 	return 1
 }
@@ -501,6 +499,7 @@ deploy_dotfiles() {
 	fi
 	if profile_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply
+		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --apply
 	fi
 	ok "Dotfiles desplegados ($PROFILE): ${PROFILE_MODULES[*]}"
 }
@@ -518,6 +517,7 @@ main() {
 	check_packages
 	if profile_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
+		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --check
 	fi
 
 	if ((CHECK_ONLY)); then

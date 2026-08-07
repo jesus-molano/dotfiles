@@ -537,10 +537,13 @@ upstream como skills o plugins, sustituye las adaptaciones locales ni modifica l
 configuración de Codex. `just codex-clean-rules` es la acción independiente que
 retira reglas temporales detectadas y también conserva una copia previa.
 
-Al aplicar el módulo `codex`, la migración de `$linear` a `$linear-workflow`
-retira únicamente los cuatro enlaces heredados que todavía apunten a la fuente
-canónica antigua y los mueve a una copia reversible bajo el estado de dotfiles.
-Si encuentra contenido ajeno o inesperado, lo conserva y detiene la operación.
+Al aplicar el módulo `codex`, las skills locales se despliegan como enlaces de
+carpeta, el formato enlazado que Codex descubre oficialmente. La migración de
+`$linear` a `$linear-workflow` retira únicamente los cuatro enlaces heredados que
+todavía apunten a la fuente canónica antigua. Cada árbol sustituido se mueve a
+una copia reversible bajo el estado de dotfiles; si aparece contenido ajeno o
+inesperado, se conserva y la operación se detiene. Las tres skills de Atlas
+continúan siendo copias reales gestionadas por `just atlas-sync`.
 
 La sincronización de configuración activa `features.memories`. Es memoria
 auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica

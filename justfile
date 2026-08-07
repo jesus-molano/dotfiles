@@ -43,6 +43,7 @@ check target:
     for package in "${packages[@]}"; do
         if [[ "$package" == codex ]]; then
             "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
+            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
             break
         fi
     done
@@ -87,6 +88,7 @@ apply target:
 
     if [[ "$target" == codex ]]; then
         "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
+        "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
     fi
 
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
@@ -96,6 +98,7 @@ apply target:
 
     if [[ "$target" == codex ]]; then
         "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --apply
+        "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --apply
     fi
 
 # Retira enlaces de un perfil o módulo permitido; nunca acepta una llamada vacía.
@@ -115,10 +118,26 @@ remove target:
         exit 2
     fi
 
+    for package in "${packages[@]}"; do
+        if [[ "$package" == codex ]]; then
+            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
+            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check-remove
+            break
+        fi
+    done
+
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+
+    for package in "${packages[@]}"; do
+        if [[ "$package" == codex ]]; then
+            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --apply
+            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --remove
+            break
+        fi
+    done
 
 # Muestra de solo lectura qué cambiaría en el perfil indicado.
 status profile:
@@ -160,6 +179,7 @@ codex-tests:
 codex-check:
     @just --justfile "{{ justfile() }}" codex-skills-check
     @just --justfile "{{ justfile() }}" codex-tests
+    "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
 

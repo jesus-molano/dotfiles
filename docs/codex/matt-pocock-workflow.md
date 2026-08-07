@@ -21,7 +21,9 @@ archivos locales versionados: el caché actualizado nunca las sobrescribe.
   [Instalación y compatibilidad](https://github.com/mattpocock/skills#installation-30-second-setup)
 - Codex descubre skills personales en `$HOME/.agents/skills`, skills de equipo en
   `.agents/skills`, y usa `agents/openai.yaml` para presentación y política de
-  invocación. Las instrucciones duraderas y obligatorias pertenecen a
+  invocación. El despliegue usa enlaces de carpeta completos, el tipo de enlace
+  que la documentación oficial declara compatible con el escaneo. Las
+  instrucciones duraderas y obligatorias pertenecen a
   `AGENTS.md`; una regla más cercana al código prevalece.
   [Skills de Codex](https://learn.chatgpt.com/docs/build-skills),
   [AGENTS.md](https://learn.chatgpt.com/docs/agent-configuration/agents-md)
