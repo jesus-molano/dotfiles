@@ -14,9 +14,11 @@ from pathlib import Path
 
 import tomllib
 
-DESIRED_TOP = {
+DEFAULT_TOP = {
     "model": '"gpt-5.6-sol"',
     "model_reasoning_effort": '"medium"',
+}
+DESIRED_TOP = {
     "approval_policy": '"on-request"',
     "approvals_reviewer": '"user"',
     "sandbox_mode": '"workspace-write"',
@@ -105,6 +107,10 @@ def render(original: str) -> str:
     lines = original.splitlines(keepends=True)
     if original and not original.endswith("\n"):
         lines[-1] += "\n"
+    current = tomllib.loads(original) if original else {}
+    for key, value in DEFAULT_TOP.items():
+        if key not in current:
+            set_key(lines, None, key, value)
     for key, value in DESIRED_TOP.items():
         set_key(lines, None, key, value)
     for section, values in DESIRED_SECTIONS.items():
@@ -119,9 +125,7 @@ def render(original: str) -> str:
 
 def desired_state(document: dict) -> bool:
     return (
-        document.get("model") == "gpt-5.6-sol"
-        and document.get("model_reasoning_effort") == "medium"
-        and document.get("approval_policy") == "on-request"
+        document.get("approval_policy") == "on-request"
         and document.get("approvals_reviewer") == "user"
         and document.get("sandbox_mode") == "workspace-write"
         and document.get("notify") == ["codex-notify"]

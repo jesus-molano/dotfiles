@@ -13,12 +13,18 @@ SYNC = runpy.run_path(SCRIPT, run_name="sync_codex_config_test")
 
 
 class SyncCodexConfigTest(unittest.TestCase):
-    def test_render_sets_complete_managed_policy(self) -> None:
+    def test_render_sets_model_defaults_when_missing(self) -> None:
+        document = tomllib.loads(SYNC["render"](""))
+
+        self.assertEqual(document["model"], "gpt-5.6-sol")
+        self.assertEqual(document["model_reasoning_effort"], "medium")
+
+    def test_render_sets_policy_without_overwriting_interactive_reasoning(self) -> None:
         rendered = SYNC["render"]('model_reasoning_effort = "xhigh"\n')
         document = tomllib.loads(rendered)
 
         self.assertEqual(document["model"], "gpt-5.6-sol")
-        self.assertEqual(document["model_reasoning_effort"], "medium")
+        self.assertEqual(document["model_reasoning_effort"], "xhigh")
         self.assertEqual(document["approval_policy"], "on-request")
         self.assertEqual(document["approvals_reviewer"], "user")
         self.assertEqual(document["sandbox_mode"], "workspace-write")
@@ -91,6 +97,7 @@ keep = "yes"
         rendered = SYNC["render"](original)
         self.assertEqual(SYNC["render"](rendered), rendered)
         document = tomllib.loads(rendered)
+        self.assertEqual(document["model"], "custom")
         self.assertEqual(document["hooks"], {"enabled": True})
         self.assertEqual(document["projects"]["/work"], {"trust_level": "trusted"})
         self.assertEqual(

@@ -27,10 +27,11 @@ es una instrucción fiable por sí mismo.
 
 ## Perfiles y capacidades
 
-La configuración base usa Sol con razonamiento `medium`. `fast` usa Terra
-`medium`; `deep`, Sol `high`; y `ultra`, Sol `ultra`. Los perfiles solo cambian
-modelo y razonamiento. La base mantiene aprobaciones `on-request`, revisión por
-la persona y sandbox de escritura sin red.
+La plantilla propone Sol con razonamiento `medium` cuando aún no existe una
+selección. El sincronizador conserva el modelo y razonamiento elegidos en Codex.
+`fast` usa Terra `medium`; `deep`, Sol `high`; y `ultra`, Sol `ultra`. Los
+perfiles solo cambian modelo y razonamiento. La base mantiene aprobaciones
+`on-request`, revisión por la persona y sandbox de escritura sin red.
 
 El MCP `linear-write` sigue deshabilitado. Una capacidad temporal de escritura
 requiere una sesión nueva y confirmación inmediata antes de cambiar estado.

@@ -503,7 +503,8 @@ tooling sin dejar `__pycache__`; `just codex-check` reúne ambas comprobaciones 
 añade la configuración y las reglas gestionadas.
 
 `just codex-config-sync` muestra el destino de `config.toml` y requiere escribir
-`APLICAR`; con backup, sincroniza el modelo base Sol `medium`, aprobaciones
+`APLICAR`; con backup, propone Sol `medium` cuando aún no existe una selección,
+pero conserva el modelo y razonamiento elegidos en Codex. Sincroniza aprobaciones
 `on-request` revisadas por la persona, sandbox de escritura sin red, hooks y
 memorias, agentes, estado TUI y notificaciones. Conserva hooks de Orca, trusts,
 MCP y las demás claves existentes. Los perfiles `fast`, `deep` y `ultra` solo
