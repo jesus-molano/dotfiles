@@ -1,4 +1,0 @@
-interface:
-  display_name: "Writing for Agents"
-  short_description: "Write reliable agent-facing instructions"
-  default_prompt: "Use $writing-for-agents to guide this task."

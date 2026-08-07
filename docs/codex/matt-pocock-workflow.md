@@ -37,21 +37,23 @@ continúa mandando sobre comandos, riesgos y despliegue.
 
 | Necesidad | Pieza local | Invocación y resultado |
 | --- | --- | --- |
-| Aclarar una idea | `grill-with-docs`, apoyada por `grilling` | La fase exterior se invoca explícitamente; entrevista de una decisión cada vez y devuelve un ledger con alcance, alternativas y aceptación. |
+| Aclarar una idea | `grill-with-docs` | Explícita; entrevista una decisión cada vez y devuelve un ledger con alcance, alternativas y aceptación. |
 | Formalizar alcance | `to-spec` | Explícita; produce una especificación verificable, sin publicarla por su cuenta. |
 | Dividir el trabajo | `to-tickets` | Explícita; devuelve tickets Markdown locales y dependencias, sin presuponer GitHub Issues o Linear. |
 | Ejecutar un cambio | `engineering-flow` / `implement-ticket` | Explícita; conserva cambios ajenos, valida y pide confirmación inmediatamente antes de cualquier commit. Nunca hace push, deploy o apply por iniciativa propia. |
 | Mantener calidad | `test-driven-development` y `systematic-debugging` | Disciplinas automáticas ya existentes, ampliadas con feedback de diseño y evidencia segura; no se instalaron duplicados `tdd` o `diagnosing-bugs`. |
-| Diseñar límites | `domain-modeling` / `codebase-design` | Referencias automáticas para vocabulario, invariantes, módulos y contratos. |
+| Diseñar límites | `domain-modeling` / `codebase-design` | Explícitas; profundizan en vocabulario, invariantes, módulos y contratos solo cuando la complejidad lo justifica. |
 | Investigar | `research-primary-sources` | Solo lectura por defecto; separa hechos, observaciones e inferencias y devuelve citas actuales. |
-| Revisar | `spec-and-standards-review` más `reviewer-spec` y `reviewer-standards` | Revisión sin escritura, trazada por separado contra especificación y estándares. |
-| Escribir contexto o relevar | `writing-for-agents` / `handoff` | Instrucciones ejecutables y un paquete de continuidad; solo persisten a archivo si se pide el destino exacto. |
+| Revisar | `spec-and-standards-review` más `reviewer-spec` y `reviewer-standards` | Explícita y sin escritura; traza por separado especificación y estándares. |
+| Dejar contexto | `handoff` | Explícita; devuelve notas de continuidad, pero no mueve chats, worktrees, terminales ni propiedad en Orca. |
 
 `engineering-flow` conecta las fases, pero no obliga a recorrerlas todas. Una
 corrección pequeña puede saltar directamente a TDD o diagnóstico; una idea
 ambigua debe resolver primero sus decisiones. La separación entre skills
 explícitas y automáticas evita que una conversación normal publique documentos
-o ejecute una cadena completa sin que se solicite.
+o ejecute una cadena completa sin que se solicite. El diseño, la revisión doble y
+las notas de continuidad también son opt-in; TDD, diagnóstico e investigación
+primaria conservan activación contextual porque no publican ni despliegan estado.
 
 ## Qué se omitió y por qué
 
@@ -63,6 +65,9 @@ o ejecute una cadena completa sin que se solicite.
   skill de revisión y dos agentes Codex de solo lectura.
 - Copias nuevas de `tdd` y `diagnosing-bugs`: se fusionaron las ideas útiles en
   las skills maduras que ya existían para evitar disparadores duplicados.
+- `grilling` y `writing-for-agents` como skills globales independientes: sus
+  reglas útiles viven directamente en `grill-with-docs`, `to-spec`, `to-tickets`
+  y `handoff`, donde tienen un consumidor claro y no ocupan dos disparadores más.
 - `prototype`, `wayfinder`, `wizard`, automatizaciones de Ralph y operaciones de
   merge: aportan valor en casos concretos, pero amplían superficie, estado o
   riesgo sin una necesidad recurrente demostrada aquí.
@@ -74,22 +79,22 @@ y una prueba de consumo representativa. El repositorio lo comprueba con
 
 ## Actualización, caché y trazabilidad
 
-`just codex-sync` realiza dos acciones secuenciales y sus efectos son distintos:
+El mantenimiento upstream y la configuración viva son acciones independientes:
 
-1. Actualiza automáticamente el `main` oficial en el caché de referencia
-   `${XDG_DATA_HOME:-$HOME/.local/share}/codex/upstreams/mattpocock-skills`.
-   Valida origen, rama, licencia y rutas esperadas; registra el SHA en
-   `.dotfiles-upstream.json` y conserva el caché anterior bajo
-   `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/codex-upstreams/`.
-2. Solo después intenta sincronizar las preferencias gestionadas de Codex. Esta
-   segunda acción muestra su destino y pide escribir `APLICAR`.
+- `just codex-upstream-check` valida sin escribir el caché de referencia.
+- `just codex-upstream-refresh` actualiza el `main` oficial bajo
+  `${XDG_DATA_HOME:-$HOME/.local/share}/codex/upstreams/mattpocock-skills`, valida
+  origen, rama, licencia y rutas esperadas, registra el SHA en
+  `.dotfiles-upstream.json` y conserva el caché anterior bajo
+  `${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/codex-upstreams/`.
+- `just codex-config-sync` solo intenta sincronizar las preferencias gestionadas
+  de Codex; muestra el destino y pide escribir `APLICAR` antes de modificarlo.
 
-Por tanto, invocar `just codex-sync` puede actualizar el caché **antes** de que
-aparezca la confirmación de configuración. No es una tarea periódica ni instala
-el upstream: las skills versionadas bajo `codex/.agents/skills/` no cambian hasta
-que una persona compara, adapta, prueba y hace commit de una actualización. Si
-la descarga o validación falla, el caché anterior permanece y la configuración
-no se toca. Para validar un caché existente sin escribir:
+No existe un comando compuesto: refrescar la referencia nunca adelanta una
+mutación distinta a la que su nombre anuncia. Ninguna receta instala el upstream;
+las skills versionadas bajo `codex/.agents/skills/` no cambian hasta que una
+persona compara, adapta, prueba y hace commit de una actualización. Si la descarga
+o validación falla, el caché anterior permanece. Para validar el caché directamente:
 
 ```bash
 ./scripts/sync-matt-pocock-skills.py --check
@@ -117,8 +122,11 @@ fuente primaria equivalente.
    validaciones como autoridad.
 4. Usa `$to-spec` y `$to-tickets` solo cuando el tamaño lo justifique; los
    borradores permanecen locales salvo autorización expresa.
-5. Implementa con evidencia y revisa por separado especificación y estándares.
-6. Antes de commit, muestra el alcance validado y pide confirmación. Push,
-   despliegue, `apply` y mutaciones externas son autorizaciones independientes.
+5. En cambios grandes, invoca explícitamente `$domain-modeling`,
+   `$codebase-design` o `$spec-and-standards-review` solo para la fase que lo
+   necesite.
+6. Antes de commit, muestra el alcance validado y pide confirmación. No añadas por
+   iniciativa propia trailers `Co-authored-by` ni atribuyas autoría a agentes.
+   Push, despliegue, `apply` y mutaciones externas son autorizaciones distintas.
 7. Cierra con pruebas realmente ejecutadas, `git diff --check`, incertidumbres y,
-   si queda trabajo, un `$handoff` compacto.
+   si queda trabajo, notas compactas mediante `$handoff`.

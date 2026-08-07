@@ -2,3 +2,5 @@ interface:
   display_name: "Codebase Design"
   short_description: "Design boundaries and module contracts"
   default_prompt: "Use $codebase-design to guide this task."
+policy:
+  allow_implicit_invocation: false

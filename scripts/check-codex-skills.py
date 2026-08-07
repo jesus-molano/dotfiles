@@ -16,22 +16,20 @@ MARKDOWN_LINK = re.compile(r"!?\[[^]]*]\(([^)\s]+)(?:\s+[^)]*)?\)")
 YAML_KEY = re.compile(r"^( {2})([a-z_]+):\s*(.*)$")
 SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 EXPLICIT_SKILLS = {
+    "codebase-design",
+    "domain-modeling",
     "engineering-flow",
     "grill-with-docs",
     "handoff",
     "implement-ticket",
+    "spec-and-standards-review",
     "to-spec",
     "to-tickets",
 }
 IMPLICIT_SKILLS = {
-    "codebase-design",
-    "domain-modeling",
-    "grilling",
     "research-primary-sources",
-    "spec-and-standards-review",
     "systematic-debugging",
     "test-driven-development",
-    "writing-for-agents",
 }
 
 
@@ -227,7 +225,7 @@ def main() -> int:
             names[frontmatter["name"]] = skill
             implicit = check_openai_yaml(skill / "agents/openai.yaml")
             if skill.name in EXPLICIT_SKILLS and implicit is not False:
-                raise ValueError("la skill orquestadora requiere invocación explícita")
+                raise ValueError("la skill requiere invocación explícita")
             if skill.name in IMPLICIT_SKILLS and implicit is False:
                 raise ValueError(
                     "la disciplina de referencia debe permitir invocación implícita"

@@ -14,5 +14,6 @@ description: Implement one software ticket safely by confirming its contract, ma
 Do not fold unrelated cleanup into the ticket. Preserve other worktree changes
 and never include secrets in logs or summaries. After validation, show the
 intended commit scope and ask for explicit confirmation immediately before
-committing. Never push, deploy, apply configuration, or mutate another external
-system unless that exact action was authorized.
+committing. Do not add `Co-authored-by` attribution for an agent, tool, or
+upstream author. Never push, deploy, apply configuration, or mutate another
+external system unless that exact action was authorized.

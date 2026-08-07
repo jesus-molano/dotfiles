@@ -1,4 +1,0 @@
-interface:
-  display_name: "Grilling"
-  short_description: "Interview decisions and challenge assumptions"
-  default_prompt: "Use $grilling to guide this task."

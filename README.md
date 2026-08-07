@@ -489,7 +489,9 @@ conservar trusts, hooks de Orca y MCP:
 ```bash
 just codex-skills-check
 just codex-check
-just codex-sync
+just codex-config-sync
+just codex-upstream-check
+just codex-upstream-refresh
 just codex-clean-rules
 ```
 
@@ -497,30 +499,31 @@ just codex-clean-rules
 las skills y agentes versionados. `just codex-check` añade la comprobación de
 configuración y reglas gestionadas.
 
-`just codex-sync` tiene dos efectos consecutivos. Primero actualiza, sin ejecutar
-su código, el `main` oficial de `mattpocock/skills` en el caché de referencia
-`~/.local/share/codex/upstreams/mattpocock-skills`, registra el SHA y conserva un
-backup recuperable del caché anterior. Esta actualización ocurre antes del
-prompt de configuración. Después muestra el destino de `config.toml` y requiere
-escribir `APLICAR`; con backup, solo sincroniza `notify`, `features.memories`, las
+`just codex-config-sync` muestra el destino de `config.toml` y requiere escribir
+`APLICAR`; con backup, solo sincroniza `notify`, `features.memories`, las
 preferencias de agentes y las notificaciones TUI gestionadas. Conserva hooks,
-trusts, MCP y las demás claves existentes. No instala el upstream como skills,
-plugins o Codex, ni sustituye el modelo, sandbox o política de aprobación
-locales. Si falla la descarga o su validación, conserva el caché y no llega a
-modificar la configuración. `just codex-clean-rules` es la acción independiente
-que retira reglas temporales detectadas y también conserva una copia previa.
+trusts, MCP y las demás claves existentes.
 
-La sincronización activa `features.memories`. Es memoria auxiliar local generada
-por Codex; `AGENTS.md` continúa siendo la fuente canónica de instrucciones y el
-estado generado bajo `~/.codex/memories` no se versiona.
+El upstream se mantiene separado: `just codex-upstream-check` valida sin escribir
+el caché existente y `just codex-upstream-refresh` actualiza, sin ejecutar su
+código, el `main` oficial de `mattpocock/skills` bajo
+`~/.local/share/codex/upstreams/mattpocock-skills`. Registra el SHA y conserva un
+backup recuperable del caché anterior. Ninguno de los dos comandos instala el
+upstream como skills o plugins, sustituye las adaptaciones locales ni modifica la
+configuración de Codex. `just codex-clean-rules` es la acción independiente que
+retira reglas temporales detectadas y también conserva una copia previa.
+
+La sincronización de configuración activa `features.memories`. Es memoria
+auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica
+de instrucciones y el estado generado bajo `~/.codex/memories` no se versiona.
 
 Para un flujo de ingeniería componible inspirado en Matt Pocock —entrevista,
 especificación, tickets, implementación, revisión y handoff— consulta
 [el workflow de Codex](docs/codex/matt-pocock-workflow.md). La adopción es local
 y revisable: solo el caché de consulta sigue el `main` actual cuando se invoca
-`just codex-sync`; las skills adaptadas nunca se sobrescriben automáticamente y
-no se presupone un tracker. Para repetir la evaluación desde cero en otro equipo
-o repositorio, usa el
+`just codex-upstream-refresh`; las skills adaptadas nunca se sobrescriben
+automáticamente y no se presupone un tracker. Para repetir la evaluación desde
+cero en otro equipo o repositorio, usa el
 [prompt de auditoría de solo lectura](docs/prompts/audit-matt-pocock-codex.md).
 
 Las tres automatizaciones de Orca creadas para este host —auditoría semanal,

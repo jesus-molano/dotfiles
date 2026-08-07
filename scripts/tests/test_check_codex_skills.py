@@ -26,17 +26,30 @@ def run_checker(skills: Path, agents: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def roots(root: Path) -> tuple[Path, Path, Path]:
+def roots(root: Path, name: str = "example") -> tuple[Path, Path, Path]:
     skills = root / "skills"
     agents = root / "agents"
-    skill = skills / "example"
+    skill = skills / name
     skill.mkdir(parents=True)
     agents.mkdir()
     (skill / "SKILL.md").write_text(
-        "---\nname: example\ndescription: Valid example skill.\n---\n\n# Example\n",
+        f"---\nname: {name}\ndescription: Valid example skill.\n---\n\n# Example\n",
         encoding="utf-8",
     )
     return skills, agents, skill
+
+
+def write_metadata(skill: Path, *, implicit: bool) -> None:
+    metadata = skill / "agents"
+    metadata.mkdir()
+    (metadata / "openai.yaml").write_text(
+        'interface:\n  display_name: "Example Skill"\n'
+        '  short_description: "Valid example skill metadata"\n'
+        f'  default_prompt: "Use ${skill.name} for this task."\n'
+        "policy:\n"
+        f"  allow_implicit_invocation: {str(implicit).lower()}\n",
+        encoding="utf-8",
+    )
 
 
 class CheckCodexSkillsTest(unittest.TestCase):
@@ -71,6 +84,29 @@ class CheckCodexSkillsTest(unittest.TestCase):
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
             self.assertIn("entre comillas", checked.stderr)
+
+    def test_explicit_skill_requires_disabled_implicit_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "codebase-design")
+            write_metadata(skill, implicit=True)
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("requiere invocación explícita", checked.stderr)
+
+    def test_explicit_skill_accepts_disabled_implicit_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "domain-modeling")
+            write_metadata(skill, implicit=False)
+            checked = run_checker(skills, agents)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "research-primary-sources")
+            write_metadata(skill, implicit=False)
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("debe permitir invocación implícita", checked.stderr)
 
     def test_rejects_unapproved_reviewer_model(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

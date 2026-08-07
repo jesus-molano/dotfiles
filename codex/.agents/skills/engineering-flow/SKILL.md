@@ -21,10 +21,13 @@ Turn a request into a small, verifiable change. First inspect the repository, ne
 
 - Missing or conflicting requirements: ask a focused question before changing durable behavior.
 - A failure or surprising result: switch to `$systematic-debugging`; do not guess a fix.
-- A design crosses domains or introduces new concepts: use `$domain-modeling` and `$codebase-design` first.
+- A design crosses domains or introduces new concepts: pause and propose the
+  explicit `$domain-modeling` or `$codebase-design` pass that would reduce the
+  uncertainty; do not silently expand the workflow.
 - Work is too broad: create or refine a spec with `$to-spec`, then split it with `$to-tickets`.
 - A commit is ready: show the validated scope and ask for explicit confirmation
-  immediately before committing. Never push, deploy, apply configuration, or
+  immediately before committing. Do not add `Co-authored-by` attribution for an
+  agent, tool, or upstream author. Never push, deploy, apply configuration, or
   mutate an external system unless that exact action was authorized.
 
 Never claim a check passed unless it was run in the current environment. Do not expose credentials, tokens, private keys, or environment-file contents in commands, diffs, or handoffs.

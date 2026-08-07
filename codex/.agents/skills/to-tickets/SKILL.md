@@ -9,4 +9,8 @@ Work only from an approved or clearly provisional spec. Split by independently v
 
 For every ticket state: goal and non-goal; context and affected boundary; dependencies; implementation outline; acceptance criteria; test/verification plan; rollout or migration needs; risk. Keep each ticket small enough to review and revert. Order prerequisites before consumers, and make contracts or migrations explicit dependencies.
 
-Do not create duplicate tickets for one cohesive change or hide cross-ticket coupling. When the tracker write is not explicitly authorized, output draft tickets rather than changing external state.
+Use imperative language, stable paths or commands only when known, and observable
+checkpoints. Separate facts from provisional assumptions and name the owner of
+every unresolved decision. Do not create duplicate tickets for one cohesive
+change or hide cross-ticket coupling. When the tracker write is not explicitly
+authorized, output draft tickets rather than changing external state.

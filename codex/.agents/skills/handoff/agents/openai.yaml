@@ -1,6 +1,6 @@
 interface:
-  display_name: "Handoff"
-  short_description: "Prepare precise engineering continuation notes"
-  default_prompt: "Use $handoff to guide this task."
+  display_name: "Handoff Notes"
+  short_description: "Prepare precise continuation notes"
+  default_prompt: "Use $handoff to prepare continuation notes for this task."
 policy:
   allow_implicit_invocation: false
