@@ -546,9 +546,11 @@ La sincronización de configuración activa `features.memories`. Es memoria
 auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica
 de instrucciones y el estado generado bajo `~/.codex/memories` no se versiona.
 
-Consulta el [modelo operativo de Codex](docs/codex/operating-model.md) para el
-enrutamiento de skills, la autonomía segura y la verificación. Linear es opcional
-y explícito; ninguna skill o plugin de terceros se instala automáticamente.
+Consulta la [guía diaria de Codex](docs/codex/guia-diaria.md) para prompts,
+perfiles y consejos de uso. El [modelo operativo](docs/codex/operating-model.md)
+documenta el enrutamiento de skills, la autonomía segura y la verificación.
+Linear es opcional y explícito; ninguna skill o plugin de terceros se instala
+automáticamente.
 
 Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
 radar upstream y auditoría mensual Restic— nacen desactivadas. Revísalas con
