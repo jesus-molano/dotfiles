@@ -69,7 +69,7 @@ You MUST complete each phase before proceeding to the next.
 
 4. **Gather Evidence in Multi-Component Systems**
 
-   **WHEN system has multiple components (CI → build → signing, API → service → database):**
+   **WHEN system has multiple components (CI → build → deploy, API → service → database):**
 
    **BEFORE proposing fixes, add diagnostic instrumentation:**
    ```
@@ -86,24 +86,14 @@ You MUST complete each phase before proceeding to the next.
 
    **Example (multi-layer system):**
    ```bash
-   # Layer 1: Workflow
-   echo "=== Secrets available in workflow: ==="
-   echo "IDENTITY: ${IDENTITY:+SET}${IDENTITY:-UNSET}"
-
-   # Layer 2: Build script
-   echo "=== Env vars in build script: ==="
-   env | grep IDENTITY || echo "IDENTITY not in environment"
-
-   # Layer 3: Signing script
-   echo "=== Keychain state: ==="
-   security list-keychains
-   security find-identity -v
-
-   # Layer 4: Actual signing
-   codesign --sign "$IDENTITY" --verbose=4 "$APP"
+   # Record only non-sensitive, structural facts at each boundary.
+   printf 'request-id=%s input-bytes=%s\n' "$request_id" "${#payload}"
+   ./build --verbose
+   printf 'artifact-exists=%s\n' "$(test -f dist/app && echo yes || echo no)"
    ```
 
-   **This reveals:** Which layer fails (secrets → workflow ✓, workflow → build ✗)
+   **This reveals:** Which boundary first violates its expected contract, without
+   printing configuration values or credentials.
 
 5. **Trace Data Flow**
 
@@ -262,6 +252,14 @@ If you catch yourself thinking:
 | **2. Pattern** | Find working examples, compare | Identify differences |
 | **3. Hypothesis** | Form theory, test minimally | Confirmed or new hypothesis |
 | **4. Implementation** | Create test, fix, verify | Bug resolved, tests pass |
+
+## Evidence Discipline
+
+- Prefer a minimal reproduction over an interpretation of a large log.
+- Change one causal variable per experiment and write down the predicted result.
+- Verify the failed condition and the repaired condition through the same public behavior when possible.
+- Keep diagnostics temporary, scoped, and free of credentials, tokens, private keys, or environment values.
+- A passing test is evidence only for the behavior it exercises; do not generalize beyond its setup.
 
 ## When Process Reveals "No Root Cause"
 

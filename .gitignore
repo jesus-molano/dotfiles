@@ -19,6 +19,8 @@ codex/.codex/*
 codex/.codex/agents/*
 !codex/.codex/agents/reviewer-web.toml
 !codex/.codex/agents/reviewer-linux.toml
+!codex/.codex/agents/reviewer-spec.toml
+!codex/.codex/agents/reviewer-standards.toml
 
 # Política ExecPolicy específica de este repositorio (la exclusión global de
 # ~/.codex no debe ocultar la capa local confiable).

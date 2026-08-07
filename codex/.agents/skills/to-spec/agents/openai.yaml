@@ -1,0 +1,6 @@
+interface:
+  display_name: "To Spec"
+  short_description: "Turn requests into clear specifications"
+  default_prompt: "Use $to-spec to guide this task."
+policy:
+  allow_implicit_invocation: false

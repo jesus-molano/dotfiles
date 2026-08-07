@@ -34,15 +34,19 @@ Thinking "skip TDD just this once"? Stop. That's rationalization.
 NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST
 ```
 
-Write code before the test? Delete it. Start over.
+If you wrote provisional implementation during the current task before its
+test, revert only that exact provisional change and start over. Never delete or
+rewrite pre-existing code or another person's work merely to reconstruct a TDD
+sequence. For an existing implementation, add a focused regression or
+characterization test and state any limit on demonstrating the original RED.
 
-**No exceptions:**
+**For provisional code created in this task:**
 - Don't keep it as "reference"
 - Don't "adapt" it while writing tests
-- Don't look at it
-- Delete means delete
+- Revert only lines you own
+- Preserve the starting worktree exactly
 
-Implement fresh from tests. Period.
+For new behavior you own, implement fresh from the failing test.
 
 ## Red-Green-Refactor
 
@@ -208,6 +212,24 @@ When writing or changing any test, read [writing-good-tests.md](writing-good-tes
 - Assert on real behavior, never on mock behavior
 - Keep test-only code in test utilities, out of production classes
 - Understand a dependency's side effects before mocking it
+
+## Design Feedback
+
+Treat the test as a consumer of the public contract. Prefer arranging real inputs,
+calling the public behavior, and asserting an observable result. If setup requires
+deep internals, broad mocks, or many unrelated collaborators, first ask whether the
+API or module boundary is carrying too many responsibilities.
+
+- Write the smallest example that distinguishes the intended behavior from the old one.
+- Name the behavior in domain language; implementation details belong in neither the
+  test name nor its assertions unless they are the contract.
+- Use mocks only at an owned boundary where the real dependency would make the test
+  slow, nondeterministic, destructive, or unavailable. Assert the outcome, not the
+  mock choreography.
+- Add one test per meaningful rule or edge case. Parameterize only cases that share
+  the same rule and failure explanation.
+- Keep production code free of test-only switches. A test seam must also be a valid
+  production boundary.
 
 ## Common Rationalizations
 

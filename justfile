@@ -133,13 +133,19 @@ atlas-check:
 atlas-sync:
     "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --apply
 
-# Comprueba las preferencias duraderas sin leer ni reemplazar hooks o MCP.
+# Valida todas las skills locales y los agentes TOML de Codex sin escribir.
+codex-skills-check:
+    "{{ dotfiles_dir }}/scripts/check-codex-skills.py"
+
+# Comprueba skills y preferencias duraderas sin leer ni reemplazar hooks o MCP.
 codex-check:
+    @just --justfile "{{ justfile() }}" codex-skills-check
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
 
-# Sincroniza preferencias Codex con destino exacto, confirmación y backup.
+# Actualiza el main upstream y después sincroniza preferencias Codex con confirmación y backup.
 codex-sync:
+    "{{ dotfiles_dir }}/scripts/sync-matt-pocock-skills.py" --apply
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --apply
 
 # Retira solo las reglas temporales exactas detectadas durante la investigación.
