@@ -17,11 +17,12 @@ esac
 
 source_input="${CODEX_SKILLS_SOURCE_ROOT:-$DOTFILES_DIR/codex/.agents/skills}"
 skills_input="${CODEX_SKILLS_ROOT:-$HOME/.agents/skills}"
+retired_file="${CODEX_RETIRED_SKILLS_FILE:-$DOTFILES_DIR/codex/.agents/retired-skills.txt}"
 home_root="$(realpath -m -s -- "$HOME")"
 source_root="$(realpath -- "$source_input")"
 skills_root="$(realpath -m -s -- "$skills_input")"
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/codex-skills/backups"
-readonly home_root source_root skills_root state_root
+readonly home_root source_root skills_root state_root retired_file
 readonly -a externally_managed=(frontend-task reuse-first visual-direction)
 
 [[ "$skills_root" == "$home_root"/* ]] || {
@@ -51,6 +52,24 @@ declare -a managed_skills=()
 while IFS= read -r skill; do
 	is_externally_managed "$skill" || managed_skills+=("$skill")
 done < <(find "$source_root" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | LC_ALL=C sort)
+
+[[ -f "$retired_file" ]] || {
+	printf 'ERROR: no existe el inventario de skills retiradas: %s\n' "$retired_file" >&2
+	exit 1
+}
+declare -a retired_skills=()
+while IFS= read -r skill || [[ -n "$skill" ]]; do
+	[[ -z "$skill" || "$skill" == \#* ]] && continue
+	[[ "$skill" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]] || {
+		printf 'ERROR: nombre de skill retirada no válido: %s\n' "$skill" >&2
+		exit 1
+	}
+	[[ ! -d "$source_root/$skill" ]] || {
+		printf 'ERROR: una skill activa figura como retirada: %s\n' "$skill" >&2
+		exit 1
+	}
+	retired_skills+=("$skill")
+done < "$retired_file"
 
 ((${#managed_skills[@]} > 0)) || {
 	printf 'ERROR: no hay skills locales para gestionar en %s\n' "$source_root" >&2
@@ -104,6 +123,28 @@ classify_target() {
 	return 1
 }
 
+is_exact_retired_link() {
+	local skill=$1 raw resolved
+	local target="$skills_root/$skill"
+	[[ -L "$target" ]] || return 1
+	raw="$(readlink -- "$target")"
+	if [[ "$raw" != /* ]]; then
+		raw="$(dirname -- "$target")/$raw"
+	fi
+	resolved="$(realpath -m -s -- "$raw")"
+	[[ "$resolved" == "$source_root/$skill" ]]
+}
+
+declare -a retired_links=()
+for skill in "${retired_skills[@]}"; do
+	if is_exact_retired_link "$skill"; then
+		retired_links+=("$skill")
+	elif [[ -e "$skills_root/$skill" || -L "$skills_root/$skill" ]]; then
+		printf 'KEEP: se conserva contenido ajeno con nombre retirado: %s/%s\n' \
+			"$skills_root" "$skill"
+	fi
+done
+
 declare -A target_state=()
 pending=0
 invalid=0
@@ -120,6 +161,10 @@ done
 ((invalid == 0)) || exit 1
 
 if [[ "$mode" == --check ]]; then
+	if ((${#retired_links[@]})); then
+		printf 'RETIRED: se respaldarán y retirarán %d enlace(s) canónicos obsoletos.\n' \
+			"${#retired_links[@]}"
+	fi
 	if ((pending)); then
 		printf 'SYNC: %d skill(s) se convertirán en enlaces de carpeta compatibles con Codex.\n' \
 			"$pending"
@@ -135,12 +180,12 @@ if [[ "$mode" == --check-remove ]]; then
 	for skill in "${managed_skills[@]}"; do
 		[[ "${target_state[$skill]}" == absent ]] || ((removable += 1))
 	done
-	printf 'REMOVE: se respaldarán y retirarán %d enlaces o árboles gestionados de skills.\n' \
-		"$removable"
+	printf 'REMOVE: se respaldarán y retirarán %d enlaces o árboles gestionados y %d retirados.\n' \
+		"$removable" "${#retired_links[@]}"
 	exit 0
 fi
 
-if [[ "$mode" == --apply && "$pending" == 0 ]]; then
+if [[ "$mode" == --apply && "$pending" == 0 && "${#retired_links[@]}" == 0 ]]; then
 	printf 'OK: %d skills locales ya están sincronizadas.\n' "${#managed_skills[@]}"
 	exit 0
 fi
@@ -150,7 +195,7 @@ if [[ "$mode" == --remove ]]; then
 	for skill in "${managed_skills[@]}"; do
 		[[ "${target_state[$skill]}" == absent ]] || ((removable += 1))
 	done
-	if ((removable == 0)); then
+	if ((removable == 0 && ${#retired_links[@]} == 0)); then
 		printf 'OK: no hay enlaces de skills locales que retirar.\n'
 		exit 0
 	fi
@@ -159,8 +204,8 @@ fi
 mkdir -p -- "$state_root" "$skills_root"
 backup_root="$(mktemp -d -- "$state_root/sync-$(date +%Y%m%d-%H%M%S)-XXXXXX")"
 chmod 700 "$backup_root"
-mkdir -p -- "$backup_root/skills" "$backup_root/failed"
-declare -A touched=() previous=()
+mkdir -p -- "$backup_root/skills" "$backup_root/retired" "$backup_root/failed"
+declare -A touched=() previous=() retired_touched=()
 rollback_active=1
 
 rollback() {
@@ -182,11 +227,27 @@ rollback() {
 				mv -- "$backup" "$target"
 			fi
 		done
+		for skill in "${retired_links[@]}"; do
+			[[ "${retired_touched[$skill]:-0}" == 1 ]] || continue
+			target="$skills_root/$skill"
+			backup="$backup_root/retired/$skill"
+			failed="$backup_root/failed/retired-$skill"
+			if [[ -e "$target" || -L "$target" ]]; then
+				mv -- "$target" "$failed"
+			fi
+			mv -- "$backup" "$target"
+		done
 		printf 'Backup y restos recuperables: %s\n' "$backup_root" >&2
 	fi
 	exit "$status"
 }
 trap rollback ERR INT TERM
+
+for skill in "${retired_links[@]}"; do
+	target="$skills_root/$skill"
+	mv -- "$target" "$backup_root/retired/$skill"
+	retired_touched["$skill"]=1
+done
 
 for skill in "${managed_skills[@]}"; do
 	state=${target_state[$skill]}

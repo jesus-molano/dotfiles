@@ -1,6 +1,6 @@
 ---
 name: domain-modeling
-description: Model a problem domain into precise concepts, invariants, lifecycle states, and boundaries before designing software. Use when requirements introduce ambiguous business concepts, workflows, or rules.
+description: Model ambiguous business concepts, invariants, lifecycle states, and boundaries before software design. Use when the user asks for a domain model or unresolved business rules block a decision; do not invoke for routine implementation.
 ---
 
 # Domain Modeling

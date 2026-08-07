@@ -1,13 +1,14 @@
 ---
 name: debug-web-flow
-description: Reproducir y depurar flujos web completos en aplicaciones Next.js, Nuxt o Vue usando navegador, consola, red, logs y código. Usar ante errores de interfaz, SSR/hidratación, navegación, formularios, autenticación, APIs, estados asíncronos o fallos que cruzan frontend y backend.
+description: Reproduce and diagnose a complete Next.js, Nuxt, or Vue flow with browser, console, network, logs, and code. Use for UI, SSR, hydration, navigation, forms, authentication, APIs, async state, or failures that cross browser and server boundaries; not for generic isolated bugs.
 ---
 
 # Depurar un flujo web
 
 ## Reproducir antes de cambiar
 
-1. Leer instrucciones, estado Git y pasos aportados por el usuario.
+1. Leer instrucciones, estado Git y pasos aportados por el usuario. Si el fallo
+   no cruza una frontera web, usar `$systematic-debugging`.
 2. Detectar framework, gestor de paquetes y comandos reales del repositorio.
 3. Usar un entorno local, de prueba o staging y datos desechables. No ejecutar
    flujos de autenticación, formularios o persistencia contra producción salvo

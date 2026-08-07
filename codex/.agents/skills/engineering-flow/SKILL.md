@@ -1,33 +1,22 @@
 ---
 name: engineering-flow
-description: Plan and execute a software change end to end, from understanding the request through implementation, verification, and a concise handoff. Use for feature work, bug fixes, refactors, and scoped engineering tasks.
+description: Implement a scoped feature, bug fix, refactor, or ready ticket from inspection through verification and concise handoff. Do not use for research-only, review-only, or diagnosis-only requests.
 ---
 
 # Engineering Flow
 
-Turn a request into a small, verifiable change. First inspect the repository, nearest instructions, existing patterns, and current working tree. State assumptions that materially affect scope.
-
-## Flow
-
-1. Define the observable outcome, non-goals, constraints, and acceptance checks.
-2. Find the owning code path and a comparable working pattern before designing.
-3. Choose the smallest design that preserves boundaries; record alternatives only when they change risk or cost.
-4. For behavior changes, use `$test-driven-development`: show the focused test fail, implement the minimum, then keep it green.
-5. Keep changes cohesive. Do not combine opportunistic cleanup with the requested change.
-6. Run focused checks first, then the repository-mandated checks. Inspect the diff for unintended files.
-7. Report outcome, files changed, validation actually run, and remaining uncertainty.
-
-## Decision gates
-
-- Missing or conflicting requirements: ask a focused question before changing durable behavior.
-- A failure or surprising result: switch to `$systematic-debugging`; do not guess a fix.
-- A design crosses domains or introduces new concepts: pause and propose the
-  explicit `$domain-modeling` or `$codebase-design` pass that would reduce the
-  uncertainty; do not silently expand the workflow.
-- Work is too broad: create or refine a spec with `$to-spec`, then split it with `$to-tickets`.
-- A commit is ready: show the validated scope and ask for explicit confirmation
-  immediately before committing. Do not add `Co-authored-by` attribution for an
-  agent, tool, or upstream author. Never push, deploy, apply configuration, or
-  mutate an external system unless that exact action was authorized.
-
-Never claim a check passed unless it was run in the current environment. Do not expose credentials, tokens, private keys, or environment-file contents in commands, diffs, or handoffs.
+1. Read the nearest instructions, inspect the worktree, owner path, tests, and
+   comparable working pattern. Read a referenced ticket through the read-only
+   tracker when available; do not invent acceptance criteria.
+2. State the observable outcome, non-goals, constraints, and any material
+   assumption. Use `$clarify-change` only when inspection cannot resolve a
+   consequential decision.
+3. Make the smallest cohesive change. Reuse local boundaries and patterns.
+   Use `$test-driven-development` for an isolatable behavior change. Route a
+   confirmed failure to `$systematic-debugging`, or `$debug-web-flow` for a
+   Next, Nuxt, or Vue path spanning browser and server.
+4. Run focused checks, required repository checks, and `$verification-before-completion`.
+   Inspect the diff and report only evidence actually obtained.
+5. Commit a coherent verified change when the governing instructions allow it.
+   Keep the configured Git identity; never add `Co-authored-by`. Tracker writes,
+   deployment, and push need their own explicit authority and safety gates.

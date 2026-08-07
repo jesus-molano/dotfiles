@@ -1,6 +1,6 @@
 ---
 name: codebase-design
-description: Design maintainable codebase structure, module boundaries, dependency direction, and public contracts. Use before significant features, refactors, or cross-cutting changes.
+description: Produce an architecture plan for module boundaries, dependency direction, and public contracts. Use when the user asks for software design or an implementation is blocked by a cross-cutting boundary decision; do not invoke for routine feature work.
 ---
 
 # Codebase Design

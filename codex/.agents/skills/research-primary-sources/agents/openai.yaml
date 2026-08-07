@@ -2,3 +2,5 @@ interface:
   display_name: "Research Primary Sources"
   short_description: "Research using current primary evidence"
   default_prompt: "Use $research-primary-sources to guide this task."
+policy:
+  allow_implicit_invocation: true

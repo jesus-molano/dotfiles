@@ -1,0 +1,6 @@
+interface:
+  display_name: "Clarify Change"
+  short_description: "Resolve material change decisions"
+  default_prompt: "Use $clarify-change to resolve this change before implementation."
+policy:
+  allow_implicit_invocation: true

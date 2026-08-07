@@ -3,4 +3,4 @@ interface:
   short_description: "Model concepts and business rules"
   default_prompt: "Use $domain-modeling to guide this task."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

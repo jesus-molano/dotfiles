@@ -37,7 +37,12 @@ def create_legacy_tree(source: Path, skills: Path, name: str = "example") -> Pat
 
 
 def run_manager(
-    home: Path, source: Path, skills: Path, state: Path, mode: str
+    home: Path,
+    source: Path,
+    skills: Path,
+    state: Path,
+    mode: str,
+    retired: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment.update(
@@ -48,6 +53,8 @@ def run_manager(
             "CODEX_SKILLS_ROOT": str(skills),
         }
     )
+    if retired is not None:
+        environment["CODEX_RETIRED_SKILLS_FILE"] = str(retired)
     return subprocess.run(
         [str(MANAGER), mode],
         text=True,
@@ -58,6 +65,52 @@ def run_manager(
 
 
 class ManageCodexSkillLinksTest(unittest.TestCase):
+    def test_apply_backs_up_and_retires_an_exact_broken_skill_link(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            source = create_source(root)
+            skills = home / ".agents/skills"
+            skills.mkdir(parents=True)
+            retired = root / "retired-skills.txt"
+            retired.write_text("old-skill\n", encoding="utf-8")
+            target = skills / "old-skill"
+            target.symlink_to(source / "old-skill", target_is_directory=True)
+
+            applied = run_manager(
+                home, source, skills, root / "state", "--apply", retired
+            )
+
+            self.assertEqual(applied.returncode, 0, applied.stderr)
+            self.assertFalse(target.exists())
+            self.assertFalse(target.is_symlink())
+            backups = list(
+                (root / "state/dotfiles/codex-skills/backups").glob(
+                    "sync-*/retired/old-skill"
+                )
+            )
+            self.assertEqual(len(backups), 1)
+            self.assertTrue(backups[0].is_symlink())
+
+    def test_apply_preserves_foreign_content_named_like_a_retired_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            source = create_source(root)
+            skills = home / ".agents/skills"
+            foreign = skills / "old-skill"
+            foreign.mkdir(parents=True)
+            (foreign / "SKILL.md").write_text("foreign\n", encoding="utf-8")
+            retired = root / "retired-skills.txt"
+            retired.write_text("old-skill\n", encoding="utf-8")
+
+            applied = run_manager(
+                home, source, skills, root / "state", "--apply", retired
+            )
+
+            self.assertEqual(applied.returncode, 0, applied.stderr)
+            self.assertEqual((foreign / "SKILL.md").read_text(), "foreign\n")
+
     def test_apply_converts_legacy_file_links_to_one_directory_link(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -1,6 +1,6 @@
 ---
 name: review-web-pr
-description: Revisar una rama o pull request de Next.js, Nuxt o Vue como propietario senior, priorizando errores de comportamiento, seguridad, accesibilidad, rendimiento y pruebas ausentes. Usar cuando se pida revisar un PR, comparar una rama con main, ejecutar `/review` con más profundidad o preparar un cambio web para fusionar.
+description: Own review of a Next.js, Nuxt, or Vue branch or pull request, including checks against its specification. Use for review requests, branch comparisons, or `/review`; keep the task read-only unless the user separately requests a fix.
 ---
 
 # Revisar una PR web

@@ -1,4 +1,6 @@
 interface:
-  display_name: "Systematic Debugging"
-  short_description: "Help with Systematic Debugging tasks"
-  default_prompt: "Use $systematic-debugging to guide this task."
+  display_name: "Diagnóstico sistemático"
+  short_description: "Aísla la causa antes de corregir"
+  default_prompt: "Usa $systematic-debugging para reproducir el fallo, aislar una causa comprobable y verificar la corrección."
+policy:
+  allow_implicit_invocation: true

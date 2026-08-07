@@ -1,4 +1,6 @@
 interface:
-  display_name: "Test Driven Development"
-  short_description: "Help with Test Driven Development tasks"
-  default_prompt: "Use $test-driven-development to guide this task."
+  display_name: "Desarrollo guiado por pruebas"
+  short_description: "Aplica RED-GREEN a conducta aislable"
+  default_prompt: "Usa $test-driven-development para demostrar el cambio con una prueba RED antes de implementar."
+policy:
+  allow_implicit_invocation: false

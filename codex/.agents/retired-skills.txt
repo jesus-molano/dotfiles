@@ -1,0 +1,4 @@
+# Enlaces canónicos que el gestor puede retirar con backup.
+grill-with-docs
+implement-ticket
+to-spec

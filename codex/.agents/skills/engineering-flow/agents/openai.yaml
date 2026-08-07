@@ -3,4 +3,4 @@ interface:
   short_description: "Plan and verify software changes"
   default_prompt: "Use $engineering-flow to guide this task."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

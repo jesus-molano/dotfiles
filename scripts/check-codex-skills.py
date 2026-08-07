@@ -15,23 +15,46 @@ FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 MARKDOWN_LINK = re.compile(r"!?\[[^]]*]\(([^)\s]+)(?:\s+[^)]*)?\)")
 YAML_KEY = re.compile(r"^( {2})([a-z_]+):\s*(.*)$")
 SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
-EXPLICIT_SKILLS = {
+MAX_CATALOG_SKILLS = 20
+MAX_DESCRIPTION_WORDS = 700
+# Inventario deliberadamente exhaustivo. Una skill sin clasificación no debe
+# llegar al perfil: su activación sería ambigua y gastaría contexto sin control.
+IMPLICIT_SKILLS = {
+    "cachyos-host-audit",
+    "clarify-change",
     "codebase-design",
+    "debug-web-flow",
     "domain-modeling",
     "engineering-flow",
-    "grill-with-docs",
     "handoff",
-    "implement-ticket",
     "linear-workflow",
-    "spec-and-standards-review",
-    "to-spec",
-    "to-tickets",
-}
-IMPLICIT_SKILLS = {
     "research-primary-sources",
+    "review-web-pr",
+    "spec-and-standards-review",
     "systematic-debugging",
-    "test-driven-development",
+    "to-tickets",
+    "verification-before-completion",
 }
+EXPLICIT_SKILLS = {
+    "frontend-task",
+    "reuse-first",
+    "test-driven-development",
+    "verify-web-change",
+    "visual-direction",
+}
+ROUTED_SKILLS = IMPLICIT_SKILLS | EXPLICIT_SKILLS
+
+
+def check_catalog_budget(skill_count: int, description_words: int) -> None:
+    if skill_count > MAX_CATALOG_SKILLS:
+        raise ValueError(
+            f"el catálogo supera el límite de {MAX_CATALOG_SKILLS} skills"
+        )
+    if description_words > MAX_DESCRIPTION_WORDS:
+        raise ValueError(
+            "las descripciones superan el presupuesto de "
+            f"{MAX_DESCRIPTION_WORDS} palabras"
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -211,6 +234,7 @@ def main() -> int:
     args = parse_args()
     failures: list[str] = []
     names: dict[str, Path] = {}
+    description_words = 0
     for skill in sorted(path for path in args.skills_root.iterdir() if path.is_dir()):
         try:
             descriptor = skill / "SKILL.md"
@@ -224,10 +248,15 @@ def main() -> int:
             if frontmatter["name"] in names:
                 raise ValueError(f"name duplicado con {names[frontmatter['name']]}")
             names[frontmatter["name"]] = skill
+            description_words += len(frontmatter["description"].split())
             implicit = check_openai_yaml(skill / "agents/openai.yaml")
+            if skill.name not in ROUTED_SKILLS:
+                raise ValueError("la skill no figura en el inventario de routing")
+            if implicit is None:
+                raise ValueError("la skill requiere agents/openai.yaml con routing")
             if skill.name in EXPLICIT_SKILLS and implicit is not False:
                 raise ValueError("la skill requiere invocación explícita")
-            if skill.name in IMPLICIT_SKILLS and implicit is False:
+            if skill.name in IMPLICIT_SKILLS and implicit is not True:
                 raise ValueError(
                     "la disciplina de referencia debe permitir invocación implícita"
                 )
@@ -235,6 +264,10 @@ def main() -> int:
                 check_links(skill, markdown)
         except (OSError, ValueError) as error:
             failures.append(f"{skill}: {error}")
+    try:
+        check_catalog_budget(len(names), description_words)
+    except ValueError as error:
+        failures.append(f"catálogo: {error}")
     agent_names: dict[str, Path] = {}
     for agent in sorted(args.agents_root.glob("*.toml")):
         try:
@@ -247,6 +280,17 @@ def main() -> int:
     if failures:
         print("Skills Codex inválidas:", file=sys.stderr)
         print("\n".join(f"- {failure}" for failure in failures), file=sys.stderr)
+        return 1
+    canonical_skills_root = (
+        Path(__file__).resolve().parents[1] / "codex/.agents/skills"
+    ).resolve()
+    missing = ROUTED_SKILLS - set(names)
+    if args.skills_root.resolve() == canonical_skills_root and missing:
+        print("Skills Codex inválidas:", file=sys.stderr)
+        print(
+            "- faltan skills del inventario de routing: " + ", ".join(sorted(missing)),
+            file=sys.stderr,
+        )
         return 1
     print(f"✓ {len(names)} skills Codex y {len(agent_names)} agentes TOML válidos")
     return 0

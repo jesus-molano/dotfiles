@@ -3,4 +3,4 @@ interface:
   short_description: "Prepare precise continuation notes"
   default_prompt: "Use $handoff to prepare continuation notes for this task."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

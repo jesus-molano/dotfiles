@@ -59,7 +59,7 @@ silently edit Codex configuration.
 
 - `$to-tickets` owns decomposition and produces local drafts first. Publish an
   approved batch only through this skill after its Linear mapping is explicit.
-- `$implement-ticket` may use a Linear key or URL as read-only input. Code being
+- `$engineering-flow` may use a Linear key or URL as read-only input. Code being
   implemented, validated, committed, pushed, or merged never implies permission
   to change the issue status or add a comment.
 - `$handoff` may include verified Linear IDs, links, status, and pending tracker

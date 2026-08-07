@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import runpy
 import subprocess
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 CHECKER = SCRIPTS / "check-codex-skills.py"
+CHECKS = runpy.run_path(str(CHECKER), run_name="check_codex_skills_test")
 
 
 def run_checker(skills: Path, agents: Path) -> subprocess.CompletedProcess[str]:
@@ -53,9 +55,16 @@ def write_metadata(skill: Path, *, implicit: bool) -> None:
 
 
 class CheckCodexSkillsTest(unittest.TestCase):
+    def test_catalog_budget_rejects_skill_or_description_growth(self) -> None:
+        with self.assertRaisesRegex(ValueError, "skills"):
+            CHECKS["check_catalog_budget"](21, 10)
+        with self.assertRaisesRegex(ValueError, "descripciones"):
+            CHECKS["check_catalog_budget"](19, 701)
+
     def test_valid_minimal_skill(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, _ = roots(Path(temporary))
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
@@ -87,7 +96,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_requires_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "codebase-design")
+            skills, agents, skill = roots(Path(temporary), "frontend-task")
             write_metadata(skill, implicit=True)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
@@ -95,7 +104,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_accepts_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "linear-workflow")
+            skills, agents, skill = roots(Path(temporary), "frontend-task")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
@@ -103,6 +112,22 @@ class CheckCodexSkillsTest(unittest.TestCase):
     def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             skills, agents, skill = roots(Path(temporary), "research-primary-sources")
+            write_metadata(skill, implicit=False)
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("debe permitir invocación implícita", checked.stderr)
+
+    def test_rejects_skill_missing_from_routing_inventory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "unclassified-skill")
+            write_metadata(skill, implicit=True)
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("no figura en el inventario de routing", checked.stderr)
+
+    def test_routing_inventory_requires_exact_invocation_policy(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)

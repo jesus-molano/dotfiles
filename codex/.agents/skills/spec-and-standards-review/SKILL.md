@@ -1,6 +1,6 @@
 ---
 name: spec-and-standards-review
-description: Review a change or proposal against its specification and applicable engineering standards, with evidence-based findings. Use for pre-merge, design, or compliance-oriented reviews.
+description: Review a specification, proposal, compliance question, or non-web change against explicit requirements and engineering standards. Use for traceability or standards reviews; route Next.js, Nuxt, and Vue branch reviews to review-web-pr.
 ---
 
 # Spec and Standards Review

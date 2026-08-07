@@ -1,6 +1,7 @@
 # Estado y credenciales de Codex: solo se despliegan los ficheros duraderos
 # versionados de este paquete.
 ^/\.agents/skills(?:/|$)
+^/\.agents/retired-skills\.txt$
 ^/\.codex/(?:auth\.json|config\.toml(?:\.bak\..+)?|history\.jsonl|hooks\.json|installation_id|models_cache\.json|version\.json)$
 ^/\.codex/(?:goals_.+|logs_.+|memories_.+|state_.+|thread_history_.+)\.sqlite(?:-.+)?$
 ^/\.codex/(?:\.sandbox_migration|\.tmp|app-server-control|app-server-daemon|archived_sessions|cache|log|memories|plugins|sessions|shell_snapshots|skills|tmp)(?:/|$)
