@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+set -u
+
+readonly card='alsa_card.pci-0000_07_00.1'
+readonly base_profile='output:hdmi-stereo'
+readonly right_profile='output:hdmi-stereo-extra1'
+readonly sink_prefix='alsa_output.pci-0000_07_00.1.'
+
+current_sink=$(pactl get-default-sink 2>/dev/null || true)
+if [[ "$current_sink" == "${sink_prefix}${right_profile#output:}" ]]; then
+	target_profile=$base_profile
+	target_label='Salida HDMI'
+else
+	target_profile=$right_profile
+	target_label='Salida HDMI 2 (monitor derecho)'
+fi
+target_sink="${sink_prefix}${target_profile#output:}"
+
+if ! pactl set-card-profile "$card" "$target_profile" 2>/dev/null; then
+	noctalia msg notification-show 'Audio HDMI' -- 'No se pudo cambiar el perfil' 2>/dev/null || true
+	exit 1
+fi
+
+# El nodo nuevo aparece después de cambiar el perfil de la tarjeta.
+for _ in {1..20}; do
+	if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq "$target_sink"; then
+		pactl set-default-sink "$target_sink" || exit 1
+		target_id=$(pactl list short sinks | awk -v sink="$target_sink" '$2 == sink { print $1; exit }')
+
+		while read -r input_id current_sink_id _; do
+			if [[ -n "$input_id" && "$current_sink_id" != "$target_id" ]]; then
+				pactl move-sink-input "$input_id" "$target_sink" 2>/dev/null || true
+			fi
+		done < <(pactl list short sink-inputs 2>/dev/null)
+
+		noctalia msg notification-show 'Audio HDMI' -- "$target_label" 2>/dev/null || true
+		exit 0
+	fi
+	sleep 0.1
+done
+
+noctalia msg notification-show 'Audio HDMI' -- 'La salida no está disponible' 2>/dev/null || true
+exit 1

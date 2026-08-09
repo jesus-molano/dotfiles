@@ -570,12 +570,14 @@ espera hasta veinte segundos a que todas las salidas externas activas aparezcan
 en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
 por una carrera de detección durante el arranque.
 
-En el perfil `desktop`, `ensure-main-hdmi-audio` selecciona al iniciar el primer
-perfil HDMI de la NVIDIA (`hdmi-stereo`), que corresponde al Philips principal
-de la derecha. Ese monitor aporta el jack de audio; el perfil `hdmi-stereo-extra1`
-del Philips izquierdo no se usa como salida predeterminada. El helper espera a
-PipeWire durante un máximo de veinte segundos y mueve también las aplicaciones
-que hayan abierto un stream antes de que aparezca el monitor.
+En el perfil `desktop`, `ensure-main-hdmi-audio` selecciona al iniciar el perfil
+NVIDIA `hdmi-stereo-extra1`, confirmado mediante prueba auditiva como el Philips
+principal de la derecha. Es el único monitor cuyo jack está conectado a los
+altavoces. El helper espera a PipeWire durante un máximo de veinte segundos y
+mueve también las aplicaciones que hayan abierto un stream antes de que aparezca
+el monitor. Un clic central sobre el icono de volumen de Noctalia alterna entre
+los perfiles `HDMI` y `HDMI 2`. El clic normal conserva el panel de audio. En el
+icono de Bluetooth, el clic derecho abre su panel y ya no apaga el adaptador.
 
 ## Validación
 

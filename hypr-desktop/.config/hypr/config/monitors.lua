@@ -2,8 +2,9 @@
 -- HDMI-A-1 is physically left; HDMI-A-2 is the primary display on the right.
 -- Workspace ownership is declared separately in user-inputs.lua.
 hl.on("hyprland.start", function ()
-    -- Both identical panels expose an NVIDIA HDMI audio endpoint. The first
-    -- profile belongs to the main/right panel, whose jack feeds the speakers.
+    -- Both identical panels expose an NVIDIA HDMI audio endpoint. The alternate
+    -- profile currently belongs to the main/right panel, whose jack is the only
+    -- one connected to the speakers.
     hl.exec_cmd("ensure-main-hdmi-audio")
 end)
 

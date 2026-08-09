@@ -453,6 +453,12 @@ if [[ "$mode" != live ]]; then
 	check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
 	check "Noctalia gaming desktop" noctalia config validate \
 		"$repo_root/gaming/.config/noctalia/gaming.toml"
+	check "Noctalia audio desktop" noctalia config validate \
+		"$repo_root/hypr-desktop/.config/noctalia/desktop-audio.toml"
+	check "Audio HDMI del monitor derecho" \
+		"$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
+	check "Selector HDMI desde Noctalia" \
+		"$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
 	check "Sesión gaming sin notificaciones" \
 		"$repo_root/scripts/tests/test_game_run_dnd.sh"
 	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
