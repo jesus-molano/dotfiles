@@ -233,11 +233,11 @@ check_flatpaks() {
 	local spec app_id remote branch metadata
 	for spec in "${flatpaks[@]}"; do
 		IFS=, read -r app_id remote branch <<<"$spec"
-		if ! flatpak remotes --columns=name 2>/dev/null | grep -Fxq -- "$remote"; then
+		if ! flatpak remotes --user --columns=name 2>/dev/null | grep -Fxq -- "$remote"; then
 			warn "El remoto $remote no está configurado; se añadirá para el usuario al aplicar."
 			continue
 		fi
-		if ! metadata="$(flatpak remote-info "$remote" "$app_id//$branch" 2>&1)"; then
+		if ! metadata="$(flatpak remote-info --user "$remote" "$app_id//$branch" 2>&1)"; then
 			printf '%s\n' "$metadata" >&2
 			die "Flatpak no disponible: $app_id//$branch en $remote."
 		fi
