@@ -280,7 +280,8 @@ capsule_fill = "primary"
 
 [widget.workspaces]
 style = "minimal"
-display = "name"
+label_source = "name"
+show_labels = true
 font_family = "FontAwesome"
 max_label_chars = 1
 labels_only_when_occupied = false
