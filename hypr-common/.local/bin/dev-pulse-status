@@ -21,11 +21,23 @@ while (($#)); do
 	shift
 done
 
-find_active_directory() {
-	local pid directory
+git_root_for_directory() {
+	local directory=$1
+	timeout 1s env GIT_OPTIONAL_LOCKS=0 \
+		git -C "$directory" rev-parse --show-toplevel 2>/dev/null
+}
+
+find_active_root() {
+	local pid current directory root children_file child
+	local inspected=0
+	local -a queue=() child_pids=()
+	local -A seen_directories=()
 
 	if [[ -n "${DEV_PULSE_PROJECT_DIR:-}" ]]; then
-		readlink -f -- "$DEV_PULSE_PROJECT_DIR" 2>/dev/null || true
+		directory="$(readlink -f -- "$DEV_PULSE_PROJECT_DIR" 2>/dev/null || true)"
+		if [[ -n "$directory" ]]; then
+			git_root_for_directory "$directory" || true
+		fi
 		return
 	fi
 
@@ -33,9 +45,33 @@ find_active_directory() {
 	command -v jq >/dev/null 2>&1 || return 0
 	pid="$(hyprctl -j activewindow 2>/dev/null | jq -r '.pid // empty' 2>/dev/null || true)"
 	[[ "$pid" =~ ^[0-9]+$ ]] || return 0
-	directory="/proc/$pid/cwd"
-	[[ -e "$directory" ]] || return 0
-	readlink -f -- "$directory" 2>/dev/null || true
+
+	queue=("$pid")
+	while ((${#queue[@]} > 0 && inspected < 64)); do
+		current=${queue[0]}
+		queue=("${queue[@]:1}")
+		((inspected += 1))
+
+		directory="$(readlink -f -- "/proc/$current/cwd" 2>/dev/null || true)"
+		if [[ -n "$directory" && -z "${seen_directories[$directory]+x}" ]]; then
+			seen_directories["$directory"]=1
+			if root="$(git_root_for_directory "$directory")"; then
+				printf '%s\n' "$root"
+				return
+			fi
+		fi
+
+		# GUI terminals can spawn the shell from a worker thread. Linux records
+		# those children under that thread, not necessarily under the main task.
+		for children_file in "/proc/$current/task/"*/children; do
+			[[ -r "$children_file" ]] || continue
+			child_pids=()
+			IFS=' ' read -r -a child_pids <"$children_file" || true
+			for child in "${child_pids[@]}"; do
+				[[ "$child" =~ ^[0-9]+$ ]] && queue+=("$child")
+			done
+		done
+	done
 }
 
 count_processes() {
@@ -44,14 +80,13 @@ count_processes() {
 	[[ "$count" =~ ^[0-9]+$ ]] && printf '%s\n' "$count" || printf '0\n'
 }
 
-directory="$(find_active_directory)"
 project=''
 branch=''
 dirty=0
 dirty_available=false
-root=''
+root="$(find_active_root)"
 
-if [[ -n "$directory" ]] && root="$(timeout 1s git -C "$directory" rev-parse --show-toplevel 2>/dev/null)"; then
+if [[ -n "$root" ]]; then
 	project="$(basename -- "$root")"
 	branch="$(timeout 1s git -C "$root" symbolic-ref --quiet --short HEAD 2>/dev/null ||
 		timeout 1s git -C "$root" rev-parse --short HEAD)"

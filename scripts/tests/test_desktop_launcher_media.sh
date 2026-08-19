@@ -8,11 +8,6 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 mkdir -p "$test_root/bin"
 
-grep -Fxq 'common,media,yt-dlp,native' "$repo_root/packages.csv" || {
-	printf '%s\n' 'FAIL: qutebrowser → mpv requiere yt-dlp en el perfil común.' >&2
-	exit 1
-}
-
 cat >"$test_root/bin/uwsm" <<'EOF'
 #!/usr/bin/env bash
 printf 'uwsm\t%s\n' "$*" >>"$TEST_LOG"

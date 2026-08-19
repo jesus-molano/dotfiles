@@ -4,7 +4,16 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly helper=${1:-"$repo_root/hypr-common/.local/bin/dev-pulse-status"}
 test_root=$(mktemp -d)
-trap 'rm -rf -- "$test_root"' EXIT
+terminal_pid=''
+
+cleanup() {
+	if [[ "$terminal_pid" =~ ^[0-9]+$ ]] && kill -0 "$terminal_pid" 2>/dev/null; then
+		kill "$terminal_pid" 2>/dev/null || true
+		wait "$terminal_pid" 2>/dev/null || true
+	fi
+	rm -rf -- "$test_root"
+}
+trap cleanup EXIT
 
 project="$test_root/project"
 mkdir -p "$project" "$test_root/bin"
@@ -26,6 +35,12 @@ esac
 EOF
 chmod +x "$test_root/bin/pgrep"
 
+cat >"$test_root/bin/hyprctl" <<'EOF'
+#!/usr/bin/env bash
+printf '{"pid":%s}\n' "${DEV_PULSE_TEST_PID:?}"
+EOF
+chmod +x "$test_root/bin/hyprctl"
+
 actual=$(DEV_PULSE_PROJECT_DIR="$project" PATH="$test_root/bin:$PATH" "$helper" --json)
 jq -e \
 	--arg project project \
@@ -41,6 +56,33 @@ clean=$(DEV_PULSE_PROJECT_DIR="$project" PATH="$test_root/bin:$PATH" "$helper" -
 jq -e '.available == true and .dirty_available == true and .dirty == 0' \
 	<<<"$clean" >/dev/null || {
 	printf 'FAIL: un repositorio limpio no devolvió cero cambios: %s\n' "$clean" >&2
+	exit 1
+}
+
+# Hyprland reports the terminal window PID. Ghostty itself can remain in HOME
+# while its Zellij or shell child owns the actual project directory.
+(
+	cd "$test_root"
+	sh -c 'cd "$1" && exec sleep 30' sh "$project" &
+	child_pid=$!
+	trap 'kill "$child_pid" 2>/dev/null || true' EXIT
+	wait "$child_pid"
+) &
+terminal_pid=$!
+
+for _ in {1..50}; do
+	children_file="/proc/$terminal_pid/task/$terminal_pid/children"
+	[[ -r "$children_file" && -n "$(<"$children_file")" ]] && break
+	sleep 0.02
+done
+
+terminal_status=$(env -u DEV_PULSE_PROJECT_DIR \
+	DEV_PULSE_TEST_PID="$terminal_pid" PATH="$test_root/bin:$PATH" \
+	"$helper" --json)
+jq -e --arg path "$project" \
+	'.available == true and .path == $path and .project == "project"' \
+	<<<"$terminal_status" >/dev/null || {
+	printf 'FAIL: no detectó el repositorio del proceso hijo del terminal: %s\n' "$terminal_status" >&2
 	exit 1
 }
 

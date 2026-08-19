@@ -97,8 +97,8 @@ bind(hyper .. " + 1", hl.dsp.exec_cmd(launch .. "1password"), "Abrir 1Password")
 bind(hyper .. " + C", hl.dsp.exec_cmd(noctalia .. "caffeine-toggle"), "Alternar cafeína")
 bind(hyper .. " + I", hl.dsp.exec_cmd("desktop-focus-mode toggle"),
     "Alternar modo foco")
-bind(hyper .. " + U", hl.dsp.exec_cmd("desktop-focus-mode demo"),
-    "Activar modo demo con grabación")
+bind(hyper .. " + U", hl.dsp.exec_cmd("desktop-focus-mode demo-toggle"),
+    "Alternar modo demo con grabación")
 bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Mostrar ayuda de atajos")
 
 -- Alt+Tab has one owner: Noctalia.

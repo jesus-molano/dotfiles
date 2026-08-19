@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|ssh|media|commands} [selección]'
+	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|commands} [selección]'
 }
 
 notify_error() {
@@ -54,6 +54,14 @@ safe_display() {
 }
 
 list_projects() {
+	local path display
+	while IFS= read -r -d '' path; do
+		display="$(safe_display "$path")"
+		printf '%s\t%s — %s\n' "$(project_token session "$path")" "$(basename -- "$path")" "$display"
+	done < <(projects)
+}
+
+list_project_actions() {
 	local path display script_dir
 	script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 	while IFS= read -r -d '' path; do
@@ -136,12 +144,13 @@ list_commands() {
 }
 
 run_project() {
-	local selection=$1 action path script_dir session_action
+	local selection=$1 category=$2 action path script_dir session_action
 	path="$(find_project "$selection")" || {
 		notify_error 'El proyecto seleccionado ya no está disponible.'
 		return 1
 	}
 	action=${selection%%_*}
+	[[ "$category" != projects || "$action" == session ]] || return 2
 	case "$action" in
 	session) session_action=resume ;;
 	term) session_action=terminal ;;
@@ -199,7 +208,7 @@ run_command() {
 		exec local-dictation toggle --paste
 		;;
 	focus_toggle) exec desktop-focus-mode toggle ;;
-	demo_mode) exec desktop-focus-mode demo ;;
+	demo_mode) exec desktop-focus-mode demo-toggle ;;
 	direct_scanout_toggle)
 		command -v game-run >/dev/null 2>&1 || return 127
 		exec direct-scanout-toggle toggle
@@ -220,10 +229,11 @@ selection=${3:-}
 
 case "$mode:$category" in
 list:projects) list_projects ;;
+list:project-actions) list_project_actions ;;
 list:ssh) list_ssh ;;
 list:media) list_media ;;
 list:commands) list_commands ;;
-run:projects) [[ -n "$selection" ]] && run_project "$selection" ;;
+run:projects|run:project-actions) [[ -n "$selection" ]] && run_project "$selection" "$category" ;;
 run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
 run:media) [[ -n "$selection" ]] && run_media "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;

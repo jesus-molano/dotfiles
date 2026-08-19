@@ -238,8 +238,6 @@ config.bind(",O", "download-open --dir")
 config.bind(",D", "download-clear")
 config.bind(",B", "spawn brave {url}")
 config.bind(";B", "hint links spawn brave {hint-url}")
-config.bind(",v", "spawn --detach mpv {url}")
-config.bind(";v", "hint links spawn --detach mpv {hint-url}")
 
 # Development keeps the browser as a first-class diagnostic tool. Ctrl-E in a
 # text field still opens Neovim through editor.command.

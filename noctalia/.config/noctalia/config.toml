@@ -23,7 +23,7 @@ padding = 8
 widget_spacing = 4
 start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "dev_pulse", "screen_mirror", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
+end = [ "group:resources", "dev_pulse", "screen_mirror", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -49,6 +49,9 @@ inactive_style = "ghost"
 [widget.screen_mirror]
 type = "elijaharch/wl-screen-mirror:mirror"
 
+[widget.screen_recorder]
+type = "noctalia/screen_recorder:recorder"
+
 [shell]
 font_family = "Inter"
 clipboard_enabled = true
@@ -71,6 +74,14 @@ prefix = "proj"
 glyph = "code"
 global = false
 exec = "desktop-launcher run projects {selection}"
+
+[shell.launcher.dmenu.entry.project_actions]
+command = "desktop-launcher list project-actions"
+label = "Acciones de proyecto"
+prefix = "proj-actions"
+glyph = "code"
+global = false
+exec = "desktop-launcher run project-actions {selection}"
 
 [shell.launcher.dmenu.entry.ssh]
 command = "desktop-launcher list ssh"
@@ -239,7 +250,7 @@ copy_to_clipboard = false
 directory = "~/Videos/Recordings"
 filename_pattern = "recording_%Y%m%d_%H%M%S"
 frame_rate = 60
-hide_inactive = false
+hide_inactive = true
 replay_duration = 90
 replay_enabled = true
 replay_filename_pattern = "replay_%Y%m%d_%H%M%S"

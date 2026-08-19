@@ -28,7 +28,6 @@ def main() -> None:
         'config.bind(",y", "yank inline [{title}]({url:yank})")',
         'config.bind(";m", "hint links userscript yank-markdown-link")',
         'config.bind(",i", "devtools right")',
-        'config.bind(",v", "spawn --detach mpv {url}")',
         'c.downloads.location.suggestion = "both"',
     ):
         require(source, fragment)

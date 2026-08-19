@@ -139,7 +139,8 @@ default_preview=$(
 assert_contains 'pnpm run dev' "$default_preview"
 
 set +e
-"$project_session" --dry-run resume "$test_root/not-a-project" >/dev/null 2>&1
+PATH="$test_root/bin:$PATH" \
+	"$project_session" --dry-run resume "$test_root/not-a-project" >/dev/null 2>&1
 invalid_status=$?
 set -e
 [[ $invalid_status -ne 0 ]] || {

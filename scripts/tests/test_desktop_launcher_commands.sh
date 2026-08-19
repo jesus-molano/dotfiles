@@ -40,7 +40,7 @@ expected=$(cat <<'EOF'
 capture-context	--focus orca
 local-dictation	toggle --paste
 desktop-focus-mode	toggle
-desktop-focus-mode	demo
+desktop-focus-mode	demo-toggle
 direct-scanout-toggle	toggle
 EOF
 )

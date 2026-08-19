@@ -11,7 +11,7 @@ contexto.
 ## Orca y Codex CLI
 
 1. Pulsa `Hyper + J` para abrir `/proj`.
-2. Selecciona `Sesión Orca + terminal` para el repositorio.
+2. Selecciona el repositorio por nombre y ruta.
 3. Trabaja con Orca y Codex CLI desde el terminal que abre la sesión.
 4. Abre Nvim solo cuando necesites editar, ejecutar Task Hub, investigar un
    diagnóstico o revisar contexto.
@@ -26,21 +26,26 @@ tarea requiera un agente. Orca conserva el trabajo visual, los worktrees y sus
 terminales. Este reparto evita abrir Nvim, un agente y varios terminales para
 cada proyecto aunque solo quieras hablar con Codex.
 
-## Project Cockpit
+## Proyectos y acciones avanzadas
 
 `/proj` descubre repositorios dentro de `~/projects`, `~/work`, `~/.dotfiles` y
-`~/orca/workspaces`. Sus opciones son:
+`~/orca/workspaces`. Muestra exactamente una fila por repositorio, con su nombre
+y ruta. Al elegir una fila, registra el repositorio en Orca, enfoca o abre Orca
+y abre Ghostty/Zellij en el directorio del proyecto.
+
+`/proj-actions` muestra acciones específicas para un repositorio:
 
 | Opción | Uso |
 |---|---|
-| `Sesión Orca + terminal` | Acción diaria. Registra el repositorio en Orca y abre Ghostty/Zellij. |
+| `Sesión Orca + terminal` | Repite la sesión normal de `/proj`. |
 | `Orca` | Enfoca o abre Orca después de registrar el repositorio. |
 | `Ghostty` | Abre o recupera el terminal Zellij del repositorio. |
 | `Nvim` | Abre Nvim de forma explícita. Úsalo para código, contexto o diagnóstico. |
 | `Tareas` | Muestra tareas de `justfile`, `mise.toml` y `package.json`. |
 | `Preview` | Inicia `scripts.preview` o `scripts.dev` del proyecto. |
 
-Las tareas se eligen con `fzf` dentro de un terminal. Task Hub de Nvim detecta
+Usa `/proj-actions` solo cuando necesites una acción distinta de la sesión
+normal. Las tareas se eligen con `fzf` dentro de un terminal. Task Hub de Nvim detecta
 las mismas fuentes más `.vscode/tasks.json`.
 
 Para que `Preview` abra también qutebrowser, añade una URL local explícita al
@@ -106,10 +111,8 @@ Estos flujos son independientes del cockpit de desarrollo:
 ventana. No usa `game-run`. Stremio se abre desde la instalación Flatpak de
 usuario declarada por el perfil común.
 
-Para YouTube, qutebrowser es la ruta predeterminada. `,v` abre la página actual
-en mpv y `;v` permite elegir un enlace. El perfil instala `yt-dlp` para este
-flujo. mpv es opcional: úsalo cuando prefieras su control de teclado; no se
-fuerza para todos los vídeos.
+Para YouTube, qutebrowser es la ruta única del perfil. `/media` abre la portada
+o las suscripciones y el vídeo se reproduce en la propia página.
 
 `game-run` sí pertenece al flujo gaming. Activa rendimiento y protege No
 Molestar solo durante el juego. Si hay dos juegos simultáneos, el último en
@@ -123,7 +126,7 @@ oculta la barra.
 
 ## Task Hub de Neovim
 
-El líder de Neovim es Espacio. Abre Nvim con la acción `Nvim` de `/proj` o desde
+El líder de Neovim es Espacio. Abre Nvim con la acción `Nvim` de `/proj-actions` o desde
 un terminal del proyecto. Task Hub usa Overseer y no sustituye el terminal de
 Codex.
 
@@ -175,9 +178,13 @@ predeterminado.
 Molestar y oculta la barra. Pulsa el mismo atajo para restaurar el estado que
 había antes.
 
-`Hyper + U` activa modo demo. Añade la grabación de pantalla al modo foco. Al
-desactivarlo, detiene solo la grabación iniciada por el modo y restaura barra,
-No Molestar, cafeína y perfil energético anteriores.
+`Hyper + U` alterna modo demo. La primera pulsación inicia una grabación de la
+pantalla enfocada. La barra permanece visible y muestra una cámara roja mientras
+graba. Pulsa otra vez `Hyper + U`, o haz clic en la cámara roja, para detener la
+grabación. `Hyper + U` también restaura No Molestar, cafeína, barra y perfil
+energético al estado anterior. Un clic en la cámara detiene solo el vídeo; pulsa
+después `Hyper + U` para salir del modo demo. La cámara desaparece cuando no hay
+una grabación activa.
 
 No uses modo foco para juegos. `game-run` mantiene su propio comportamiento de
 pantalla completa y notificaciones. Si estaba activo, `game-run` lo restaura
@@ -200,8 +207,8 @@ La base revisada fija Dev Pulse `1.0.0`, Special Workspaces `1.4.0` y Screen
 Mirror `1.0.0`. `just doctor-live desktop` detecta un cambio de versión antes
 de aceptarlo como parte del perfil.
 
-El grabador de Noctalia sigue disponible en el centro de control. El modo demo
-lo controla solo durante su propia sesión.
+El grabador de Noctalia también está disponible en el centro de control. El
+modo demo detiene solo la grabación que inició él mismo.
 
 ## qutebrowser
 
@@ -226,7 +233,6 @@ Markdown y `Ctrl + E` dentro de un campo para editarlo con Neovim.
 | `;m` | Elegir un enlace con hints y copiarlo como Markdown. |
 | `,o` / `,O` / `,D` | Abrir la última descarga, abrir su directorio o limpiar descargas terminadas. |
 | `,B` / `;B` | Abrir la página o un enlace elegido en Brave. |
-| `,v` / `;v` | Abrir la página o un enlace elegido en mpv. |
 | `,E` | Editar el campo de texto activo con Neovim. |
 | `,i` / `,I` | Abrir DevTools a la derecha o mover el foco entre DevTools y la página. |
 
@@ -281,7 +287,7 @@ O mdn AbortController
 
 1. Pulsa `Hyper + V` y elige YouTube o suscripciones.
 2. Navega con los hints de qutebrowser.
-3. Usa `,v` para enviar la página a mpv o `;v` para elegir un enlace.
+3. Reproduce el vídeo directamente en qutebrowser.
 
 ### Jugar
 

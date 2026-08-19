@@ -113,8 +113,6 @@ common,themes,noto-fonts-cjk,native
 common,themes,noto-fonts-emoji,native
 common,themes,ttf-jetbrains-mono-nerd,native
 common,themes,otf-font-awesome,native
-common,media,mpv,native
-common,media,yt-dlp,native
 common,media,vlc,native
 common,media,vlc-plugins-all,native
 common,media,ffmpegthumbnailer,native

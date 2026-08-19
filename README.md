@@ -50,9 +50,9 @@ servicios quedan fuera de ambos perfiles.
 
 Project Cockpit, el puente Nvim–Orca, qutebrowser, captura OCR, Dev Pulse,
 scratchpads, Screen Mirror y el hub `/media` son comunes. Stremio, Spotify,
-mpv y `yt-dlp` funcionan en ambos perfiles. El backend Whisper/Vulkan, el
-pegado del dictado y direct scanout permanecen en `desktop`; no cargan el
-portátil antiguo con herramientas que dependen de su rendimiento.
+YouTube y las suscripciones funcionan en ambos perfiles. El backend
+Whisper/Vulkan, el pegado del dictado y direct scanout permanecen en `desktop`;
+no cargan el portátil antiguo con herramientas que dependen de su rendimiento.
 
 La arquitectura completa está documentada en [PROFILES.md](PROFILES.md).
 `profiles.sh` es la fuente única de módulos; `packages.csv` declara paquetes
@@ -347,10 +347,9 @@ Stremio es una aplicación Flatpak común. `Hyper + S` enfoca la ventana
 existente o abre la instalación de usuario. `Hyper + V` abre `/media`, con
 Stremio, Spotify, YouTube y las suscripciones de YouTube.
 
-qutebrowser reproduce YouTube normalmente. `,v` envía la página actual a mpv y
-`;v` permite elegir un enlace mediante hints. `yt-dlp` queda declarado junto a
-mpv para que ese flujo funcione sin configuración manual. El widget central de
-Noctalia y las teclas físicas controlan los reproductores compatibles.
+YouTube y las suscripciones se abren directamente en qutebrowser. El widget
+central de Noctalia y las teclas físicas controlan los reproductores
+compatibles.
 
 El hub multimedia no cambia DND, potencia, audio ni fullscreen. Si un
 reproductor no inhibe el bloqueo durante una película, usa `Hyper + C` para
@@ -422,10 +421,11 @@ La tabla completa de buffers, sesiones, Markdown, aplicaciones externas,
 DevTools, descargas y búsquedas técnicas está en la
 [guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#qutebrowser).
 
-El launcher ofrece `/proj`, `/ssh`, `/media`, `/game` y `/cmd`. `/proj` abre por defecto
-Orca y un terminal del repositorio; Nvim queda como acción explícita para
-tareas, diagnósticos y contexto. Consulta la
-[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#project-cockpit) para cada
+El launcher ofrece `/proj`, `/proj-actions`, `/ssh`, `/media`, `/game` y `/cmd`.
+`/proj` muestra una fila por repositorio, con nombre y ruta, y abre Orca con un
+terminal del repositorio. `/proj-actions` conserva las acciones explícitas como
+Nvim, tareas y preview. Consulta la
+[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#proyectos-y-acciones-avanzadas) para cada
 acción disponible.
 
 ## Secretos
@@ -593,8 +593,9 @@ Noctalia usa un horario privado local para luz nocturna, brillo DDC/CI para los
 dos Philips y el plugin oficial `noctalia/screen_recorder`. Este se materializa
 desde la fuente oficial al arrancar la configuración desplegada y usa
 `gpu-screen-recorder`: 1080p60 H.264, audio de salida y replay de 90 segundos en
-RAM. El acceso está en el centro de control. No se ejecuta `hyprsunset` en
-paralelo. La cápsula de recursos muestra uso de CPU, temperatura de CPU, RAM y
+RAM. El acceso está en el centro de control. La barra muestra una cámara roja
+solo mientras hay una grabación activa; un clic la detiene. No se ejecuta
+`hyprsunset` en paralelo. La cápsula de recursos muestra uso de CPU, temperatura de CPU, RAM y
 temperatura de la GPU; las temperaturas se actualizan cada tres segundos.
 `start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
 espera hasta veinte segundos a que todas las salidas externas activas aparezcan

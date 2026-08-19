@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: desktop-focus-mode {status|on|demo|off|toggle}'
+	printf '%s\n' 'Uso: desktop-focus-mode {status|on|demo|off|toggle|demo-toggle}'
 }
 
 readonly state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/desktop-focus-mode"
@@ -75,7 +75,9 @@ gaming_active() {
 
 recording_identity() {
 	local pid starttime
-	pid="$(pgrep -xn gpu-screen-recorder 2>/dev/null || true)"
+	# Linux trunca comm a 15 caracteres. Buscar la línea de órdenes completa
+	# evita que gpu-screen-recorder quede invisible para el modo demo.
+	pid="$(pgrep -nf '(^|/)gpu-screen-recorder([[:space:]]|$)' 2>/dev/null || true)"
 	[[ "$pid" =~ ^[0-9]+$ ]] || return 1
 	starttime="$(process_starttime "$pid")" || return 1
 	printf '%s %s\n' "$pid" "$starttime"
@@ -83,13 +85,13 @@ recording_identity() {
 
 write_state() {
 	local dnd=$1 bar_visible=$2 caffeine=$3 power_profile=$4 power_changed=$5 started_recording=$6
-	local recording_pid=$7 recording_starttime=$8 temporary
+	local recording_pid=$7 recording_starttime=$8 mode=$9 temporary
 	mkdir -p -- "$state_root"
 	chmod 700 "$state_root"
 	temporary="$(mktemp "$state_root/state.XXXXXX")"
-	printf 'dnd=%s\nbar_visible=%s\ncaffeine=%s\npower_profile=%s\npower_changed=%s\nstarted_recording=%s\nrecording_pid=%s\nrecording_starttime=%s\n' \
+	printf 'dnd=%s\nbar_visible=%s\ncaffeine=%s\npower_profile=%s\npower_changed=%s\nstarted_recording=%s\nrecording_pid=%s\nrecording_starttime=%s\nmode=%s\n' \
 		"$dnd" "$bar_visible" "$caffeine" "$power_profile" "$power_changed" "$started_recording" \
-		"$recording_pid" "$recording_starttime" \
+		"$recording_pid" "$recording_starttime" "$mode" \
 		>"$temporary"
 	mv -f -- "$temporary" "$state_file"
 }
@@ -108,8 +110,18 @@ state_value() {
 		[[ "$line" =~ ^[0-9]+$ ]] || return 1
 		printf '%s\n' "$line"
 		;;
+	mode:focus | mode:demo)
+		printf '%s\n' "$line"
+		;;
 	*) return 1 ;;
 	esac
+}
+
+state_mode() {
+	local mode
+	mode="$(state_value mode 2>/dev/null || true)"
+	# Los estados creados por una versión anterior eran siempre modo foco.
+	printf '%s\n' "${mode:-focus}"
 }
 
 recording_active() {
@@ -143,7 +155,8 @@ enable_failed() {
 
 enable_mode() {
 	local demo=$1 dnd bar_visible caffeine power_profile power_changed=false started_recording=false
-	local recording_pid=0 recording_starttime=0 identity
+	local recording_pid=0 recording_starttime=0 identity mode=focus
+	[[ "$demo" == true ]] && mode=demo
 	[[ ! -e "$state_file" ]] || {
 		printf '%s\n' 'El modo foco ya está activo.' >&2
 		exit 1
@@ -174,7 +187,7 @@ enable_mode() {
 	# Persistir primero permite que `off` restaure el host incluso si una acción
 	# posterior falla o se interrumpe.
 	write_state "$dnd" "$bar_visible" "$caffeine" "$power_profile" "$power_changed" "$started_recording" \
-		"$recording_pid" "$recording_starttime"
+		"$recording_pid" "$recording_starttime" "$mode"
 
 	if [[ "$caffeine" == off ]]; then
 		noctalia msg caffeine-enable >/dev/null || enable_failed 'no se pudo activar cafeína.'
@@ -183,7 +196,7 @@ enable_mode() {
 	if [[ "$power_profile" != performance ]]; then
 		power_changed=true
 		write_state "$dnd" "$bar_visible" "$caffeine" "$power_profile" "$power_changed" "$started_recording" \
-			"$recording_pid" "$recording_starttime"
+			"$recording_pid" "$recording_starttime" "$mode"
 		noctalia msg power-set performance >/dev/null || enable_failed 'no se pudo activar performance.'
 		wait_for_power_profile performance || enable_failed 'el perfil performance no llegó a activarse.'
 	fi
@@ -191,8 +204,10 @@ enable_mode() {
 	if [[ "$dnd" == off ]]; then
 		noctalia msg notification-dnd-set on >/dev/null || enable_failed 'no se pudo activar DND.'
 	fi
-	if [[ "$bar_visible" == true ]]; then
+	if [[ "$demo" == false && "$bar_visible" == true ]]; then
 		noctalia msg bar-hide >/dev/null || enable_failed 'no se pudo ocultar la barra.'
+	elif [[ "$demo" == true && "$bar_visible" == false ]]; then
+		noctalia msg bar-show >/dev/null || enable_failed 'no se pudo mostrar el indicador de grabación.'
 	fi
 
 	if [[ "$demo" == true ]] && ! recording_active; then
@@ -202,11 +217,14 @@ enable_mode() {
 				[[ -n "$identity" ]] && break
 				sleep 0.05
 			done
-			[[ -n "$identity" ]] || enable_failed 'la grabación no llegó al estado activo.'
+			if [[ -z "$identity" ]]; then
+				noctalia msg plugin noctalia/screen_recorder:service all stop >/dev/null 2>&1 || true
+				enable_failed 'la grabación no llegó al estado activo.'
+			fi
 			read -r recording_pid recording_starttime <<<"$identity"
 			started_recording=true
 			write_state "$dnd" "$bar_visible" "$caffeine" "$power_profile" "$power_changed" "$started_recording" \
-				"$recording_pid" "$recording_starttime"
+				"$recording_pid" "$recording_starttime" "$mode"
 		else
 			enable_failed 'no se pudo iniciar la grabación.'
 		fi
@@ -215,7 +233,7 @@ enable_mode() {
 
 disable_mode() {
 	local dnd bar_visible caffeine power_profile power_changed started_recording
-	local recording_pid recording_starttime restore_failed=false
+	local recording_pid recording_starttime mode restore_failed=false
 	[[ -f "$state_file" ]] || {
 		printf '%s\n' 'El modo foco no está activo.' >&2
 		exit 1
@@ -228,13 +246,16 @@ disable_mode() {
 	started_recording="$(state_value started_recording)" || exit 1
 	recording_pid="$(state_value recording_pid)" || exit 1
 	recording_starttime="$(state_value recording_starttime)" || exit 1
+	mode="$(state_mode)"
 
 	if [[ "$started_recording" == true &&
 		"$(process_starttime "$recording_pid" 2>/dev/null || true)" == "$recording_starttime" ]]; then
 		noctalia msg plugin noctalia/screen_recorder:service all stop >/dev/null 2>&1 || restore_failed=true
 	fi
-	if [[ "$bar_visible" == true ]]; then
+	if [[ "$mode" == focus && "$bar_visible" == true ]]; then
 		noctalia msg bar-show >/dev/null || restore_failed=true
+	elif [[ "$mode" == demo && "$bar_visible" == false ]]; then
+		noctalia msg bar-hide >/dev/null || restore_failed=true
 	fi
 	if [[ "$dnd" == off ]]; then
 		noctalia msg notification-dnd-set off >/dev/null || restore_failed=true
@@ -284,6 +305,18 @@ toggle)
 		disable_mode
 	else
 		enable_mode false
+	fi
+	;;
+demo-toggle)
+	if [[ -f "$state_file" ]]; then
+		if [[ "$(state_mode)" == demo ]]; then
+			disable_mode
+		else
+			printf '%s\n' 'El modo foco está activo; desactívalo con Hyper+I antes de iniciar una demo.' >&2
+			exit 1
+		fi
+	else
+		enable_mode true
 	fi
 	;;
 --help | -h) usage ;;

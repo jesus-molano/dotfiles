@@ -82,6 +82,8 @@ EOF
 cat >"$test_root/bin/pgrep" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+[[ "$1" == -nf ]]
+[[ "$2" == '(^|/)gpu-screen-recorder([[:space:]]|$)' ]]
 [[ -s "$TEST_RECORDING_FILE" ]] || exit 1
 pid=$(<"$TEST_RECORDING_FILE")
 [[ -r "/proc/$pid/stat" ]] || exit 1
@@ -93,6 +95,7 @@ chmod +x "$test_root/bin/noctalia" "$test_root/bin/systemd-inhibit" \
 
 run_case() {
 	local name=$1 action=$2 dnd=$3 bar_visible=$4 caffeine=$5 power=$6 recording=$7 expected=$8
+	local close_action=${9:-off}
 	local log="$test_root/$name.log" recording_file="$test_root/$name-recording"
 	: >"$log"
 	: >"$recording_file"
@@ -115,7 +118,7 @@ run_case() {
 		XDG_RUNTIME_DIR="$test_root/$name-runtime" \
 		TEST_CAFFEINE_FILE="$test_root/$name-caffeine" TEST_POWER_FILE="$test_root/$name-power" \
 		TEST_LOG="$log" TEST_DND="$dnd" TEST_BAR_VISIBLE="$bar_visible" TEST_RECORDING_FILE="$recording_file" \
-		"$helper" off
+		"$helper" "$close_action"
 	if [[ -s "$recording_file" ]]; then
 		kill "$(<"$recording_file")" 2>/dev/null || true
 	fi
@@ -134,9 +137,13 @@ run_case() {
 
 run_case focus on off true off balanced false \
 	$'caffeine:on\npower:performance\ndnd:on\nbar:hide\nbar:show\ndnd:off\npower:balanced\ncaffeine:off'
-run_case demo demo off true off power-saver false \
-	$'caffeine:on\npower:performance\ndnd:on\nbar:hide\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\nbar:show\ndnd:off\npower:power-saver\ncaffeine:off'
-run_case preserve demo on false on performance true ''
+run_case demo demo-toggle off true off power-saver false \
+	$'caffeine:on\npower:performance\ndnd:on\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\ndnd:off\npower:power-saver\ncaffeine:off' \
+	demo-toggle
+run_case demo-hidden demo-toggle off false off balanced false \
+	$'caffeine:on\npower:performance\ndnd:on\nbar:show\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\nbar:hide\ndnd:off\npower:balanced\ncaffeine:off' \
+	demo-toggle
+run_case preserve demo-toggle on false on performance true $'bar:show\nbar:hide' demo-toggle
 
 mkdir -p "$test_root/gaming-runtime/dotfiles-gaming-sessions"
 shell_starttime=$(awk '{ print $22 }' "/proc/$$/stat")
