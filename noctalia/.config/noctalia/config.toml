@@ -27,7 +27,7 @@ end = [ "group:resources", "dev_pulse", "screen_mirror", "screen_recorder", "pri
 
 [[bar.default.capsule_group]]
 id = "resources"
-members = [ "gpu_usage", "gpu_temp", "gpu_vram" ]
+members = [ "cpu", "cpu_temp", "gpu_usage", "gpu_temp", "gpu_vram" ]
 fill = "surface_variant"
 padding = 5.0
 opacity = 0.82
@@ -35,6 +35,14 @@ enabled = true
 
 [widget.dev_pulse]
 type = "dotfiles/dev-pulse:pulse"
+
+[widget.gpu_usage]
+type = "sysmon"
+stat = "gpu_usage"
+
+[widget.gpu_vram]
+type = "sysmon"
+stat = "gpu_vram"
 
 [widget.special_workspaces]
 type = "jamesfeeder/special-workspaces:special-workspaces"
