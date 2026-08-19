@@ -27,7 +27,7 @@ end = [ "group:resources", "dev_pulse", "screen_mirror", "screen_recorder", "pri
 
 [[bar.default.capsule_group]]
 id = "resources"
-members = [ "cpu", "cpu_temp", "ram", "gpu_temp" ]
+members = [ "gpu_usage", "gpu_temp", "gpu_vram" ]
 fill = "surface_variant"
 padding = 5.0
 opacity = 0.82

@@ -595,8 +595,8 @@ desde la fuente oficial al arrancar la configuración desplegada y usa
 `gpu-screen-recorder`: 1080p60 H.264, audio de salida y replay de 90 segundos en
 RAM. El acceso está en el centro de control. La barra muestra una cámara roja
 solo mientras hay una grabación activa; un clic la detiene. No se ejecuta
-`hyprsunset` en paralelo. La cápsula de recursos muestra uso de CPU, temperatura de CPU, RAM y
-temperatura de la GPU; las temperaturas se actualizan cada tres segundos.
+`hyprsunset` en paralelo. La cápsula de recursos muestra uso, temperatura y VRAM
+de la GPU; estas métricas se actualizan cada tres segundos.
 `start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
 espera hasta veinte segundos a que todas las salidas externas activas aparezcan
 en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
