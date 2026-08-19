@@ -427,6 +427,35 @@ check_backup_runtime() {
 }
 
 check_desktop_runtime() {
+	local command plugin_list
+	for command in wl-mirror whisper-cli tesseract wtype; do
+		if command -v "$command" >/dev/null 2>&1; then
+			ok "Flujo desktop: $command disponible"
+		else
+			fail "Flujo desktop: falta $command"
+		fi
+	done
+	if pacman -Qq ggml-cpu ggml-vulkan >/dev/null 2>&1; then
+		ok "Whisper: backends GGML CPU y Vulkan instalados"
+	else
+		fail "Whisper: faltan backends GGML CPU o Vulkan"
+	fi
+	if [[ -s "$HOME/.local/share/whisper.cpp/ggml-base.bin" ]]; then
+		ok "Whisper: modelo base local presente"
+	else
+		warn "Whisper: falta el modelo base; ejecuta just dictation-setup"
+	fi
+	if plugin_list="$(noctalia msg plugins list 2>/dev/null)"; then
+		if grep -Fxq 'dotfiles/dev-pulse [local] 1.0.0 enabled requires dev-pulse-status' <<<"$plugin_list" &&
+			grep -Fxq 'jamesfeeder/special-workspaces [community] 1.4.0 enabled' <<<"$plugin_list" &&
+			grep -Fxq 'elijaharch/wl-screen-mirror [community] 1.0.0 enabled' <<<"$plugin_list"; then
+			ok "Noctalia: versiones revisadas de Dev Pulse, workspaces y mirror"
+		else
+			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
+		fi
+	else
+		fail "Noctalia: no se pudo consultar el catálogo de plugins activo"
+	fi
 	if command -v ddcutil >/dev/null 2>&1; then
 		if ddcutil detect --brief >/dev/null 2>&1; then
 			ok "DDC/CI responde para gestionar brillo externo"
@@ -442,6 +471,21 @@ check_desktop_runtime() {
 		fail "gpu-screen-recorder no está instalado"
 	fi
 	check_backup_runtime
+}
+
+check_desktop_workflows() {
+	check "Captura OCR a contexto" "$repo_root/scripts/tests/test_capture_context.sh"
+	check "Modo foco y demo reversible" "$repo_root/scripts/tests/test_desktop_focus_mode.sh"
+	check "Acciones locales del launcher" "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
+	check "Launcher multimedia" "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
+	check "Estado del widget Dev Pulse" "$repo_root/scripts/tests/test_dev_pulse_status.sh"
+	check "Direct scanout reversible" "$repo_root/scripts/tests/test_direct_scanout_toggle.sh"
+	check "Dictado local" "$repo_root/scripts/tests/test_local_dictation.sh"
+	check "Project Cockpit" "$repo_root/scripts/tests/test_project_session.sh"
+	check "Proveedor de proyectos" "$repo_root/scripts/tests/test_project_launcher.sh"
+	check "Configuración de qutebrowser" env PYTHONDONTWRITEBYTECODE=1 \
+		python "$repo_root/scripts/tests/test_qutebrowser_config.py"
+	check "Enlaces Markdown de qutebrowser" "$repo_root/scripts/tests/test_qutebrowser_yank_markdown.sh"
 }
 
 if [[ "$mode" != live ]]; then
@@ -461,6 +505,7 @@ if [[ "$mode" != live ]]; then
 		"$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
 	check "Sesión gaming sin notificaciones" \
 		"$repo_root/scripts/tests/test_game_run_dnd.sh"
+	check_desktop_workflows
 	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
 	if [[ "$mode" == config ]]; then

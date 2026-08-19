@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Focus an existing Stremio window by its Wayland app id. If no matching
+# surface exists, Flatpak/DBus starts or activates the application.
+if command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1; then
+	address="$(hyprctl clients -j 2>/dev/null | jq -er '
+		first(.[] | select(
+			[((.class // "") | ascii_downcase), ((.initialClass // "") | ascii_downcase)]
+			| any(. == "stremio" or . == "com.stremio.stremio")
+		) | .address) // empty
+	' 2>/dev/null || true)"
+	if [[ "$address" =~ ^0x[0-9a-fA-F]+$ ]]; then
+		exec hyprctl eval 'hl.dispatch(hl.dsp.focus({ window = "class:^(com\\.stremio\\.Stremio|[Ss]tremio)$" }))'
+	fi
+fi
+
+exec uwsm app -- flatpak --user run com.stremio.Stremio

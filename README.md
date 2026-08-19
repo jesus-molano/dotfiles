@@ -48,6 +48,12 @@ servicios quedan fuera de ambos perfiles.
 `gaming` y `backup` son exclusivos del sobremesa y solo gestionan archivos en
 `HOME`. CHWD continúa siendo el propietario del controlador NVIDIA.
 
+Project Cockpit, el puente Nvim–Orca, qutebrowser, captura OCR, Dev Pulse,
+scratchpads, Screen Mirror y el hub `/media` son comunes. Stremio, Spotify,
+mpv y `yt-dlp` funcionan en ambos perfiles. El backend Whisper/Vulkan, el
+pegado del dictado y direct scanout permanecen en `desktop`; no cargan el
+portátil antiguo con herramientas que dependen de su rendimiento.
+
 La arquitectura completa está documentada en [PROFILES.md](PROFILES.md).
 `profiles.sh` es la fuente única de módulos; `packages.csv` declara paquetes
 Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
@@ -63,6 +69,10 @@ VS Code/VSCodium.
 abrir la aplicación; Hyprland lo ejecuta una vez al comenzar cada sesión.
 1Password arranca de forma silenciosa después del `StatusNotifierWatcher` de
 Noctalia y permanece accesible como icono inline en su bandeja.
+
+La [guía del flujo desktop](docs/DESKTOP-WORKFLOW.md) describe el uso diario
+keyboard-first: Project Cockpit, Orca, Codex CLI, Task Hub, captura OCR,
+dictado, Noctalia y qutebrowser.
 
 ## Instalación paso a paso
 
@@ -324,8 +334,27 @@ el NVMe Btrfs y no en NTFS. El DualSense es opcional y el soporte anti-cheat
 depende del publisher. La auditoría de ReBAR y DOCP se documenta, pero no cambia
 firmware ni configuración de sistema.
 
+`game-run` comparte la propiedad de No Molestar entre sesiones simultáneas. La
+primera sesión guarda el estado y la última lo restaura. Terminar un juego no
+puede reactivar notificaciones mientras otro siga abierto.
+
 Consulta [GAMING.md](GAMING.md) para launchers, almacenamiento, diagnóstico,
 rollback seguro, limitaciones y fuentes.
+
+## Multimedia
+
+Stremio es una aplicación Flatpak común. `Hyper + S` enfoca la ventana
+existente o abre la instalación de usuario. `Hyper + V` abre `/media`, con
+Stremio, Spotify, YouTube y las suscripciones de YouTube.
+
+qutebrowser reproduce YouTube normalmente. `,v` envía la página actual a mpv y
+`;v` permite elegir un enlace mediante hints. `yt-dlp` queda declarado junto a
+mpv para que ese flujo funcione sin configuración manual. El widget central de
+Noctalia y las teclas físicas controlan los reproductores compatibles.
+
+El hub multimedia no cambia DND, potencia, audio ni fullscreen. Si un
+reproductor no inhibe el bloqueo durante una película, usa `Hyper + C` para
+activar cafeína y desactívala al terminar.
 
 ## Atajos
 
@@ -346,6 +375,8 @@ rollback seguro, limitaciones y fuentes.
 | `Hyper + F` | Alternar pantalla completa |
 | `Alt + S` | Mostrar u ocultar el scratchpad |
 | `Alt + Shift + S` | Enviar al scratchpad |
+| `Alt + A` / `Alt + Shift + A` | Mostrar o enviar al scratchpad de IA |
+| `Alt + Z` / `Alt + Shift + Z` | Mostrar o enviar al scratchpad de logs |
 | `Alt + G` | Alternar grupo de ventanas |
 | `Alt + N` / `Alt + Shift + N` | Recorrer ventanas del grupo |
 
@@ -359,13 +390,20 @@ rollback seguro, limitaciones y fuentes.
 | `Hyper + Y` | Yazi en Ghostty |
 | `Hyper + O` | Enfocar o abrir Orca |
 | `Hyper + M` | Enfocar o abrir Spotify |
+| `Hyper + S` | Enfocar o abrir Stremio |
 | `Hyper + G` | Enfocar o abrir Steam (`desktop`) |
 | `Hyper + 1` | 1Password |
 | `Alt + Space` | Launcher de Noctalia |
+| `Hyper + Space` | Abrir `/cmd` |
+| `Hyper + J` | Abrir `/proj` |
+| `Hyper + V` | Abrir `/media` |
 | `Hyper + N` | Notificaciones |
-| `Hyper + P` | Captura de región |
+| `Hyper + P` | Capturar una región y preparar contexto para Orca |
 | `Hyper + K` | Selector de color |
 | `Hyper + C` | Cafeína |
+| `Hyper + I` | Alternar modo foco |
+| `Hyper + U` | Activar modo demo con grabación |
+| `Hyper + T` | Iniciar o terminar dictado local y pegar el texto (`desktop`) |
 | `Hyper + L` | Bloquear la sesión |
 | `Hyper + Q` | Menú de sesión |
 | `Hyper + 7` | Ayuda de atajos |
@@ -379,29 +417,16 @@ brillo viven solo en `hypr-laptop`.
 
 ### qutebrowser
 
-La configuración usa la paleta Project Atlas, navegación Vim y bloqueo ABP +
-hosts. Además de los atajos nativos (`f`, `F`, `o`, `t`, `J`, `K`, `d`, `u`):
+qutebrowser usa la paleta Project Atlas, navegación Vim y el líder local `,`.
+La tabla completa de buffers, sesiones, Markdown, aplicaciones externas,
+DevTools, descargas y búsquedas técnicas está en la
+[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#qutebrowser).
 
-| Atajo | Acción |
-|---|---|
-| `,a` | Alternar el bloqueo temporalmente para el dominio actual |
-| `,A` | Alternar el bloqueo globalmente durante la sesión |
-| `,u` | Actualizar todas las listas de bloqueo |
-| `,p` | Abrir una ventana de navegación privada |
-| `,B` | Abrir la página actual en Brave |
-| `;B` | Elegir mediante hints un enlace para abrirlo en Brave |
-| `,e` | Editar la configuración en Neovim |
-| `,r` | Recargar la configuración |
-
-Los buscadores rápidos disponibles son `aw` (ArchWiki), `g` (Google), `gh`
-(GitHub) y `yt` (YouTube); por ejemplo, `O aw qutebrowser`.
-
-El launcher admite proveedores persistentes: `/proj` registra un repositorio en
-Orca o abre Ghostty en su directorio, `/ssh` abre un alias de `~/.ssh/config`,
-`/game` reúne launchers y SCX Manager solo en `desktop`, y `/cmd` ofrece
-acciones locales acotadas. Las rutas nunca se interpolan directamente en el
-shell: el proveedor solo entrega identificadores que `desktop-launcher` vuelve
-a resolver.
+El launcher ofrece `/proj`, `/ssh`, `/media`, `/game` y `/cmd`. `/proj` abre por defecto
+Orca y un terminal del repositorio; Nvim queda como acción explícita para
+tareas, diagnósticos y contexto. Consulta la
+[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#project-cockpit) para cada
+acción disponible.
 
 ## Secretos
 
@@ -488,6 +513,12 @@ primero y exige autorización inmediatamente antes de cualquier escritura.
 También incorpora reglas de auditoría estrechas y notificaciones que nunca
 incluyen el prompt ni la respuesta. La configuración viva se fusiona para
 conservar trusts, hooks de Orca y MCP:
+
+En el uso diario, Orca y Codex CLI son el núcleo: Project Cockpit abre Orca y
+un terminal reutilizable por repositorio; Codex se ejecuta desde ese terminal.
+Nvim sirve para edición, tareas, diagnósticos y preparación de contexto. La
+[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#orca-y-codex-cli) define
+este reparto.
 
 ```bash
 just codex-skills-check
@@ -578,6 +609,10 @@ mueve también las aplicaciones que hayan abierto un stream antes de que aparezc
 el monitor. Un clic central sobre el icono de volumen de Noctalia alterna entre
 los perfiles `HDMI` y `HDMI 2`. El clic normal conserva el panel de audio. En el
 icono de Bluetooth, el clic derecho abre su panel y ya no apaga el adaptador.
+
+La guía diaria de captura OCR, dictado local, modo foco/demo, Dev Pulse,
+scratchpads y espejo de pantalla está en
+[docs/DESKTOP-WORKFLOW.md](docs/DESKTOP-WORKFLOW.md).
 
 ## Validación
 

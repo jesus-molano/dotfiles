@@ -1,0 +1,186 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' \
+		'Uso: project-task {--available|--detect|--menu|run} RUTA [just|mise|package] [tarea]' \
+		'' \
+		'run ejecuta una tarea mediante argumentos separados; nunca evalúa texto de un archivo del proyecto.'
+}
+
+project_path() {
+	local value=$1 resolved
+	resolved="$(readlink -f -- "$value" 2>/dev/null || true)"
+	[[ -n "$resolved" && -d "$resolved" && -e "$resolved/.git" ]] || return 1
+	printf '%s' "$resolved"
+}
+
+has_just() {
+	[[ -f "$1/justfile" || -f "$1/Justfile" ]]
+}
+
+has_mise() {
+	[[ -f "$1/mise.toml" || -f "$1/.mise.toml" ]]
+}
+
+has_package() {
+	[[ -f "$1/package.json" ]] && jq -e '.scripts? | type == "object" and length > 0' "$1/package.json" >/dev/null
+}
+
+detect() {
+	local path=$1 found=false
+	if has_just "$path"; then
+		printf '%s\n' just
+		found=true
+	fi
+	if has_mise "$path"; then
+		printf '%s\n' mise
+		found=true
+	fi
+	if has_package "$path"; then
+		printf '%s\n' package
+		found=true
+	fi
+	"$found"
+}
+
+task_exists() {
+	local path=$1 runner=$2 task=$3
+	case "$runner" in
+	just)
+		# Recipe names are identifiers in just.  This keeps execution argument-safe.
+		[[ "$task" =~ ^[A-Za-z0-9_-]+$ ]]
+		;;
+mise)
+		[[ "$task" =~ ^[A-Za-z0-9_.:-]+$ ]]
+		;;
+package)
+		jq -e --arg task "$task" '.scripts[$task] | type == "string"' "$path/package.json" >/dev/null
+		;;
+*) return 1 ;;
+	esac
+}
+
+print_package_tasks() {
+	jq -r '.scripts | keys[] | select(test("^[A-Za-z0-9_.:-]+$"))' "$1/package.json"
+}
+
+print_just_tasks() {
+	just --summary --unsorted --working-directory "$1" 2>/dev/null |
+		tr ' ' '\n' | sed '/^$/d' | LC_ALL=C sort -u
+}
+
+print_mise_tasks() {
+	mise tasks ls --name-only --local --cd "$1" 2>/dev/null |
+		sed -nE '/^[A-Za-z0-9_.:-]+$/p'
+}
+
+menu_rows() {
+	local path=$1 task
+	if has_just "$path"; then
+		while IFS= read -r task; do
+			[[ -n "$task" ]] && printf 'just\t%s\tjust · %s\n' "$task" "$task"
+		done < <(print_just_tasks "$path")
+	fi
+	if has_mise "$path"; then
+		while IFS= read -r task; do
+			[[ -n "$task" ]] && printf 'mise\t%s\tmise · %s\n' "$task" "$task"
+		done < <(print_mise_tasks "$path")
+	fi
+	if has_package "$path"; then
+		while IFS= read -r task; do
+			[[ -n "$task" ]] && printf 'package\t%s\tpackage.json · %s\n' "$task" "$task"
+		done < <(print_package_tasks "$path")
+	fi
+}
+
+menu() {
+	local path=$1 selection runner task status
+	cd -- "$path"
+	if { [[ -t 0 && -t 1 ]] || [[ ${PROJECT_TASK_FORCE_SELECTOR:-0} == 1 ]]; } &&
+		command -v fzf >/dev/null 2>&1; then
+		selection="$(menu_rows "$path" | fzf \
+			--delimiter=$'\t' --with-nth=3 --layout=reverse --border \
+			--prompt='Tarea> ' --header="$(basename -- "$path") · Esc abre una shell")" || true
+		if [[ -n "$selection" ]]; then
+			IFS=$'\t' read -r runner task _ <<<"$selection"
+			printf 'Proyecto: %s\nTarea: %s · %s\n\n' "$path" "$runner" "$task"
+			set +e
+			run_task "$path" "$runner" "$task"
+			status=$?
+			set -e
+			printf '\nTarea terminada con código %s.\n' "$status"
+		fi
+		exec "${SHELL:-bash}" -i
+	fi
+
+	printf 'Proyecto: %s\n\n' "$path"
+	if has_just "$path"; then
+		printf '%s\n' 'just:'
+		just --list --unsorted --working-directory "$path" 2>/dev/null || true
+		printf 'Ejecutar: project-task run %q just NOMBRE\n\n' "$path"
+	fi
+	if has_mise "$path"; then
+		printf '%s\n' 'mise:'
+		mise tasks ls --cd "$path" 2>/dev/null || true
+		printf 'Ejecutar: project-task run %q mise NOMBRE\n\n' "$path"
+	fi
+	if has_package "$path"; then
+		printf '%s\n' 'package.json:'
+		print_package_tasks "$path" | sed 's/^/  /'
+		printf 'Ejecutar: project-task run %q package NOMBRE\n' "$path"
+	fi
+	printf '\nAbriendo una shell en el proyecto.\n'
+	exec "${SHELL:-bash}" -i
+}
+
+run_task() {
+	local path=$1 runner=$2 task=$3
+	task_exists "$path" "$runner" "$task" || {
+		printf 'Tarea no válida: %s/%s\n' "$runner" "$task" >&2
+		return 2
+	}
+	cd -- "$path"
+	case "$runner" in
+	just) just "$task" ;;
+	mise) mise run "$task" ;;
+	package)
+		if [[ -f pnpm-lock.yaml ]] && command -v pnpm >/dev/null 2>&1; then
+			pnpm run "$task"
+			return
+		fi
+		npm run "$task"
+		;;
+	esac
+}
+
+if (($# == 0)); then
+	set -- --menu "$PWD"
+fi
+
+(($# >= 2)) || {
+	usage >&2
+	exit 2
+}
+
+action=$1
+path="$(project_path "$2")" || {
+	printf '%s\n' 'La ruta no es un repositorio Git disponible.' >&2
+	exit 1
+}
+
+case "$action" in
+--available)
+	detect "$path" >/dev/null
+	;;
+--detect) detect "$path" ;;
+--menu) menu "$path" ;;
+run)
+	(($# == 4)) || { usage >&2; exit 2; }
+	run_task "$path" "$3" "$4"
+	;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

@@ -40,6 +40,7 @@ return {
         { "<leader>d", group = "debug" },
         { "<leader>f", group = "file/find" },
         { "<leader>g", group = "git" },
+        { "<leader>j", group = "jobs/tasks" },
         { "<leader>q", group = "quit/session" },
         { "<leader>s", group = "search" },
         { "<leader>t", group = "test" },

@@ -1,0 +1,53 @@
+[general]
+fullscreen = false
+resize = { mode = "smart" }
+floating-hack = true
+auto-copy = false
+early-exit = [ "all" ]
+corner-roundness = 12
+initial-tool = "rectangle"
+copy-command = "wl-copy"
+annotation-size-factor = 0.7
+save-after-copy = false
+default-hide-toolbars = false
+focus-toggles-toolbars = false
+default-fill-shapes = false
+primary-highlighter = "block"
+disable-notifications = true
+actions-on-right-click = []
+actions-on-enter = [ "save-to-file", "exit" ]
+actions-on-escape = [ "exit" ]
+no-window-decoration = true
+brush-smooth-history-size = 8
+pan-step-size = 50.0
+zoom-factor = 1.1
+text-move-length = 20.0
+title = "Captura a contexto"
+app-id = "org.satty.satty"
+
+[keybinds]
+pointer = "1"
+crop = "2"
+brush = "3"
+line = "4"
+arrow = "5"
+rectangle = "6"
+ellipse = "7"
+text = "8"
+marker = "9"
+blur = "0"
+highlight = "h"
+
+[font]
+family = "JetBrainsMono Nerd Font"
+
+[color-palette]
+palette = [
+  "#ff5b4d",
+  "#73bd8a",
+  "#d8aa5d",
+  "#83a7c4",
+  "#b98eaa",
+  "#f1f3f5",
+]
+custom = []

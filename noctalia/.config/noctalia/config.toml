@@ -21,9 +21,9 @@ capsule_opacity = 0.82
 capsule_padding = 6
 padding = 8
 widget_spacing = 4
-start = [ "workspaces", "active_window" ]
+start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
+end = [ "group:resources", "dev_pulse", "screen_mirror", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -32,6 +32,22 @@ fill = "surface_variant"
 padding = 5.0
 opacity = 0.82
 enabled = true
+
+[widget.dev_pulse]
+type = "dotfiles/dev-pulse:pulse"
+
+[widget.special_workspaces]
+type = "jamesfeeder/special-workspaces:special-workspaces"
+max_label_chars = 3
+hide_inactive = false
+capsule_radius = 8
+capsule_padding = 4
+capsule_min_width = 28
+active_style = "fill"
+inactive_style = "ghost"
+
+[widget.screen_mirror]
+type = "elijaharch/wl-screen-mirror:mirror"
 
 [shell]
 font_family = "Inter"
@@ -63,6 +79,14 @@ prefix = "ssh"
 glyph = "server"
 global = false
 exec = "desktop-launcher run ssh {selection}"
+
+[shell.launcher.dmenu.entry.media]
+command = "desktop-launcher list media"
+label = "Multimedia"
+prefix = "media"
+glyph = "play"
+global = false
+exec = "desktop-launcher run media {selection}"
 
 [shell.launcher.dmenu.entry.commands]
 command = "desktop-launcher list commands"
@@ -204,7 +228,7 @@ enabled = false
 
 [plugins]
 auto_update = false
-enabled = [ "noctalia/screen_recorder" ]
+enabled = [ "noctalia/screen_recorder", "dotfiles/dev-pulse", "jamesfeeder/special-workspaces", "elijaharch/wl-screen-mirror" ]
 
 [plugin_settings."noctalia/screen_recorder"]
 audio_bitrate = 0

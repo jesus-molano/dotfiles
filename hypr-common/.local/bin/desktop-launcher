@@ -2,7 +2,7 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|ssh|commands} [selección]'
+	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|ssh|media|commands} [selección]'
 }
 
 notify_error() {
@@ -54,18 +54,30 @@ safe_display() {
 }
 
 list_projects() {
-	local path display
+	local path display script_dir
+	script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 	while IFS= read -r -d '' path; do
 		display="$(safe_display "$path")"
+		printf '%s\tSesión Orca + terminal - %s\n' "$(project_token session "$path")" "$display"
 		printf '%s\tOrca - %s\n' "$(project_token orca "$path")" "$display"
 		printf '%s\tGhostty - %s\n' "$(project_token term "$path")" "$display"
+		printf '%s\tNvim - %s\n' "$(project_token nvim "$path")" "$display"
+		if "$script_dir/project-session" has-tasks "$path" >/dev/null 2>&1; then
+			printf '%s\tTareas - %s\n' "$(project_token tasks "$path")" "$display"
+		fi
+		if "$script_dir/project-session" has-preview "$path" >/dev/null 2>&1; then
+			printf '%s\tPreview - %s\n' "$(project_token preview "$path")" "$display"
+		fi
 	done < <(projects)
 }
 
 find_project() {
 	local selection=$1 action path
 	action=${selection%%_*}
-	[[ "$action" == orca || "$action" == term ]] || return 1
+	case "$action" in
+	session|orca|term|nvim|tasks|preview) ;;
+	*) return 1 ;;
+	esac
 	while IFS= read -r -d '' path; do
 		[[ "$(project_token "$action" "$path")" == "$selection" ]] || continue
 		printf '%s' "$path"
@@ -97,39 +109,53 @@ list_ssh() {
 	done < <(ssh_hosts)
 }
 
+list_media() {
+	printf '%s\n' \
+		$'stremio\tStremio' \
+		$'youtube\tYouTube' \
+		$'youtube_subscriptions\tYouTube - suscripciones' \
+		$'spotify\tSpotify'
+}
+
 list_commands() {
 	printf '%s\n' \
 		$'doctor_host\tAuditar el host actual' \
 		$'system_monitor\tbtop en Ghostty' \
 		$'noctalia_settings\tAbrir ajustes de Noctalia' \
+		$'capture_context\tCapturar, anotar y preparar contexto para Orca' \
+		$'focus_toggle\tAlternar modo foco' \
+		$'demo_mode\tPreparar una demo o grabación' \
 		$'power_balanced\tPerfil energetico balanced' \
 		$'power_performance\tPerfil energetico performance'
+	if command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1; then
+		printf '%s\n' $'dictation_toggle\tIniciar o terminar dictado local'
+	fi
+	if command -v game-run >/dev/null 2>&1; then
+		printf '%s\n' $'direct_scanout_toggle\tAlternar direct scanout auto (experimental)'
+	fi
 }
 
 run_project() {
-	local selection=$1 action path
+	local selection=$1 action path script_dir session_action
 	path="$(find_project "$selection")" || {
 		notify_error 'El proyecto seleccionado ya no está disponible.'
 		return 1
 	}
 	action=${selection%%_*}
-	if [[ "$action" == term ]]; then
-		exec uwsm app -- ghostty --working-directory="$path"
-	fi
-	command -v orca-ide >/dev/null 2>&1 || {
-		notify_error 'orca-ide no está disponible en PATH.'
+	case "$action" in
+	session) session_action=resume ;;
+	term) session_action=terminal ;;
+	*) session_action=$action ;;
+	esac
+	script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+	[[ -x "$script_dir/project-session" ]] || {
+		notify_error 'project-session no está disponible.'
 		return 127
 	}
-	local repo_json
-	if ! repo_json="$(orca-ide repo list --json 2>/dev/null)" ||
-		! jq -e --arg path "$path" \
-			'.ok == true and any(.result.repos[]?; .path == $path)' \
-			>/dev/null <<<"$repo_json"; then
-		if ! orca-ide repo add --path "$path" --json >/dev/null 2>&1; then
-			notify_error 'Orca no pudo registrar el proyecto; se abrirá igualmente.'
-		fi
+	if [[ "${PROJECT_SESSION_DRY_RUN:-0}" == 1 ]]; then
+		exec "$script_dir/project-session" --dry-run "$session_action" "$path"
 	fi
-	exec hypr-orca
+	exec "$script_dir/project-session" "$session_action" "$path"
 }
 
 run_ssh() {
@@ -141,6 +167,16 @@ run_ssh() {
 		return 1
 	}
 	exec uwsm app -- ghostty -e ssh "$host"
+}
+
+run_media() {
+	case "$1" in
+	stremio) exec hypr-stremio ;;
+	youtube) exec uwsm app -- qutebrowser 'https://www.youtube.com/' ;;
+	youtube_subscriptions) exec uwsm app -- qutebrowser 'https://www.youtube.com/feed/subscriptions' ;;
+	spotify) exec hypr-spotify ;;
+	*) return 2 ;;
+	esac
 }
 
 run_command() {
@@ -157,6 +193,17 @@ run_command() {
 		;;
 	system_monitor) exec uwsm app -- ghostty -e btop ;;
 	noctalia_settings) exec noctalia msg settings-open ;;
+	capture_context) exec capture-context --focus orca ;;
+	dictation_toggle)
+		command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1 || return 127
+		exec local-dictation toggle --paste
+		;;
+	focus_toggle) exec desktop-focus-mode toggle ;;
+	demo_mode) exec desktop-focus-mode demo ;;
+	direct_scanout_toggle)
+		command -v game-run >/dev/null 2>&1 || return 127
+		exec direct-scanout-toggle toggle
+		;;
 	power_balanced) exec powerprofilesctl set balanced ;;
 	power_performance) exec powerprofilesctl set performance ;;
 	*) return 2 ;;
@@ -174,9 +221,11 @@ selection=${3:-}
 case "$mode:$category" in
 list:projects) list_projects ;;
 list:ssh) list_ssh ;;
+list:media) list_media ;;
 list:commands) list_commands ;;
 run:projects) [[ -n "$selection" ]] && run_project "$selection" ;;
 run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
+run:media) [[ -n "$selection" ]] && run_media "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
 *)
 	usage >&2

@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' \
+		'Uso: project-preview {--available|--script|--url|--serve|--open} RUTA' \
+		'' \
+		'Usa scripts.preview y, si no existe, scripts.dev de package.json.' \
+		'Para abrir el navegador de forma automática, define projectCockpit.previewUrl con una URL local.'
+}
+
+open_preview() {
+	local path=$1 url
+	url="$(preview_url "$path")" || {
+		printf '%s\n' 'No hay una URL local configurada.' >&2
+		return 1
+	}
+	command -v curl >/dev/null 2>&1 || {
+		printf '%s\n' 'No se encontró curl.' >&2
+		return 127
+	}
+	for _ in {1..60}; do
+		if curl --fail --silent --show-error --max-time 1 --output /dev/null "$url" 2>/dev/null; then
+			command -v qutebrowser >/dev/null 2>&1 || {
+				printf '%s\n' 'No se encontró qutebrowser.' >&2
+				return 127
+			}
+			exec qutebrowser "$url"
+		fi
+		sleep 0.5
+	done
+	printf 'El preview no respondió en 30 segundos: %s\n' "$url" >&2
+	return 1
+}
+
+project_path() {
+	local value=$1 resolved
+	resolved="$(readlink -f -- "$value" 2>/dev/null || true)"
+	[[ -n "$resolved" && -d "$resolved" && -e "$resolved/.git" ]] || return 1
+	printf '%s' "$resolved"
+}
+
+script_name() {
+	local path=$1
+	[[ -f "$path/package.json" ]] || return 1
+	jq -er 'if (.scripts.preview? | type == "string") then "preview"
+		elif (.scripts.dev? | type == "string") then "dev"
+		else empty end' "$path/package.json"
+}
+
+preview_url() {
+	local path=$1 url
+	url="$(jq -er '.projectCockpit.previewUrl? // empty' "$path/package.json" 2>/dev/null || true)"
+	[[ "$url" =~ ^https?://(localhost|127\.0\.0\.1)(:[0-9]{1,5})?(/[^[:space:]]*)?$ ]] || return 1
+	printf '%s' "$url"
+}
+
+serve() {
+	local path=$1 script runner
+	script="$(script_name "$path")" || {
+		printf '%s\n' 'No hay script preview ni dev.' >&2
+		return 1
+	}
+	if [[ -f "$path/pnpm-lock.yaml" ]] && command -v pnpm >/dev/null 2>&1; then
+		runner=pnpm
+	elif command -v npm >/dev/null 2>&1; then
+		runner=npm
+	else
+		printf '%s\n' 'No se encontró pnpm ni npm.' >&2
+		return 127
+	fi
+	cd -- "$path"
+	exec "$runner" run "$script"
+}
+
+if (($# == 0)); then
+	set -- --serve "$PWD"
+fi
+
+(($# == 2)) || {
+	usage >&2
+	exit 2
+}
+
+action=$1
+path="$(project_path "$2")" || {
+	printf '%s\n' 'La ruta no es un repositorio Git disponible.' >&2
+	exit 1
+}
+
+case "$action" in
+--available) script_name "$path" >/dev/null ;;
+--script) script_name "$path" ;;
+--url) preview_url "$path" ;;
+--serve) serve "$path" ;;
+--open) open_preview "$path" ;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

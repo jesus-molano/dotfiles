@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+"""Copy a hinted qutebrowser link as clean, command-safe Markdown."""
+
+from __future__ import annotations
+
+import os
+import stat
+import subprocess
+import sys
+from pathlib import Path
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+IGNORED_PARAMETERS = {
+    "ref",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_name",
+    "fbclid",
+    "gclid",
+    "mc_cid",
+    "mc_eid",
+}
+
+
+def clean_url(raw_url: str) -> str:
+    parts = urlsplit(raw_url)
+    query = urlencode(
+        [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key.lower() not in IGNORED_PARAMETERS
+        ],
+        doseq=True,
+    )
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, query, parts.fragment))
+
+
+def markdown_label(raw_label: str) -> str:
+    label = " ".join(raw_label.splitlines()).strip()
+    return label.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+
+
+def notify_qutebrowser() -> None:
+    fifo = os.environ.get("QUTE_FIFO", "")
+    if not fifo:
+        return
+    path = Path(fifo)
+    try:
+        if not stat.S_ISFIFO(path.stat().st_mode):
+            return
+        path.write_text("message-info Enlace copiado como Markdown\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def main() -> int:
+    raw_url = os.environ.get("QUTE_URL", "")
+    if not raw_url:
+        print("qutebrowser no proporcionó una URL para el enlace.", file=sys.stderr)
+        return 1
+
+    url = clean_url(raw_url)
+    label = (
+        markdown_label(
+            os.environ.get("QUTE_SELECTED_TEXT") or os.environ.get("QUTE_TITLE", "")
+        )
+        or url
+    )
+    markdown = f"[{label}](<{url}>)\n"
+    try:
+        subprocess.run(["wl-copy"], input=markdown, text=True, check=True)
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(f"No se pudo copiar el enlace: {error}", file=sys.stderr)
+        return 1
+    notify_qutebrowser()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

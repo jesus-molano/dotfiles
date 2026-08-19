@@ -6,6 +6,10 @@ common,core,xorg-xwayland,native
 common,core,wl-clipboard,native
 common,core,hyprpicker,native
 common,core,satty,native
+common,core,curl,native
+common,core,tesseract,native
+common,core,tesseract-data-eng,native
+common,core,tesseract-data-spa,native
 common,core,brave-bin,native
 common,browser,qutebrowser,native
 common,browser,python-adblock,native
@@ -81,6 +85,7 @@ common,system,ksshaskpass,native
 common,system,libappindicator,native
 common,system,gnome-keyring,native
 common,system,jq,native
+common,system,socat,native
 common,system,networkmanager-openvpn,native
 common,system,bluez,native
 common,system,bluez-utils,native
@@ -97,6 +102,7 @@ common,system,unrar,native
 common,system,unzip,native
 common,system,flatpak,native
 common,utility,gnome-calculator,native
+common,utility,wl-mirror,native
 common,themes,papirus-icon-theme,native
 common,themes,nwg-look,native
 common,themes,qt5ct,native
@@ -108,11 +114,16 @@ common,themes,noto-fonts-emoji,native
 common,themes,ttf-jetbrains-mono-nerd,native
 common,themes,otf-font-awesome,native
 common,media,mpv,native
+common,media,yt-dlp,native
 common,media,vlc,native
 common,media,vlc-plugins-all,native
 common,media,ffmpegthumbnailer,native
 common,media,libdvdcss,native
 common,media,gpu-screen-recorder,native
+desktop,development,whisper-cpp,native
+desktop,development,ggml-cpu,native
+desktop,development,ggml-vulkan,native
+desktop,utility,wtype,native
 common,development,1password,aur
 common,development,1password-cli,aur
 common,development,visual-studio-code-bin,aur

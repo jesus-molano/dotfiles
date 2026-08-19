@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' 'Uso: direct-scanout-toggle {status|auto|off|toggle}'
+}
+
+notify() {
+	noctalia msg notification-show 'Direct scanout' -- "$1" >/dev/null 2>&1 || true
+}
+
+current_value() {
+	hyprctl -j getoption render:direct_scanout | jq -er '.int | numbers' 2>/dev/null
+}
+
+set_value() {
+	local value=$1 message=$2
+	hyprctl keyword render:direct_scanout "$value" >/dev/null
+	notify "$message"
+}
+
+command -v hyprctl >/dev/null 2>&1 || {
+	printf '%s\n' 'direct-scanout-toggle: hyprctl no está disponible.' >&2
+	exit 127
+}
+command -v jq >/dev/null 2>&1 || {
+	printf '%s\n' 'direct-scanout-toggle: jq no está disponible.' >&2
+	exit 127
+}
+
+action=${1:-toggle}
+[[ $# -le 1 ]] || {
+	usage >&2
+	exit 2
+}
+
+case "$action" in
+	status)
+		case "$(current_value)" in
+		2) printf '%s\n' 'auto' ;;
+		1) printf '%s\n' 'on' ;;
+		0) printf '%s\n' 'off' ;;
+		*) printf '%s\n' 'unknown' ;;
+		esac
+	;;
+	auto)
+		if [[ "$(current_value)" != 2 ]]; then
+			set_value 2 'Modo auto experimental: solo contenido game. Usa /cmd para desactivarlo si aparecen fallos gráficos.'
+		fi
+	;;
+	off)
+		if [[ "$(current_value)" != 0 ]]; then
+			set_value 0 'Desactivado. La configuración persistente no se ha modificado.'
+		fi
+	;;
+	toggle)
+		if [[ "$(current_value)" != 0 ]]; then
+			set_value 0 'Desactivado. La configuración persistente no se ha modificado.'
+	else
+		set_value 2 'Modo auto experimental: solo contenido game. Usa /cmd para desactivarlo si aparecen fallos gráficos.'
+	fi
+	;;
+	--help | -h) usage ;;
+	*)
+		usage >&2
+		exit 2
+	;;
+esac

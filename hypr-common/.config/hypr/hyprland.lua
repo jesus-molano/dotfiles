@@ -1,6 +1,6 @@
 -- CachyOS Hyprland configuration with personal overrides.
 --
--- The vendored base comes from cachyos-hypr-noctalia 1.2.3-1. Resolve modules
+-- The reviewed base comes from cachyos-hypr-noctalia 1.2.5-1. Resolve modules
 -- relative to this file so both the deployed symlink and an in-repository
 -- `hyprland --verify-config` use exactly the version tracked here.
 local source = debug.getinfo(1, "S").source

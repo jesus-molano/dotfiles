@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: capture-context [opciones]
+
+Captura una región, permite anotarla y copia un bloque Markdown con OCR.
+
+Opciones:
+  --image RUTA       Usa una imagen existente en vez de capturar una región.
+  --no-annotate      No abre Satty.
+  --no-ocr           No extrae texto.
+  --focus DESTINO    none, orca o nvim. Predeterminado: none.
+  --print            Imprime también el Markdown generado.
+  -h, --help         Muestra esta ayuda.
+EOF
+}
+
+fail() {
+	command -v notify-send >/dev/null 2>&1 && notify-send 'Captura a contexto' "$1" || true
+	printf 'capture-context: %s\n' "$1" >&2
+	exit "${2:-1}"
+}
+
+input=''
+annotate=1
+ocr=1
+focus=none
+print_context=0
+
+while (($#)); do
+	case "$1" in
+	--image)
+		(($# >= 2)) || fail 'Falta la ruta de --image.' 2
+		input=$2
+		shift 2
+		;;
+	--no-annotate)
+		annotate=0
+		shift
+		;;
+	--no-ocr)
+		ocr=0
+		shift
+		;;
+	--focus)
+		(($# >= 2)) || fail 'Falta el destino de --focus.' 2
+		focus=$2
+		shift 2
+		;;
+	--print)
+		print_context=1
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*) fail "Opción no reconocida: $1" 2 ;;
+	esac
+done
+
+[[ "$focus" == none || "$focus" == orca || "$focus" == nvim ]] ||
+	fail "Destino de foco no válido: $focus" 2
+
+state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/desktop-context"
+output_dir="${CAPTURE_CONTEXT_DIR:-$HOME/Pictures/Screenshots}"
+runtime_root=${XDG_RUNTIME_DIR:-/tmp}
+mkdir -p "$state_dir" "$output_dir"
+
+raw=''
+owns_raw=0
+# ShellCheck no detecta llamadas indirectas desde trap.
+# shellcheck disable=SC2329
+cleanup() {
+	if ((owns_raw)) && [[ -n "$raw" ]]; then rm -f -- "$raw"; fi
+}
+trap cleanup EXIT
+
+if [[ -n "$input" ]]; then
+	[[ -f "$input" ]] || fail "No existe la imagen: $input"
+	raw=$(readlink -f -- "$input")
+else
+	command -v slurp >/dev/null 2>&1 || fail 'Falta slurp.' 127
+	command -v grim >/dev/null 2>&1 || fail 'Falta grim.' 127
+	geometry=$(slurp) || exit 0
+	[[ -n "$geometry" ]] || exit 0
+	raw=$(mktemp --tmpdir="$runtime_root" --suffix=.png capture-context.XXXXXX)
+	owns_raw=1
+	grim -g "$geometry" "$raw" || fail 'No se pudo capturar la región.'
+fi
+
+timestamp=$(date +%Y-%m-%d_%H-%M-%S)
+image="$output_dir/context-$timestamp.png"
+
+if ((annotate)); then
+	command -v satty >/dev/null 2>&1 || fail 'Falta Satty.' 127
+	satty --filename "$raw" --output-filename "$image" || exit 0
+	[[ -s "$image" ]] || exit 0
+else
+	cp -- "$raw" "$image"
+fi
+
+text=''
+if ((ocr)); then
+	command -v tesseract >/dev/null 2>&1 || fail 'Falta Tesseract.' 127
+	text=$(tesseract "$image" stdout -l spa+eng --psm 6 2>/dev/null || true)
+fi
+
+context_tmp=$(mktemp --tmpdir="$state_dir" .latest.XXXXXX)
+{
+	printf '## Contexto visual\n\n'
+	printf '![Captura](<%s>)\n' "$image"
+	if [[ -n "$text" ]]; then
+		printf '\n### Texto detectado\n\n%s\n%s\n%s\n' '```text' "$text" '```'
+	fi
+} >"$context_tmp"
+mv -f -- "$context_tmp" "$state_dir/latest.md"
+
+command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
+wl-copy <"$state_dir/latest.md"
+
+case "$focus" in
+orca)
+	command -v hypr-orca >/dev/null 2>&1 && hypr-orca >/dev/null 2>&1 || true
+	;;
+nvim)
+	if command -v uwsm >/dev/null 2>&1 && command -v ghostty >/dev/null 2>&1; then
+		uwsm app -- ghostty -e nvim "$state_dir/latest.md" >/dev/null 2>&1 &
+	fi
+	;;
+esac
+
+command -v notify-send >/dev/null 2>&1 &&
+	notify-send 'Contexto preparado' 'La captura y el texto están en el portapapeles.' || true
+((print_context)) && cat -- "$state_dir/latest.md"
+exit 0

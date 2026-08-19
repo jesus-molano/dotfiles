@@ -159,6 +159,10 @@ plan profile="desktop":
 doctor-live profile="desktop":
     "{{ dotfiles_dir }}/scripts/doctor.sh" {{ quote(profile) }} --live-only
 
+# Descarga de forma explícita el modelo local de dictado. No se ejecuta durante Stow.
+dictation-setup model="base":
+    "{{ dotfiles_dir }}/hypr-common/.local/bin/local-dictation" setup {{ quote(model) }}
+
 # Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
 atlas-check:
     "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --check

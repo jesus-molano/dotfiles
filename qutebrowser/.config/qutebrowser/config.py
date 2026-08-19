@@ -65,10 +65,34 @@ c.url.start_pages = ["https://start.duckduckgo.com/"]
 c.url.searchengines = {
     "DEFAULT": "https://duckduckgo.com/?q={}",
     "aw": "https://wiki.archlinux.org/index.php?search={}",
+    "archpkg": "https://archlinux.org/packages/?q={}",
+    "aur": "https://aur.archlinux.org/packages?O=0&K={}",
     "g": "https://www.google.com/search?q={}",
     "gh": "https://github.com/search?q={}",
+    "ghc": "https://github.com/search?q={}&type=code",
+    "mdn": "https://developer.mozilla.org/en-US/search?q={}",
+    "npm": "https://www.npmjs.com/search?q={}",
+    "pypi": "https://pypi.org/search/?q={}",
+    "qute": "https://www.google.com/search?q=site%3Aqutebrowser.org%2Fdoc+{}",
+    "so": "https://stackoverflow.com/search?q={}",
     "yt": "https://www.youtube.com/results?search_query={}",
 }
+
+# Keep shared links clean when they are yanked. The defaults cover UTMs; these
+# additions cover the equally common click IDs used by search and newsletters.
+c.url.yank_ignored_parameters = [
+    "ref",
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "utm_name",
+    "fbclid",
+    "gclid",
+    "mc_cid",
+    "mc_eid",
+]
 
 
 # Conservative privacy defaults which do not usually break modern sites.
@@ -77,6 +101,8 @@ c.content.geolocation = False
 c.content.notifications.enabled = "ask"
 c.content.register_protocol_handler = False
 c.downloads.location.prompt = True
+c.downloads.location.remember = True
+c.downloads.location.suggestion = "both"
 c.downloads.remove_finished = 15000
 
 
@@ -178,14 +204,47 @@ c.statusbar.padding = {"bottom": 5, "left": 8, "right": 8, "top": 5}
 
 
 # Local leader: comma never conflicts with qutebrowser's default bindings.
-config.bind(",a", "config-cycle -t -u *://{url:host}/* content.blocking.enabled true false ;; reload")
+config.bind(
+    ",a",
+    "config-cycle -t -u *://{url:host}/* content.blocking.enabled true false ;; reload",
+)
 config.bind(",A", "config-cycle -t content.blocking.enabled true false ;; reload")
-config.bind(",d", "config-cycle -t -u *://{url:host}/* colors.webpage.darkmode.enabled true false ;; reload")
+config.bind(
+    ",d",
+    "config-cycle -t -u *://{url:host}/* colors.webpage.darkmode.enabled true false ;; reload",
+)
 config.bind(",u", "adblock-update")
 config.bind(",e", "config-edit")
 config.bind(",r", "config-source")
 config.bind(",p", "open --private")
+
+# Buffers and named sessions. The defaults remain available; these bindings
+# make the operations discoverable under one leader without fixing a session
+# name in the configuration.
+config.bind(",t", "cmd-set-text -s :tab-focus ")
+config.bind(",T", "cmd-set-text -s :tab-move ")
+config.bind(",c", "tab-clone")
+config.bind(",g", "tab-focus last")
+config.bind(",s", "cmd-set-text -s :session-save ")
+config.bind(",S", "cmd-set-text -s :session-load ")
+config.bind(",X", "cmd-set-text -s :session-delete ")
+
+# Links, downloads and external applications. `ym` remains the built-in
+# current-page Markdown yank; `;m` adds the same workflow for a hinted link.
+config.bind(",y", "yank inline [{title}]({url:yank})")
+config.bind(";m", "hint links userscript yank-markdown-link")
+config.bind(",o", "download-open")
+config.bind(",O", "download-open --dir")
+config.bind(",D", "download-clear")
 config.bind(",B", "spawn brave {url}")
 config.bind(";B", "hint links spawn brave {hint-url}")
+config.bind(",v", "spawn --detach mpv {url}")
+config.bind(";v", "hint links spawn --detach mpv {hint-url}")
+
+# Development keeps the browser as a first-class diagnostic tool. Ctrl-E in a
+# text field still opens Neovim through editor.command.
+config.bind(",E", "edit-text")
+config.bind(",i", "devtools right")
+config.bind(",I", "devtools-focus")
 config.bind("<Ctrl-Shift-J>", "tab-move +")
 config.bind("<Ctrl-Shift-K>", "tab-move -")

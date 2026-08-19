@@ -56,6 +56,14 @@ end
 bind(alt .. " + S", hl.dsp.workspace.toggle_special("scratchpad"), "Alternar scratchpad")
 bind(alt .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }),
     "Enviar ventana al scratchpad")
+bind(alt .. " + A", hl.dsp.workspace.toggle_special("ai"),
+    "Alternar scratchpad de IA")
+bind(alt .. " + SHIFT + A", hl.dsp.window.move({ workspace = "special:ai" }),
+    "Enviar ventana al scratchpad de IA")
+bind(alt .. " + Z", hl.dsp.workspace.toggle_special("logs"),
+    "Alternar scratchpad de logs")
+bind(alt .. " + SHIFT + Z", hl.dsp.window.move({ workspace = "special:logs" }),
+    "Enviar ventana al scratchpad de logs")
 
 -- Window groups/tabs.
 bind(alt .. " + G", hl.dsp.group.toggle(), "Alternar grupo de ventanas")
@@ -70,15 +78,27 @@ bind(hyper .. " + Y", hl.dsp.exec_cmd(launch .. TERMINAL .. " -e fish -ic y"),
     "Abrir Yazi en Ghostty")
 bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Enfocar o abrir Orca")
 bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Enfocar o abrir Spotify")
+bind(hyper .. " + S", hl.dsp.exec_cmd("hypr-stremio"), "Enfocar o abrir Stremio")
 bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Abrir launcher")
+bind(hyper .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /cmd"),
+    "Abrir comandos del launcher")
+bind(hyper .. " + J", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /proj"),
+    "Abrir proyectos del launcher")
+bind(hyper .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /media"),
+    "Abrir multimedia del launcher")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Abrir notificaciones")
-bind(hyper .. " + P", hl.dsp.exec_cmd(noctalia .. "screenshot-region"), "Capturar una región")
+bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),
+    "Capturar una región y preparar contexto para Orca")
 bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"), "Abrir menú de sesión")
 bind(hyper .. " + L", hl.dsp.exec_cmd(noctalia .. "session lock"), "Bloquear la sesión")
 bind(hyper .. " + K", hl.dsp.exec_cmd("hyprpicker -a -n"), "Seleccionar y copiar un color")
 bind(hyper .. " + 1", hl.dsp.exec_cmd(launch .. "1password"), "Abrir 1Password")
 bind(hyper .. " + C", hl.dsp.exec_cmd(noctalia .. "caffeine-toggle"), "Alternar cafeína")
+bind(hyper .. " + I", hl.dsp.exec_cmd("desktop-focus-mode toggle"),
+    "Alternar modo foco")
+bind(hyper .. " + U", hl.dsp.exec_cmd("desktop-focus-mode demo"),
+    "Activar modo demo con grabación")
 bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Mostrar ayuda de atajos")
 
 -- Alt+Tab has one owner: Noctalia.

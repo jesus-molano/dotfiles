@@ -1,0 +1,221 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Start or resume the desktop tools for a repository.  This script accepts a
+# path only after it resolves it again and confirms it is a Git worktree.  The
+# launcher passes opaque tokens, never paths typed by the user.
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly script_dir
+
+dry_run=false
+
+usage() {
+	printf '%s\n' \
+		'Uso: project-session [--dry-run] {resume|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
+		'' \
+		'Acciones:' \
+		'  resume    abre Orca y un terminal Zellij reutilizable' \
+		'  tasks     abre el selector de tareas detectadas' \
+		'  preview   inicia el script preview/dev detectado una sola vez'
+}
+
+notify_error() {
+	local message=$1
+	if command -v noctalia >/dev/null 2>&1; then
+		noctalia msg notification-show 'Proyecto' -- "$message" >/dev/null 2>&1 || true
+	else
+		notify-send 'Proyecto' "$message" >/dev/null 2>&1 || true
+	fi
+}
+
+project_path() {
+	local value=$1 resolved
+	resolved="$(readlink -f -- "$value" 2>/dev/null || true)"
+	[[ -n "$resolved" && -d "$resolved" && -e "$resolved/.git" ]] || return 1
+	printf '%s' "$resolved"
+}
+
+project_token() {
+	local path=$1 slug digest
+	slug="$(basename -- "$path" | LC_ALL=C tr -cs '[:alnum:]_-' '_' | cut -c1-28)"
+	slug=${slug##_}
+	slug=${slug%%_}
+	[[ -n "$slug" ]] || slug=project
+	digest="$(printf '%s' "$path" | sha256sum | cut -c1-12)"
+	printf 'project_%s_%s' "$slug" "$digest"
+}
+
+emit() {
+	local action=$1
+	shift
+	printf 'DRY-RUN\t%s' "$action"
+	local value
+	for value in "$@"; do printf '\t%q' "$value"; done
+	printf '\n'
+}
+
+launch_detached() {
+	local action=$1
+	shift
+	if "$dry_run"; then
+		emit "$action" "$@"
+		return 0
+	fi
+	"$@" >/dev/null 2>&1 &
+}
+
+launch_uwsm() {
+	local action=$1
+	shift
+	if "$dry_run"; then
+		emit "$action" uwsm app -- "$@"
+		return 0
+	fi
+	uwsm app -- "$@" >/dev/null 2>&1 &
+}
+
+zellij_session_exists() {
+	local session=$1
+	command -v zellij >/dev/null 2>&1 || return 1
+	zellij list-sessions --short 2>/dev/null | grep -Fxq -- "$session"
+}
+
+launch_terminal() {
+	local path=$1 session
+	session="$(project_token "$path")"
+	if ! command -v zellij >/dev/null 2>&1; then
+		launch_uwsm terminal ghostty --working-directory="$path"
+		return 0
+	fi
+	launch_uwsm terminal ghostty --working-directory="$path" -e zellij attach --create "$session"
+}
+
+launch_zellij_command() {
+	local action=$1 path=$2 suffix=$3 command=$4
+	local session
+	session="$(project_token "$path")_$suffix"
+	if zellij_session_exists "$session"; then
+		launch_uwsm "$action-attach" ghostty --working-directory="$path" -e zellij attach "$session"
+		return 0
+	fi
+	launch_uwsm "$action" ghostty --working-directory="$path" -e \
+		zellij attach --create "$session" options --default-cwd "$path" --default-shell "$command"
+}
+
+nvim_running_for_project() {
+	local path=$1 proc executable cwd
+	for proc in /proc/[0-9]*; do
+		[[ -r "$proc/comm" ]] || continue
+		executable="$(<"$proc/comm")"
+		[[ "$executable" == nvim ]] || continue
+		cwd="$(readlink -f -- "$proc/cwd" 2>/dev/null || true)"
+		[[ "$cwd" == "$path" ]] && return 0
+	done
+	return 1
+}
+
+register_orca_project() {
+	local path=$1 repo_json
+	command -v orca-ide >/dev/null 2>&1 || {
+		notify_error 'orca-ide no está disponible en PATH.'
+		return 127
+	}
+	if ! repo_json="$(orca-ide repo list --json 2>/dev/null)" ||
+		! jq -e --arg path "$path" \
+			'.ok == true and any(.result.repos[]?; .path == $path)' \
+			>/dev/null <<<"$repo_json"; then
+		if ! orca-ide repo add --path "$path" --json >/dev/null 2>&1; then
+			notify_error 'Orca no pudo registrar el repositorio.'
+			return 1
+		fi
+	fi
+}
+
+launch_orca() {
+	local path=$1
+	if "$dry_run"; then
+		emit orca-register "$path"
+		emit orca "$script_dir/hypr-orca"
+		return 0
+	fi
+	register_orca_project "$path" || return
+	launch_detached orca "$script_dir/hypr-orca"
+}
+
+launch_nvim() {
+	local path=$1
+	if nvim_running_for_project "$path"; then
+		if "$dry_run"; then
+			emit nvim-running "$path"
+		fi
+		return 0
+	fi
+	launch_uwsm nvim ghostty --working-directory="$path" -e nvim
+}
+
+task_available() {
+	"$script_dir/project-task" --available "$1"
+}
+
+preview_available() {
+	"$script_dir/project-preview" --available "$1"
+}
+
+launch_tasks() {
+	local path=$1
+	task_available "$path" || {
+		notify_error 'Este proyecto no define tareas just, mise ni package.json.'
+		return 1
+	}
+	launch_zellij_command tasks "$path" tasks "$script_dir/project-task"
+}
+
+launch_preview() {
+	local path=$1 url
+	preview_available "$path" || {
+		notify_error 'Este proyecto no define un script preview ni dev.'
+		return 1
+	}
+	launch_zellij_command preview "$path" preview "$script_dir/project-preview"
+	url="$("$script_dir/project-preview" --url "$path" 2>/dev/null || true)"
+	[[ -n "$url" ]] && launch_uwsm preview-url "$script_dir/project-preview" --open "$path"
+}
+
+while (($#)); do
+	case "$1" in
+	--dry-run) dry_run=true; shift ;;
+	-h|--help) usage; exit 0 ;;
+	--) shift; break ;;
+	*) break ;;
+	esac
+done
+
+(($# == 2)) || {
+	usage >&2
+	exit 2
+}
+
+action=$1
+path="$(project_path "$2")" || {
+	notify_error 'La ruta no es un repositorio Git disponible.'
+	exit 1
+}
+
+case "$action" in
+resume)
+	launch_orca "$path"
+	launch_terminal "$path"
+	;;
+orca) launch_orca "$path" ;;
+terminal) launch_terminal "$path" ;;
+nvim) launch_nvim "$path" ;;
+tasks) launch_tasks "$path" ;;
+preview) launch_preview "$path" ;;
+has-tasks) task_available "$path" ;;
+has-preview) preview_available "$path" ;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

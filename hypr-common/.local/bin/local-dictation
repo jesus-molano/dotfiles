@@ -1,0 +1,260 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: local-dictation {start|stop|toggle|status|model|setup} [opciones]
+
+  start              Empieza a grabar el micrófono.
+  stop [--paste]     Transcribe, copia y, con --paste, escribe el texto.
+  toggle [--paste]   Alterna entre start y stop.
+  status             Imprime recording o idle.
+  model              Imprime la ruta del modelo activo.
+  setup [modelo]     Descarga y activa tiny, base o small.
+EOF
+}
+
+notify() {
+	command -v notify-send >/dev/null 2>&1 && notify-send 'Dictado local' "$1" || true
+}
+
+fail() {
+	notify "$1"
+	printf 'local-dictation: %s\n' "$1" >&2
+	exit "${2:-1}"
+}
+
+state_dir=${LOCAL_DICTATION_STATE_DIR:-${XDG_RUNTIME_DIR:-/tmp}/local-dictation}
+history_dir=${LOCAL_DICTATION_HISTORY_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/local-dictation}
+data_dir=${XDG_DATA_HOME:-$HOME/.local/share}/whisper.cpp
+selection_file=${LOCAL_DICTATION_SELECTION_FILE:-$history_dir/active-model}
+pid_file="$state_dir/recorder.pid"
+audio_file="$state_dir/recording.wav"
+phase_file="$state_dir/phase"
+mkdir -p "$state_dir" "$history_dir"
+chmod 700 "$state_dir" "$history_dir"
+
+active_model_path() {
+	local selected=base extra
+	if [[ -n "${LOCAL_DICTATION_MODEL:-}" ]]; then
+		printf '%s\n' "$LOCAL_DICTATION_MODEL"
+		return
+	fi
+	if [[ -s "$selection_file" ]]; then
+		read -r selected extra <"$selection_file"
+		[[ -z "${extra:-}" ]] || return 1
+	fi
+	case "$selected" in
+	tiny | base | small) printf '%s/ggml-%s.bin\n' "$data_dir" "$selected" ;;
+	*) return 1 ;;
+	esac
+}
+
+activate_model() {
+	local selected=$1 temporary
+	[[ -z "${LOCAL_DICTATION_MODEL:-}" ]] || return 0
+	temporary="$(mktemp "$history_dir/active-model.XXXXXX")"
+	printf '%s\n' "$selected" >"$temporary"
+	mv -f -- "$temporary" "$selection_file"
+}
+
+process_starttime() {
+	local pid=$1 stat_line remainder
+	local -a fields
+	[[ "$pid" =~ ^[0-9]+$ && -r "/proc/$pid/stat" ]] || return 1
+	stat_line=$(<"/proc/$pid/stat")
+	remainder=${stat_line##*) }
+	read -r -a fields <<<"$remainder"
+	((${#fields[@]} >= 20)) && [[ "${fields[19]}" =~ ^[0-9]+$ ]] || return 1
+	printf '%s\n' "${fields[19]}"
+}
+
+recorder_identity() {
+	local pid expected_starttime extra current_starttime
+	[[ -s "$pid_file" ]] || return 1
+	read -r pid expected_starttime extra <"$pid_file"
+	[[ "$pid" =~ ^[0-9]+$ && "$expected_starttime" =~ ^[0-9]+$ && -z "${extra:-}" ]] || return 1
+	current_starttime="$(process_starttime "$pid")" || return 1
+	[[ "$current_starttime" == "$expected_starttime" ]] || return 1
+	printf '%s %s\n' "$pid" "$expected_starttime"
+}
+
+is_recording() {
+	recorder_identity >/dev/null
+}
+
+start_recording() {
+	local model
+	is_recording && fail 'Ya hay una grabación activa.' 2
+	rm -f -- "$pid_file" "$audio_file"
+	model="$(active_model_path)" || fail 'La selección del modelo local no es válida.' 3
+	[[ -f "$model" ]] || fail "Falta el modelo: ejecuta local-dictation setup base" 3
+	command -v pw-record >/dev/null 2>&1 || fail 'Falta pw-record.' 127
+
+	pw-record --rate 16000 --channels 1 --format s16 "$audio_file" >/dev/null 2>&1 &
+	local pid=$! starttime
+	for _ in {1..20}; do
+		starttime="$(process_starttime "$pid" 2>/dev/null || true)"
+		[[ -n "$starttime" ]] && break
+		sleep 0.01
+	done
+	[[ -n "${starttime:-}" ]] || {
+		kill -TERM "$pid" 2>/dev/null || true
+		fail 'No se pudo identificar el proceso de grabación.'
+	}
+	printf '%s %s\n' "$pid" "$starttime" >"$pid_file"
+	printf '%s\n' recording >"$phase_file"
+	notify 'Grabando. Pulsa otra vez para transcribir.'
+}
+
+whisper_binary() {
+	if [[ -n "${LOCAL_DICTATION_WHISPER_BIN:-}" ]]; then
+		printf '%s\n' "$LOCAL_DICTATION_WHISPER_BIN"
+	elif command -v whisper-cli >/dev/null 2>&1; then
+		printf '%s\n' whisper-cli
+	elif command -v whisper-cpp >/dev/null 2>&1; then
+		printf '%s\n' whisper-cpp
+	else
+		return 1
+	fi
+}
+
+stop_recording() {
+	local paste=${1:-0} identity pid starttime whisper prefix transcript model
+	identity="$(recorder_identity)" || fail 'No hay una grabación activa o su PID quedó obsoleta.' 2
+	read -r pid starttime <<<"$identity"
+	kill -INT "$pid" 2>/dev/null || true
+	for _ in {1..40}; do
+		[[ "$(process_starttime "$pid" 2>/dev/null || true)" != "$starttime" ]] && break
+		sleep 0.05
+	done
+	if [[ "$(process_starttime "$pid" 2>/dev/null || true)" == "$starttime" ]]; then
+		kill -TERM "$pid" 2>/dev/null || true
+		for _ in {1..40}; do
+			[[ "$(process_starttime "$pid" 2>/dev/null || true)" != "$starttime" ]] && break
+			sleep 0.05
+		done
+	fi
+	[[ "$(process_starttime "$pid" 2>/dev/null || true)" != "$starttime" ]] ||
+		fail 'pw-record no se detuvo; no se procesará un WAV incompleto.'
+	rm -f -- "$pid_file"
+	[[ -s "$audio_file" ]] || fail 'La grabación está vacía.'
+	whisper=$(whisper_binary) || fail 'Falta whisper-cpp.' 127
+	model="$(active_model_path)" || fail 'La selección del modelo local no es válida.' 3
+	[[ -f "$model" ]] || fail "Falta el modelo: $model" 3
+
+	printf '%s\n' transcribing >"$phase_file"
+	prefix="$state_dir/transcript"
+	rm -f -- "${prefix}.txt"
+	"$whisper" -m "$model" -f "$audio_file" -l auto -otxt -of "$prefix" --no-timestamps \
+		>/dev/null 2>&1 || fail 'Whisper no pudo transcribir el audio.'
+	[[ -s "${prefix}.txt" ]] || fail 'Whisper no devolvió texto.'
+	transcript=$(sed -e 's/\r$//' -e '/^[[:space:]]*$/d' "${prefix}.txt")
+	[[ -n "$transcript" ]] || fail 'La transcripción está vacía.'
+	printf '%s\n' "$transcript" >"$history_dir/latest.txt"
+
+	command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
+	printf '%s' "$transcript" | wl-copy
+	if ((paste)); then
+		command -v wtype >/dev/null 2>&1 || fail 'Falta wtype para pegar el texto.' 127
+		# Stdin mantiene saltos de línea y evita que un texto que empiece por
+		# guion se interprete como una opción de wtype.
+		printf '%s' "$transcript" | wtype -
+	fi
+	printf '%s\n' idle >"$phase_file"
+	notify 'Transcripción copiada al portapapeles.'
+}
+
+setup_model() {
+	local requested=${1:-base} revision expected_sha expected_size url destination tmp actual_sha actual_size
+	revision=5359861c739e955e79d9a303bcbc70fb988958b1
+	case "$requested" in
+	tiny)
+		expected_sha=be07e048e1e599ad46341c8d2a135645097a538221678b7acdd1b1919c6e1b21
+		expected_size=77691713
+		;;
+	base)
+		expected_sha=60ed5bc3dd14eea856493d334349b405782ddcaf0028d4b5df4088345fba2efe
+		expected_size=147951465
+		;;
+	small)
+		expected_sha=1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b
+		expected_size=487601967
+		;;
+	*) fail "Modelo no permitido: $requested" 2 ;;
+	esac
+	command -v curl >/dev/null 2>&1 || fail 'Falta curl.' 127
+	destination=${LOCAL_DICTATION_MODEL:-$data_dir/ggml-${requested}.bin}
+	mkdir -p "$(dirname -- "$destination")"
+	if [[ -s "$destination" ]]; then
+		actual_sha="$(sha256sum "$destination" | awk '{ print $1 }')"
+		actual_size="$(stat -c %s "$destination")"
+		[[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]] ||
+			fail "El modelo existente no coincide con la revisión fijada: $destination"
+		activate_model "$requested"
+		printf '%s\n' "$destination"
+		return
+	fi
+	url="https://huggingface.co/ggerganov/whisper.cpp/resolve/${revision}/ggml-${requested}.bin"
+	tmp="${destination}.part"
+	rm -f -- "$tmp"
+	curl --fail --location --progress-bar --output "$tmp" "$url" || {
+		rm -f -- "$tmp"
+		fail 'No se pudo descargar el modelo Whisper.'
+	}
+	actual_sha="$(sha256sum "$tmp" | awk '{ print $1 }')"
+	actual_size="$(stat -c %s "$tmp")"
+	[[ "$actual_sha" == "$expected_sha" && "$actual_size" == "$expected_size" ]] || {
+		rm -f -- "$tmp"
+		fail 'El modelo descargado no coincide con su SHA-256 y tamaño fijados.'
+	}
+	mv -f -- "$tmp" "$destination"
+	activate_model "$requested"
+	printf '%s\n' "$destination"
+}
+
+(($# >= 1)) || {
+	usage >&2
+	exit 2
+}
+command=$1
+shift
+
+case "$command" in
+start)
+	(($# == 0)) || fail 'start no admite opciones.' 2
+	start_recording
+	;;
+stop)
+	paste=0
+	if (($#)); then
+		[[ "$1" == --paste && $# -eq 1 ]] || fail 'Uso: local-dictation stop [--paste]' 2
+		paste=1
+	fi
+	stop_recording "$paste"
+	;;
+toggle)
+	paste=0
+	if (($#)); then
+		[[ "$1" == --paste && $# -eq 1 ]] || fail 'Uso: local-dictation toggle [--paste]' 2
+		paste=1
+	fi
+	if is_recording; then stop_recording "$paste"; else start_recording; fi
+	;;
+status)
+	(($# == 0)) || fail 'status no admite opciones.' 2
+	if is_recording; then printf '%s\n' recording; else printf '%s\n' idle; fi
+	;;
+model)
+	(($# == 0)) || fail 'model no admite opciones.' 2
+	active_model_path || fail 'La selección del modelo local no es válida.' 3
+	;;
+setup)
+	(($# <= 1)) || fail 'Uso: local-dictation setup [tiny|base|small]' 2
+	setup_model "${1:-base}"
+	;;
+-h | --help | help)
+	usage
+	;;
+*) fail "Comando no reconocido: $command" 2 ;;
+esac

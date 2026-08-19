@@ -32,6 +32,14 @@ Codex se ejecuta fuera de Neovim, normalmente en un terminal gestionado por
 Orca, para que pueda trabajar sobre el repositorio completo y ejecutar sus
 validaciones. `Hyper + O` enfoca Orca o lo abre si todavía no está activo.
 
+| Atajo | Acción |
+|-------|--------|
+| `<leader>ao` | Copiar archivo, línea y diagnóstico; enfocar Orca |
+| Visual + `<leader>ao` | Copiar archivo, rango y selección; enfocar Orca |
+
+El contexto queda en los portapapeles `+` y `*`. Pégalo donde corresponda en
+Orca. Neovim no ejecuta Codex ni envía el contenido de forma automática.
+
 ### Copilot (viene con el extra `ai.copilot`)
 
 - Sugerencias inline automaticas mientras escribes
@@ -240,7 +248,32 @@ compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 ---
 
-## 10. Debugging (DAP)
+## 10. Task Hub (Overseer)
+
+Overseer detecta tareas desde el archivo actual hacia arriba en el proyecto:
+`justfile`, `package.json` (npm, pnpm, yarn o bun), configuración de `mise` y
+`.vscode/tasks.json`.
+
+| Atajo | Acción |
+|-------|--------|
+| `<leader>jr` | Elegir y ejecutar tarea detectada |
+| `<leader>jl` | Mostrar u ocultar lista de tareas |
+| `<leader>ja` | Elegir una acción para una tarea |
+| `<leader>js` | Ejecutar un comando puntual como tarea |
+
+La salida queda en un buffer de tarea. Si una tarea falla, Overseer abre
+quickfix. Los formatos comunes de TypeScript, JavaScript y herramientas de
+línea de comandos también generan diagnósticos en el editor.
+
+Dentro de la lista: `Enter` abre acciones, `o` abre la salida, `<C-q>` envía la
+salida a quickfix y `dd` descarta la tarea.
+
+Las configuraciones DAP pueden usar `preLaunchTask` y `postDebugTask` de
+`.vscode/launch.json`. Overseer ejecuta esas tareas antes o después del debug.
+
+---
+
+## 11. Debugging (DAP)
 
 | Atajo | Accion |
 |-------|--------|
@@ -272,7 +305,7 @@ compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 ---
 
-## 11. UI y Toggles (`<leader>u`)
+## 12. UI y Toggles (`<leader>u`)
 
 | Atajo | Accion |
 |-------|--------|
@@ -290,7 +323,7 @@ compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 ---
 
-## 12. Aerial — Outline de Simbolos
+## 13. Aerial — Outline de Simbolos
 
 | Atajo | Accion |
 |-------|--------|
@@ -301,7 +334,7 @@ compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 ---
 
-## 13. Sesiones (`<leader>q`)
+## 14. Sesiones (`<leader>q`)
 
 | Atajo | Accion |
 |-------|--------|
@@ -315,7 +348,7 @@ compara con el indice de Git: no hace unstage; para eso usa LazyGit.
 
 ---
 
-## 14. TODO Comments
+## 15. TODO Comments
 
 | Atajo | Accion |
 |-------|--------|
@@ -328,14 +361,14 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ---
 
-## 15. Autocmds Personalizados
+## 16. Autocmds Personalizados
 
 1. **Trailing whitespace**: se elimina al guardar (excepto markdown)
 2. **Sin auto-comment**: al hacer `o` o `Enter` en una linea con comentario, la nueva linea NO es comentario
 
 ---
 
-## 16. Tips Pro
+## 17. Tips Pro
 
 ### Navegacion rapida
 - `<C-o>` / `<C-i>` — saltar atras/adelante en jump list
@@ -370,7 +403,7 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ---
 
-## 17. Cheatsheet Rapida
+## 18. Cheatsheet Rapida
 
 ```
 NAVEGACION          CODIGO              GIT                 AI
@@ -379,6 +412,11 @@ NAVEGACION          CODIGO              GIT                 AI
 <leader>e  tree     K  hover            ghgh       stage
 s          flash    <leader>ca actions  <leader>gb blame
 <C-o>      back     <leader>cr rename   <leader>gd diff
+
+TAREAS             CONTEXTO ORCA
+<leader>jr run     <leader>ao archivo/diagnóstico
+<leader>jl list    visual + <leader>ao selección
+<leader>ja action
 
 TESTING             BUFFERS             UI                  DEBUG
 <leader>tr nearest  <S-h/l>   cambiar   <leader>ut context  <leader>db break
@@ -401,3 +439,5 @@ Para comprobar que todo funciona:
 7. `<leader>ut` — verificar treesitter context toggle
 8. `<leader>tt` en un archivo `.test.ts` — verificar que neotest ejecuta vitest
 9. `<leader>dc` — verificar que aparecen las configuraciones de Nuxt/Vite/Node
+10. `<leader>jr` dentro de un proyecto con tareas — verificar la detección y ejecución
+11. `<leader>ao` — verificar que se copia contexto y se enfoca Orca
