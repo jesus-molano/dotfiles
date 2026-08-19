@@ -139,8 +139,10 @@ if [[ -n "$benchmark_name" ]]; then
 		printf 'kernel=%s\n' "$(uname -r)"
 		printf 'programa=%s\n' "${game_command[0]##*/}"
 		printf 'duracion=%s\n' "$benchmark_duration"
+		printf '%s\n' 'perfil=desktop'
 		printf 'dlss_swapper=%s\n' "$use_dlss"
-		nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || true
+		driver=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || true)
+		[[ -z "$driver" ]] || printf 'gpu_driver=%s\n' "$driver"
 	} >"$benchmark_run/metadata.txt"
 	printf 'Benchmark MangoHud: %s\n' "$benchmark_run"
 fi

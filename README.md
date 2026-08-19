@@ -43,13 +43,13 @@ El módulo Hyprland de `desktop` no configura touchpad ni teclas de brillo porqu
 el informe real de este equipo no detectó touchpad, batería interna ni
 backlight. Los widgets adaptativos de Noctalia siguen compartidos y detectan los
 dispositivos disponibles. GPU, CHWD, initramfs, arranque, Btrfs, ZRAM, `/etc` y
-servicios quedan fuera de ambos perfiles.
+servicios del sistema quedan fuera de ambos perfiles.
 
 `gaming` y `backup` son exclusivos del sobremesa y solo gestionan archivos en
 `HOME`. CHWD continúa siendo el propietario del controlador NVIDIA.
 
-Project Cockpit, el puente Nvim–Orca, qutebrowser, captura OCR, Dev Pulse,
-scratchpads, Screen Mirror y el hub `/media` son comunes. Stremio, Spotify,
+Project Cockpit, el puente Nvim–Orca, qutebrowser, captura OCR, scratchpads y
+el hub `/media` son comunes. Stremio, Spotify,
 YouTube y las suscripciones funcionan en ambos perfiles. El backend
 Whisper/Vulkan, el pegado del dictado y direct scanout permanecen en `desktop`;
 no cargan el portátil antiguo con herramientas que dependen de su rendimiento.
@@ -59,14 +59,27 @@ La arquitectura completa está documentada en [PROFILES.md](PROFILES.md).
 Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
 `flatpak-remotes.csv` declara las aplicaciones Flatpak y su procedencia.
 
-## Tema Project Atlas
+## Apariencias y Project Atlas
 
-La paleta `ProjectAtlas` genera los temas de Hyprland, GTK, Qt/KDE, Ghostty,
-Kitty, Starship, btop, Zellij, Micro, bat/delta, Codex, Neovim, Orca y
-VS Code/VSCodium.
+`ProjectAtlas` sigue siendo la escena base. `/appearance` ofrece Atlas,
+Catppuccin Mocha, Rosé Pine Moon, Nord Night, Dracula Violet y Tokyo Night
+City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
+los temas de Hyprland, GTK, Qt/KDE, Ghostty, Kitty,
+Starship, btop, Zellij, Micro, bat/delta, Codex y VS Code/VSCodium. Neovim,
+qutebrowser y Orca leen la paleta activa al iniciar. Starship usa un archivo
+generado fuera del checkout para que rotar el tema no ensucie Git.
+El proveedor `/wall` muestra solo la colección del tema activo y cambia la
+imagen sin tocar la paleta. Cada carpeta admite una cantidad variable de
+fondos. SDDM conserva su tema Project Atlas estático porque se
+ejecuta fuera de la sesión del usuario.
+Cada tema recuerda el último fondo usado. Las colecciones se editan en
+`noctalia/.local/share/wallpapers/noctalia-themes/<tema>/`; los formatos
+admitidos son PNG, JPEG y WebP.
 
 `orca-safe-settings` actualiza con backup el tema de terminal de Orca antes de
-abrir la aplicación; Hyprland lo ejecuta una vez al comenzar cada sesión.
+abrir la aplicación; distingue el daemon permanente de una ventana real y no
+escribe mientras la interfaz está abierta. Hyprland lo ejecuta al comenzar la
+sesión y `hypr-orca` antes de abrir Orca.
 1Password arranca de forma silenciosa después del `StatusNotifierWatcher` de
 Noctalia y permanece accesible como icono inline en su bandeja.
 
@@ -206,9 +219,10 @@ La secuencia completa de cada perfil queda, por tanto:
 ### Qué cambia y qué queda fuera
 
 El instalador gestiona paquetes globales, aplicaciones Flatpak del usuario y
-enlaces en `HOME`. No despliega
+enlaces en `HOME`. En `desktop` también recarga systemd de usuario y habilita
+`reactive-rgb.service`; no habilita otras unidades. No despliega
 `system-etc`, no cambia explícitamente el controlador NVIDIA, CHWD, initramfs,
-arranque, Btrfs, ZRAM o firmware, ni habilita servicios. Pacman/Shelly sí pueden
+arranque, Btrfs, ZRAM o firmware. Pacman/Shelly sí pueden
 instalar archivos, hooks o unidades proporcionados por sus paquetes; esa parte
 no queda cubierta por el backup de `HOME`. El perfil tampoco mueve o borra
 bibliotecas de juegos. Los módulos propios de `/etc` siempre requieren los
@@ -226,7 +240,9 @@ just apply desktop
 ```
 
 La retirada no desinstala paquetes ni elimina datos personales. Para el cambio
-inverso usa `just remove desktop` y después valida y aplica `workstation`.
+inverso usa `just remove desktop` y después valida y aplica `workstation`. Esa
+retirada también detiene y deshabilita `reactive-rgb.service`; si Stow falla,
+intenta restaurar el estado anterior de la unidad.
 
 ## Gestión
 
@@ -396,13 +412,16 @@ activar cafeína y desactívala al terminar.
 | `Hyper + Space` | Abrir `/cmd` |
 | `Hyper + J` | Abrir `/proj` |
 | `Hyper + V` | Abrir `/media` |
+| `Hyper + W` | Siguiente fondo del tema activo |
+| `Hyper + [` / `Hyper + ]` | Fondo anterior/siguiente del tema activo |
+| `Hyper + T` | Siguiente apariencia completa |
+| `Hyper + R` | Iniciar o detener el dictado local |
 | `Hyper + N` | Notificaciones |
 | `Hyper + P` | Capturar una región y preparar contexto para Orca |
 | `Hyper + K` | Selector de color |
 | `Hyper + C` | Cafeína |
 | `Hyper + I` | Alternar modo foco |
 | `Hyper + U` | Activar modo demo con grabación |
-| `Hyper + T` | Iniciar o terminar dictado local y pegar el texto (`desktop`) |
 | `Hyper + L` | Bloquear la sesión |
 | `Hyper + Q` | Menú de sesión |
 | `Hyper + 7` | Ayuda de atajos |
@@ -421,7 +440,8 @@ La tabla completa de buffers, sesiones, Markdown, aplicaciones externas,
 DevTools, descargas y búsquedas técnicas está en la
 [guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#qutebrowser).
 
-El launcher ofrece `/proj`, `/proj-actions`, `/ssh`, `/media`, `/game` y `/cmd`.
+El launcher ofrece `/proj`, `/proj-actions`, `/ssh`, `/media`, `/typing`, `/appearance`,
+`/ports`, `/crash`, `/game` y `/cmd`.
 `/proj` muestra una fila por repositorio, con nombre y ruta, y abre Orca con un
 terminal del repositorio. `/proj-actions` conserva las acciones explícitas como
 Nvim, tareas y preview. Consulta la
@@ -596,8 +616,9 @@ desde la fuente oficial al arrancar la configuración desplegada y usa
 RAM. El acceso está en el centro de control. La barra muestra una cámara roja
 solo mientras hay una grabación activa; un clic la detiene. No se ejecuta
 `hyprsunset` en paralelo. La cápsula de recursos muestra uso y temperatura de la
-CPU, además de uso, temperatura y VRAM de la GPU. Estas métricas se actualizan
-cada tres segundos.
+CPU, uso y temperatura de GPU y porcentaje de RAM. Estas métricas se actualizan
+cada tres segundos. Se retiraron el espejo de pantalla y el estado periódico del
+repositorio para reducir ruido visual.
 `start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
 espera hasta veinte segundos a que todas las salidas externas activas aparezcan
 en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
@@ -612,8 +633,13 @@ el monitor. Un clic central sobre el icono de volumen de Noctalia alterna entre
 los perfiles `HDMI` y `HDMI 2`. El clic normal conserva el panel de audio. En el
 icono de Bluetooth, el clic derecho abre su panel y ya no apaga el adaptador.
 
-La guía diaria de captura OCR, dictado local, modo foco/demo, Dev Pulse,
-scratchpads y espejo de pantalla está en
+El desktop separa dos indicadores térmicos en `Aura Addressable 1`: los 12 LED
+de la CPU siguen su temperatura y los 48 LED de los ventiladores internos
+siguen la temperatura de la GPU. Azul indica frío; verde, carga normal;
+naranja, carga alta estable; y rojo, cercanía al límite térmico. Las
+líneas frontal y superior quedan blancas. No controla PWM ni la iluminación de
+la GPU o la RAM. La guía diaria de apariencias, captura OCR/QR, cápsulas de
+errores, dictado, modo foco/demo, puertos y scratchpads está en
 [docs/DESKTOP-WORKFLOW.md](docs/DESKTOP-WORKFLOW.md).
 
 ## Validación

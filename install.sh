@@ -497,11 +497,35 @@ deploy_dotfiles() {
 		restore_backup
 		die "Stow falló y se intentó restaurar la copia previa."
 	fi
+	if [[ "$PROFILE" == desktop ]]; then
+		"$DOTFILES_DIR/scripts/migrate-retired-desktop-links.sh" --apply
+	fi
 	if profile_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply
 		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --apply
 	fi
 	ok "Dotfiles desplegados ($PROFILE): ${PROFILE_MODULES[*]}"
+}
+
+configure_user_services() {
+	[[ "$PROFILE" == desktop ]] || return 0
+	command -v systemctl >/dev/null 2>&1 || die 'systemctl no está disponible para activar Reactive RGB.'
+	local rgb_was_enabled=0 rgb_was_active=0
+	systemctl --user is-enabled reactive-rgb.service >/dev/null 2>&1 && rgb_was_enabled=1
+	systemctl --user is-active reactive-rgb.service >/dev/null 2>&1 && rgb_was_active=1
+	systemctl --user daemon-reload || die 'No se pudo recargar systemd de usuario.'
+	# `enable --now` no reinicia una unidad que ya estaba activa. Reinicia de
+	# forma explícita para cargar el script, la configuración y la unidad recién
+	# desplegados.
+	if ! systemctl --user enable reactive-rgb.service ||
+		! systemctl --user restart reactive-rgb.service; then
+		warn 'Falló Reactive RGB; restaurando su estado anterior.'
+		systemctl --user disable --now reactive-rgb.service >/dev/null 2>&1 || true
+		((rgb_was_enabled)) && systemctl --user enable reactive-rgb.service >/dev/null 2>&1 || true
+		((rgb_was_active)) && systemctl --user start reactive-rgb.service >/dev/null 2>&1 || true
+		die 'No se pudo habilitar y reiniciar reactive-rgb.service.'
+	fi
+	ok 'Reactive RGB habilitado para el perfil desktop.'
 }
 
 main() {
@@ -519,6 +543,9 @@ main() {
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
 		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --check
 	fi
+	if [[ "$PROFILE" == desktop ]]; then
+		"$DOTFILES_DIR/scripts/migrate-retired-desktop-links.sh" --check
+	fi
 
 	if ((CHECK_ONLY)); then
 		check_dotfiles
@@ -528,6 +555,9 @@ main() {
 
 	printf '\nPerfil: %s\nDestino dotfiles: %s\n' "$PROFILE" "$HOME"
 	printf '%s\n' 'Shelly modificará paquetes globales y Flatpak gestionará aplicaciones del usuario; esos cambios no forman parte del backup de HOME.'
+	if [[ "$PROFILE" == desktop ]]; then
+		printf '%s\n' 'El perfil desktop habilitará reactive-rgb.service como unidad de usuario.'
+	fi
 	printf 'No se desplegará system-etc ni se cambiarán explícitamente GPU, arranque, Btrfs o zram. ¿Continuar? [s/N] '
 	read -r answer
 	[[ "$answer" =~ ^[sS]$ ]] || exit 0
@@ -537,8 +567,11 @@ main() {
 	mkdir -p "$STATE_DIR"
 	backup_targets
 	deploy_dotfiles
+	configure_user_services
 	command -v fc-cache >/dev/null && fc-cache -f
 	ok "Instalación terminada. Reinicia la sesión si cambiaste teclado o shell."
 }
 
-main "$@"
+if [[ ${DOTFILES_INSTALL_SOURCE_ONLY:-0} != 1 ]]; then
+	main "$@"
+fi

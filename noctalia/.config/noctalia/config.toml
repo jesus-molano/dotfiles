@@ -23,26 +23,19 @@ padding = 8
 widget_spacing = 4
 start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "dev_pulse", "screen_mirror", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
+end = [ "group:resources", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
-members = [ "cpu", "cpu_temp", "gpu_usage", "gpu_temp", "gpu_vram" ]
+members = [ "cpu", "cpu_temp", "gpu_usage", "gpu_temp", "ram" ]
 fill = "surface_variant"
 padding = 5.0
 opacity = 0.82
 enabled = true
 
-[widget.dev_pulse]
-type = "dotfiles/dev-pulse:pulse"
-
 [widget.gpu_usage]
 type = "sysmon"
 stat = "gpu_usage"
-
-[widget.gpu_vram]
-type = "sysmon"
-stat = "gpu_vram"
 
 [widget.special_workspaces]
 type = "jamesfeeder/special-workspaces:special-workspaces"
@@ -53,9 +46,6 @@ capsule_padding = 4
 capsule_min_width = 28
 active_style = "fill"
 inactive_style = "ghost"
-
-[widget.screen_mirror]
-type = "elijaharch/wl-screen-mirror:mirror"
 
 [widget.screen_recorder]
 type = "noctalia/screen_recorder:recorder"
@@ -106,6 +96,38 @@ prefix = "media"
 glyph = "play"
 global = false
 exec = "desktop-launcher run media {selection}"
+
+[shell.launcher.dmenu.entry.typing]
+command = "desktop-launcher list typing"
+label = "Mecanografía"
+prefix = "typing"
+glyph = "keyboard"
+global = false
+exec = "desktop-launcher run typing {selection}"
+
+[shell.launcher.dmenu.entry.appearance]
+command = "desktop-launcher list appearance"
+label = "Apariencia"
+prefix = "appearance"
+glyph = "palette"
+global = false
+exec = "desktop-launcher run appearance {selection}"
+
+[shell.launcher.dmenu.entry.ports]
+command = "desktop-launcher list ports"
+label = "Puertos de desarrollo"
+prefix = "ports"
+glyph = "network"
+global = false
+exec = "desktop-launcher run ports {selection}"
+
+[shell.launcher.dmenu.entry.crashes]
+command = "desktop-launcher list crashes"
+label = "Crashes recientes"
+prefix = "crash"
+glyph = "bug"
+global = false
+exec = "desktop-launcher run crashes {selection}"
 
 [shell.launcher.dmenu.entry.commands]
 command = "desktop-launcher list commands"
@@ -247,7 +269,7 @@ enabled = false
 
 [plugins]
 auto_update = false
-enabled = [ "noctalia/screen_recorder", "dotfiles/dev-pulse", "jamesfeeder/special-workspaces", "elijaharch/wl-screen-mirror" ]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces" ]
 
 [plugin_settings."noctalia/screen_recorder"]
 audio_bitrate = 0
@@ -274,12 +296,12 @@ video_source = "focused"
 enabled = true
 fill_mode = "crop"
 fill_color = "surface"
-directory = "/home/jesus-molano/Pictures"
+directory = "/home/jesus-molano/.local/state/dotfiles/appearance-switch/visible"
 transition = [ "fade" ]
 transition_duration = 900
 
 [wallpaper.default]
-path = "/home/jesus-molano/Pictures/wallhaven-2ero7g_2560x1440.png"
+path = "/home/jesus-molano/.local/share/wallpapers/noctalia-themes/atlas/default.png"
 
 [theme]
 mode = "dark"
@@ -288,12 +310,29 @@ custom_palette = "ProjectAtlas"
 wallpaper_scheme = "m3-tonal-spot"
 
 [theme.templates]
-builtin_ids = [ "btop", "ghostty", "gtk3", "gtk4", "hyprland", "kcolorscheme", "kitty", "qt", "starship" ]
+# El template integrado de beta.8 fusiona la paleta en STARSHIP_CONFIG. Usamos
+# uno completo para que su salida siempre sea un archivo generado, no el enlace
+# de Stow de starship.toml.
+builtin_ids = [ "btop", "ghostty", "gtk3", "gtk4", "hyprland", "kcolorscheme", "kitty", "qt" ]
+
+[theme.templates.user.starship]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas-starship.toml"
+output_path = "$XDG_CONFIG_HOME/noctalia/generated/starship.toml"
 
 [theme.templates.user.bat]
 input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas.tmTheme"
 output_path = "$XDG_CONFIG_HOME/bat/themes/project-atlas.tmTheme"
 post_hook = "bat cache --build"
+
+[theme.templates.user.active_palette]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/active-palette.json"
+output_path = "$XDG_CONFIG_HOME/noctalia/generated/active-palette.json"
+
+[theme.templates.user.appearance_ready]
+input_path = "$XDG_CONFIG_HOME/noctalia/templates/appearance-ready.json"
+output_path = "$XDG_STATE_HOME/dotfiles/appearance-switch/rendered-theme.json"
+index = 10000
+post_hook = "$HOME/.local/bin/appearance-switch template-ready"
 
 [theme.templates.user.codex]
 input_path = "$XDG_CONFIG_HOME/noctalia/templates/project-atlas.tmTheme"
@@ -355,7 +394,7 @@ stat = "cpu_temp"
 
 [widget.ram]
 type = "sysmon"
-stat = "ram_used"
+stat = "ram_pct"
 
 [widget.gpu_temp]
 type = "sysmon"

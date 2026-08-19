@@ -71,10 +71,13 @@ el servidor en su terminal y muestra su salida.
 | `Hyper + J` | Abre `/proj`. |
 | `Hyper + Space` | Abre `/cmd`. |
 | `Hyper + V` | Abre `/media`. |
+| `Hyper + W` | Usa el siguiente fondo del tema activo. |
+| `Hyper + [` / `Hyper + ]` | Usa el fondo anterior/siguiente del tema activo. |
+| `Hyper + T` | Rota a la siguiente apariencia completa. |
+| `Hyper + R` | Inicia o detiene el dictado local y pega el texto. |
 | `Hyper + O` | Enfoca o abre Orca. |
 | `Hyper + S` | Enfoca o abre Stremio. |
 | `Hyper + P` | Captura una región y prepara contexto para Orca. |
-| `Hyper + T` | Inicia o termina dictado local y pega el resultado. |
 | `Hyper + I` | Alterna modo foco. |
 | `Hyper + U` | Activa modo demo y grabación. |
 | `Alt + S` | Alterna el scratchpad general. |
@@ -87,12 +90,31 @@ el servidor en su terminal y muestra su salida.
 | Acción | Resultado |
 |---|---|
 | `capture_context` | Ejecuta la captura OCR y enfoca Orca. |
+| `capture_qr` | Selecciona un QR y copia su valor como dato sensible de un solo pegado. |
+| `bug_capsule` | Agrupa captura, OCR, metadatos limitados y el replay reciente. |
+| `media_convert` | Convierte imágenes o vídeos mediante una interfaz breve. |
+| `demo_studio` | Elige audio, webcam y fuente; la misma acción detiene su grabación. |
+| `window_width_save` / `window_width_restore` | Conserva un ancho útil por clase y workspace. |
 | `dictation_toggle` | Graba o transcribe y pega el texto. |
 | `focus_toggle` | Activa o restaura el modo foco. |
 | `demo_mode` | Activa el modo demo con grabación. |
 | `direct_scanout_toggle` | Prueba direct scanout auto para juegos. Es experimental y no cambia la configuración persistente. |
 | `doctor_host` | Abre la auditoría del host en Ghostty. |
 | `system_monitor` | Abre btop. |
+
+El launcher también ofrece cuatro proveedores de trabajo:
+
+| Prefijo | Resultado |
+|---|---|
+| `/appearance` | Aplica una escena de color y fondo coordinados. |
+| `/ports` | Lista solo los servidores TCP del usuario y abre el puerto revalidado. |
+| `/crash` | Prepara contexto Markdown de un coredump reciente y enfoca Orca. |
+| `/typing` | Abre Ttyper en inglés, ejercicios de código o Keybr. |
+
+`/typing` usa el teclado inglés del desktop. La práctica rápida abre 50 palabras
+de `english1000`; la larga abre 100. Los modos de código ofrecen Python,
+JavaScript y Rust. Keybr se abre en una ventana Brave tipo aplicación y respeta
+el layout activo del sistema.
 
 ## Gaming y multimedia
 
@@ -101,7 +123,7 @@ Estos flujos son independientes del cockpit de desarrollo:
 | Entrada | Uso |
 |---|---|
 | `Hyper + G` | Enfocar o abrir Steam. |
-| `/game` | Abrir Steam, Heroic, Lutris, Faugus o SCX Manager. |
+| `/game` | Abrir launchers y los informes de benchmarks MangoHud disponibles. |
 | `Hyper + S` | Enfocar Stremio si ya existe; abrirlo si no existe. |
 | `Hyper + V` o `/media` | Elegir Stremio, Spotify, YouTube o suscripciones. |
 | `Hyper + M` | Enfocar o abrir Spotify. |
@@ -118,6 +140,11 @@ o las suscripciones y el vídeo se reproduce en la propia página.
 Molestar solo durante el juego. Si hay dos juegos simultáneos, el último en
 cerrarse restaura el estado original. Usa las opciones de lanzamiento descritas
 en [GAMING.md](../GAMING.md).
+
+Tras tres ejecuciones con `game-run --bench NOMBRE -- COMANDO [ARGUMENTOS...]`, `/game` muestra un
+informe. Calcula mediana FPS, 1% low, dispersión de frametimes y registra kernel,
+driver y perfil. También está disponible como `game-bench-report NOMBRE` o con
+`--json`.
 
 Los reproductores compatibles pueden inhibir el estado inactivo. Si una web o
 una aplicación no lo hace, activa cafeína con `Hyper + C` y desactívala al
@@ -156,6 +183,14 @@ Para abrir el Markdown en Nvim en vez de Orca:
 capture-context --focus nvim
 ```
 
+`capture-qr` usa una selección independiente y acepta solo QR. No imprime su
+contenido. `bug-capsule` crea una carpeta privada bajo
+`~/.local/state/bug-capsules`, copia la captura, añade el OCR y pide guardar los
+últimos 90 segundos del replay. El resultado es local; no crea issues ni publica.
+
+`media-convert` sin argumentos abre un selector para imagen a JPG/PNG o vídeo a
+MP4/GIF. Conserva el original, evita sobrescrituras y copia la URI del resultado.
+
 ### Dictado
 
 El dictado es local y bajo demanda. Antes del primer uso descarga un modelo:
@@ -164,7 +199,7 @@ El dictado es local y bajo demanda. Antes del primer uso descarga un modelo:
 just dictation-setup base
 ```
 
-`Hyper + T` empieza a grabar. Pulsa de nuevo para detener, transcribir, copiar y
+`Hyper + R` empieza a grabar. Pulsa de nuevo para detener, transcribir, copiar y
 pegar el texto en la ventana activa. Usa `local-dictation status` para comprobar
 si está grabando. Los modelos permitidos son `tiny`, `base` y `small`. La
 descarga usa una revisión fijada y valida tamaño y SHA-256 antes de instalar el
@@ -178,13 +213,19 @@ predeterminado.
 Molestar y oculta la barra. Pulsa el mismo atajo para restaurar el estado que
 había antes.
 
-`Hyper + U` alterna modo demo. La primera pulsación inicia una grabación de la
-pantalla enfocada. La barra permanece visible y muestra una cámara roja mientras
+`Hyper + U` alterna modo demo. La primera pulsación abre una confirmación modal.
+Selecciona **Iniciar demo** para iniciar la grabación de la pantalla enfocada; usa
+**Cancelar** para no cambiar el estado del equipo. La barra permanece visible y muestra una cámara roja mientras
 graba. Pulsa otra vez `Hyper + U`, o haz clic en la cámara roja, para detener la
 grabación. `Hyper + U` también restaura No Molestar, cafeína, barra y perfil
 energético al estado anterior. Un clic en la cámara detiene solo el vídeo; pulsa
 después `Hyper + U` para salir del modo demo. La cámara desaparece cuando no hay
 una grabación activa.
+
+La acción `demo_studio` de `/cmd` es el modo avanzado. Permite elegir audio del
+escritorio, micrófono, ambos o ninguno; webcam flotante; y monitor enfocado o
+portal. El modo predeterminado usa el monitor enfocado. Demo Studio solo detiene
+el proceso que inició y no interfiere con el replay de Noctalia.
 
 No uses modo foco para juegos. `game-run` mantiene su propio comportamiento de
 pantalla completa y notificaciones. Si estaba activo, `game-run` lo restaura
@@ -192,23 +233,66 @@ antes de iniciar; mientras haya una sesión gaming, el modo foco no se activa.
 
 ## Noctalia: estado y presentación
 
-La barra incluye tres herramientas de trabajo:
+La barra incluye estas herramientas de trabajo:
 
-- **Dev Pulse** muestra el proyecto de la ventana activa, rama Git, número de
-  cambios y procesos Codex locales. Se actualiza cada treinta segundos. Es de
-  solo lectura: no abre repositorios, no ejecuta prompts y no modifica Git.
 - **Special Workspaces** muestra los scratchpads poblados. Usa `Alt + A` para
   IA y `Alt + Z` para logs sin abandonar el workspace principal.
-- **Screen Mirror** permite preparar un espejo de pantalla desde el widget de
-  la barra. Úsalo para demos o para comprobar una salida; no sustituye la
-  configuración permanente de monitores.
 
-La base revisada fija Dev Pulse `1.0.0`, Special Workspaces `1.4.0` y Screen
-Mirror `1.0.0`. `just doctor-live desktop` detecta un cambio de versión antes
-de aceptarlo como parte del perfil.
+La base revisada fija Special Workspaces `1.4.0`. `just doctor-live desktop`
+detecta un cambio de versión antes de aceptarlo como parte del perfil.
 
 El grabador de Noctalia también está disponible en el centro de control. El
 modo demo detiene solo la grabación que inició él mismo.
+
+La cápsula de recursos muestra CPU, temperatura de CPU, uso y temperatura de GPU
+y porcentaje de RAM. Ya no muestra VRAM. La barra tampoco incluye espejo de
+pantalla ni estado periódico del repositorio.
+
+## Apariencias y RGB
+
+`/appearance` ofrece seis escenas: Atlas, Catppuccin Mocha, Rosé Pine Moon,
+Nord Night, Dracula Violet y Tokyo Night City. Cada escena cambia la paleta de
+Noctalia y el fondo como una sola acción. `Hyper + T` rota estas escenas sin
+abrir el menú.
+Usa `appearance-switch next` o `previous` desde terminal para recorrerlas.
+El proveedor `/wall` muestra solo los fondos de la apariencia activa y cambia
+la imagen sin cambiar la paleta. Cada carpeta admite una cantidad variable de
+fondos. Al cambiar de apariencia, cierra y vuelve a
+abrir `/wall` para consultar la nueva colección. El panel gráfico de fondos
+requiere su acción `Refresh` si ya estaba abierto.
+Cada apariencia recuerda su último fondo y lo restaura al volver; si ese
+archivo ya no existe, usa el primer nombre de archivo disponible. Para editar las
+colecciones, añade o retira PNG, JPEG o WebP en
+`~/.dotfiles/noctalia/.local/share/wallpapers/noctalia-themes/<tema>/`.
+Los cambios aparecen al volver a abrir `/wall`; no requieren desplegar Stow.
+
+Noctalia regenera Hyprland, Ghostty, GTK, Qt, btop, Starship, Bat/Delta y las
+demás plantillas activas. Starship se genera fuera del checkout. Neovim y
+qutebrowser leen la paleta al abrir una instancia nueva. Orca la aplica antes
+de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
+abierta.
+SDDM mantiene Project Atlas: se ejecuta antes de la sesión y no participa en
+este cambio de apariencia.
+
+En el desktop, `reactive-rgb.service` usa dos indicadores independientes dentro
+de `Aura Addressable 1`. Los LED 1–12 de la CPU siguen exclusivamente la
+temperatura de CPU. Los LED 13–60 de los ventiladores internos siguen
+exclusivamente la temperatura de la GPU. La CPU usa azul por debajo de 50 °C,
+verde entre 50 y 69 °C, naranja entre 70 y 84 °C y rojo desde 85 °C. La GPU
+usa azul por debajo de 50 °C, verde entre 50 y 69 °C, naranja entre 70 y 82 °C
+y rojo desde 83 °C. Las líneas frontal y superior permanecen blancas mediante
+la zona fija de la placa y los
+dos canales NZXT. OpenRGB nunca selecciona la iluminación de la GPU o la RAM y
+no modifica PWM. El estado vivo se guarda en `XDG_RUNTIME_DIR`, no en el NVMe,
+y los destinos se reaplican cada cinco minutos aunque la banda térmica no
+cambie. Comandos útiles:
+
+```bash
+reactive-rgb status
+reactive-rgb dry-run --mode thermal
+systemctl --user enable --now reactive-rgb.service
+systemctl --user status reactive-rgb.service
+```
 
 ## qutebrowser
 
@@ -273,9 +357,8 @@ O mdn AbortController
 
 ### Preparar una demo
 
-1. `Hyper + U` para activar demo y grabación.
-2. Abre Screen Mirror desde Noctalia si necesitas duplicar una salida.
-3. Pulsa `Hyper + U` al terminar para restaurar el estado anterior.
+1. Pulsa `Hyper + U` y selecciona **Iniciar demo** para activar demo y grabación.
+2. Pulsa `Hyper + U` al terminar para restaurar el estado anterior.
 
 ### Ver una serie o película
 

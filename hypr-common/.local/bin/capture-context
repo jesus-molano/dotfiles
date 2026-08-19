@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 usage() {
 	cat <<'EOF'
@@ -71,10 +72,12 @@ mkdir -p "$state_dir" "$output_dir"
 
 raw=''
 owns_raw=0
+context_private=''
 # ShellCheck no detecta llamadas indirectas desde trap.
 # shellcheck disable=SC2329
 cleanup() {
 	if ((owns_raw)) && [[ -n "$raw" ]]; then rm -f -- "$raw"; fi
+	[[ -z "$context_private" ]] || rm -f -- "$context_private"
 }
 trap cleanup EXIT
 
@@ -92,7 +95,9 @@ else
 fi
 
 timestamp=$(date +%Y-%m-%d_%H-%M-%S)
-image="$output_dir/context-$timestamp.png"
+# El PID evita que dos capturas iniciadas durante el mismo segundo escriban
+# sobre el mismo archivo.
+image="$output_dir/context-$timestamp-$$.png"
 
 if ((annotate)); then
 	command -v satty >/dev/null 2>&1 || fail 'Falta Satty.' 127
@@ -108,18 +113,20 @@ if ((ocr)); then
 	text=$(tesseract "$image" stdout -l spa+eng --psm 6 2>/dev/null || true)
 fi
 
-context_tmp=$(mktemp --tmpdir="$state_dir" .latest.XXXXXX)
+context_private=$(mktemp --tmpdir="$state_dir" .context.XXXXXX)
 {
 	printf '## Contexto visual\n\n'
 	printf '![Captura](<%s>)\n' "$image"
 	if [[ -n "$text" ]]; then
 		printf '\n### Texto detectado\n\n%s\n%s\n%s\n' '```text' "$text" '```'
 	fi
-} >"$context_tmp"
-mv -f -- "$context_tmp" "$state_dir/latest.md"
+} >"$context_private"
+latest_tmp=$(mktemp --tmpdir="$state_dir" .latest.XXXXXX)
+cp -- "$context_private" "$latest_tmp"
+mv -f -- "$latest_tmp" "$state_dir/latest.md"
 
 command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
-wl-copy <"$state_dir/latest.md"
+wl-copy --sensitive --paste-once <"$context_private"
 
 case "$focus" in
 orca)
@@ -134,5 +141,5 @@ esac
 
 command -v notify-send >/dev/null 2>&1 &&
 	notify-send 'Contexto preparado' 'La captura y el texto están en el portapapeles.' || true
-((print_context)) && cat -- "$state_dir/latest.md"
+((print_context)) && cat -- "$context_private"
 exit 0

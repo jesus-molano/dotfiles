@@ -1,55 +1,122 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Orca owns this JSON while running. Apply conservative defaults only between
-# sessions so its in-memory state cannot overwrite the change on exit.
-if pgrep -x orca-ide >/dev/null; then
-	exit 0
-fi
-
 readonly profile="${ORCA_PROFILE:-local-default}"
 readonly config_root="${XDG_CONFIG_HOME:-$HOME/.config}"
 readonly settings="$config_root/orca/profiles/$profile/orca-data.json"
-readonly palette="$config_root/noctalia/palettes/ProjectAtlas.json"
+readonly active_palette="$config_root/noctalia/generated/active-palette.json"
+readonly fallback_palette="$config_root/noctalia/palettes/ProjectAtlas.json"
 
 [[ -f "$settings" ]] || exit 0
-[[ -f "$palette" ]] || {
-	printf 'orca-safe-settings: ProjectAtlas.json is missing; settings left untouched.\n' >&2
-	exit 1
-}
 command -v jq >/dev/null || {
 	printf 'orca-safe-settings: jq is required; settings left untouched.\n' >&2
-	exit 1
+	exit 0
+}
+
+# La paleta generada se puede leer mientras Noctalia la está sustituyendo. No
+# basta con que exista: todos los valores que se escriben en Orca deben estar.
+valid_palette() {
+	jq -e '
+    def hex: type == "string" and test("^#[0-9A-Fa-f]{6}$");
+    .dark as $dark
+    | [
+        $dark.mSurface,
+        $dark.mOutline,
+        $dark.terminal.foreground,
+        $dark.terminal.background,
+        $dark.terminal.cursor,
+        $dark.terminal.cursorText,
+        $dark.terminal.selectionBg,
+        $dark.terminal.selectionFg,
+        $dark.terminal.normal.black,
+        $dark.terminal.normal.red,
+        $dark.terminal.normal.green,
+        $dark.terminal.normal.yellow,
+        $dark.terminal.normal.blue,
+        $dark.terminal.normal.magenta,
+        $dark.terminal.normal.cyan,
+        $dark.terminal.normal.white,
+        $dark.terminal.bright.black,
+        $dark.terminal.bright.red,
+        $dark.terminal.bright.green,
+        $dark.terminal.bright.yellow,
+        $dark.terminal.bright.blue,
+        $dark.terminal.bright.magenta,
+        $dark.terminal.bright.cyan,
+        $dark.terminal.bright.white
+      ]
+    | all(hex)
+  ' "$1" >/dev/null 2>&1
+}
+
+if valid_palette "$active_palette"; then
+	readonly palette="$active_palette"
+elif valid_palette "$fallback_palette"; then
+	readonly palette="$fallback_palette"
+else
+	printf 'orca-safe-settings: no hay una paleta activa o fallback valida; ajustes sin cambios.\n' >&2
+	exit 0
+fi
+
+# orca-ide remains as a background daemon after the UI closes. Only a visible
+# Orca window can still hold in-memory settings that would overwrite this file.
+readonly hyprctl_bin="${HYPRCTL_BIN:-hyprctl}"
+orca_window_state() {
+	local clients_json
+	clients_json=$("$hyprctl_bin" clients -j 2>/dev/null) || return 2
+	jq -r '
+  if type != "array" then
+    error("hyprctl clients no devolvio una lista")
+  elif any(
+    .[]?;
+    [(.class // ""), (.initialClass // "")]
+    | any(.[]; tostring | ascii_downcase | test("(^|[._-])orca([._-]ide)?($|[._-])"))
+  ) then
+    "visible"
+  else
+    "none"
+  end
+' <<<"$clients_json"
 }
 
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/orca"
 mkdir -p "$state_root"
 chmod 700 "$state_root"
+exec 9>"$state_root/settings.lock"
+flock -w 2 9 || exit 0
+
+if ! window_state=$(orca_window_state); then
+	printf 'orca-safe-settings: no se pudieron validar las ventanas de Hyprland; ajustes sin cambios.\n' >&2
+	exit 0
+fi
+if [[ "$window_state" == "visible" ]]; then
+	exit 0
+fi
 
 tmp="$(mktemp "$state_root/orca-data.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
 
 jq --slurpfile palette "$palette" '
-  ($palette[0].dark) as $atlas
-  | ($atlas.terminal) as $terminal
+  ($palette[0].dark) as $theme
+  | ($theme.terminal) as $terminal
   | .settings.telemetry.optedIn = false
   | .settings.terminalLineHeight = 1.15
   | .settings.terminalScrollbackRows = 20000
   | .settings.theme = "dark"
   | .settings.leftSidebarAppearanceMode = "match-terminal"
-  | .settings.leftSidebarTintColor = $atlas.mSurface
+  | .settings.leftSidebarTintColor = $theme.mSurface
   | .settings.leftSidebarTintOpacity = 0.12
-  | .settings.terminalThemeDark = "custom:manual:project-atlas"
+  | .settings.terminalThemeDark = "custom:manual:noctalia-active"
   | .settings.terminalUseSeparateLightTheme = false
-  | .settings.terminalDividerColorDark = $atlas.mOutline
+  | .settings.terminalDividerColorDark = $theme.mOutline
   | .settings.terminalCustomThemes = (
       ((.settings.terminalCustomThemes // [])
-        | map(select(.id != "manual:project-atlas")))
+        | map(select(.id != "manual:project-atlas" and .id != "manual:noctalia-active")))
       + [{
-          id: "manual:project-atlas",
-          name: "Project Atlas",
+          id: "manual:noctalia-active",
+          name: "Noctalia Active",
           source: "manual",
-          sourceLabel: "Noctalia ProjectAtlas",
+          sourceLabel: "Noctalia active palette",
           mode: "dark",
           importedAt: "1970-01-01T00:00:00.000Z",
           terminal: {
@@ -82,6 +149,12 @@ jq --slurpfile palette "$palette" '
 ' "$settings" >"$tmp"
 
 if cmp -s "$settings" "$tmp"; then
+	exit 0
+fi
+
+# Vuelve a consultar justo antes de escribir. Esto cierra la ventana de carrera
+# normal entre preparar la paleta y que otra acción abra Orca.
+if ! window_state=$(orca_window_state) || [[ "$window_state" == "visible" ]]; then
 	exit 0
 fi
 

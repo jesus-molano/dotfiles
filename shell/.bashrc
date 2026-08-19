@@ -13,6 +13,9 @@ PS1='[\u@\h \W]\$ '
 export EDITOR=nvim
 export VISUAL=nvim
 export SUDO_EDITOR=nvim
+export STARSHIP_CONFIG="$HOME/.config/noctalia/generated/starship.toml"
+export BAT_THEME="project-atlas"
+[[ -r $STARSHIP_CONFIG ]] || export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
 if command -v mise >/dev/null 2>&1; then
 	eval "$(mise activate bash)"
@@ -35,6 +38,9 @@ fi
 
 if command -v zoxide >/dev/null 2>&1; then
 	eval "$(zoxide init bash)"
+fi
+if command -v starship >/dev/null 2>&1; then
+	eval "$(starship init bash)"
 fi
 if command -v direnv >/dev/null 2>&1; then
 	eval "$(direnv hook bash)"

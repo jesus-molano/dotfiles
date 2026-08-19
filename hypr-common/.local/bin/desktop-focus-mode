@@ -153,6 +153,16 @@ enable_failed() {
 	exit 1
 }
 
+confirm_demo_start() {
+	command -v zenity >/dev/null 2>&1 || {
+		printf '%s\n' 'desktop-focus-mode: zenity no está disponible para confirmar el inicio de la demo.' >&2
+		return 1
+	}
+	zenity --question --modal --title='Iniciar modo demo' \
+		--text='Se activarán el modo demo y la grabación de la pantalla enfocada.' \
+		--ok-label='Iniciar demo' --cancel-label='Cancelar' --width=440
+}
+
 enable_mode() {
 	local demo=$1 dnd bar_visible caffeine power_profile power_changed=false started_recording=false
 	local recording_pid=0 recording_starttime=0 identity mode=focus
@@ -161,6 +171,10 @@ enable_mode() {
 		printf '%s\n' 'El modo foco ya está activo.' >&2
 		exit 1
 	}
+	if [[ "$demo" == true ]] && ! confirm_demo_start; then
+		printf '%s\n' 'desktop-focus-mode: inicio del modo demo cancelado.' >&2
+		exit 1
+	fi
 
 	dnd="$(noctalia msg notification-dnd-status)"
 	[[ "$dnd" == on || "$dnd" == off ]] || {

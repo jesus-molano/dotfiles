@@ -6,6 +6,6 @@ body=$'Caps: Esc / Hyper\nAlt+H J K L: foco\nAlt+Shift+H J K L: mover\nAlt+Ctrl+
 if command -v hypr-gaming >/dev/null; then
 	body+=$'\nHyper+G: Steam\nLauncher /game: launchers y SCX Manager'
 fi
-body+=$'\nAlt+Space: launcher (/proj /ssh /cmd)\nSuper+Space: teclado US/ES\nHyper+K/N/P: color, notificaciones, captura\nSuper+V: historial del portapapeles\nHyper+C/L/Q: cafeína, bloqueo, sesión'
+body+=$'\nAlt+Space: launcher (/proj /ssh /typing /cmd)\nSuper+Space: teclado US/ES\nHyper+W: apariencias y fondos\nHyper+K/N/P: color, notificaciones, captura\nSuper+V: historial del portapapeles\nHyper+C/L/Q: cafeína, bloqueo, sesión'
 
 exec noctalia msg notification-show "$summary" -- "$body"

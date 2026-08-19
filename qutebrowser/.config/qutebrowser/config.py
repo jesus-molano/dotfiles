@@ -1,4 +1,76 @@
-"""Project Atlas: qutebrowser keyboard-first configuration."""
+"""Qutebrowser keyboard-first con la paleta activa de Noctalia."""
+
+import json
+from pathlib import Path
+
+
+DEFAULT_PALETTE = {
+    "background": "#090a0d",
+    "surface": "#14171c",
+    "surface_variant": "#1b1f26",
+    "hover": "#222731",
+    "outline": "#454b57",
+    "foreground": "#f1f3f5",
+    "muted": "#a8afba",
+    "primary": "#ff5b4d",
+    "on_primary": "#180a08",
+    "secondary": "#83a7c4",
+    "tertiary": "#c4a663",
+    "error": "#d86f91",
+    "green": "#73bd8a",
+}
+
+
+def _is_hex_color(value):
+    return (
+        isinstance(value, str)
+        and len(value) == 7
+        and value.startswith("#")
+        and all(character in "0123456789abcdefABCDEF" for character in value[1:])
+    )
+
+
+def _read_palette(path):
+    """Read only the color fields qutebrowser needs from a palette JSON file."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return {}
+
+    dark = data.get("dark") if isinstance(data, dict) else None
+    terminal = dark.get("terminal") if isinstance(dark, dict) else None
+    normal = terminal.get("normal") if isinstance(terminal, dict) else None
+    if not isinstance(dark, dict):
+        return {}
+
+    fields = {
+        "background": terminal.get("background") if isinstance(terminal, dict) else None,
+        "surface": dark.get("mSurface"),
+        "surface_variant": dark.get("mSurfaceVariant"),
+        "hover": dark.get("mHover"),
+        "outline": dark.get("mOutline"),
+        "foreground": terminal.get("foreground") if isinstance(terminal, dict) else None,
+        "muted": dark.get("mOnSurfaceVariant"),
+        "primary": dark.get("mPrimary"),
+        "on_primary": dark.get("mOnPrimary"),
+        "secondary": dark.get("mSecondary"),
+        "tertiary": dark.get("mTertiary"),
+        "error": dark.get("mError"),
+        "green": normal.get("green") if isinstance(normal, dict) else None,
+    }
+    return {name: value for name, value in fields.items() if _is_hex_color(value)}
+
+
+def _load_palette(active_path=None, fallback_path=None):
+    """Prefer Noctalia's generated palette and safely fall back to Project Atlas."""
+    config_dir = Path.home() / ".config/noctalia"
+    active_path = active_path or config_dir / "generated/active-palette.json"
+    fallback_path = fallback_path or config_dir / "palettes/ProjectAtlas.json"
+
+    palette = DEFAULT_PALETTE.copy()
+    palette.update(_read_palette(fallback_path))
+    palette.update(_read_palette(active_path))
+    return palette
 
 # Keep per-site permissions and temporary changes made with :set, while this
 # file remains the canonical source for the shared profile defaults.
@@ -106,20 +178,22 @@ c.downloads.location.suggestion = "both"
 c.downloads.remove_finished = 15000
 
 
-# Project Atlas palette.
-background = "#090a0d"
-surface = "#14171c"
-surface_variant = "#1b1f26"
-hover = "#222731"
-outline = "#454b57"
-foreground = "#f1f3f5"
-muted = "#a8afba"
-primary = "#ff5b4d"
-on_primary = "#180a08"
-secondary = "#83a7c4"
-tertiary = "#c4a663"
-error = "#d86f91"
-green = "#73bd8a"
+# Project Atlas palette. This is read when qutebrowser starts; an already
+# running instance keeps its current colors until its next start.
+palette = _load_palette()
+background = palette["background"]
+surface = palette["surface"]
+surface_variant = palette["surface_variant"]
+hover = palette["hover"]
+outline = palette["outline"]
+foreground = palette["foreground"]
+muted = palette["muted"]
+primary = palette["primary"]
+on_primary = palette["on_primary"]
+secondary = palette["secondary"]
+tertiary = palette["tertiary"]
+error = palette["error"]
+green = palette["green"]
 
 c.fonts.default_family = ["JetBrainsMono Nerd Font"]
 c.fonts.default_size = "10pt"

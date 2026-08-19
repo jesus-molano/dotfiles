@@ -1,0 +1,9 @@
+# id	label	palette_source	palette_name	wallpaper_hint
+# Cada ID coincide con su carpeta. `-` usa el último fondo recordado o, si no
+# existe, el primer raster por nombre. `/wall` consulta solo esa carpeta.
+atlas	Atlas	custom	ProjectAtlas	-
+catppuccin	Catppuccin Mocha	builtin	Catppuccin	-
+rose-pine	Rosé Pine Moon	custom	RosePine	-
+nord	Nord Night	builtin	Nord	-
+dracula	Dracula Violet	builtin	Dracula	-
+tokyo-night	Tokyo Night City	builtin	Tokyo-Night	-

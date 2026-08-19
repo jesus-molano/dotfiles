@@ -3,6 +3,9 @@ source /usr/share/cachyos-zsh-config/cachyos-config.zsh
 export EDITOR=nvim
 export VISUAL=nvim
 export SUDO_EDITOR=nvim
+export STARSHIP_CONFIG="$HOME/.config/noctalia/generated/starship.toml"
+export BAT_THEME="project-atlas"
+[[ -r $STARSHIP_CONFIG ]] || export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
 # mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
 if command -v mise >/dev/null 2>&1; then
@@ -26,6 +29,9 @@ fi
 
 if command -v zoxide >/dev/null 2>&1; then
   eval "$(zoxide init zsh)"
+fi
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
 fi
 
 # direnv

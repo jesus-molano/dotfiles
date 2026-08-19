@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: hypr-window-width save|restore
+
+Guarda o restaura el ancho de la ventana activa. El estado se separa por clase
+de ventana y espacio de trabajo en XDG_STATE_HOME.
+EOF
+}
+
+fail() { printf 'hypr-window-width: %s\n' "$1" >&2; exit "${2:-1}"; }
+notify() { command -v notify-send >/dev/null 2>&1 && notify-send 'Ancho de ventana' "$1" || true; }
+
+[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+case "$1" in
+save | restore) action=$1 ;;
+-h | --help) usage; exit 0 ;;
+*) fail "Acción no reconocida: $1" 2 ;;
+esac
+
+hyprctl_cmd=${HYPR_WINDOW_WIDTH_HYPRCTL:-hyprctl}
+state_dir=${HYPR_WINDOW_WIDTH_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/hypr-window-width"}
+command -v "$hyprctl_cmd" >/dev/null 2>&1 || fail "Falta $hyprctl_cmd." 127
+command -v jq >/dev/null 2>&1 || fail 'Falta jq.' 127
+
+active=$($hyprctl_cmd activewindow -j) || fail 'No se pudo leer la ventana activa.'
+class=$(jq -er '.class | strings | select(length > 0)' <<<"$active") || fail 'La ventana activa no tiene clase.'
+workspace=$(jq -er '.workspace.id | numbers | tostring' <<<"$active") || fail 'La ventana activa no tiene espacio de trabajo.'
+width=$(jq -er '.size[0] | numbers | select(. > 0) | floor | tostring' <<<"$active") || fail 'El ancho activo no es válido.'
+height=$(jq -er '.size[1] | numbers | select(. > 0) | floor | tostring' <<<"$active") || fail 'La altura activa no es válida.'
+
+# cksum evita que una clase o un nombre de espacio no fiable forme una ruta.
+key=$(printf '%s\0%s' "$class" "$workspace" | cksum | awk '{print $1 "-" $2}')
+state_file="$state_dir/$key.width"
+
+case "$action" in
+save)
+	install -d -m 700 -- "$state_dir"
+	(umask 077; printf '%s\n' "$width" >"$state_file")
+	notify "Guardado: $width px para $class en el espacio $workspace."
+	printf 'Guardado: clase=%s espacio=%s ancho=%s\n' "$class" "$workspace" "$width"
+	;;
+restore)
+	[[ -r "$state_file" ]] || fail "No hay ancho guardado para clase=$class espacio=$workspace." 3
+	saved_width=$(<"$state_file")
+	[[ "$saved_width" =~ ^[1-9][0-9]*$ ]] || fail 'El ancho guardado no es válido.'
+
+	"$hyprctl_cmd" dispatch resizeactive "exact $saved_width $height" || fail 'No se pudo restaurar el ancho.'
+	notify "Restaurado: $saved_width px para $class en el espacio $workspace."
+	printf 'Restaurado: clase=%s espacio=%s ancho=%s\n' "$class" "$workspace" "$saved_width"
+	;;
+esac

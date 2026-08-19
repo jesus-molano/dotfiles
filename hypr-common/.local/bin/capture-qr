@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: capture-qr
+
+Selecciona una región, decodifica exclusivamente códigos QR y copia el valor
+al portapapeles de un solo pegado. No imprime el contenido decodificado.
+
+Variables de prueba: CAPTURE_QR_SLURP, CAPTURE_QR_GRIM, CAPTURE_QR_ZBARIMG,
+CAPTURE_QR_WL_COPY y CAPTURE_QR_RUNTIME_DIR.
+EOF
+}
+
+fail() {
+	command -v notify-send >/dev/null 2>&1 && notify-send 'Código QR' "$1" || true
+	printf 'capture-qr: %s\n' "$1" >&2
+	exit "${2:-1}"
+}
+
+case "${1:-}" in
+'') ;;
+-h | --help)
+	usage
+	exit 0
+	;;
+*) fail "Opción no reconocida: $1" 2 ;;
+esac
+
+slurp_cmd=${CAPTURE_QR_SLURP:-slurp}
+grim_cmd=${CAPTURE_QR_GRIM:-grim}
+zbarimg_cmd=${CAPTURE_QR_ZBARIMG:-zbarimg}
+wl_copy_cmd=${CAPTURE_QR_WL_COPY:-wl-copy}
+runtime_dir=${CAPTURE_QR_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/tmp}}
+
+for required in "$slurp_cmd" "$grim_cmd" "$zbarimg_cmd" "$wl_copy_cmd"; do
+	command -v "$required" >/dev/null 2>&1 || fail "Falta $required." 127
+done
+
+geometry=$("$slurp_cmd") || exit 0
+[[ -n "$geometry" ]] || exit 0
+image=$(mktemp --tmpdir="$runtime_dir" --suffix=.png capture-qr.XXXXXX)
+trap 'rm -f -- "$image"' EXIT
+"$grim_cmd" -g "$geometry" "$image" || fail 'No se pudo capturar la región.'
+
+# Desactiva todos los simbologías salvo QR. Nunca se registra ni se imprime el valor.
+value=$("$zbarimg_cmd" --quiet --raw --set enable=0 --set qrcode.enable=1 "$image" 2>/dev/null || true)
+[[ -n "$value" ]] || fail 'No se detectó ningún código QR.'
+[[ $(printf '%s\n' "$value" | wc -l) -eq 1 ]] || fail 'Se detectaron varios códigos QR; selecciona solo uno.'
+
+printf '%s' "$value" | "$wl_copy_cmd" --sensitive --paste-once --trim-newline
+command -v notify-send >/dev/null 2>&1 && notify-send 'Código QR copiado' 'Disponible para un solo pegado.' || true

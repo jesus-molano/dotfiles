@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# Grabación local para demostraciones. No gestiona DND, energía, cafeína ni replay.
+set -euo pipefail
+
+usage() {
+	printf '%s\n' 'Uso: demo-studio {status|start|stop|toggle|show}'
+}
+
+readonly runtime_root="${DEMO_STUDIO_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/tmp}/demo-studio}"
+readonly state_file="$runtime_root/state"
+readonly lock_file="$runtime_root/lock"
+readonly recordings_dir="${DEMO_STUDIO_RECORDINGS_DIR:-$HOME/Videos/Recordings}"
+readonly gsr_bin="${DEMO_STUDIO_GSR_BIN:-gpu-screen-recorder}"
+readonly mpv_bin="${DEMO_STUDIO_MPV_BIN:-mpv}"
+readonly zenity_bin="${DEMO_STUDIO_ZENITY:-zenity}"
+readonly notify_bin="${DEMO_STUDIO_NOTIFY:-notify-send}"
+
+notify() {
+	command -v "$notify_bin" >/dev/null 2>&1 && "$notify_bin" 'Demo Studio' "$1" >/dev/null 2>&1 || true
+}
+
+fail() {
+	printf 'demo-studio: %s\n' "$1" >&2
+	notify "$1"
+	exit "${2:-1}"
+}
+
+process_starttime() {
+	local pid=$1 stat_line remainder
+	local -a fields
+	[[ "$pid" =~ ^[0-9]+$ && -r "/proc/$pid/stat" ]] || return 1
+	stat_line=$(<"/proc/$pid/stat")
+	remainder=${stat_line##*) }
+	read -r -a fields <<<"$remainder"
+	((${#fields[@]} >= 20)) && [[ "${fields[19]}" =~ ^[0-9]+$ ]] || return 1
+	printf '%s\n' "${fields[19]}"
+}
+
+read_state() {
+	local key=$1 line
+	[[ -s "$state_file" ]] || return 1
+	line="$(awk -F= -v key="$key" '$1 == key { print $2; exit }' "$state_file")"
+	case "$key:$line" in
+	pid:* | starttime:* | webcam_pid:* | webcam_starttime:*) [[ "$line" =~ ^[0-9]+$ ]] ;;
+	output:/*) [[ "$line" != *$'\n'* ]] ;;
+	webcam:true | webcam:false) : ;;
+	*) return 1 ;;
+	esac
+	printf '%s\n' "$line"
+}
+
+recorder_identity() {
+	local pid starttime
+	pid="$(read_state pid)" || return 1
+	starttime="$(read_state starttime)" || return 1
+	[[ "$(process_starttime "$pid" 2>/dev/null || true)" == "$starttime" ]] || return 1
+	printf '%s %s\n' "$pid" "$starttime"
+}
+
+is_active() { recorder_identity >/dev/null; }
+
+write_state() {
+	local pid=$1 starttime=$2 output=$3 webcam=$4 webcam_pid=$5 webcam_starttime=$6 tmp
+	mkdir -p -- "$runtime_root"
+	chmod 700 "$runtime_root"
+	tmp=$(mktemp "$runtime_root/state.XXXXXX")
+	printf 'pid=%s\nstarttime=%s\noutput=%s\nwebcam=%s\nwebcam_pid=%s\nwebcam_starttime=%s\n' \
+		"$pid" "$starttime" "$output" "$webcam" "$webcam_pid" "$webcam_starttime" >"$tmp"
+	mv -f -- "$tmp" "$state_file"
+}
+
+# Todas las acciones que cambian la sesión comparten este bloqueo. Así, una
+# segunda invocación no puede pasar la comprobación de estado mientras la
+# primera aún reserva el nombre, inicia el grabador y escribe el estado.
+with_session_lock() {
+	local lock_fd result
+	mkdir -p -- "$runtime_root"
+	chmod 700 "$runtime_root"
+	exec {lock_fd}>"$lock_file"
+	flock -x "$lock_fd"
+	if "$@"; then
+		result=0
+	else
+		result=$?
+	fi
+	flock -u "$lock_fd"
+	exec {lock_fd}>&-
+	return "$result"
+}
+
+clear_stale_state() {
+	[[ -e "$state_file" ]] || return 0
+	is_active || rm -f -- "$state_file"
+}
+
+# Una instancia con -r es replay. No la toca esta utilidad; una sin -r es una
+# grabación normal y se rechaza para no competir por la captura.
+other_normal_recording_active() {
+	local proc pid cmdline own_pid
+	own_pid="$(read_state pid 2>/dev/null || true)"
+	for proc in /proc/[0-9]*; do
+		pid=${proc##*/}
+		[[ "$pid" != "$own_pid" && -r "$proc/cmdline" ]] || continue
+		cmdline=$(tr '\0' ' ' <"$proc/cmdline" 2>/dev/null || true)
+		[[ "$cmdline" == *gpu-screen-recorder* ]] || continue
+		case " $cmdline " in *' -r '*) continue ;; esac
+		return 0
+	done
+	return 1
+}
+
+choose_options() {
+	local choice
+	command -v "$zenity_bin" >/dev/null 2>&1 || fail 'Falta Zenity para elegir la grabación.' 127
+	choice=$("$zenity_bin" --list --radiolist --title='Demo Studio' --text='Audio de la grabación' \
+		--column='' --column='Audio' TRUE 'Audio del escritorio' FALSE 'Micrófono' FALSE 'Ambos' FALSE 'Sin audio' \
+		--height=280 --width=420) || return 1
+	case "$choice" in
+	'Audio del escritorio') DEMO_STUDIO_AUDIO=desktop ;;
+	Micrófono) DEMO_STUDIO_AUDIO=mic ;;
+	Ambos) DEMO_STUDIO_AUDIO=both ;;
+	'Sin audio') DEMO_STUDIO_AUDIO=none ;;
+	*) fail 'La selección de audio no es válida.' ;;
+	esac
+	if "$zenity_bin" --question --title='Demo Studio' --text='¿Mostrar la webcam en una ventana?'; then
+		DEMO_STUDIO_WEBCAM=true
+	else
+		DEMO_STUDIO_WEBCAM=false
+	fi
+	choice=$("$zenity_bin" --list --radiolist --title='Demo Studio' --text='Fuente de pantalla' \
+		--column='' --column='Fuente' TRUE 'Monitor enfocado' FALSE 'Elegir mediante portal' --height=240 --width=420) || return 1
+	case "$choice" in
+	'Monitor enfocado') DEMO_STUDIO_CAPTURE=focused ;;
+	'Elegir mediante portal') DEMO_STUDIO_CAPTURE=portal ;;
+	*) fail 'La selección de pantalla no es válida.' ;;
+	esac
+}
+
+validate_options() {
+	case "${DEMO_STUDIO_AUDIO:-desktop}" in desktop | mic | both | none) : ;; *) fail 'DEMO_STUDIO_AUDIO no es válido.' 2 ;; esac
+	case "${DEMO_STUDIO_CAPTURE:-focused}" in focused | portal) : ;; *) fail 'DEMO_STUDIO_CAPTURE no es válido.' 2 ;; esac
+	case "${DEMO_STUDIO_WEBCAM:-false}" in true | false | 1 | 0) : ;; *) fail 'DEMO_STUDIO_WEBCAM no es válido.' 2 ;; esac
+}
+
+start_webcam() {
+	local device=${DEMO_STUDIO_WEBCAM_DEVICE:-/dev/video0}
+	command -v "$mpv_bin" >/dev/null 2>&1 || fail 'Falta mpv para la webcam.' 127
+	[[ -r "$device" || "${DEMO_STUDIO_DRY_RUN:-0}" == 1 ]] || fail "No se puede leer la webcam: $device"
+	"$mpv_bin" --force-window=yes --no-audio --profile=low-latency --untimed --no-cache \
+		--title='Demo Studio Webcam' --wayland-app-id=demo-studio-webcam \
+		"av://v4l2:$device" >/dev/null 2>&1 &
+	printf '%s\n' "$!"
+}
+
+wait_for_identity() {
+	local pid=$1 starttime
+	for _ in {1..50}; do
+		starttime="$(process_starttime "$pid" 2>/dev/null || true)"
+		[[ -n "$starttime" ]] && { printf '%s\n' "$starttime"; return 0; }
+		sleep 0.02
+	done
+	return 1
+}
+
+start_recording() {
+	local interactive=${1:-false} audio=${DEMO_STUDIO_AUDIO:-desktop} capture=${DEMO_STUDIO_CAPTURE:-focused}
+	local webcam=${DEMO_STUDIO_WEBCAM:-false} output stamp webcam_pid=0 webcam_starttime=0 pid starttime
+	local -a args audio_args=()
+	clear_stale_state
+	! is_active || fail 'Demo Studio ya está grabando.' 2
+	other_normal_recording_active && fail 'Ya hay otra grabación normal activa. Demo Studio no la detiene.' 2
+	if [[ "$interactive" == true ]]; then choose_options || exit 0; fi
+	validate_options
+	audio=${DEMO_STUDIO_AUDIO:-desktop}; capture=${DEMO_STUDIO_CAPTURE:-focused}; webcam=${DEMO_STUDIO_WEBCAM:-false}
+	[[ "$webcam" == true || "$webcam" == 1 ]] && webcam=true || webcam=false
+	command -v "$gsr_bin" >/dev/null 2>&1 || fail 'Falta gpu-screen-recorder.' 127
+	mkdir -p -- "$recordings_dir"
+	stamp=$(date '+%Y-%m-%d_%H-%M-%S')
+	# El PID evita reutilizar el mismo nombre al iniciar dos sesiones en el
+	# mismo segundo. El bloqueo mantiene la reserva y el lanzamiento atómicos.
+	output="$recordings_dir/demo-$stamp-$$.mp4"
+	case "$audio" in
+	desktop) audio_args=(-a default_output) ;;
+	mic) audio_args=(-a default_input) ;;
+	both) audio_args=(-a 'default_output|default_input') ;;
+	none) : ;;
+	esac
+	args=(-w "$capture" -c mp4 -s 1920x1080 -f 60 -k h264 -o "$output")
+	if [[ "${DEMO_STUDIO_DRY_RUN:-0}" == 1 ]]; then
+		printf 'DRY-RUN '
+		printf '%q ' "$gsr_bin" "${args[@]}" "${audio_args[@]}"
+		printf '\n'
+		return 0
+	fi
+	if [[ "$webcam" == true ]]; then
+		webcam_pid="$(start_webcam)"
+		webcam_starttime="$(wait_for_identity "$webcam_pid")" || { kill -TERM "$webcam_pid" 2>/dev/null || true; fail 'La webcam no se inició.'; }
+	fi
+	"$gsr_bin" "${args[@]}" "${audio_args[@]}" >/dev/null 2>&1 &
+	pid=$!
+	starttime="$(wait_for_identity "$pid")" || {
+		[[ "$webcam" == true ]] && kill -TERM "$webcam_pid" 2>/dev/null || true
+		fail 'gpu-screen-recorder no se inició.'
+	}
+	write_state "$pid" "$starttime" "$output" "$webcam" "$webcam_pid" "$webcam_starttime"
+	notify "Grabando en $output"
+	printf '%s\n' "$output"
+}
+
+stop_process() {
+	local pid=$1 starttime=$2 signal=$3
+	[[ "$pid" =~ ^[0-9]+$ && "$starttime" =~ ^[0-9]+$ ]] || return 0
+	[[ "$(process_starttime "$pid" 2>/dev/null || true)" == "$starttime" ]] || return 0
+	kill "-$signal" "$pid" 2>/dev/null || return 1
+	for _ in {1..80}; do
+		[[ "$(process_starttime "$pid" 2>/dev/null || true)" != "$starttime" ]] && return 0
+		sleep 0.05
+	done
+	return 1
+}
+
+stop_recording() {
+	local identity pid starttime output webcam webcam_pid webcam_starttime
+	identity="$(recorder_identity)" || { clear_stale_state; fail 'Demo Studio no está grabando.' 2; }
+	read -r pid starttime <<<"$identity"
+	output="$(read_state output)"; webcam="$(read_state webcam)"
+	webcam_pid="$(read_state webcam_pid)"; webcam_starttime="$(read_state webcam_starttime)"
+	stop_process "$pid" "$starttime" INT || fail 'gpu-screen-recorder no se detuvo tras SIGINT; se conserva el estado para reintentar.'
+	if [[ "$webcam" == true ]]; then stop_process "$webcam_pid" "$webcam_starttime" TERM || true; fi
+	rm -f -- "$state_file"
+	if [[ -s "$output" ]]; then notify "Archivo guardado: $output"; else notify "Grabación detenida: $output"; fi
+	printf '%s\n' "$output"
+}
+
+status() {
+	if is_active; then printf '%s\n' recording; else clear_stale_state; printf '%s\n' idle; fi
+}
+
+toggle() {
+	if is_active; then stop_recording; else start_recording false; fi
+}
+
+action=${1:-show}
+[[ $# -le 1 ]] || { usage >&2; exit 2; }
+case "$action" in
+status) with_session_lock status ;;
+start) with_session_lock start_recording false ;;
+show) with_session_lock start_recording true ;;
+stop) with_session_lock stop_recording ;;
+toggle) with_session_lock toggle ;;
+*) usage >&2; exit 2 ;;
+esac

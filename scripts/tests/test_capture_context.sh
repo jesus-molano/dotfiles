@@ -19,7 +19,14 @@ EOF
 cat >"$test_root/bin/wl-copy" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
+printf '%s\n' "$*" >"$TEST_WL_COPY_ARGS"
+[[ -z ${TEST_WL_COPY_SLEEP:-} ]] || sleep "$TEST_WL_COPY_SLEEP"
 cat >"$TEST_CLIPBOARD"
+EOF
+
+cat >"$test_root/bin/date" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' '2026-08-19_23-00-00'
 EOF
 
 cat >"$test_root/bin/hypr-orca" <<'EOF'
@@ -39,6 +46,7 @@ output=$(HOME="$test_root/home" \
 	XDG_STATE_HOME="$test_root/state" \
 	PATH="$test_root/bin:$PATH" \
 	TEST_CLIPBOARD="$test_root/clipboard" \
+	TEST_WL_COPY_ARGS="$test_root/wl-copy-args" \
 	TEST_ORCA_LOG="$test_root/orca" \
 	"$helper" --image "$test_root/input.png" --no-annotate --focus orca --print)
 
@@ -55,6 +63,7 @@ cmp -s "$latest" "$test_root/clipboard" || {
 	printf '%s\n' 'FAIL: --print no devolvió el contexto persistido' >&2
 	exit 1
 }
+grep -Fxq -- '--sensitive --paste-once' "$test_root/wl-copy-args"
 grep -Fq 'Error E42 en el componente' "$latest"
 grep -Fq 'segunda línea' "$latest"
 grep -Fq '![Captura]' "$latest"
@@ -71,10 +80,34 @@ HOME="$test_root/home" \
 	XDG_STATE_HOME="$test_root/state" \
 	PATH="$test_root/bin:$PATH" \
 	TEST_CLIPBOARD="$test_root/clipboard" \
+	TEST_WL_COPY_ARGS="$test_root/wl-copy-args" \
 	"$helper" --image "$test_root/input.png" --no-annotate --no-ocr >/dev/null
 
 if grep -Fq 'Error E42' "$latest"; then
 	printf '%s\n' 'FAIL: --no-ocr conservó texto anterior' >&2
+	exit 1
+fi
+
+# Dos procesos en el mismo segundo deben reservar imágenes distintas.
+HOME="$test_root/home" XDG_STATE_HOME="$test_root/state" PATH="$test_root/bin:$PATH" \
+	TEST_CLIPBOARD="$test_root/clipboard-1" TEST_WL_COPY_ARGS="$test_root/wl-copy-args-1" \
+	TEST_WL_COPY_SLEEP=0.2 \
+	"$helper" --image "$test_root/input.png" --no-annotate --no-ocr --print \
+	>"$test_root/output-1" &
+pid_1=$!
+HOME="$test_root/home" XDG_STATE_HOME="$test_root/state" PATH="$test_root/bin:$PATH" \
+	TEST_CLIPBOARD="$test_root/clipboard-2" TEST_WL_COPY_ARGS="$test_root/wl-copy-args-2" \
+	"$helper" --image "$test_root/input.png" --no-annotate --no-ocr --print \
+	>"$test_root/output-2" &
+pid_2=$!
+wait "$pid_1" "$pid_2"
+mapfile -t images < <(find "$test_root/home/Pictures/Screenshots" -maxdepth 1 -type f \
+	-name 'context-2026-08-19_23-00-00-*.png' -printf '%f\n' | sort -u)
+[[ ${#images[@]} -eq 4 ]]
+cmp -s "$test_root/output-1" "$test_root/clipboard-1"
+cmp -s "$test_root/output-2" "$test_root/clipboard-2"
+if cmp -s "$test_root/output-1" "$test_root/output-2"; then
+	printf '%s\n' 'FAIL: dos capturas compartieron el mismo contexto privado.' >&2
 	exit 1
 fi
 printf '%s\n' 'PASS: capture-context guarda, copia y enfoca sin enviar datos'

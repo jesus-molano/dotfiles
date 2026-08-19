@@ -427,8 +427,8 @@ check_backup_runtime() {
 }
 
 check_desktop_runtime() {
-	local command plugin_list
-	for command in wl-mirror whisper-cli tesseract wtype; do
+	local command plugin_list rgb_health
+	for command in zenity whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl; do
 		if command -v "$command" >/dev/null 2>&1; then
 			ok "Flujo desktop: $command disponible"
 		else
@@ -446,10 +446,8 @@ check_desktop_runtime() {
 		warn "Whisper: falta el modelo base; ejecuta just dictation-setup"
 	fi
 	if plugin_list="$(noctalia msg plugins list 2>/dev/null)"; then
-		if grep -Fxq 'dotfiles/dev-pulse [local] 1.0.0 enabled requires dev-pulse-status' <<<"$plugin_list" &&
-			grep -Fxq 'jamesfeeder/special-workspaces [community] 1.4.0 enabled' <<<"$plugin_list" &&
-			grep -Fxq 'elijaharch/wl-screen-mirror [community] 1.0.0 enabled' <<<"$plugin_list"; then
-			ok "Noctalia: versiones revisadas de Dev Pulse, workspaces y mirror"
+		if grep -Fxq 'jamesfeeder/special-workspaces [community] 1.4.0 enabled' <<<"$plugin_list"; then
+			ok "Noctalia: versión revisada de Special Workspaces"
 		else
 			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
 		fi
@@ -470,15 +468,46 @@ check_desktop_runtime() {
 	else
 		fail "gpu-screen-recorder no está instalado"
 	fi
+	if command -v openrgb >/dev/null 2>&1 && command -v liquidctl >/dev/null 2>&1; then
+		ok "RGB: OpenRGB y liquidctl disponibles"
+	else
+		fail "RGB: faltan OpenRGB o liquidctl"
+	fi
+	if systemctl --user is-enabled --quiet reactive-rgb.service &&
+		systemctl --user is-active --quiet reactive-rgb.service &&
+		rgb_health="$("$HOME/.local/bin/reactive-rgb" health 2>/dev/null)" &&
+		grep -Fxq 'health_status=ok' <<<"$rgb_health" &&
+		grep -Fxq 'health_scope=liveness-with-periodic-hardware-reapply' <<<"$rgb_health" &&
+		grep -Fxq 'health_fresh=1' <<<"$rgb_health"; then
+		ok "RGB: bucle activo; última aplicación completa y revalidación periódica configurada"
+	else
+		warn "RGB: reactive-rgb.service no tiene actividad reciente o una aplicación completa"
+	fi
 	check_backup_runtime
 }
 
 check_desktop_workflows() {
+	check "Superficie limpia y atajos" "$repo_root/scripts/tests/test_desktop_surface.sh"
 	check "Captura OCR a contexto" "$repo_root/scripts/tests/test_capture_context.sh"
 	check "Modo foco y demo reversible" "$repo_root/scripts/tests/test_desktop_focus_mode.sh"
 	check "Acciones locales del launcher" "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
 	check "Launcher multimedia" "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
-	check "Estado del widget Dev Pulse" "$repo_root/scripts/tests/test_dev_pulse_status.sh"
+	check "Práctica de mecanografía" "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
+	check "Apariencias coordinadas" "$repo_root/scripts/tests/test_appearance_switch.sh"
+	check "Temas terminales generados" env PYTHONDONTWRITEBYTECODE=1 \
+		python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
+	check "Colección de fondos al iniciar" "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
+	check "Paleta activa de Orca" "$repo_root/scripts/tests/test_orca_safe_settings.sh"
+	check "Caja de herramientas de captura" "$repo_root/scripts/tests/test_capture_toolbox.sh"
+	check "Demo Studio" "$repo_root/scripts/tests/test_demo_studio.sh"
+	check "Puertos de desarrollo" "$repo_root/scripts/tests/test_dev_ports.sh"
+	check "Contexto de crashes" "$repo_root/scripts/tests/test_crash_context.sh"
+	check "Anchos de ventana" "$repo_root/scripts/tests/test_window_width.sh"
+	check "RGB térmico" "$repo_root/scripts/tests/test_reactive_rgb.sh"
+	check "Ciclo de servicio del perfil" "$repo_root/scripts/tests/test_profile_service_lifecycle.sh"
+	check "Informes de benchmark" "$repo_root/scripts/tests/test_game_bench_report.sh"
+	check "Launcher de benchmarks" "$repo_root/scripts/tests/test_gaming_launcher.sh"
+	check "Migración de enlaces retirados" "$repo_root/scripts/tests/test_migrate_retired_desktop_links.sh"
 	check "Direct scanout reversible" "$repo_root/scripts/tests/test_direct_scanout_toggle.sh"
 	check "Dictado local" "$repo_root/scripts/tests/test_local_dictation.sh"
 	check "Project Cockpit" "$repo_root/scripts/tests/test_project_session.sh"
@@ -508,6 +537,8 @@ if [[ "$mode" != live ]]; then
 	check_desktop_workflows
 	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
+	check "Unidad Reactive RGB" systemd-analyze --user verify \
+		"$repo_root/hypr-desktop/.config/systemd/user/reactive-rgb.service"
 	if [[ "$mode" == config ]]; then
 		check "Stow hermético $profile" "$repo_root/scripts/stow-lint.sh" "$profile"
 	else

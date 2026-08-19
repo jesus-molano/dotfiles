@@ -1,0 +1,82 @@
+# Archivo completo que Noctalia renderiza fuera del checkout de dotfiles.
+palette = "noctalia"
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$nodejs\
+$rust\
+$golang\
+$python\
+$cmd_duration\
+$line_break\
+$character"""
+
+[directory]
+style = "bold lavender"
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+symbol = " "
+style = "bold mauve"
+
+[git_status]
+style = "bold maroon"
+
+[nodejs]
+symbol = " "
+style = "bold green"
+
+[rust]
+symbol = " "
+style = "bold peach"
+
+[golang]
+symbol = " "
+style = "bold blue"
+
+[python]
+symbol = " "
+style = "bold yellow"
+
+[cmd_duration]
+min_time = 2000
+style = "bold yellow"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[palettes.noctalia]
+blue      = "{{colors.terminal_normal_blue.default.hex}}"
+red       = "{{colors.terminal_normal_red.default.hex}}"
+green     = "{{colors.terminal_normal_green.default.hex}}"
+yellow    = "{{colors.terminal_normal_yellow.default.hex}}"
+cyan      = "{{colors.terminal_normal_cyan.default.hex}}"
+magenta   = "{{colors.terminal_normal_magenta.default.hex}}"
+white     = "{{colors.terminal_normal_white.default.hex}}"
+black     = "{{colors.terminal_normal_black.default.hex}}"
+rosewater = "{{colors.terminal_bright_yellow.default.hex}}"
+flamingo  = "{{colors.terminal_bright_red.default.hex}}"
+pink      = "{{colors.terminal_bright_magenta.default.hex}}"
+mauve     = "{{colors.terminal_normal_magenta.default.hex}}"
+maroon    = "{{colors.terminal_bright_red.default.hex}}"
+peach     = "{{colors.terminal_bright_yellow.default.hex}}"
+teal      = "{{colors.terminal_normal_cyan.default.hex}}"
+sky       = "{{colors.terminal_bright_cyan.default.hex}}"
+sapphire  = "{{colors.terminal_bright_blue.default.hex}}"
+lavender  = "{{colors.terminal_bright_magenta.default.hex}}"
+text      = "{{colors.terminal_foreground.default.hex}}"
+subtext1  = "{{colors.terminal_normal_white.default.hex}}"
+subtext0  = "{{colors.terminal_bright_black.default.hex}}"
+overlay2  = "{{colors.terminal_bright_black.default.hex}}"
+overlay1  = "{{colors.terminal_bright_black.default.hex}}"
+overlay0  = "{{colors.terminal_normal_black.default.hex}}"
+surface2  = "{{colors.terminal_normal_black.default.hex}}"
+surface1  = "{{colors.terminal_normal_black.default.hex}}"
+surface0  = "{{colors.terminal_background.default.hex}}"
+base      = "{{colors.terminal_background.default.hex}}"
+mantle    = "{{colors.terminal_background.default.hex}}"
+crust     = "{{colors.terminal_background.default.hex}}"

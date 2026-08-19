@@ -1,0 +1,7 @@
+{
+  "primary": "{{ colors.primary.default.hex }}",
+  "secondary": "{{ colors.secondary.default.hex }}",
+  "surface": "{{ colors.surface.default.hex }}",
+  "foreground": "{{ colors.terminal_foreground.default.hex }}",
+  "background": "{{ colors.terminal_background.default.hex }}"
+}

@@ -2,7 +2,8 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|commands} [selección]'
+	printf '%s\n' \
+		'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|typing|appearance|ports|crashes|commands} [selección]'
 }
 
 notify_error() {
@@ -83,7 +84,7 @@ find_project() {
 	local selection=$1 action path
 	action=${selection%%_*}
 	case "$action" in
-	session|orca|term|nvim|tasks|preview) ;;
+	session | orca | term | nvim | tasks | preview) ;;
 	*) return 1 ;;
 	esac
 	while IFS= read -r -d '' path; do
@@ -125,12 +126,51 @@ list_media() {
 		$'spotify\tSpotify'
 }
 
+list_typing() {
+	if command -v "${DESKTOP_LAUNCHER_TTYPER:-ttyper}" >/dev/null 2>&1; then
+		printf '%s\n' \
+			$'english_quick\tTtyper — inglés — 50 palabras' \
+			$'english_long\tTtyper — inglés — 100 palabras' \
+			$'python\tTtyper — Python' \
+			$'javascript\tTtyper — JavaScript' \
+			$'rust\tTtyper — Rust'
+	fi
+	printf '%s\n' $'keybr\tKeybr — entrenamiento adaptativo'
+}
+
+list_appearance() {
+	local id label detail
+	while IFS=$'\t' read -r id label detail; do
+		[[ -n "$id" && -n "$label" ]] || continue
+		printf '%s\t%s — %s\n' "$id" "$label" "$detail"
+	done < <(appearance-switch list)
+}
+
+list_ports() {
+	dev-ports list
+}
+
+list_crashes() {
+	local token pid signal executable timestamp
+	while IFS=$'\t' read -r token pid signal executable timestamp; do
+		[[ -n "$token" ]] || continue
+		printf '%s\tCrash %s — %s — %s — %s\n' "$token" "${pid#pid=}" \
+			"${signal#signal=}" "$(basename -- "${executable#exe=}")" "${timestamp#time=}"
+	done < <(crash-context list)
+}
+
 list_commands() {
 	printf '%s\n' \
 		$'doctor_host\tAuditar el host actual' \
 		$'system_monitor\tbtop en Ghostty' \
 		$'noctalia_settings\tAbrir ajustes de Noctalia' \
 		$'capture_context\tCapturar, anotar y preparar contexto para Orca' \
+		$'capture_qr\tLeer un código QR de la pantalla' \
+		$'bug_capsule\tCrear cápsula local con captura, OCR y replay' \
+		$'media_convert\tConvertir una imagen o un vídeo' \
+		$'demo_studio\tIniciar o detener Demo Studio' \
+		$'window_width_save\tGuardar el ancho de la ventana activa' \
+		$'window_width_restore\tRestaurar el ancho guardado' \
 		$'focus_toggle\tAlternar modo foco' \
 		$'demo_mode\tPreparar una demo o grabación' \
 		$'power_balanced\tPerfil energetico balanced' \
@@ -188,6 +228,42 @@ run_media() {
 	esac
 }
 
+run_typing() {
+	local ttyper_bin=${DESKTOP_LAUNCHER_TTYPER:-ttyper}
+	case "$1" in
+	english_quick | english_long | python | javascript | rust)
+		command -v "$ttyper_bin" >/dev/null 2>&1 || {
+			notify_error 'Ttyper no está instalado en este perfil.'
+			return 127
+		}
+		case "$1" in
+		english_quick) exec uwsm app -- ghostty -e "$ttyper_bin" -l english1000 -w 50 ;;
+		english_long) exec uwsm app -- ghostty -e "$ttyper_bin" -l english1000 -w 100 ;;
+		python) exec uwsm app -- ghostty -e "$ttyper_bin" -l python -w 30 ;;
+		javascript) exec uwsm app -- ghostty -e "$ttyper_bin" -l javascript -w 30 ;;
+		rust) exec uwsm app -- ghostty -e "$ttyper_bin" -l rust -w 30 ;;
+		esac
+		;;
+	keybr) exec uwsm app -- /usr/bin/brave --app='https://www.keybr.com/' ;;
+	*) return 2 ;;
+	esac
+}
+
+run_appearance() {
+	[[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 2
+	exec appearance-switch apply "$1"
+}
+
+run_port() {
+	[[ "$1" =~ ^port_[0-9]+_pid_[0-9]+_addr_([0-9A-Fa-f:.]+|\*)$ ]] || return 2
+	exec dev-ports open "$1"
+}
+
+run_crash() {
+	[[ "$1" =~ ^[0-9]+-[0-9]+-[0-9]+$ ]] || return 2
+	exec crash-context select "$1"
+}
+
 run_command() {
 	local dotfiles_root
 	case "$1" in
@@ -203,6 +279,17 @@ run_command() {
 	system_monitor) exec uwsm app -- ghostty -e btop ;;
 	noctalia_settings) exec noctalia msg settings-open ;;
 	capture_context) exec capture-context --focus orca ;;
+	capture_qr) exec capture-qr ;;
+	bug_capsule) exec bug-capsule ;;
+	media_convert) exec media-convert ;;
+	demo_studio)
+		if [[ $(demo-studio status) == recording ]]; then
+			exec demo-studio stop
+		fi
+		exec demo-studio show
+		;;
+	window_width_save) exec hypr-window-width save ;;
+	window_width_restore) exec hypr-window-width restore ;;
 	dictation_toggle)
 		command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1 || return 127
 		exec local-dictation toggle --paste
@@ -232,10 +319,18 @@ list:projects) list_projects ;;
 list:project-actions) list_project_actions ;;
 list:ssh) list_ssh ;;
 list:media) list_media ;;
+list:typing) list_typing ;;
+list:appearance) list_appearance ;;
+list:ports) list_ports ;;
+list:crashes) list_crashes ;;
 list:commands) list_commands ;;
-run:projects|run:project-actions) [[ -n "$selection" ]] && run_project "$selection" "$category" ;;
+run:projects | run:project-actions) [[ -n "$selection" ]] && run_project "$selection" "$category" ;;
 run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
 run:media) [[ -n "$selection" ]] && run_media "$selection" ;;
+run:typing) [[ -n "$selection" ]] && run_typing "$selection" ;;
+run:appearance) [[ -n "$selection" ]] && run_appearance "$selection" ;;
+run:ports) [[ -n "$selection" ]] && run_port "$selection" ;;
+run:crashes) [[ -n "$selection" ]] && run_crash "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
 *)
 	usage >&2

@@ -90,8 +90,16 @@ pid=$(<"$TEST_RECORDING_FILE")
 printf '%s\n' "$pid"
 EOF
 
+cat >"$test_root/bin/zenity" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$*" == *'--question'* && "$*" == *'--modal'* ]] || exit 2
+printf '%s\n' 'confirmation:demo' >>"$TEST_LOG"
+exit "${TEST_ZENITY_STATUS:-0}"
+EOF
+
 chmod +x "$test_root/bin/noctalia" "$test_root/bin/systemd-inhibit" \
-	"$test_root/bin/powerprofilesctl" "$test_root/bin/pgrep"
+	"$test_root/bin/powerprofilesctl" "$test_root/bin/pgrep" "$test_root/bin/zenity"
 
 run_case() {
 	local name=$1 action=$2 dnd=$3 bar_visible=$4 caffeine=$5 power=$6 recording=$7 expected=$8
@@ -111,13 +119,13 @@ run_case() {
 		XDG_STATE_HOME="$test_root/$name-state" \
 		XDG_RUNTIME_DIR="$test_root/$name-runtime" \
 		TEST_CAFFEINE_FILE="$test_root/$name-caffeine" TEST_POWER_FILE="$test_root/$name-power" \
-		TEST_LOG="$log" TEST_DND="$dnd" TEST_BAR_VISIBLE="$bar_visible" TEST_RECORDING_FILE="$recording_file" \
+		TEST_LOG="$log" TEST_DND="$dnd" TEST_BAR_VISIBLE="$bar_visible" TEST_RECORDING_FILE="$recording_file" TEST_ZENITY_STATUS=0 \
 		"$helper" "$action"
 	PATH="$test_root/bin:$PATH" \
 		XDG_STATE_HOME="$test_root/$name-state" \
 		XDG_RUNTIME_DIR="$test_root/$name-runtime" \
 		TEST_CAFFEINE_FILE="$test_root/$name-caffeine" TEST_POWER_FILE="$test_root/$name-power" \
-		TEST_LOG="$log" TEST_DND="$dnd" TEST_BAR_VISIBLE="$bar_visible" TEST_RECORDING_FILE="$recording_file" \
+		TEST_LOG="$log" TEST_DND="$dnd" TEST_BAR_VISIBLE="$bar_visible" TEST_RECORDING_FILE="$recording_file" TEST_ZENITY_STATUS=99 \
 		"$helper" "$close_action"
 	if [[ -s "$recording_file" ]]; then
 		kill "$(<"$recording_file")" 2>/dev/null || true
@@ -138,12 +146,29 @@ run_case() {
 run_case focus on off true off balanced false \
 	$'caffeine:on\npower:performance\ndnd:on\nbar:hide\nbar:show\ndnd:off\npower:balanced\ncaffeine:off'
 run_case demo demo-toggle off true off power-saver false \
-	$'caffeine:on\npower:performance\ndnd:on\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\ndnd:off\npower:power-saver\ncaffeine:off' \
+	$'confirmation:demo\ncaffeine:on\npower:performance\ndnd:on\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\ndnd:off\npower:power-saver\ncaffeine:off' \
 	demo-toggle
 run_case demo-hidden demo-toggle off false off balanced false \
-	$'caffeine:on\npower:performance\ndnd:on\nbar:show\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\nbar:hide\ndnd:off\npower:balanced\ncaffeine:off' \
+	$'confirmation:demo\ncaffeine:on\npower:performance\ndnd:on\nbar:show\nplugin:noctalia/screen_recorder:service all start focused\nplugin:noctalia/screen_recorder:service all stop\nbar:hide\ndnd:off\npower:balanced\ncaffeine:off' \
 	demo-toggle
-run_case preserve demo-toggle on false on performance true $'bar:show\nbar:hide' demo-toggle
+run_case preserve demo-toggle on false on performance true $'confirmation:demo\nbar:show\nbar:hide' demo-toggle
+
+: >"$test_root/cancel.log"
+: >"$test_root/cancel-recording"
+printf '%s\n' off >"$test_root/cancel-caffeine"
+printf '%s\n' balanced >"$test_root/cancel-power"
+set +e
+PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/cancel-state" XDG_RUNTIME_DIR="$test_root/cancel-runtime" \
+	TEST_CAFFEINE_FILE="$test_root/cancel-caffeine" TEST_POWER_FILE="$test_root/cancel-power" \
+	TEST_LOG="$test_root/cancel.log" TEST_DND=off TEST_BAR_VISIBLE=true TEST_RECORDING_FILE="$test_root/cancel-recording" \
+	TEST_ZENITY_STATUS=1 "$helper" demo-toggle >/dev/null 2>&1
+cancel_status=$?
+set -e
+[[ $cancel_status -ne 0 && $(<"$test_root/cancel.log") == 'confirmation:demo' &&
+! -e "$test_root/cancel-state/dotfiles/desktop-focus-mode/state" ]] || {
+	printf '%s\n' 'FAIL: cancelar la demo debe evitar cualquier cambio de estado' >&2
+	exit 1
+}
 
 mkdir -p "$test_root/gaming-runtime/dotfiles-gaming-sessions"
 shell_starttime=$(awk '{ print $22 }' "/proc/$$/stat")

@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: crash-context list [--limit N]
+     crash-context select TOKEN [--limit N]
+
+Lista coredumps recientes o crea un contexto Markdown local del token elegido.
+La selección se revalida antes de copiar el resultado y enfocar Orca.
+EOF
+}
+
+fail() { printf 'crash-context: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+action=${1:-}
+case "$action" in
+list | select) shift ;;
+-h | --help | '') usage; exit 0 ;;
+*) fail "Acción no reconocida: $action" 2 ;;
+esac
+
+token=''
+if [[ "$action" == select ]]; then
+	(($# >= 1)) || fail 'Falta TOKEN para select.' 2
+	token=$1
+	shift
+fi
+
+limit=${CRASH_CONTEXT_LIMIT:-10}
+while (($#)); do
+	case "$1" in
+	--limit) (($# >= 2)) || fail 'Falta N para --limit.' 2; limit=$2; shift 2 ;;
+	*) fail "Opción no reconocida: $1" 2 ;;
+	esac
+done
+[[ "$limit" =~ ^[1-9][0-9]*$ ]] || fail 'El límite debe ser un entero positivo.' 2
+
+coredumpctl_cmd=${CRASH_CONTEXT_COREDUMPCTL:-coredumpctl}
+orca_cmd=${CRASH_CONTEXT_ORCA_CMD:-hypr-orca}
+state_dir=${CRASH_CONTEXT_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/crash-context"}
+command -v "$coredumpctl_cmd" >/dev/null 2>&1 || fail "Falta $coredumpctl_cmd." 127
+command -v jq >/dev/null 2>&1 || fail 'Falta jq.' 127
+
+records() {
+	"$coredumpctl_cmd" --no-pager --json=short --reverse -n "$limit" list |
+		jq -r '
+			if type == "array" then .[] else . end |
+			[(.COREDUMP_PID // .PID // .pid // ""),
+			 (.COREDUMP_EXE // .EXE // .exe // ""),
+			 (.COREDUMP_SIGNAL // .SIGNAL // .signal // .sig // ""),
+			 (.__REALTIME_TIMESTAMP // .COREDUMP_TIMESTAMP // .TIME // .timestamp // .time // "")] |
+			map(tostring) |
+			@tsv
+		'
+}
+
+format_timestamp() {
+	local timestamp=$1 seconds
+	if [[ "$timestamp" =~ ^[0-9]{13,}$ ]]; then
+		seconds=$((timestamp / 1000000))
+		date --date="@$seconds" --iso-8601=seconds 2>/dev/null || printf '%s' "$timestamp"
+	else
+		printf '%s' "$timestamp"
+	fi
+}
+
+token_for_record() {
+	local pid=$1 exe=$2 signal=$3 timestamp=$4
+	printf '%s-%s\n' "$pid" "$(printf '%s\0%s\0%s\0%s' "$pid" "$exe" "$signal" "$timestamp" |
+		cksum | awk '{print $1 "-" $2}')"
+}
+
+format_records() {
+	local pid exe signal timestamp display_time row_token
+	while IFS=$'\t' read -r pid exe signal timestamp; do
+		[[ "$pid" =~ ^[1-9][0-9]*$ && -n "$exe" ]] || continue
+		row_token=$(token_for_record "$pid" "$exe" "$signal" "$timestamp")
+		display_time=$(format_timestamp "$timestamp")
+		printf '%s\tpid=%s\tsignal=%s\texe=%s\ttime=%s\n' "$row_token" "$pid" "$signal" "$exe" "$display_time"
+	done
+}
+
+raw_record_for_token() {
+	local wanted=$1 pid exe signal timestamp row_token found=0
+	while IFS=$'\t' read -r pid exe signal timestamp; do
+		[[ "$pid" =~ ^[1-9][0-9]*$ && -n "$exe" ]] || continue
+		row_token=$(token_for_record "$pid" "$exe" "$signal" "$timestamp")
+		if [[ $found -eq 0 && "$row_token" == "$wanted" ]]; then
+			printf '%s\t%s\t%s\t%s\n' "$pid" "$exe" "$signal" "$timestamp"
+			found=1
+		fi
+	done
+	((found))
+}
+
+listed=$(records | format_records) || fail 'No se pudieron listar los coredumps.'
+[[ -n "$listed" ]] || fail 'No hay coredumps seleccionables.' 3
+
+if [[ "$action" == list ]]; then
+	printf '%s\n' "$listed"
+	exit 0
+fi
+
+selected=$(awk -F '\t' -v wanted="$token" '$1 == wanted { print; exit }' <<<"$listed")
+[[ -n "$selected" ]] || fail 'El token no corresponde a un coredump reciente.' 3
+IFS=$'\t' read -r selected_token selected_pid selected_signal selected_exe selected_time <<<"$selected"
+selected_pid=${selected_pid#pid=}
+selected_signal=${selected_signal#signal=}
+selected_exe=${selected_exe#exe=}
+selected_time=${selected_time#time=}
+
+# Relee la lista y recupera la marca cruda justo antes de pedir detalles. El
+# intervalo exacto evita mezclar dos coredumps que reutilicen el mismo PID.
+raw_selected=$(records | raw_record_for_token "$selected_token") ||
+	fail 'El coredump seleccionado ya no coincide con el token.' 3
+IFS=$'\t' read -r raw_pid raw_exe raw_signal raw_timestamp <<<"$raw_selected"
+[[ "$raw_pid" == "$selected_pid" && "$raw_exe" == "$selected_exe" && "$raw_signal" == "$selected_signal" ]] ||
+	fail 'La identidad revalidada no coincide con la selección.' 3
+[[ "$raw_timestamp" =~ ^[0-9]{13,}$ ]] || fail 'El coredump no tiene una marca temporal exacta.' 3
+timestamp_seconds=$((raw_timestamp / 1000000))
+timestamp_micros=$((raw_timestamp % 1000000))
+instant=$(printf '@%s.%06d' "$timestamp_seconds" "$timestamp_micros")
+
+info=$($coredumpctl_cmd --no-pager --since "$instant" --until "$instant" info "$selected_pid") ||
+	fail 'No se pudieron leer los detalles del coredump.'
+[[ $(grep -Ec "^[[:space:]]*PID:[[:space:]]*$selected_pid([[:space:]]|$)" <<<"$info") -eq 1 ]] ||
+	fail 'El PID revalidado no coincide con el coredump seleccionado.' 3
+safe_info=$(awk -F: '
+	{
+		key=$1
+		gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+		if (key ~ /^(PID|UID|GID|Signal|Timestamp|Executable|Unit|User Unit|Storage|Size|Package|Architecture)$/) print
+	}
+' <<<"$info")
+[[ -n "$safe_info" ]] || fail 'coredumpctl no devolvió campos seguros utilizables.' 3
+
+install -d -m 700 -- "$state_dir"
+markdown="$state_dir/latest.md"
+{
+	printf '# Contexto de coredump\n\n'
+	printf '%s\n' "- Token: \`$selected_token\`"
+	printf '%s\n' "- PID: \`$selected_pid\`"
+	printf '%s\n' "- Ejecutable: \`$selected_exe\`"
+	printf '%s\n' "- Señal: \`$selected_signal\`"
+	printf '%s\n\n' "- Marca temporal: \`$selected_time\`"
+	printf '%s\n\n' '## Resumen de coredumpctl'
+	printf '%s\n' '```text'
+	printf '%s\n' "$safe_info"
+	printf '%s\n' '```'
+} >"$markdown"
+
+command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
+wl-copy --sensitive --paste-once <"$markdown"
+if command -v "$orca_cmd" >/dev/null 2>&1; then
+	"$orca_cmd"
+fi
+printf '%s\n' "$markdown"

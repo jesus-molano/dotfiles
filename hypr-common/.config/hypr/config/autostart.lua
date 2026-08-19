@@ -2,8 +2,8 @@
 -- Do not import the entire shell environment into systemd: it can include
 -- credentials. xhost access for root is neither required nor appropriate.
 hl.on("hyprland.start", function ()
-    -- Orca owns its settings while running. Apply the tracked Project Atlas
-    -- terminal palette before the app can restore or open a window.
+    -- Orca owns its settings while running. Apply the active Noctalia terminal
+    -- palette before the app can restore or open a window.
     hl.exec_cmd("orca-safe-settings")
     -- Espera a que las salidas externas respondan por DDC. No depende de que
     -- haya dos monitores: también arranca con uno solo o únicamente con eDP.

@@ -19,7 +19,7 @@
 	side-by-side = true
 	line-numbers = true
 	hyperlinks = true
-	syntax-theme = Project Atlas
+	syntax-theme = project-atlas
 [diff]
 	tool = difftastic
 	colorMoved = default

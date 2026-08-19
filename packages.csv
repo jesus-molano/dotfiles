@@ -6,6 +6,9 @@ common,core,xorg-xwayland,native
 common,core,wl-clipboard,native
 common,core,hyprpicker,native
 common,core,satty,native
+common,core,grim,native
+common,core,slurp,native
+common,core,zbar,native
 common,core,curl,native
 common,core,tesseract,native
 common,core,tesseract-data-eng,native
@@ -102,7 +105,7 @@ common,system,unrar,native
 common,system,unzip,native
 common,system,flatpak,native
 common,utility,gnome-calculator,native
-common,utility,wl-mirror,native
+common,utility,zenity,native
 common,themes,papirus-icon-theme,native
 common,themes,nwg-look,native
 common,themes,qt5ct,native
@@ -115,12 +118,18 @@ common,themes,ttf-jetbrains-mono-nerd,native
 common,themes,otf-font-awesome,native
 common,media,vlc,native
 common,media,vlc-plugins-all,native
+common,media,ffmpeg,native
 common,media,ffmpegthumbnailer,native
+common,media,imagemagick,native
+common,media,mpv,native
 common,media,libdvdcss,native
 common,media,gpu-screen-recorder,native
+desktop,hardware,openrgb,native
+desktop,hardware,liquidctl,native
 desktop,development,whisper-cpp,native
 desktop,development,ggml-cpu,native
 desktop,development,ggml-vulkan,native
+desktop,utility,ttyper,native
 desktop,utility,wtype,native
 common,development,1password,aur
 common,development,1password-cli,aur

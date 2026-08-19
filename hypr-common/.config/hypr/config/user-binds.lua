@@ -86,6 +86,14 @@ bind(hyper .. " + J", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /proj"),
     "Abrir proyectos del launcher")
 bind(hyper .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /media"),
     "Abrir multimedia del launcher")
+bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
+    "Usar el siguiente fondo del tema")
+bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper-previous"),
+    "Usar el fondo anterior del tema")
+bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
+    "Usar el siguiente fondo del tema")
+bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next"),
+    "Usar la siguiente apariencia")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Abrir notificaciones")
 bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),

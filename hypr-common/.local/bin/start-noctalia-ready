@@ -4,6 +4,11 @@ set -euo pipefail
 # Noctalia consulta DDC al arrancar. En NVIDIA, Hyprland puede publicar la
 # sesión antes de que todas las salidas externas respondan, dejando una de
 # ellas como no controlable hasta reiniciar el proceso.
+if command -v appearance-switch >/dev/null 2>&1; then
+	appearance-switch prepare >/dev/null ||
+		printf '%s\n' 'start-noctalia-ready: no se pudo preparar el catálogo de fondos.' >&2
+fi
+
 noctalia msg status >/dev/null 2>&1 && exit 0
 
 readonly earliest_start=$((SECONDS + 3))

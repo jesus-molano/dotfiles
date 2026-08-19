@@ -28,7 +28,9 @@ return {
             cyan = "#7fa4c0",
           }
 
-          local palette_path = vim.fn.expand("~/.config/noctalia/palettes/ProjectAtlas.json")
+          local active_palette = vim.fn.expand("~/.config/noctalia/generated/active-palette.json")
+          local fallback_palette = vim.fn.expand("~/.config/noctalia/palettes/ProjectAtlas.json")
+          local palette_path = vim.uv.fs_stat(active_palette) and active_palette or fallback_palette
           local ok_read, lines = pcall(vim.fn.readfile, palette_path)
           if ok_read then
             local ok_decode, palette = pcall(vim.json.decode, table.concat(lines, "\n"))

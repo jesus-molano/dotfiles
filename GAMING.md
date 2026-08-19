@@ -121,8 +121,10 @@ pasada de calentamiento que no cuente. Después:
 game-bench-report cyberpunk
 ```
 
-El informe exige tres CSV antes de invocar `mangoplot`. MangoHud tiene las
-subidas desactivadas (`permit_upload=0`), así que los datos permanecen locales.
+El informe exige tres ejecuciones válidas y realiza el análisis internamente con
+Python. Muestra una salida legible o JSON; no depende de `mangoplot`. MangoHud
+tiene las subidas desactivadas (`permit_upload=0`), así que los datos permanecen
+locales.
 
 ### Caso validado: Arma Reforger
 

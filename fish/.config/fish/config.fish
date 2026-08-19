@@ -9,6 +9,13 @@ set -gx SUDO_EDITOR nvim
 function fish_greeting
 end
 
+# Noctalia reemplaza este archivo en cada rotación de tema.
+set -gx STARSHIP_CONFIG "$HOME/.config/noctalia/generated/starship.toml"
+set -gx BAT_THEME "project-atlas"
+if not test -r "$STARSHIP_CONFIG"
+    set -gx STARSHIP_CONFIG "$HOME/.config/starship.toml"
+end
+
 # mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
 if command -q mise
     mise activate fish | source

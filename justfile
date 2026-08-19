@@ -126,10 +126,54 @@ remove target:
         fi
     done
 
+    manage_rgb_service=false
+    for package in "${packages[@]}"; do
+        [[ "$package" == hypr-desktop ]] && manage_rgb_service=true
+    done
+
     stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --simulate --verbose=2 \
         --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
+
+    rgb_service_changed=false
+    rgb_was_enabled=false
+    rgb_was_active=false
+    restore_rgb_service() {
+        systemctl --user disable --now reactive-rgb.service >/dev/null 2>&1 || true
+        if "$rgb_was_enabled"; then
+            systemctl --user enable reactive-rgb.service >/dev/null 2>&1 || true
+        fi
+        if "$rgb_was_active"; then
+            systemctl --user start reactive-rgb.service >/dev/null 2>&1 || true
+        fi
+    }
+    if "$manage_rgb_service"; then
+        command -v systemctl >/dev/null 2>&1 || {
+            printf '%s\n' 'systemctl no está disponible para retirar Reactive RGB.' >&2
+            exit 1
+        }
+        systemctl --user is-enabled reactive-rgb.service >/dev/null 2>&1 && rgb_was_enabled=true
+        systemctl --user is-active reactive-rgb.service >/dev/null 2>&1 && rgb_was_active=true
+        if "$rgb_was_enabled" || "$rgb_was_active" || systemctl --user cat reactive-rgb.service >/dev/null 2>&1; then
+            if ! systemctl --user disable --now reactive-rgb.service; then
+                restore_rgb_service
+                printf '%s\n' 'No se pudo desactivar Reactive RGB; se restauró su estado anterior.' >&2
+                exit 1
+            fi
+            rgb_service_changed=true
+        fi
+    fi
+
+    if ! stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
+        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"; then
+        if "$rgb_service_changed"; then
+            restore_rgb_service
+        fi
+        exit 1
+    fi
+
+    if "$manage_rgb_service"; then
+        systemctl --user daemon-reload
+    fi
 
     for package in "${packages[@]}"; do
         if [[ "$package" == codex ]]; then

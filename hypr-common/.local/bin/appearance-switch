@@ -1,0 +1,424 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' 'Uso: appearance-switch [--dry-run] {list|current|prepare|apply <id>|next|previous}'
+}
+
+fail() {
+	printf 'appearance-switch: %s\n' "$1" >&2
+	exit "${2:-1}"
+}
+
+script_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+readonly script_path
+repo_root=$(cd -- "$(dirname -- "$script_path")/../../.." && pwd)
+readonly repo_root
+readonly catalog_path=${APPEARANCE_CATALOG:-"$repo_root/noctalia/.config/noctalia/appearances/catalog.tsv"}
+readonly state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+readonly state_dir="$state_home/dotfiles/appearance-switch"
+readonly state_file="$state_dir/current"
+readonly rendered_id_file="$state_dir/rendered"
+readonly visible_link=${APPEARANCE_VISIBLE_LINK:-"$state_dir/visible"}
+# Apunta a la fuente canónica para que añadir o retirar fondos en el checkout
+# sea visible de inmediato y no exija regenerar enlaces Stow por archivo.
+readonly wallpaper_root=${APPEARANCE_WALLPAPER_ROOT:-"$repo_root/noctalia/.local/share/wallpapers/noctalia-themes"}
+readonly lock_file="$state_dir/lock"
+readonly lock_timeout=${APPEARANCE_LOCK_TIMEOUT:-15}
+readonly apply_timeout=${APPEARANCE_APPLY_TIMEOUT:-12}
+
+declare -a appearance_ids=()
+declare -A appearance_labels=()
+declare -A appearance_sources=()
+declare -A appearance_palettes=()
+declare -A appearance_wallpapers=()
+
+valid_id() {
+	[[ $1 =~ ^[a-z0-9][a-z0-9-]*$ ]]
+}
+
+valid_palette_name() {
+	[[ $1 =~ ^[A-Za-z0-9][A-Za-z0-9_.\ -]*$ ]]
+}
+
+valid_wallpaper_path() {
+	local path=$1
+	[[ $path == '-' || $path == /* || $path == \~/* ]] || return 1
+	[[ "/$path/" != *'/../'* && "/$path/" != *'/./'* ]]
+}
+
+load_catalog() {
+	[[ -r $catalog_path ]] || fail "no se puede leer el catálogo: $catalog_path"
+
+	local id label source palette wallpaper key line_number=0
+	declare -A palette_keys=()
+	while IFS=$'\t' read -r id label source palette wallpaper; do
+		line_number=$((line_number + 1))
+		[[ -z $id || $id == \#* ]] && continue
+		[[ -n $label && -n $source && -n $palette && -n $wallpaper ]] ||
+			fail "catálogo inválido en la línea $line_number"
+		valid_id "$id" || fail "ID inválido en el catálogo: $id"
+		[[ -z ${appearance_labels[$id]+present} ]] || fail "ID duplicado en el catálogo: $id"
+		case "$source" in
+		builtin | custom) ;;
+		*) fail "origen de paleta inválido para $id: $source" ;;
+		esac
+		valid_palette_name "$palette" || fail "paleta inválida para $id"
+		valid_wallpaper_path "$wallpaper" || fail "ruta de fondo inválida para $id"
+		key="$source:$palette"
+		[[ -z ${palette_keys[$key]+present} ]] ||
+			fail "paleta duplicada en el catálogo: $key"
+
+		appearance_ids+=("$id")
+		appearance_labels[$id]=$label
+		appearance_sources[$id]=$source
+		appearance_palettes[$id]=$palette
+		appearance_wallpapers[$id]=$wallpaper
+		palette_keys[$key]=$id
+	done <"$catalog_path"
+
+	((${#appearance_ids[@]} > 0)) || fail 'el catálogo no contiene apariencias'
+}
+
+expand_wallpaper_path() {
+	local path=$1
+	case "$path" in
+	-) return 1 ;;
+	\~/*) printf '%s\n' "$HOME/${path:2}" ;;
+	/*) printf '%s\n' "$path" ;;
+	*) return 1 ;;
+	esac
+}
+
+current_id() {
+	local scheme id
+	if command -v noctalia >/dev/null 2>&1 && scheme=$(noctalia msg color-scheme-get 2>/dev/null); then
+		if id=$(id_for_scheme "$scheme"); then
+			printf '%s\n' "$id"
+			return
+		fi
+		fail "la paleta activa no pertenece al catálogo: $scheme" 3
+	fi
+	if [[ -r $state_file ]]; then
+		IFS= read -r id <"$state_file" || true
+		if valid_id "$id" && [[ -n ${appearance_labels[$id]+present} ]]; then
+			printf '%s\n' "$id"
+			return
+		fi
+	fi
+	printf '%s\n' "${appearance_ids[0]}"
+}
+
+id_for_scheme() {
+	local scheme=$1 source palette id
+	source=${scheme%% *}
+	palette=${scheme#* }
+	[[ $source != "$scheme" && -n $palette ]] || return 1
+	for id in "${appearance_ids[@]}"; do
+		if [[ ${appearance_sources[$id]} == "$source" && ${appearance_palettes[$id]} == "$palette" ]]; then
+			printf '%s\n' "$id"
+			return
+		fi
+	done
+	return 1
+}
+
+write_current_id() {
+	local id=$1 tmp
+	install -d -m 700 -- "$state_dir"
+	tmp=$(mktemp "$state_dir/current.XXXXXX")
+	(umask 077; printf '%s\n' "$id" >"$tmp")
+	mv -f -- "$tmp" "$state_file"
+}
+
+write_rendered_id() {
+	local id=$1 tmp
+	install -d -m 700 -- "$state_dir"
+	tmp=$(mktemp "$state_dir/rendered.XXXXXX")
+	(umask 077; printf '%s\n' "$id" >"$tmp")
+	mv -f -- "$tmp" "$rendered_id_file"
+}
+
+valid_raster_name() {
+	local name=${1,,}
+	[[ $name != */* && $name != .* && $name =~ \.(png|jpg|jpeg|webp)$ ]]
+}
+
+write_last_wallpaper() {
+	local id=$1 name=$2 last_dir tmp
+	last_dir="$state_dir/last"
+	install -d -m 700 -- "$last_dir"
+	tmp=$(mktemp "$last_dir/$id.XXXXXX")
+	(umask 077; printf '%s\n' "$name" >"$tmp")
+	mv -f -- "$tmp" "$last_dir/$id"
+}
+
+remember_current_wallpaper() {
+	local id=$1 current=$2 current_real candidate candidate_real name
+	[[ -n ${appearance_labels[$id]+present} && -f $current ]] || return 0
+	current_real=$(readlink -f -- "$current") || return 0
+	for candidate in "$wallpaper_root/$id"/*; do
+		[[ -f $candidate ]] || continue
+		name=$(basename -- "$candidate")
+		valid_raster_name "$name" || continue
+		candidate_real=$(readlink -f -- "$candidate") || continue
+		if [[ $candidate_real == "$current_real" ]]; then
+			write_last_wallpaper "$id" "$name"
+			return
+		fi
+	done
+}
+
+select_remembered_wallpaper() {
+	local id=$1 name candidate parent
+	local last_file="$state_dir/last/$id"
+	[[ -r $last_file ]] || return 0
+	IFS= read -r name <"$last_file" || return 0
+	valid_raster_name "$name" || return 0
+	candidate="$wallpaper_root/$id/$name"
+	[[ -f $candidate ]] || return 0
+	parent=$(readlink -f -- "$(dirname -- "$candidate")") || return 0
+	[[ $parent == "$resolved_theme_dir" ]] || return 0
+	resolved_wallpaper=$candidate
+}
+
+acquire_lock() {
+	install -d -m 700 -- "$state_dir"
+	exec 9>"$lock_file"
+	flock -w "$lock_timeout" 9 || fail 'otra operación de apariencia sigue activa.' 75
+}
+
+resolve_appearance_assets() {
+	local id=$1 root_real theme_real wallpaper wallpaper_parent raster=''
+	[[ -d $wallpaper_root ]] || fail "no existe la raíz de fondos: $wallpaper_root"
+	root_real=$(readlink -f -- "$wallpaper_root") ||
+		fail "no se puede resolver la raíz de fondos: $wallpaper_root"
+	theme_real=$(readlink -f -- "$wallpaper_root/$id") ||
+		fail "no existe el conjunto de fondos para $id"
+	[[ -d $theme_real && $theme_real == "$root_real/$id" ]] ||
+		fail "conjunto de fondos no gestionado para $id: $theme_real"
+
+	while IFS= read -r -d '' candidate; do
+		raster=$candidate
+		break
+	done < <(find -L "$theme_real" -maxdepth 1 -type f \
+		\( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) \
+		-print0 | sort -z)
+	[[ -n $raster ]] || fail "el conjunto $id no contiene imágenes"
+
+	wallpaper=''
+	if [[ ${appearance_wallpapers[$id]} != '-' ]]; then
+		wallpaper=$(expand_wallpaper_path "${appearance_wallpapers[$id]}" || true)
+		if [[ -n $wallpaper && -f $wallpaper ]]; then
+			wallpaper_parent=$(readlink -f -- "$(dirname -- "$wallpaper")") || true
+			[[ $wallpaper_parent == "$theme_real" ]] || wallpaper=''
+		else
+			wallpaper=''
+		fi
+	fi
+	[[ -n $wallpaper ]] || wallpaper=$raster
+
+	resolved_theme_dir=$theme_real
+	resolved_wallpaper=$wallpaper
+}
+
+replace_visible_link() {
+	local target=$1 tmp
+	install -d -m 700 -- "$(dirname -- "$visible_link")"
+	if [[ -e $visible_link && ! -L $visible_link ]]; then
+		fail "la ruta visible existe y no es un enlace: $visible_link"
+	fi
+	tmp=$(mktemp "$(dirname -- "$visible_link")/.visible.XXXXXX")
+	rm -f -- "$tmp"
+	if ! ln -s -- "$target" "$tmp"; then
+		rm -f -- "$tmp"
+		fail 'no se pudo preparar el conjunto visible'
+	fi
+	if ! mv -Tf -- "$tmp" "$visible_link"; then
+		rm -f -- "$tmp"
+		fail 'no se pudo activar el conjunto visible'
+	fi
+}
+
+prepare_visible() {
+	local id=$1
+	resolve_appearance_assets "$id"
+	if ((dry_run)); then
+		printf 'visible %q -> %q\n' "$visible_link" "$resolved_theme_dir"
+		return
+	fi
+	replace_visible_link "$resolved_theme_dir"
+}
+
+require_noctalia() {
+	command -v noctalia >/dev/null 2>&1 || fail 'noctalia no está disponible.' 127
+}
+
+wait_for_appearance() {
+	local id=$1 wallpaper=$2 deadline scheme active_wallpaper stable=0
+	deadline=$((SECONDS + apply_timeout))
+	while ((SECONDS <= deadline)); do
+		scheme=$(noctalia msg color-scheme-get 2>/dev/null || true)
+		active_wallpaper=$(noctalia msg wallpaper-get 2>/dev/null || true)
+		if [[ $scheme == "${appearance_sources[$id]} ${appearance_palettes[$id]}" &&
+			$active_wallpaper == "$wallpaper" ]]; then
+			stable=$((stable + 1))
+			((stable >= 2)) && return 0
+		else
+			stable=0
+		fi
+		sleep 0.1
+	done
+	return 1
+}
+
+wait_for_templates() {
+	local id=$1 deadline rendered_id scheme
+	deadline=$((SECONDS + apply_timeout))
+	while ((SECONDS <= deadline)); do
+		rendered_id=''
+		[[ -r $rendered_id_file ]] && IFS= read -r rendered_id <"$rendered_id_file"
+		scheme=$(noctalia msg color-scheme-get 2>/dev/null || true)
+		if [[ $rendered_id == "$id" &&
+			$scheme == "${appearance_sources[$id]} ${appearance_palettes[$id]}" ]]; then
+			return 0
+		fi
+		sleep 0.1
+	done
+	return 1
+}
+
+apply_appearance() {
+	local id=$1 previous_id='' previous_target='' previous_scheme previous_source previous_palette
+	local previous_wallpaper
+	[[ -n ${appearance_labels[$id]+present} ]] || fail "ID de apariencia desconocido: $id" 2
+	resolve_appearance_assets "$id"
+	select_remembered_wallpaper "$id"
+
+	if ((dry_run)); then
+		printf 'visible %q -> %q\n' "$visible_link" "$resolved_theme_dir"
+		printf 'noctalia msg color-scheme-set %q %q\n' \
+			"${appearance_sources[$id]}" "${appearance_palettes[$id]}"
+		printf 'noctalia msg wallpaper-set %q\n' "$resolved_wallpaper"
+		printf '%s\n' 'noctalia msg templates-apply'
+		printf 'state %q\n' "$id"
+		return
+	fi
+
+	require_noctalia
+	previous_scheme=$(noctalia msg color-scheme-get) ||
+		fail 'no se pudo leer la paleta activa antes del cambio'
+	previous_source=${previous_scheme%% *}
+	previous_palette=${previous_scheme#* }
+	[[ $previous_source != "$previous_scheme" && -n $previous_palette ]] ||
+		fail "respuesta de paleta inválida: $previous_scheme"
+	previous_wallpaper=$(noctalia msg wallpaper-get) ||
+		fail 'no se pudo leer el fondo activo antes del cambio'
+	previous_id=$(id_for_scheme "$previous_scheme" || true)
+	if [[ -n $previous_id ]]; then
+		remember_current_wallpaper "$previous_id" "$previous_wallpaper"
+		# Si se reaplica el mismo tema, el fondo recién recordado gana al default.
+		if [[ $previous_id == "$id" ]]; then
+			select_remembered_wallpaper "$id"
+		fi
+	fi
+	if [[ -L $visible_link ]]; then
+		previous_target=$(readlink -- "$visible_link")
+	fi
+	replace_visible_link "$resolved_theme_dir"
+	if ! {
+		noctalia msg color-scheme-set "${appearance_sources[$id]}" "${appearance_palettes[$id]}" &&
+			noctalia msg wallpaper-set "$resolved_wallpaper" &&
+			wait_for_appearance "$id" "$resolved_wallpaper" &&
+			rm -f -- "$rendered_id_file" &&
+			noctalia msg templates-apply &&
+			wait_for_templates "$id"
+	}; then
+		if [[ -n $previous_target ]]; then
+			replace_visible_link "$previous_target"
+		else
+			rm -f -- "$visible_link"
+		fi
+		noctalia msg color-scheme-set "$previous_source" "$previous_palette" >/dev/null 2>&1 || true
+		if [[ -f $previous_wallpaper ]]; then
+			noctalia msg wallpaper-set "$previous_wallpaper" >/dev/null 2>&1 || true
+		fi
+		noctalia msg templates-apply >/dev/null 2>&1 || true
+		fail "Noctalia no pudo aplicar la apariencia $id"
+	fi
+	write_current_id "$id"
+	printf '%s\n' "$id"
+}
+
+cycle_appearance() {
+	local direction=$1 active index=0 next_index
+	active=$(current_id)
+	for index in "${!appearance_ids[@]}"; do
+		[[ ${appearance_ids[$index]} == "$active" ]] && break
+	done
+	case "$direction" in
+	next) next_index=$(((index + 1) % ${#appearance_ids[@]})) ;;
+	previous) next_index=$(((index - 1 + ${#appearance_ids[@]}) % ${#appearance_ids[@]})) ;;
+	*) fail "dirección inválida: $direction" ;;
+	esac
+	apply_appearance "${appearance_ids[$next_index]}"
+}
+
+dry_run=0
+if [[ ${1:-} == --dry-run ]]; then
+	dry_run=1
+	shift
+fi
+
+load_catalog
+[[ $apply_timeout =~ ^[1-9][0-9]*$ ]] || fail 'APPEARANCE_APPLY_TIMEOUT debe ser un entero positivo.' 2
+action=${1:-}
+case "$action" in
+list)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	for id in "${appearance_ids[@]}"; do
+		printf '%s\t%s\t%s %s\n' "$id" "${appearance_labels[$id]}" \
+			"${appearance_sources[$id]}" "${appearance_palettes[$id]}"
+	done
+	;;
+current)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	current_id
+	;;
+template-ready)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	active=$(current_id)
+	write_rendered_id "$active"
+	;;
+prepare)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	if ((dry_run)); then
+		active=$(current_id)
+		prepare_visible "$active"
+	else
+		acquire_lock
+		active=$(current_id)
+		prepare_visible "$active"
+	fi
+	printf '%s\n' "$active"
+	;;
+apply)
+	[[ $# -eq 2 ]] || { usage >&2; exit 2; }
+	valid_id "$2" || fail "ID de apariencia inválido: $2" 2
+	((dry_run)) || acquire_lock
+	apply_appearance "$2"
+	;;
+next | previous)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	((dry_run)) || acquire_lock
+	cycle_appearance "$action"
+	;;
+--help | -h)
+	[[ $# -eq 1 ]] || { usage >&2; exit 2; }
+	usage
+	;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

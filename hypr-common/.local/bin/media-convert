@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Uso: media-convert --input RUTA --format jpg|png|mp4|gif [--size original|1920|1280|720] [--output-dir RUTA]
+       media-convert
+
+Sin argumentos abre una interfaz Zenity. El resultado se crea junto al archivo,
+o en --output-dir, sin sobrescribir archivos existentes, y se copia como URI.
+
+Variables de prueba: MEDIA_CONVERT_ZENITY, MEDIA_CONVERT_MAGICK,
+MEDIA_CONVERT_FFMPEG, MEDIA_CONVERT_FILE y MEDIA_CONVERT_PYTHON.
+EOF
+}
+
+fail() {
+	command -v notify-send >/dev/null 2>&1 && notify-send 'Conversión multimedia' "$1" || true
+	printf 'media-convert: %s\n' "$1" >&2
+	exit "${2:-1}"
+}
+
+input=''
+format=''
+size=original
+output_dir=''
+
+while (($#)); do
+	case "$1" in
+	--input) (($# >= 2)) || fail 'Falta la ruta de --input.' 2; input=$2; shift 2 ;;
+	--format) (($# >= 2)) || fail 'Falta el formato de --format.' 2; format=$2; shift 2 ;;
+	--size) (($# >= 2)) || fail 'Falta el tamaño de --size.' 2; size=$2; shift 2 ;;
+	--output-dir) (($# >= 2)) || fail 'Falta la ruta de --output-dir.' 2; output_dir=$2; shift 2 ;;
+	-h | --help) usage; exit 0 ;;
+	*) fail "Opción no reconocida: $1" 2 ;;
+	esac
+done
+
+zenity_cmd=${MEDIA_CONVERT_ZENITY:-zenity}
+magick_cmd=${MEDIA_CONVERT_MAGICK:-magick}
+ffmpeg_cmd=${MEDIA_CONVERT_FFMPEG:-ffmpeg}
+file_cmd=${MEDIA_CONVERT_FILE:-file}
+python_cmd=${MEDIA_CONVERT_PYTHON:-python3}
+
+if [[ -z "$input" && -z "$format" ]]; then
+	command -v "$zenity_cmd" >/dev/null 2>&1 || fail 'Falta Zenity.' 127
+	input=$("$zenity_cmd" --file-selection --title='Selecciona un archivo multimedia') || exit 0
+	[[ -n "$input" ]] || exit 0
+	format=$("$zenity_cmd" --list --title='Formato de salida' --column='Formato' jpg png mp4 gif) || exit 0
+	[[ -n "$format" ]] || exit 0
+	size=$("$zenity_cmd" --list --title='Tamaño máximo' --column='Lado mayor' original 1920 1280 720) || exit 0
+	[[ -n "$size" ]] || exit 0
+fi
+
+[[ -n "$input" && -n "$format" ]] || fail 'Usa --input y --format, o ejecuta sin argumentos.' 2
+[[ -f "$input" ]] || fail "No existe el archivo: $input" 2
+case "$format" in jpg | png | mp4 | gif) ;; *) fail "Formato no válido: $format" 2 ;; esac
+case "$size" in original | 1920 | 1280 | 720) ;; *) fail "Tamaño no válido: $size" 2 ;; esac
+
+command -v "$file_cmd" >/dev/null 2>&1 || fail "Falta $file_cmd." 127
+mime=$("$file_cmd" --brief --mime-type -- "$input")
+case "$mime" in
+image/*) kind=image ;;
+video/*) kind=video ;;
+*) fail "Tipo no compatible: $mime" 2 ;;
+esac
+case "$kind:$format" in
+image:jpg | image:png) command -v "$magick_cmd" >/dev/null 2>&1 || fail "Falta $magick_cmd." 127 ;;
+video:mp4 | video:gif) command -v "$ffmpeg_cmd" >/dev/null 2>&1 || fail "Falta $ffmpeg_cmd." 127 ;;
+*) fail "No se puede convertir $kind a $format." 2 ;;
+esac
+
+if [[ -z "$output_dir" ]]; then output_dir=$(dirname -- "$input"); fi
+mkdir -p -- "$output_dir"
+base=$(basename -- "${input%.*}")
+stamp=$(date +%Y-%m-%d_%H-%M-%S)
+output="$output_dir/$base-converted-$stamp.$format"
+index=1
+while [[ -e "$output" || -L "$output" ]] || ! mkdir -- "$output.media-convert.lock" 2>/dev/null; do
+	output="$output_dir/$base-converted-$stamp-$index.$format"
+	((index++))
+done
+output_lock="$output.media-convert.lock"
+conversion_complete=0
+cleanup_output_reservation() {
+	local status=$?
+	rmdir -- "$output_lock" 2>/dev/null || true
+	if ((conversion_complete == 0)); then
+		rm -f -- "$output"
+	fi
+	return "$status"
+}
+trap cleanup_output_reservation EXIT
+
+resize=()
+[[ "$size" != original ]] && resize=(-resize "${size}x${size}>")
+video_filter=()
+[[ "$size" != original ]] && video_filter=(-vf "scale=w='min(iw,$size)':h='min(ih,$size)':force_original_aspect_ratio=decrease")
+if [[ "$kind" == image ]]; then
+	"$magick_cmd" "$input" "${resize[@]}" "$output"
+elif [[ "$format" == mp4 ]]; then
+	"$ffmpeg_cmd" -nostdin -n -i "$input" "${video_filter[@]}" "$output"
+else
+	"$ffmpeg_cmd" -nostdin -n -i "$input" "${video_filter[@]}" "$output"
+fi
+[[ -s "$output" ]] || fail 'La conversión no produjo un archivo.'
+conversion_complete=1
+rmdir -- "$output_lock"
+trap - EXIT
+
+command -v "$python_cmd" >/dev/null 2>&1 || fail "Falta $python_cmd." 127
+uri=$("$python_cmd" - "$output" <<'PY'
+from pathlib import Path
+import sys
+print(Path(sys.argv[1]).resolve().as_uri())
+PY
+)
+command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
+printf '%s' "$uri" | wl-copy --trim-newline
+command -v notify-send >/dev/null 2>&1 && notify-send 'Conversión completada' 'La URI del archivo está en el portapapeles.' || true
+printf '%s\n' "$output"

@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2016
+set -euo pipefail
+umask 077
+
+usage() {
+	cat <<'EOF'
+Uso: bug-capsule [--image RUTA] [--output-dir RUTA] [--no-annotate] [--no-ocr]
+
+Crea una cápsula local con contexto visual, OCR y metadatos limitados. Si se
+indica BUG_CAPSULE_REPLAY_PATH y existe noctalia, solicita guardar el replay y
+enlaza ese archivo sin copiarlo. No publica ningún dato.
+EOF
+}
+
+fail() { printf 'bug-capsule: %s\n' "$1" >&2; exit "${2:-1}"; }
+
+image=''
+output_root=${BUG_CAPSULE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/bug-capsules"}
+annotate=1
+ocr=1
+while (($#)); do
+	case "$1" in
+	--image) (($# >= 2)) || fail 'Falta la ruta de --image.' 2; image=$2; shift 2 ;;
+	--output-dir) (($# >= 2)) || fail 'Falta la ruta de --output-dir.' 2; output_root=$2; shift 2 ;;
+	--no-annotate) annotate=0; shift ;;
+	--no-ocr) ocr=0; shift ;;
+	-h | --help) usage; exit 0 ;;
+	*) fail "Opción no reconocida: $1" 2 ;;
+	esac
+done
+
+capture_context=${BUG_CAPSULE_CAPTURE_CONTEXT:-capture-context}
+command -v "$capture_context" >/dev/null 2>&1 || fail "Falta $capture_context." 127
+args=(--print)
+[[ -n "$image" ]] && args+=(--image "$image")
+((annotate)) || args+=(--no-annotate)
+((ocr)) || args+=(--no-ocr)
+context=$("$capture_context" "${args[@]}") || exit $?
+image_path=$(sed -n 's|^!\[Captura\](<\(.*\)>)$|\1|p' <<<"$context" | head -n 1)
+[[ -n "$image_path" && -f "$image_path" ]] || fail 'capture-context no devolvió una imagen válida.'
+
+install -d -m 700 -- "$output_root"
+capsule="$output_root/$(date +%Y-%m-%d_%H-%M-%S)-$$"
+install -d -m 700 -- "$capsule"
+install -m 600 -- "$image_path" "$capsule/capture.png"
+metadata="$capsule/metadata.md"
+
+active_window=''
+active_pid=''
+repo_path=''
+if command -v hyprctl >/dev/null 2>&1; then
+	active_window=$(hyprctl activewindow -j 2>/dev/null || true)
+	if command -v jq >/dev/null 2>&1 && [[ -n "$active_window" ]]; then
+		active_pid=$(jq -r '.pid // empty' <<<"$active_window" 2>/dev/null || true)
+	fi
+fi
+if [[ "$active_pid" =~ ^[1-9][0-9]*$ ]]; then
+	active_cwd=$(readlink -f -- "/proc/$active_pid/cwd" 2>/dev/null || true)
+	if [[ -n "$active_cwd" ]]; then
+		repo_path=$(git -C "$active_cwd" rev-parse --show-toplevel 2>/dev/null || true)
+	fi
+fi
+if [[ -z "$repo_path" ]]; then
+	repo_path=$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)
+fi
+
+{
+	printf '# Metadatos limitados\n\n'
+	printf -- '- Kernel: `%s`\n' "$(uname -sr)"
+	if [[ -n "$active_window" ]]; then
+		window_summary=$(jq -r '[.class // "?", .title // "?", (.workspace.name // .workspace.id // "?")] | @tsv' \
+			<<<"$active_window" 2>/dev/null || printf '%s' "$active_window")
+		window_summary=$(tr '\n\t`' '   ' <<<"$window_summary" | cut -c1-500)
+		printf -- '- Ventana activa: `%s`\n' "$window_summary"
+		workspace_summary=$(hyprctl activeworkspace -j 2>/dev/null |
+			jq -r '[.id // "?", .name // "?", .monitor // "?"] | @tsv' 2>/dev/null || true)
+		workspace_summary=$(tr '\n\t`' '   ' <<<"$workspace_summary" | cut -c1-300)
+		[[ -z "$workspace_summary" ]] || printf -- '- Espacio activo: `%s`\n' "$workspace_summary"
+	fi
+	if [[ -n "$repo_path" ]]; then
+		printf -- '- Git: `%s @ %s %s`\n' "$(basename -- "$repo_path")" \
+			"$(git -C "$repo_path" branch --show-current)" "$(git -C "$repo_path" rev-parse --short HEAD)"
+	fi
+	if command -v nvidia-smi >/dev/null 2>&1; then
+		printf -- '- GPU: `%s`\n' "$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null | head -n 1 | cut -c1-300)"
+	elif command -v lspci >/dev/null 2>&1; then
+		printf -- '- GPU: `%s`\n' "$(lspci 2>/dev/null | rg -m1 -i 'vga|3d|display' | cut -c1-300 || true)"
+	fi
+} >"$metadata"
+
+replay_line='- Replay: no disponible'
+noctalia_cmd=${BUG_CAPSULE_NOCTALIA:-noctalia}
+replay_lock=${BUG_CAPSULE_REPLAY_LOCK:-"${XDG_RUNTIME_DIR:-/tmp}/bug-capsule-$UID/replay.lock"}
+replay_locked=0
+if command -v flock >/dev/null 2>&1; then
+	install -d -m 700 -- "$(dirname -- "$replay_lock")"
+	exec 8>"$replay_lock"
+	flock -w 5 8 && replay_locked=1
+fi
+if ((replay_locked)) && command -v "$noctalia_cmd" >/dev/null 2>&1; then
+	replay_dir=${BUG_CAPSULE_REPLAY_DIR:-"$HOME/Videos/Recordings"}
+	declare -A replay_before=()
+	if [[ -d "$replay_dir" ]]; then
+		while IFS= read -r -d '' candidate; do
+			replay_before["$candidate"]=$(stat -Lc '%i:%s:%Y' -- "$candidate" 2>/dev/null || true)
+		done < <(find "$replay_dir" -maxdepth 1 -type f -name 'replay_*' -print0 2>/dev/null)
+	fi
+	"$noctalia_cmd" msg plugin noctalia/screen_recorder:service all replay-save >/dev/null 2>&1 || true
+	replay_path=${BUG_CAPSULE_REPLAY_PATH:-}
+	if [[ -z "$replay_path" && -d "$replay_dir" ]]; then
+		replay_polls=${BUG_CAPSULE_REPLAY_POLLS:-30}
+		[[ "$replay_polls" =~ ^[1-9][0-9]*$ ]] || replay_polls=30
+		for ((poll = 0; poll < replay_polls; poll++)); do
+			latest=''
+			latest_epoch=0
+			while IFS= read -r -d '' candidate; do
+				candidate_signature=$(stat -Lc '%i:%s:%Y' -- "$candidate" 2>/dev/null || true)
+				[[ -n "$candidate_signature" && ${replay_before["$candidate"]-} != "$candidate_signature" ]] || continue
+				candidate_epoch=$(stat -c '%Y' -- "$candidate" 2>/dev/null || printf 0)
+				if ((candidate_epoch >= latest_epoch)); then
+					latest=$candidate
+					latest_epoch=$candidate_epoch
+				fi
+			done < <(find "$replay_dir" -maxdepth 1 -type f -name 'replay_*' -print0 2>/dev/null)
+			[[ -z "$latest" ]] || { replay_path=$latest; break; }
+			sleep 0.1
+		done
+	fi
+	if [[ -n "$replay_path" && -f "$replay_path" ]]; then
+		replay_name="replay.${replay_path##*.}"
+		if ln -s -- "$replay_path" "$capsule/$replay_name"; then
+			replay_line="- Replay: [enlace local](<$replay_name>)"
+		fi
+	fi
+fi
+((replay_locked)) && flock -u 8
+
+{
+	printf '# Cápsula de error\n\n'
+	printf '## Contexto visual\n\n![Captura](<capture.png>)\n\n'
+	printf '%s\n\n' "$replay_line"
+	cat -- "$metadata"
+	printf '\n## OCR\n\n'
+	sed -n '/^### Texto detectado$/,$p' <<<"$context" | sed '1d'
+} >"$capsule/README.md"
+command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
+wl-copy --sensitive --paste-once <"$capsule/README.md"
+command -v notify-send >/dev/null 2>&1 && notify-send 'Cápsula preparada' 'El Markdown local está en el portapapeles.' || true
+printf '%s\n' "$capsule"

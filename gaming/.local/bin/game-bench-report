@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+	printf '%s\n' 'Uso: game-bench-report [--json] NOMBRE'
+}
+
+json=false
+if [[ "${1:-}" == --json ]]; then
+	json=true
+	shift
+fi
+
 if (($# != 1)) || [[ ! "$1" =~ ^[[:alnum:]_.-]+$ || "$1" == . || "$1" == .. ]]; then
-	printf '%s\n' 'Uso: game-bench-report NOMBRE' >&2
+	usage >&2
 	exit 2
 fi
 
@@ -12,19 +22,189 @@ benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks/$1"
 	exit 1
 }
 
-mapfile -t logs < <(find "$benchmark_root" -type f -name '*.csv' -print | sort)
-if ((${#logs[@]} < 3)); then
-	printf 'Hay %d ejecución(es); realiza al menos 3 para comparar.\n' "${#logs[@]}" >&2
+mapfile -t logs < <(find "$benchmark_root" -type f -name '*.csv' ! -name '*_summary.csv' -print | sort)
+mapfile -t run_dirs < <(find "$benchmark_root" -type f -name '*.csv' ! -name '*_summary.csv' -printf '%h\n' | sort -u)
+if ((${#run_dirs[@]} < 3)); then
+	printf 'Hay %d directorios de ejecución; realiza al menos 3 ejecuciones para comparar.\n' "${#run_dirs[@]}" >&2
 	exit 1
 fi
 
-printf 'Benchmark: %s\nEjecuciones CSV: %d\n' "$1" "${#logs[@]}"
-printf 'Directorio: %s\n' "$benchmark_root"
-printf '%s\n' "${logs[@]}"
+command -v python3 >/dev/null 2>&1 || {
+	printf '%s\n' 'No se encuentra python3; es necesario para analizar los CSV de MangoHud.' >&2
+	exit 127
+}
 
-if command -v mangoplot >/dev/null 2>&1; then
-	printf '%s\n' 'Generando comparativa con mangoplot...'
-	exec mangoplot "$benchmark_root"
-fi
+python3 - "$benchmark_root" "$json" "${logs[@]}" <<'PY'
+import csv
+import json
+import math
+import os
+import re
+import statistics
+import sys
 
-printf '%s\n' 'mangoplot no está disponible; conserva los CSV para analizarlos manualmente.' >&2
+root, json_mode, *paths = sys.argv[1:]
+
+
+def number(value):
+    try:
+        parsed = float(value.strip().replace(',', '.'))
+        return parsed if math.isfinite(parsed) else None
+    except (AttributeError, ValueError):
+        return None
+
+
+def normalized(value):
+    return re.sub(r'[^a-z0-9]+', '', value.lower())
+
+
+def percentile(values, fraction):
+    ordered = sorted(values)
+    position = (len(ordered) - 1) * fraction
+    lower, upper = math.floor(position), math.ceil(position)
+    if lower == upper:
+        return ordered[lower]
+    return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+def read_metadata(path):
+    metadata = {}
+    filename = os.path.join(os.path.dirname(path), 'metadata.txt')
+    try:
+        with open(filename, encoding='utf-8') as source:
+            for line in source:
+                key, separator, value = line.rstrip('\n').partition('=')
+                if separator and key in {'kernel', 'driver', 'gpu_driver', 'perfil'}:
+                    metadata[key] = value.strip()
+                elif not separator and line.strip() and 'driver' not in metadata:
+                    # Formato anterior de game-run: nombre de GPU y controlador en CSV.
+                    metadata['driver'] = line.strip()
+    except OSError:
+        pass
+    if 'gpu_driver' in metadata and 'driver' not in metadata:
+        metadata['driver'] = metadata['gpu_driver']
+    return metadata
+
+
+def analyse(path):
+    with open(path, newline='', encoding='utf-8-sig') as source:
+        sample = source.read(4096)
+        source.seek(0)
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=',;\t')
+        except csv.Error:
+            dialect = csv.excel
+        rows = csv.reader(source, dialect)
+        header = None
+        columns = {}
+        for row_number, candidate in enumerate(rows, 1):
+            candidate_columns = {normalized(name): index for index, name in enumerate(candidate)}
+            if any(name in {'fps', 'framerate', 'frametime', 'frametimems', 'frametimeavg'}
+                   for name in candidate_columns):
+                header = candidate
+                columns = candidate_columns
+                break
+            if row_number >= 50:
+                break
+        if not header:
+            raise ValueError('no contiene una cabecera de métricas de MangoHud')
+        fps_index = next((index for name, index in columns.items() if name in {'fps', 'framerate'}), None)
+        frametime_index = next((index for name, index in columns.items()
+                                if name in {'frametime', 'frametimems', 'frametimeavg'}), None)
+        if fps_index is None and frametime_index is None:
+            raise ValueError('no contiene columnas FPS ni frametime')
+
+        fps = []
+        frametimes = []
+        for row in rows:
+            frame = number(row[frametime_index]) if frametime_index is not None and len(row) > frametime_index else None
+            rate = number(row[fps_index]) if fps_index is not None and len(row) > fps_index else None
+            if frame is not None and frame > 0:
+                frametimes.append(frame)
+                fps.append(1000.0 / frame)
+            elif rate is not None and rate > 0:
+                fps.append(rate)
+        if not fps:
+            raise ValueError('no contiene muestras FPS válidas')
+    result = {'path': path, 'samples': len(fps), 'median_fps': statistics.median(fps),
+              'metadata': read_metadata(path)}
+    if len(fps) >= 100:
+        result['one_percent_low_fps'] = percentile(fps, 0.01)
+    if frametimes:
+        result['frametime_samples'] = len(frametimes)
+        result['frametime_median_ms'] = statistics.median(frametimes)
+        result['frametime_p95_minus_p5_ms'] = percentile(frametimes, 0.95) - percentile(frametimes, 0.05)
+        result['frametime_stddev_ms'] = statistics.pstdev(frametimes)
+    return result, fps, frametimes
+
+
+runs, all_fps, all_frametimes, skipped = [], [], [], []
+for path in paths:
+    try:
+        run, fps, frametimes = analyse(path)
+        runs.append(run)
+        all_fps.extend(fps)
+        all_frametimes.extend(frametimes)
+    except (OSError, UnicodeError, ValueError, csv.Error) as error:
+        skipped.append({'path': path, 'reason': str(error)})
+
+valid_run_dirs = {os.path.dirname(run['path']) for run in runs}
+if len(valid_run_dirs) < 3:
+    print('No hay tres ejecuciones válidas de MangoHud para comparar.', file=sys.stderr)
+    for item in skipped:
+        print(f"- {item['path']}: {item['reason']}", file=sys.stderr)
+    sys.exit(1)
+
+aggregate = {'runs': len(valid_run_dirs), 'csv_files': len(runs), 'samples': len(all_fps), 'median_fps': statistics.median(all_fps)}
+if len(all_fps) >= 100:
+    aggregate['one_percent_low_fps'] = percentile(all_fps, 0.01)
+if all_frametimes:
+    aggregate['frametime_samples'] = len(all_frametimes)
+    aggregate['frametime_median_ms'] = statistics.median(all_frametimes)
+    aggregate['frametime_p95_minus_p5_ms'] = percentile(all_frametimes, 0.95) - percentile(all_frametimes, 0.05)
+    aggregate['frametime_stddev_ms'] = statistics.pstdev(all_frametimes)
+
+metadata = {}
+for field in ('kernel', 'driver', 'perfil'):
+    values = sorted({run['metadata'][field] for run in runs if run['metadata'].get(field)})
+    metadata[field] = values
+
+report = {'benchmark': os.path.basename(root), 'directory': root, 'runs': runs,
+          'aggregate': aggregate, 'metadata': metadata, 'skipped': skipped}
+if json_mode == 'true':
+    print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+    sys.exit(0)
+
+def show(value):
+    return f'{value:.2f}'
+
+def metadata_value(values):
+    return ', '.join(values) if values else 'no registrado'
+
+def stability(item):
+    spread = item.get('frametime_p95_minus_p5_ms')
+    deviation = item.get('frametime_stddev_ms')
+    if spread is None:
+        return 'no disponible (sin frametimes)'
+    return f'p95-p5 {show(spread)} ms; desviación {show(deviation)} ms'
+
+print(f"Benchmark: {report['benchmark']}")
+print(f"Directorio: {root}")
+print(f"Ejecuciones válidas: {len(valid_run_dirs)}; CSV válidos: {len(runs)} de {len(paths)}")
+print(f"Kernel: {metadata_value(metadata['kernel'])}")
+print(f"Driver: {metadata_value(metadata['driver'])}")
+print(f"Perfil: {metadata_value(metadata['perfil'])}")
+for index, run in enumerate(runs, 1):
+    print(f"\nEjecución {index}: {run['path']}")
+    print(f"  Muestras: {run['samples']}; mediana FPS: {show(run['median_fps'])}")
+    low = run.get('one_percent_low_fps')
+    print('  1% low: ' + (f'{show(low)} FPS' if low is not None else 'no disponible (<100 muestras)'))
+    print(f"  Estabilidad: {stability(run)}")
+print('\nAgregado:')
+print(f"  Ejecuciones: {aggregate['runs']}; muestras: {aggregate['samples']}; mediana FPS: {show(aggregate['median_fps'])}")
+low = aggregate.get('one_percent_low_fps')
+print('  1% low: ' + (f'{show(low)} FPS' if low is not None else 'no disponible (<100 muestras)'))
+print(f"  Estabilidad: {stability(aggregate)}")
+for item in skipped:
+    print(f"Aviso: se omitió {item['path']}: {item['reason']}", file=sys.stderr)
+PY

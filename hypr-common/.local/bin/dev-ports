@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+
+# Inspect the current user's TCP listeners.  Tokens deliberately contain no
+# paths or command-line arguments: `open` discovers the listener again before
+# it starts a browser.
+set -euo pipefail
+
+readonly proc_root="${DEV_PORTS_PROC_ROOT:-/proc}"
+readonly ss_bin="${DEV_PORTS_SS_BIN:-ss}"
+readonly opener="${DEV_PORTS_OPENER:-qutebrowser}"
+
+usage() {
+	printf '%s\n' \
+		'Uso: dev-ports {list|open TOKEN|show}' \
+		'' \
+		'list  muestra puertos TCP LISTEN del usuario actual' \
+		'open  vuelve a comprobar el puerto y abre su URL local' \
+		'show  permite elegir un puerto con Zenity, si está disponible'
+}
+
+safe_label() {
+	printf '%s' "$1" | LC_ALL=C tr -c '[:alnum:]_.:/ -' '_'
+}
+
+process_is_current_user() {
+	local pid=$1 uid
+	[[ "$pid" =~ ^[0-9]+$ && -d "$proc_root/$pid" ]] || return 1
+	uid="$(stat -c '%u' -- "$proc_root/$pid" 2>/dev/null || true)"
+	[[ "$uid" == "$(id -u)" ]]
+}
+
+process_name() {
+	local pid=$1 name
+	name="$(cat -- "$proc_root/$pid/comm" 2>/dev/null || true)"
+	[[ -n "$name" ]] || name=proceso
+	safe_label "$name"
+}
+
+worktree_name() {
+	local pid=$1 cwd
+	cwd="$(readlink -f -- "$proc_root/$pid/cwd" 2>/dev/null || true)"
+	[[ -n "$cwd" && -d "$cwd" ]] || return 1
+	git -C "$cwd" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 1
+	safe_label "$(basename -- "$cwd")"
+}
+
+likely_web_process() {
+	local process=${1,,}
+	case "$process" in
+	node | nodejs | bun | deno | vite | nuxt | next-server | webpack*) return 0 ;;
+	esac
+	return 1
+}
+
+listeners() {
+	local raw
+	if [[ -n "${DEV_PORTS_SS_FILE:-}" ]]; then
+		raw="$(<"$DEV_PORTS_SS_FILE")"
+	else
+		command -v "$ss_bin" >/dev/null 2>&1 || {
+			printf '%s\n' 'dev-ports: ss no está disponible.' >&2
+			return 127
+		}
+		raw="$("$ss_bin" -H -ltnp 2>/dev/null || true)"
+	fi
+
+	awk '
+	{
+		listener = $4
+		port = listener
+		if (listener ~ /^\[/) {
+			sub(/^.*\]:/, "", port)
+			address = listener
+			sub(/^\[/, "", address)
+			sub(/\]:[^]]*$/, "", address)
+		} else {
+			sub(/^.*:/, "", port)
+			address = listener
+			sub(/:[^:]*$/, "", address)
+		}
+		if (port !~ /^[0-9]+$/ || port == 0 || address == "") next
+		line = $0
+		while (match(line, /pid=[0-9]+/)) {
+			pid = substr(line, RSTART + 4, RLENGTH - 4)
+			print address "\t" port "\t" pid
+			line = substr(line, RSTART + RLENGTH)
+		}
+	}' <<<"$raw" | sort -t $'\t' -k2,2n -k3,3n -k1,1 -u
+}
+
+token_for() {
+	printf 'port_%s_pid_%s_addr_%s' "$1" "$2" "$3"
+}
+
+list_ports() {
+	local address port pid process repo label
+	while IFS=$'\t' read -r address port pid; do
+		process_is_current_user "$pid" || continue
+		process="$(process_name "$pid")"
+		label="Puerto $port ($address) - $process"
+		if repo="$(worktree_name "$pid")"; then
+			label+=" - $repo"
+		elif ! likely_web_process "$process"; then
+			continue
+		fi
+		printf '%s\t%s\n' "$(token_for "$port" "$pid" "$address")" "$label"
+	done < <(listeners)
+}
+
+resolve_token() {
+	local token=$1 candidate address port pid
+	[[ "$token" =~ ^port_([0-9]+)_pid_([0-9]+)_addr_([0-9A-Fa-f:.]+|\*)$ ]] || return 1
+	port=${BASH_REMATCH[1]}
+	pid=${BASH_REMATCH[2]}
+	address=${BASH_REMATCH[3]}
+	while IFS=$'\t' read -r candidate _; do
+		[[ "$candidate" == "$token" ]] || continue
+		printf '%s\t%s\n' "$address" "$port"
+		return 0
+	done < <(list_ports)
+	return 1
+}
+
+valid_ipv4() {
+	local address=$1 octet
+	local -a octets
+	IFS=. read -r -a octets <<<"$address"
+	((${#octets[@]} == 4)) || return 1
+	for octet in "${octets[@]}"; do
+		[[ "$octet" =~ ^[0-9]{1,3}$ ]] || return 1
+		((10#$octet <= 255)) || return 1
+	done
+}
+
+url_host_for_listener() {
+	local address=$1 bare
+	case "$address" in
+	'*' | 0.0.0.0) printf '%s' '127.0.0.1' ;;
+	'::' | '[::]' | '::1' | '[::1]') printf '%s' '[::1]' ;;
+	*)
+		bare=${address#[}
+		bare=${bare%]}
+		if valid_ipv4 "$bare"; then
+			printf '%s' "$bare"
+		elif [[ "$bare" == *:* && ${#bare} -le 39 && "$bare" =~ ^[0-9A-Fa-f:.]+$ ]]; then
+			printf '[%s]' "$bare"
+		else
+			return 1
+		fi
+		;;
+	esac
+}
+
+open_port() {
+	local address port host
+	IFS=$'\t' read -r address port < <(resolve_token "$1") || {
+		printf '%s\n' 'dev-ports: el puerto seleccionado ya no está disponible.' >&2
+		return 1
+	}
+	host="$(url_host_for_listener "$address")" || {
+		printf '%s\n' 'dev-ports: el listener seleccionado no tiene una dirección IP segura.' >&2
+		return 1
+	}
+	if command -v "$opener" >/dev/null 2>&1; then
+		exec "$opener" "http://$host:$port"
+	fi
+	command -v xdg-open >/dev/null 2>&1 || {
+		printf '%s\n' 'dev-ports: no hay un navegador disponible.' >&2
+		return 127
+	}
+	exec xdg-open "http://$host:$port"
+}
+
+show_ports() {
+	local token
+	if [[ "${DEV_PORTS_SHOW_TEXT:-0}" == 1 ]] || ! command -v zenity >/dev/null 2>&1; then
+		list_ports
+		return
+	fi
+	token="$(list_ports | zenity --list --title='Puertos de desarrollo' \
+		--column='Token' --column='Servicio' --print-column=1 2>/dev/null || true)"
+	[[ -n "$token" ]] && open_port "$token"
+}
+
+case "${1:-}" in
+list)
+	(($# == 1)) || { usage >&2; exit 2; }
+	list_ports
+	;;
+open)
+	(($# == 2)) || { usage >&2; exit 2; }
+	open_port "$2"
+	;;
+show)
+	(($# == 1)) || { usage >&2; exit 2; }
+	show_ports
+	;;
+-h|--help)
+	usage
+	;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac
