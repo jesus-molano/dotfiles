@@ -84,6 +84,14 @@ cat >"$test_root/bin/noctalia" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf 'noctalia\t%s\n' "$*" >>"$TEST_LOG"
+if [[ "${TEST_TIMER_REPAIR:-0}" == 1 && "$*" == 'msg panel-toggle noctalia/timer:panel' ]]; then
+	printf '%s\n' 'error: unknown panel "noctalia/timer:panel"' >&2
+	exit 1
+fi
+if [[ "${TEST_TIMER_REPAIR:-0}" == 1 && "$*" == 'msg plugins enable noctalia/timer' ]]; then
+	mkdir -p "$XDG_STATE_HOME/noctalia/plugins/materialized/official/timer"
+	: >"$XDG_STATE_HOME/noctalia/plugins/materialized/official/timer/plugin.toml"
+fi
 EOF
 
 chmod +x "$test_root/bin/hyprctl" "$test_root/bin/noctalia"
@@ -135,6 +143,28 @@ actual=$(<"$log")
 	printf 'FAIL: acciones inesperadas\nEsperadas:\n%s\nActuales:\n%s\n' "$expected" "$actual" >&2
 	exit 1
 }
+
+: >"$log"
+timer_selection=$(grep '^Timer'$'\t' <<<"$commands")
+PATH="$test_root/bin:$PATH" TEST_LOG="$log" TEST_TIMER_REPAIR=1 \
+	XDG_DATA_HOME="$test_root/data" XDG_STATE_HOME="$test_root/state" \
+	"$launcher" run commands "$timer_selection"
+expected_timer_repair=$(cat <<'EOF'
+noctalia	msg panel-toggle noctalia/timer:panel
+noctalia	msg plugins enable noctalia/timer
+noctalia	msg config-reload
+noctalia	msg panel-open noctalia/timer:panel
+EOF
+)
+[[ $(<"$log") == "$expected_timer_repair" ]] || {
+	printf 'FAIL: reparación inesperada de Timer\nEsperada:\n%s\nActual:\n%s\n' \
+		"$expected_timer_repair" "$(<"$log")" >&2
+	exit 1
+}
+
+: >"$log"
+PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" open timer
+[[ $(<"$log") == $'noctalia\tmsg panel-toggle noctalia/timer:panel' ]]
 
 appearance=$(PATH="$test_root/bin:$PATH" "$launcher" list appearance)
 ports=$(PATH="$test_root/bin:$PATH" "$launcher" list ports)

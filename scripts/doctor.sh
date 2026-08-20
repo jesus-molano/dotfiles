@@ -427,7 +427,7 @@ check_backup_runtime() {
 }
 
 check_desktop_runtime() {
-	local command plugin_list rgb_health
+	local command plugin_list rgb_health timer_manifest
 	for command in zenity localsend wl-paste systemd-run whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl; do
 		if command -v "$command" >/dev/null 2>&1; then
 			ok "Flujo desktop: $command disponible"
@@ -451,10 +451,12 @@ check_desktop_runtime() {
 		else
 			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
 		fi
-		if grep -Fxq 'noctalia/timer [official] 1.2.1 enabled' <<<"$plugin_list"; then
-			ok "Noctalia: Timer oficial habilitado"
+		timer_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
+		if grep -Fxq 'noctalia/timer [local] 1.2.1 enabled' <<<"$plugin_list" &&
+			[[ -f "$timer_manifest" ]]; then
+			ok "Noctalia: Timer local con alarma habilitado"
 		else
-			fail "Noctalia: Timer oficial no está habilitado en la versión revisada"
+			fail "Noctalia: Timer local con alarma no está habilitado o desplegado"
 		fi
 	else
 		fail "Noctalia: no se pudo consultar el catálogo de plugins activo"

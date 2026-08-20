@@ -1,0 +1,36 @@
+# Local override of https://github.com/noctalia-dev/official-plugins/tree/main/timer
+# It keeps the official bar and panel while adding an audible completion alarm.
+id = "noctalia/timer"
+name = "Timer"
+version = "1.2.1"
+plugin_api = 3
+author = "noctalia"
+license = "MIT"
+dependencies = []
+tags = ["countdown", "utility"]
+icon = "clock"
+description = "A countdown timer with a bar widget, panel, notification, and alarm sound."
+
+[[widget]]
+id = "bar"
+entry = "bar.luau"
+
+  [[widget.setting]]
+  key = "show_idle_on_horizontal"
+  type = "bool"
+  label_key = "settings.show_idle.label"
+  description_key = "settings.show_idle.description"
+  default = true
+
+[[panel]]
+id = "panel"
+entry = "panel.luau"
+width = 320
+height = 280
+placement = "attached"
+position = "auto"
+open_near_click = true
+
+[[service]]
+id = "timer"
+entry = "service.luau"

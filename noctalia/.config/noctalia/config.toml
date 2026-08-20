@@ -23,7 +23,7 @@ padding = 8
 widget_spacing = 4
 start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "clock" ]
+end = [ "group:resources", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -49,6 +49,10 @@ inactive_style = "ghost"
 
 [widget.screen_recorder]
 type = "noctalia/screen_recorder:recorder"
+
+[widget.timer]
+type = "noctalia/timer:bar"
+show_idle_on_horizontal = false
 
 [shell]
 font_family = "Inter"

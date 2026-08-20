@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
 	printf '%s\n' \
-		'Usage: desktop-launcher {list|run} CATEGORY [SELECTION]'
+		'Usage: desktop-launcher {list|run|open} CATEGORY [SELECTION]'
 }
 
 notify_error() {
@@ -501,6 +501,49 @@ run_share() {
 	esac
 }
 
+open_noctalia_timer() {
+	local attempt local_manifest manifest output
+	local_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
+	manifest="${XDG_STATE_HOME:-$HOME/.local/state}/noctalia/plugins/materialized/official/timer/plugin.toml"
+
+	if output="$(noctalia msg panel-toggle noctalia/timer:panel 2>&1)"; then
+		return 0
+	fi
+	[[ "$output" == *'unknown panel'* ]] || {
+		notify_error 'Noctalia could not open Timer.'
+		return 1
+	}
+
+	if [[ ! -f "$local_manifest" ]]; then
+		noctalia msg plugins enable noctalia/timer >/dev/null 2>&1 || {
+			notify_error 'Noctalia could not install Timer.'
+			return 1
+		}
+		for ((attempt = 0; attempt < 60; attempt++)); do
+			[[ -f "$manifest" ]] && break
+			sleep 0.5
+		done
+		[[ -f "$manifest" ]] || {
+			notify_error 'Timer installation did not finish.'
+			return 1
+		}
+	fi
+
+	noctalia msg config-reload >/dev/null 2>&1 || {
+		notify_error 'Noctalia could not reload Timer.'
+		return 1
+	}
+	for ((attempt = 0; attempt < 40; attempt++)); do
+		if noctalia msg panel-open noctalia/timer:panel >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 0.25
+	done
+
+	notify_error 'Timer is installed but its panel is not ready.'
+	return 1
+}
+
 run_command() {
 	local dotfiles_root id
 	id=$(record_id_for_selection "$1" command_records) || return 2
@@ -534,7 +577,7 @@ run_command() {
 		;;
 	focus_toggle) exec desktop-focus-mode toggle ;;
 	demo_mode) exec desktop-focus-mode demo-toggle ;;
-	timer) exec noctalia msg panel-toggle noctalia/timer:panel ;;
+	timer) open_noctalia_timer ;;
 	direct_scanout_toggle)
 		command -v game-run >/dev/null 2>&1 || return 127
 		exec direct-scanout-toggle toggle
@@ -591,6 +634,7 @@ run:ports) [[ -n "$selection" ]] && run_port "$selection" ;;
 run:crashes) [[ -n "$selection" ]] && run_crash "$selection" ;;
 run:share) [[ -n "$selection" ]] && run_share "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
+open:timer) open_noctalia_timer ;;
 *)
 	usage >&2
 	exit 2

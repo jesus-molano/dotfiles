@@ -94,6 +94,8 @@ bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
     "Use next theme wallpaper")
 bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next"),
     "Use next appearance")
+bind(hyper .. " + A", hl.dsp.exec_cmd("desktop-launcher open timer"),
+    "Open timer")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Open notifications")
 bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),

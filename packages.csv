@@ -32,6 +32,7 @@ common,terminal,yazi,native
 common,terminal,television,native
 common,terminal,micro,native
 common,media,spotify-launcher,native
+common,media,sound-theme-freedesktop,native
 desktop,gaming,cachyos-gaming-meta,native
 desktop,gaming,steam,native
 desktop,gaming,gamescope,native

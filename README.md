@@ -619,6 +619,11 @@ solo mientras hay una grabación activa; un clic la detiene. No se ejecuta
 CPU, uso y temperatura de GPU y porcentaje de RAM. Estas métricas se actualizan
 cada tres segundos. Se retiraron el espejo de pantalla y el estado periódico del
 repositorio para reducir ruido visual.
+El temporizador de Noctalia muestra su cuenta atrás junto al reloj y abre sus
+controles con un clic, con `Hyper+A` o desde `/cmd Timer`. Al terminar, cambia a
+estado de alerta, envía una notificación y reproduce una vez la alarma de
+freedesktop. Una sobreescritura local pequeña conserva este sonido frente a la
+copia oficial, que todavía solo implementa la notificación.
 `start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
 espera hasta veinte segundos a que todas las salidas externas activas aparezcan
 en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
