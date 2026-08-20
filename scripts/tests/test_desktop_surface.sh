@@ -16,10 +16,12 @@ with open(sys.argv[1], "rb") as source:
 bar = config["bar"]["default"]
 assert "group:resources" in bar["end"]
 assert "screen_recorder" in bar["end"]
+assert "noctalia/timer:bar" not in bar["end"]
 assert "screen_mirror" not in bar["end"]
 assert "dev_pulse" not in bar["end"]
 assert config["widget"]["ram"]["stat"] == "ram_pct"
 assert all("dev-pulse" not in plugin for plugin in config["plugins"]["enabled"])
+assert "noctalia/timer" in config["plugins"]["enabled"]
 PY
 
 grep -Fq 'bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"

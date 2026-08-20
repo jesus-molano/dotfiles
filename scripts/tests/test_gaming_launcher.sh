@@ -65,6 +65,16 @@ with (root / "gaming/.config/noctalia/gaming.toml").open("rb") as source:
 assert entry["label"] == "Games"
 assert entry["glyph"] == "device-gamepad-2"
 assert entry["exec"] == 'gaming-launcher run "{selection}"'
+
+gaming = (root / "gaming/.config/hypr/config/gaming.lua").read_text(encoding="utf-8")
+assert 'match = { content = "game" }' in gaming
+assert 'match = { xdg_tag = "^(.*game.*)$" }' in gaming
+assert 'match = { class = "^(steam_app_.*|gamescope)$" }' in gaming
+assert 'name = "route-game-content-to-games"' in gaming
+assert 'name = "route-game-tag-to-games"' in gaming
+assert 'name = "route-steam-apps-and-gamescope-to-games"' in gaming
+assert "sync_fullscreen" not in gaming
+assert "fullscreen_state" not in gaming
 PY
 
-printf '%s\n' 'PASS: gaming-launcher espera tres ejecuciones y revalida el benchmark seleccionado'
+printf '%s\n' 'PASS: launcher y reglas conservadoras envían juegos reales al workspace 7'

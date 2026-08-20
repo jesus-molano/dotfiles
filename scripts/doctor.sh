@@ -428,7 +428,7 @@ check_backup_runtime() {
 
 check_desktop_runtime() {
 	local command plugin_list rgb_health
-	for command in zenity whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl; do
+	for command in zenity localsend wl-paste systemd-run whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl; do
 		if command -v "$command" >/dev/null 2>&1; then
 			ok "Flujo desktop: $command disponible"
 		else
@@ -450,6 +450,11 @@ check_desktop_runtime() {
 			ok "Noctalia: versión revisada de Special Workspaces"
 		else
 			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
+		fi
+		if grep -Fxq 'noctalia/timer [official] 1.2.1 enabled' <<<"$plugin_list"; then
+			ok "Noctalia: Timer oficial habilitado"
+		else
+			fail "Noctalia: Timer oficial no está habilitado en la versión revisada"
 		fi
 	else
 		fail "Noctalia: no se pudo consultar el catálogo de plugins activo"
@@ -491,6 +496,7 @@ check_desktop_workflows() {
 	check "Captura OCR a contexto" "$repo_root/scripts/tests/test_capture_context.sh"
 	check "Modo foco y demo reversible" "$repo_root/scripts/tests/test_desktop_focus_mode.sh"
 	check "Acciones locales del launcher" "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
+	check "Compartir con LocalSend" "$repo_root/scripts/tests/test_local_share.sh"
 	check "Launcher multimedia" "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
 	check "Práctica de mecanografía" "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
 	check "Apariencias coordinadas" "$repo_root/scripts/tests/test_appearance_switch.sh"

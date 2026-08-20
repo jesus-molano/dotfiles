@@ -361,6 +361,13 @@ crash_records() {
 }
 list_crashes() { crash_records | render_records; }
 
+share_records() {
+	emit_record clipboard 'Clipboard' 'Send copied text'
+	emit_record file 'Files' 'Choose one or more files'
+	emit_record folder 'Folder' 'Choose a folder'
+}
+list_share() { share_records | render_records; }
+
 command_records() {
 	emit_record doctor_host 'Audit this computer' 'Check configuration and current host state'
 	emit_record system_monitor 'System monitor' 'Open btop in Ghostty'
@@ -374,6 +381,7 @@ command_records() {
 	emit_record window_width_restore 'Restore window width' 'Restore the saved width'
 	emit_record focus_toggle 'Toggle focus mode' 'Control distractions and performance'
 	emit_record demo_mode 'Prepare demo mode' 'Set up the desktop for a demo or recording'
+	emit_record timer 'Timer' 'Start or manage a countdown'
 	emit_record power_balanced 'Use balanced power' 'Switch to the balanced power profile'
 	emit_record power_performance 'Use performance power' 'Switch to the performance power profile'
 	if command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1; then
@@ -484,6 +492,15 @@ run_crash() {
 	exec crash-context select "$token"
 }
 
+run_share() {
+	local id
+	id=$(record_id_for_selection "$1" share_records) || return 2
+	case "$id" in
+	clipboard | file | folder) exec local-share "$id" ;;
+	*) return 2 ;;
+	esac
+}
+
 run_command() {
 	local dotfiles_root id
 	id=$(record_id_for_selection "$1" command_records) || return 2
@@ -517,6 +534,7 @@ run_command() {
 		;;
 	focus_toggle) exec desktop-focus-mode toggle ;;
 	demo_mode) exec desktop-focus-mode demo-toggle ;;
+	timer) exec noctalia msg panel-toggle noctalia/timer:panel ;;
 	direct_scanout_toggle)
 		command -v game-run >/dev/null 2>&1 || return 127
 		exec direct-scanout-toggle toggle
@@ -561,6 +579,7 @@ list:keybindings-system) list_keybindings system ;;
 list:keybindings-all) list_keybindings all ;;
 list:ports) list_ports ;;
 list:crashes) list_crashes ;;
+list:share) list_share ;;
 list:commands) list_commands ;;
 run:projects | run:project-actions) [[ -n "$selection" ]] && run_project "$selection" "$category" ;;
 run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
@@ -570,6 +589,7 @@ run:appearance) [[ -n "$selection" ]] && run_appearance "$selection" ;;
 run:keybinding-categories) [[ -n "$selection" ]] && run_keybinding_category "$selection" ;;
 run:ports) [[ -n "$selection" ]] && run_port "$selection" ;;
 run:crashes) [[ -n "$selection" ]] && run_crash "$selection" ;;
+run:share) [[ -n "$selection" ]] && run_share "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
 *)
 	usage >&2

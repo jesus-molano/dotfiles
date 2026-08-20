@@ -97,7 +97,7 @@ commands=$(PATH="$test_root/bin:$PATH" "$launcher" list commands)
 for title in 'Capture context' 'Read QR code' 'Create bug capsule' \
 	'Convert media' 'Demo Studio' 'Save window width' \
 	'Restore window width' 'Toggle local dictation' 'Toggle focus mode' \
-	'Prepare demo mode' 'Toggle direct scanout'; do
+	'Prepare demo mode' 'Toggle direct scanout' 'Timer'; do
 	grep -q "^${title}"$'\t' <<<"$commands" || {
 		printf 'FAIL: falta %s en /cmd\n' "$title" >&2
 		exit 1
@@ -110,7 +110,7 @@ log=$test_root/actions.log
 for title in 'Capture context' 'Read QR code' 'Create bug capsule' \
 	'Convert media' 'Demo Studio' 'Save window width' \
 	'Restore window width' 'Toggle local dictation' 'Toggle focus mode' \
-	'Prepare demo mode' 'Toggle direct scanout'; do
+	'Prepare demo mode' 'Toggle direct scanout' 'Timer'; do
 	selection=$(grep "^${title}"$'\t' <<<"$commands")
 	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run commands "$selection"
 done
@@ -127,6 +127,7 @@ local-dictation	toggle --paste
 desktop-focus-mode	toggle
 desktop-focus-mode	demo-toggle
 direct-scanout-toggle	toggle
+noctalia	msg panel-toggle noctalia/timer:panel
 EOF
 )
 actual=$(<"$log")
@@ -194,6 +195,7 @@ expected = {
     "appearance": ("Appearance", "palette", 'desktop-launcher run appearance "{selection}"'),
     "ports": ("Development ports", "world-www", 'desktop-launcher run ports "{selection}"'),
     "crashes": ("Recent crashes", "bug", 'desktop-launcher run crashes "{selection}"'),
+    "share": ("Share", "share-2", 'desktop-launcher run share "{selection}"'),
     "commands": ("Commands", "terminal-2", 'desktop-launcher run commands "{selection}"'),
 }
 for name, (label, glyph, command) in expected.items():

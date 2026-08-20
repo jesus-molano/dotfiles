@@ -185,6 +185,14 @@ glyph = "bug"
 global = false
 exec = "desktop-launcher run crashes \"{selection}\""
 
+[shell.launcher.dmenu.entry.share]
+command = "desktop-launcher list share"
+label = "Share"
+prefix = "share"
+glyph = "share-2"
+global = false
+exec = "desktop-launcher run share \"{selection}\""
+
 [shell.launcher.dmenu.entry.commands]
 command = "desktop-launcher list commands"
 label = "Commands"
@@ -325,7 +333,7 @@ enabled = false
 
 [plugins]
 auto_update = false
-enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces" ]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer" ]
 
 [plugin_settings."noctalia/screen_recorder"]
 audio_bitrate = 0

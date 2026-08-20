@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Service
+Name=LocalSend service menu
+ServiceTypes=KonqPopupMenu/Plugin
+MimeType=all/allfiles;inode/directory;
+Actions=sendWithLocalSend;
+X-KDE-Priority=TopLevel
+
+[Desktop Action sendWithLocalSend]
+Name=Send with LocalSend
+Icon=localsend
+Exec=local-share file %F

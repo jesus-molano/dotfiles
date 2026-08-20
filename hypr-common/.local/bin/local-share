@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+clipboard_cleanup_file=''
+
+cleanup_clipboard_file() {
+	[[ -z "${clipboard_cleanup_file:-}" ]] || rm -f -- "$clipboard_cleanup_file"
+}
+
+usage() {
+	printf '%s\n' 'Usage: local-share {clipboard|file|folder} [PATH...]' >&2
+}
+
+notify_error() {
+	if command -v noctalia >/dev/null 2>&1; then
+		noctalia msg notification-show 'LocalSend' -- "$1" >/dev/null 2>&1 || true
+	else
+		notify-send 'LocalSend' "$1" >/dev/null 2>&1 || true
+	fi
+}
+
+require_command() {
+	command -v "$1" >/dev/null 2>&1 || {
+		notify_error "$1 is required to share with LocalSend."
+		return 127
+	}
+}
+
+send_paths() {
+	local path
+	(($#)) || return 0
+	for path in "$@"; do
+		[[ -e "$path" ]] || {
+			notify_error "The selected path no longer exists."
+			return 1
+		}
+	done
+	systemd-run --user --quiet --collect -- localsend --headless send "$@"
+}
+
+choose_paths() {
+	local mode=$1 picked status=0
+	shift
+	paths=()
+	if (($#)); then
+		paths=("$@")
+		return 0
+	fi
+
+	require_command zenity || return
+	if [[ "$mode" == folder ]]; then
+		picked=$(zenity --file-selection --directory --title='Share folder') || status=$?
+	else
+		picked=$(zenity --file-selection --multiple --separator=$'\n' --title='Share files') || status=$?
+	fi
+	case "$status" in
+	0) ;;
+	1) return 0 ;;
+	*)
+		notify_error 'The file chooser could not be opened.'
+		return "$status"
+		;;
+	esac
+	[[ -n "$picked" ]] || return 0
+	mapfile -t paths <<<"$picked"
+}
+
+send_clipboard() {
+	local share_runtime clipboard_file script_path
+	require_command wl-paste || return
+	[[ -n "${XDG_RUNTIME_DIR:-}" && -d "$XDG_RUNTIME_DIR" ]] || {
+		notify_error 'The desktop runtime directory is unavailable.'
+		return 1
+	}
+	share_runtime="$XDG_RUNTIME_DIR/local-share"
+	[[ ! -L "$share_runtime" ]] || {
+		notify_error 'The LocalSend runtime directory is not safe.'
+		return 1
+	}
+	install -d -m 700 -- "$share_runtime"
+	clipboard_file=$(mktemp --tmpdir="$share_runtime" clipboard.XXXXXX.txt)
+	if ! wl-paste --type text >"$clipboard_file"; then
+		rm -f -- "$clipboard_file"
+		notify_error 'The clipboard could not be read.'
+		return 1
+	fi
+	script_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+	if ! systemd-run --user --quiet --collect -- "$script_path" __send-clipboard "$clipboard_file"; then
+		rm -f -- "$clipboard_file"
+		notify_error 'LocalSend could not be started.'
+		return 1
+	fi
+}
+
+send_clipboard_file() {
+	local clipboard_file=$1 share_runtime actual_dir
+	[[ -n "${XDG_RUNTIME_DIR:-}" ]] || return 2
+	share_runtime=$(readlink -f -- "$XDG_RUNTIME_DIR/local-share")
+	actual_dir=$(readlink -f -- "$(dirname -- "$clipboard_file")")
+	[[ "$actual_dir" == "$share_runtime" &&
+		$(basename -- "$clipboard_file") =~ ^clipboard\.[A-Za-z0-9]+\.txt$ &&
+		-f "$clipboard_file" && ! -L "$clipboard_file" ]] || return 2
+	clipboard_cleanup_file=$clipboard_file
+	trap cleanup_clipboard_file EXIT
+	localsend --headless send "$clipboard_file"
+}
+
+(($#)) || {
+	usage
+	exit 2
+}
+
+mode=$1
+shift
+paths=()
+
+require_command localsend
+require_command systemd-run
+
+case "$mode" in
+clipboard)
+	(($# == 0)) || {
+		usage
+		exit 2
+	}
+	send_clipboard
+	;;
+file | folder)
+	choose_paths "$mode" "$@"
+	((${#paths[@]})) || exit 0
+	send_paths "${paths[@]}"
+	;;
+__send-clipboard)
+	(($# == 1)) || exit 2
+	send_clipboard_file "$1"
+	;;
+*)
+	usage
+	exit 2
+	;;
+esac
