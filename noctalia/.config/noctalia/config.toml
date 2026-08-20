@@ -113,6 +113,14 @@ glyph = "palette"
 global = false
 exec = "desktop-launcher run appearance {selection}"
 
+[shell.launcher.dmenu.entry.keybindings]
+command = "desktop-launcher list keybindings"
+label = "Atajos"
+prefix = "keys"
+glyph = "keyboard"
+global = false
+exec = "desktop-launcher run keybindings {selection}"
+
 [shell.launcher.dmenu.entry.ports]
 command = "desktop-launcher list ports"
 label = "Puertos de desarrollo"

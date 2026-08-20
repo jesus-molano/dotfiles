@@ -2,6 +2,7 @@
 # Cada ID coincide con su carpeta. `-` usa el último fondo recordado o, si no
 # existe, el primer raster por nombre. `/wall` consulta solo esa carpeta.
 atlas	Atlas	custom	ProjectAtlas	-
+obsidian-amber	Obsidian Amber	custom	ObsidianAmber	-
 catppuccin	Catppuccin Mocha	builtin	Catppuccin	-
 rose-pine	Rosé Pine Moon	custom	RosePine	-
 nord	Nord Night	builtin	Nord	-

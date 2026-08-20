@@ -62,8 +62,8 @@ Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
 ## Apariencias y Project Atlas
 
 `ProjectAtlas` sigue siendo la escena base. `/appearance` ofrece Atlas,
-Catppuccin Mocha, Rosé Pine Moon, Nord Night, Dracula Violet y Tokyo Night
-City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
+Obsidian Amber, Catppuccin Mocha, Rosé Pine Moon, Nord Night, Dracula Violet y
+Tokyo Night City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
 los temas de Hyprland, GTK, Qt/KDE, Ghostty, Kitty,
 Starship, btop, Zellij, Micro, bat/delta, Codex y VS Code/VSCodium. Neovim,
 qutebrowser y Orca leen la paleta activa al iniciar. Starship usa un archivo
@@ -424,7 +424,7 @@ activar cafeína y desactívala al terminar.
 | `Hyper + U` | Activar modo demo con grabación |
 | `Hyper + L` | Bloquear la sesión |
 | `Hyper + Q` | Menú de sesión |
-| `Hyper + 7` | Ayuda de atajos |
+| `Hyper + 7` | Alternar el panel buscable de atajos (`/keys`) |
 | `Super + Space` | Alternar teclado US/ES (`desktop`) |
 | `Super + V` | Historial del portapapeles |
 
@@ -441,7 +441,7 @@ DevTools, descargas y búsquedas técnicas está en la
 [guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#qutebrowser).
 
 El launcher ofrece `/proj`, `/proj-actions`, `/ssh`, `/media`, `/typing`, `/appearance`,
-`/ports`, `/crash`, `/game` y `/cmd`.
+`/keys`, `/ports`, `/crash`, `/game` y `/cmd`.
 `/proj` muestra una fila por repositorio, con nombre y ruta, y abre Orca con un
 terminal del repositorio. `/proj-actions` conserva las acciones explícitas como
 Nvim, tareas y preview. Consulta la

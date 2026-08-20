@@ -194,6 +194,7 @@ flock -u 8
 
 python3 - "$repo_root" <<'PY'
 import csv
+import json
 from pathlib import Path
 import re
 import sys
@@ -216,8 +217,15 @@ assert ready_template['post_hook'].endswith('/appearance-switch template-ready')
 assert (root / 'noctalia/.config/noctalia/templates/appearance-ready.json').is_file()
 
 assert wallpaper_config['directory'].endswith('/.local/state/dotfiles/appearance-switch/visible')
-assert len(catalog) == 6
+assert len(catalog) == 7
 assert 'favorite' not in wallpaper_config
+
+with (root / 'noctalia/.config/noctalia/palettes/ObsidianAmber.json').open(encoding='utf-8') as source:
+    obsidian_amber = json.load(source)['dark']
+assert obsidian_amber['mPrimary'] == '#ffc857'
+assert obsidian_amber['mSecondary'] == '#ff9f1c'
+assert obsidian_amber['mSurface'] == '#0a0907'
+assert obsidian_amber['terminal']['background'] == '#070604'
 
 for scene_id, _label, palette_source, palette_name, wallpaper in catalog:
     theme_dir = asset_root / scene_id
@@ -230,8 +238,9 @@ actual_assets = {
     for path in asset_root.glob('*/*')
     if path.suffix.lower() in {'.png', '.jpg', '.jpeg', '.webp'}
 }
+scene_pattern = '|'.join(re.escape(row[0]) for row in catalog)
 documented_assets = set(re.findall(
-    r'`((?:atlas|catppuccin|rose-pine|nord|dracula|tokyo-night)/[^`]+\.(?:png|jpe?g|webp))`',
+    rf'`((?:{scene_pattern})/[^`]+\.(?:png|jpe?g|webp))`',
     sources_path.read_text(encoding='utf-8'),
     flags=re.IGNORECASE,
 ))

@@ -71,6 +71,7 @@ el servidor en su terminal y muestra su salida.
 | `Hyper + J` | Abre `/proj`. |
 | `Hyper + Space` | Abre `/cmd`. |
 | `Hyper + V` | Abre `/media`. |
+| `Hyper + 7` | Alterna `/keys`, el panel buscable de atajos activos. |
 | `Hyper + W` | Usa el siguiente fondo del tema activo. |
 | `Hyper + [` / `Hyper + ]` | Usa el fondo anterior/siguiente del tema activo. |
 | `Hyper + T` | Rota a la siguiente apariencia completa. |
@@ -102,11 +103,12 @@ el servidor en su terminal y muestra su salida.
 | `doctor_host` | Abre la auditoría del host en Ghostty. |
 | `system_monitor` | Abre btop. |
 
-El launcher también ofrece cuatro proveedores de trabajo:
+El launcher también ofrece estos proveedores de trabajo:
 
 | Prefijo | Resultado |
 |---|---|
 | `/appearance` | Aplica una escena de color y fondo coordinados. |
+| `/keys` | Busca los atajos que Hyprland tiene activos y copia la combinación elegida. |
 | `/ports` | Lista solo los servidores TCP del usuario y abre el puerto revalidado. |
 | `/crash` | Prepara contexto Markdown de un coredump reciente y enfoca Orca. |
 | `/typing` | Abre Ttyper en inglés, ejercicios de código o Keybr. |
@@ -250,10 +252,10 @@ pantalla ni estado periódico del repositorio.
 
 ## Apariencias y RGB
 
-`/appearance` ofrece seis escenas: Atlas, Catppuccin Mocha, Rosé Pine Moon,
-Nord Night, Dracula Violet y Tokyo Night City. Cada escena cambia la paleta de
-Noctalia y el fondo como una sola acción. `Hyper + T` rota estas escenas sin
-abrir el menú.
+`/appearance` ofrece siete escenas: Atlas, Obsidian Amber, Catppuccin Mocha,
+Rosé Pine Moon, Nord Night, Dracula Violet y Tokyo Night City. Cada escena
+cambia la paleta de Noctalia y el fondo como una sola acción. `Hyper + T` rota
+estas escenas sin abrir el menú.
 Usa `appearance-switch next` o `previous` desde terminal para recorrerlas.
 El proveedor `/wall` muestra solo los fondos de la apariencia activa y cambia
 la imagen sin cambiar la paleta. Cada carpeta admite una cantidad variable de

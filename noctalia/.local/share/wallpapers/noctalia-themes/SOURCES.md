@@ -19,6 +19,18 @@ Wallhaven publica los archivos y sus metadatos, pero no garantiza autoría o
 licencia de redistribución. Úsalos como selección local y verifica la ficha
 antes de redistribuirlos.
 
+## Obsidian Amber
+
+Generados el 2026-08-20 con la herramienta integrada de generación de imágenes
+de Codex. Los tres prompts pidieron un fondo 16:9 negro dominante, sin texto,
+logos ni marcas de agua, con ámbar `#ffc857` y naranja `#ff9f1c`:
+
+| Archivo | Prompt | Transformación |
+| --- | --- | --- |
+| `obsidian-amber/01-monolith.png` | Monolito geométrico de obsidiana mate cortado por una línea de luz ámbar. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
+| `obsidian-amber/02-strata.png` | Estratos minerales negros con vetas finas de ámbar y amarillo-naranja. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
+| `obsidian-amber/03-eclipse.png` | Eclipse casi negro con corona ámbar sobre un horizonte de obsidiana. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
+
 ## Catppuccin Mocha
 
 Fuente: [zhichaoh/catppuccin-wallpapers @ 1023077](https://github.com/zhichaoh/catppuccin-wallpapers/tree/1023077979591cdeca76aae94e0359da1707a60e).

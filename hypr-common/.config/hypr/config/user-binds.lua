@@ -107,7 +107,7 @@ bind(hyper .. " + I", hl.dsp.exec_cmd("desktop-focus-mode toggle"),
     "Alternar modo foco")
 bind(hyper .. " + U", hl.dsp.exec_cmd("desktop-focus-mode demo-toggle"),
     "Alternar modo demo con grabación")
-bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Mostrar ayuda de atajos")
+bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Alternar panel de atajos")
 
 -- Alt+Tab has one owner: Noctalia.
 bind(alt .. " + TAB", hl.dsp.exec_cmd(noctalia .. "window-switcher"),

@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
 	printf '%s\n' \
-		'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|typing|appearance|ports|crashes|commands} [selección]'
+		'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|typing|appearance|keybindings|ports|crashes|commands} [selección]'
 }
 
 notify_error() {
@@ -146,6 +146,86 @@ list_appearance() {
 	done < <(appearance-switch list)
 }
 
+keybinding_records() {
+	local hyprctl_bin=${DESKTOP_LAUNCHER_HYPRCTL:-hyprctl}
+	command -v jq >/dev/null 2>&1 || return 127
+	command -v "$hyprctl_bin" >/dev/null 2>&1 || return 127
+	"$hyprctl_bin" binds -j | jq -er '
+		if type != "array" then error("hyprctl binds no devolvió una lista") else . end
+		| .[]
+		| select(
+			.has_description == true
+			and (.modmask | type == "number")
+			and .modmask >= 0
+			and .modmask <= 255
+			and (.key | type == "string")
+			and (.description | type == "string")
+			and .key != ""
+			and .description != ""
+		)
+		| [
+			(.modmask | floor | tostring),
+			(.key | gsub("[\\t\\r\\n]+"; " ")),
+			(.description | gsub("[\\t\\r\\n]+"; " "))
+		]
+		| @tsv
+	'
+}
+
+format_keybinding_key() {
+	case "$1" in
+	Return) printf '%s' 'Enter' ;;
+	bracketleft) printf '%s' '[' ;;
+	bracketright) printf '%s' ']' ;;
+	comma) printf '%s' ',' ;;
+	period) printf '%s' '.' ;;
+	semicolon) printf '%s' ';' ;;
+	'mouse:272') printf '%s' 'Mouse 1' ;;
+	'mouse:273') printf '%s' 'Mouse 2' ;;
+	*) printf '%s' "$1" ;;
+	esac
+}
+
+format_keybinding() {
+	local mask=$1 key=$2
+	local -a parts=()
+	local combo part
+	if ((mask == 77)); then
+		parts+=(Hyper)
+	else
+		((mask & 4)) && parts+=(Ctrl)
+		((mask & 8)) && parts+=(Alt)
+		((mask & 64)) && parts+=(Super)
+		((mask & 1)) && parts+=(Shift)
+		((mask & 2)) && parts+=(Caps)
+		((mask & 16)) && parts+=(Mod2)
+		((mask & 32)) && parts+=(Mod3)
+		((mask & 128)) && parts+=(Mod5)
+	fi
+	parts+=("$(format_keybinding_key "$key")")
+	combo=${parts[0]}
+	for part in "${parts[@]:1}"; do
+		combo+=" + $part"
+	done
+	printf '%s' "$combo"
+}
+
+keybinding_token() {
+	local mask=$1 key=$2 description=$3 digest
+	digest=$(printf '%s\0%s' "$key" "$description" | sha256sum | cut -c1-16)
+	printf 'bind_%s_%s' "$mask" "$digest"
+}
+
+list_keybindings() {
+	local mask key description combo token
+	while IFS=$'\t' read -r mask key description; do
+		[[ -n "$mask" && -n "$key" && -n "$description" ]] || continue
+		combo=$(format_keybinding "$mask" "$key")
+		token=$(keybinding_token "$mask" "$key" "$description")
+		printf '%s\t%s — %s\n' "$token" "$combo" "$description"
+	done < <(keybinding_records)
+}
+
 list_ports() {
 	dev-ports list
 }
@@ -254,6 +334,20 @@ run_appearance() {
 	exec appearance-switch apply "$1"
 }
 
+run_keybinding() {
+	local selection=$1 mask key description combo token
+	[[ "$selection" =~ ^bind_[0-9]+_[0-9a-f]{16}$ ]] || return 2
+	while IFS=$'\t' read -r mask key description; do
+		[[ -n "$mask" && -n "$key" && -n "$description" ]] || continue
+		token=$(keybinding_token "$mask" "$key" "$description")
+		[[ "$token" == "$selection" ]] || continue
+		combo=$(format_keybinding "$mask" "$key")
+		noctalia msg clipboard-copy "$combo"
+		return
+	done < <(keybinding_records)
+	return 1
+}
+
 run_port() {
 	[[ "$1" =~ ^port_[0-9]+_pid_[0-9]+_addr_([0-9A-Fa-f:.]+|\*)$ ]] || return 2
 	exec dev-ports open "$1"
@@ -321,6 +415,7 @@ list:ssh) list_ssh ;;
 list:media) list_media ;;
 list:typing) list_typing ;;
 list:appearance) list_appearance ;;
+list:keybindings) list_keybindings ;;
 list:ports) list_ports ;;
 list:crashes) list_crashes ;;
 list:commands) list_commands ;;
@@ -329,6 +424,7 @@ run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
 run:media) [[ -n "$selection" ]] && run_media "$selection" ;;
 run:typing) [[ -n "$selection" ]] && run_typing "$selection" ;;
 run:appearance) [[ -n "$selection" ]] && run_appearance "$selection" ;;
+run:keybindings) [[ -n "$selection" ]] && run_keybinding "$selection" ;;
 run:ports) [[ -n "$selection" ]] && run_port "$selection" ;;
 run:crashes) [[ -n "$selection" ]] && run_crash "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;
