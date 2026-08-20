@@ -506,6 +506,7 @@ check_desktop_workflows() {
 		python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
 	check "Colección de fondos al iniciar" "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
 	check "Paleta activa de Orca" "$repo_root/scripts/tests/test_orca_safe_settings.sh"
+	check "Orca en segundo plano" "$repo_root/scripts/tests/test_orca_background.sh"
 	check "Caja de herramientas de captura" "$repo_root/scripts/tests/test_capture_toolbox.sh"
 	check "Demo Studio" "$repo_root/scripts/tests/test_demo_studio.sh"
 	check "Puertos de desarrollo" "$repo_root/scripts/tests/test_dev_ports.sh"

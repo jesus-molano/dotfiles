@@ -76,10 +76,11 @@ Cada tema recuerda el último fondo usado. Las colecciones se editan en
 `noctalia/.local/share/wallpapers/noctalia-themes/<tema>/`; los formatos
 admitidos son PNG, JPEG y WebP.
 
-`orca-safe-settings` actualiza con backup el tema de terminal de Orca antes de
-abrir la aplicación; distingue el daemon permanente de una ventana real y no
-escribe mientras la interfaz está abierta. Hyprland lo ejecuta al comenzar la
-sesión y `hypr-orca` antes de abrir Orca.
+`start-orca-background` actualiza con backup el tema de terminal de Orca y
+mantiene su runtime disponible para las automatizaciones. Hyprland envía la
+ventana inicial silenciosamente a `special:orca`; `Hyper+O` muestra u oculta ese
+workspace sin ocupar uno normal. `hypr-orca` conserva el enfoque tradicional si
+encuentra una ventana anterior fuera del workspace especial.
 1Password arranca de forma silenciosa después del `StatusNotifierWatcher` de
 Noctalia y permanece accesible como icono inline en su bandeja.
 
@@ -604,8 +605,9 @@ Linear es opcional y explícito; ninguna skill o plugin de terceros se instala
 automáticamente.
 
 Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
-radar upstream y auditoría mensual Restic— nacen desactivadas. Revísalas con
-`orca automations list --json` antes de habilitar cualquiera desde Orca.
+radar upstream y auditoría mensual Restic— usan un worktree nuevo basado en
+`origin/main`. Las semanales recuperan una ejecución perdida durante siete días;
+la mensual, durante treinta. Revísalas con `orca-ide automations list --json`.
 
 ### Escritorio y captura
 

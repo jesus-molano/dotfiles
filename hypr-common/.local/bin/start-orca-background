@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly safe_settings="${ORCA_SAFE_SETTINGS_BIN:-$script_dir/orca-safe-settings}"
+readonly pgrep_bin="${PGREP_BIN:-pgrep}"
+readonly orca_cli="${ORCA_CLI_BIN:-orca-ide}"
+
+# Apply the generated terminal palette before Orca reads its settings.
+"$safe_settings"
+
+# A main desktop process has already initialized the local automation runtime.
+if "$pgrep_bin" -f '[/]orca-ide$' >/dev/null; then
+	exit 0
+fi
+
+exec "$orca_cli" open
