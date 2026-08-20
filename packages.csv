@@ -123,6 +123,7 @@ common,media,ffmpeg,native
 common,media,ffmpegthumbnailer,native
 common,media,imagemagick,native
 common,media,mpv,native
+common,media,yt-dlp,native
 common,media,libdvdcss,native
 common,media,gpu-screen-recorder,native
 desktop,hardware,openrgb,native
