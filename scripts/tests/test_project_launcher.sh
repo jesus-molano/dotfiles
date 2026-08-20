@@ -17,19 +17,23 @@ cat >"$project/package.json" <<'EOF'
 }
 EOF
 
+workspace="$test_root/orca/workspaces/dotfiles/auto-hyprland-upstream-radar-run-1-20260805T1000"
+mkdir -p "$workspace/.git"
+
 project_list=$(HOME="$test_root" "$launcher" list projects)
-[[ $(wc -l <<<"$project_list") -eq 1 && "$project_list" == *$'\tdemo — ~/work/demo' ]] || {
+grep -Fxq $'demo\tOpen in Orca with terminal — ~/work/demo' <<<"$project_list" || {
 	printf 'FAIL: /proj debe publicar una fila con nombre y ruta por repositorio:\n%s\n' "$project_list" >&2
 	exit 1
 }
-
-session_token=$(awk -F '\t' 'NR == 1 { print $1 }' <<<"$project_list")
-[[ -n "$session_token" ]] || {
-	printf '%s\n' 'FAIL: no se encontró el token de sesión.' >&2
+grep -Fxq $'Hyprland upstream radar\tOpen in Orca with terminal — Orca workspace for dotfiles' \
+	<<<"$project_list" || {
+	printf 'FAIL: /proj no convirtió el nombre técnico del workspace:\n%s\n' "$project_list" >&2
 	exit 1
 }
+[[ "$project_list" != *'auto-hyprland-upstream-radar-run-1-20260805T1000'* ]]
 
-run_output=$(HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run projects "$session_token")
+demo_selection=$(grep '^demo'$'\t' <<<"$project_list")
+run_output=$(HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run projects "$demo_selection")
 [[ "$run_output" == *$'DRY-RUN\torca-register'* && "$run_output" == *$'DRY-RUN\tterminal'* && \
 	"$run_output" != *$'DRY-RUN\tnvim'* ]] || {
 	printf 'FAIL: la sesión no delegó en project-session:\n%s\n' "$run_output" >&2
@@ -37,20 +41,25 @@ run_output=$(HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run project
 }
 
 actions_list=$(HOME="$test_root" "$launcher" list project-actions)
-for label in 'Sesión Orca + terminal - ' 'Orca - ' 'Ghostty - ' 'Nvim - ' 'Tareas - ' 'Preview - '; do
-	[[ "$actions_list" == *"$label"* ]] || {
+for label in 'Orca session and terminal' 'Open in Orca' 'Open terminal' 'Open in Nvim' 'Open tasks' 'Open preview'; do
+	grep -Fq "$label" <<<"$actions_list" || {
 		printf 'FAIL: /proj-actions no publicó %s\n%s\n' "$label" "$actions_list" >&2
 		exit 1
 	}
 done
 
-nvim_token=$(awk -F '\t' '$2 ~ /^Nvim - / { print $1; exit }' <<<"$actions_list")
-[[ -n "$nvim_token" ]] || {
-	printf '%s\n' 'FAIL: no se encontró el token Nvim.' >&2
+nvim_selection=$(awk -F '\t' '$1 == "Open in Nvim" { print; exit }' <<<"$actions_list")
+[[ -n "$nvim_selection" ]] || {
+	printf '%s\n' 'FAIL: no se encontró la acción Nvim.' >&2
 	exit 1
 }
-if HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run projects "$nvim_token" >/dev/null 2>&1; then
+if HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run projects "$nvim_selection" >/dev/null 2>&1; then
 	printf '%s\n' 'FAIL: /proj aceptó una acción avanzada.' >&2
+	exit 1
+fi
+
+if rg -q 'session_[A-Za-z0-9_]+_[0-9a-f]{12}' <<<"$project_list$actions_list"; then
+	printf '%s\n' 'FAIL: el launcher expuso un identificador interno de proyecto.' >&2
 	exit 1
 fi
 

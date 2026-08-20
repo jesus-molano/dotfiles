@@ -14,105 +14,105 @@ end
 
 -- Vim-style focus, movement and resize.
 local directions = {
-    H = { focus = "left", move = "l", label = "la izquierda", resize = { x = -40, y = 0 } },
-    J = { focus = "down", move = "d", label = "abajo", resize = { x = 0, y = 40 } },
-    K = { focus = "up", move = "u", label = "arriba", resize = { x = 0, y = -40 } },
-    L = { focus = "right", move = "r", label = "la derecha", resize = { x = 40, y = 0 } },
+    H = { focus = "left", move = "l", label = "left", resize = { x = -40, y = 0 } },
+    J = { focus = "down", move = "d", label = "down", resize = { x = 0, y = 40 } },
+    K = { focus = "up", move = "u", label = "up", resize = { x = 0, y = -40 } },
+    L = { focus = "right", move = "r", label = "right", resize = { x = 40, y = 0 } },
 }
 for key, direction in pairs(directions) do
     bind(alt .. " + " .. key, hl.dsp.focus({ direction = direction.focus }),
-        "Mover foco hacia " .. direction.label)
+        "Move focus " .. direction.label)
     bind(alt .. " + SHIFT + " .. key,
         hl.dsp.window.move({ direction = direction.move, group_aware = true }),
-        "Mover ventana hacia " .. direction.label)
+        "Move window " .. direction.label)
     bind(alt .. " + CONTROL + " .. key,
         hl.dsp.window.resize({ x = direction.resize.x, y = direction.resize.y, relative = true }),
-        "Redimensionar ventana hacia " .. direction.label, { repeating = true })
+        "Resize window " .. direction.label, { repeating = true })
 end
 
-bind(alt .. " + X", hl.dsp.window.close(), "Cerrar la ventana activa")
+bind(alt .. " + X", hl.dsp.window.close(), "Close active window")
 bind(alt .. " + M", hl.dsp.window.fullscreen({ mode = "maximized" }),
-    "Maximizar la ventana activa")
-bind(alt .. " + F", hl.dsp.window.float({ action = "toggle" }), "Alternar ventana flotante")
-bind(hyper .. " + D", hl.dsp.layout("togglesplit"), "Alternar dirección de la división")
+    "Maximize active window")
+bind(alt .. " + F", hl.dsp.window.float({ action = "toggle" }), "Toggle floating window")
+bind(hyper .. " + D", hl.dsp.layout("togglesplit"), "Toggle split direction")
 bind(hyper .. " + comma", hl.dsp.layout("move -col"),
-    "Desplazar una columna a la izquierda en el layout scrolling")
+    "Move one column left in the scrolling layout")
 bind(hyper .. " + period", hl.dsp.layout("move +col"),
-    "Desplazar una columna a la derecha en el layout scrolling")
+    "Move one column right in the scrolling layout")
 bind(hyper .. " + semicolon", hl.dsp.layout("colresize +conf"),
-    "Alternar el ancho de columna en el layout scrolling")
+    "Toggle scrolling column width")
 bind(hyper .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }),
-    "Alternar pantalla completa")
+    "Toggle fullscreen")
 
 -- Eight workspaces split between both hands on the upper letter row.
 local workspace_keys = { "Q", "W", "E", "R", "U", "I", "O", "P" }
 for workspace, key in ipairs(workspace_keys) do
     bind(alt .. " + " .. key, hl.dsp.focus({ workspace = workspace }),
-        "Ir al workspace " .. workspace)
+        "Go to workspace " .. workspace)
     bind(alt .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = workspace }),
-        "Enviar ventana al workspace " .. workspace)
+        "Move window to workspace " .. workspace)
 end
 
-bind(alt .. " + S", hl.dsp.workspace.toggle_special("scratchpad"), "Alternar scratchpad")
+bind(alt .. " + S", hl.dsp.workspace.toggle_special("scratchpad"), "Toggle scratchpad")
 bind(alt .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }),
-    "Enviar ventana al scratchpad")
+    "Move window to scratchpad")
 bind(alt .. " + A", hl.dsp.workspace.toggle_special("ai"),
-    "Alternar scratchpad de IA")
+    "Toggle AI scratchpad")
 bind(alt .. " + SHIFT + A", hl.dsp.window.move({ workspace = "special:ai" }),
-    "Enviar ventana al scratchpad de IA")
+    "Move window to AI scratchpad")
 bind(alt .. " + Z", hl.dsp.workspace.toggle_special("logs"),
-    "Alternar scratchpad de logs")
+    "Toggle logs scratchpad")
 bind(alt .. " + SHIFT + Z", hl.dsp.window.move({ workspace = "special:logs" }),
-    "Enviar ventana al scratchpad de logs")
+    "Move window to logs scratchpad")
 
 -- Window groups/tabs.
-bind(alt .. " + G", hl.dsp.group.toggle(), "Alternar grupo de ventanas")
-bind(alt .. " + N", hl.dsp.group.next(), "Ir a la siguiente ventana del grupo")
-bind(alt .. " + SHIFT + N", hl.dsp.group.prev(), "Ir a la anterior ventana del grupo")
+bind(alt .. " + G", hl.dsp.group.toggle(), "Toggle window group")
+bind(alt .. " + N", hl.dsp.group.next(), "Focus next window in group")
+bind(alt .. " + SHIFT + N", hl.dsp.group.prev(), "Focus previous window in group")
 
 -- Hyper application, layout and Noctalia layer.
-bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Abrir Ghostty")
-bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Abrir qutebrowser")
-bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Abrir Dolphin")
+bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Open Ghostty")
+bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Open qutebrowser")
+bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Open Dolphin")
 bind(hyper .. " + Y", hl.dsp.exec_cmd(launch .. TERMINAL .. " -e fish -ic y"),
-    "Abrir Yazi en Ghostty")
-bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Enfocar o abrir Orca")
-bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Enfocar o abrir Spotify")
-bind(hyper .. " + S", hl.dsp.exec_cmd("hypr-stremio"), "Enfocar o abrir Stremio")
-bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Abrir launcher")
+    "Open Yazi in Ghostty")
+bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Focus or open Orca")
+bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Focus or open Spotify")
+bind(hyper .. " + S", hl.dsp.exec_cmd("hypr-stremio"), "Focus or open Stremio")
+bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Open launcher")
 bind(hyper .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /cmd"),
-    "Abrir comandos del launcher")
+    "Open launcher commands")
 bind(hyper .. " + J", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /proj"),
-    "Abrir proyectos del launcher")
+    "Open launcher projects")
 bind(hyper .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /media"),
-    "Abrir multimedia del launcher")
+    "Open launcher media")
 bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
-    "Usar el siguiente fondo del tema")
+    "Use next theme wallpaper")
 bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper-previous"),
-    "Usar el fondo anterior del tema")
+    "Use previous theme wallpaper")
 bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
-    "Usar el siguiente fondo del tema")
+    "Use next theme wallpaper")
 bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next"),
-    "Usar la siguiente apariencia")
+    "Use next appearance")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
-    "Abrir notificaciones")
+    "Open notifications")
 bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),
-    "Capturar una región y preparar contexto para Orca")
-bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"), "Abrir menú de sesión")
-bind(hyper .. " + L", hl.dsp.exec_cmd(noctalia .. "session lock"), "Bloquear la sesión")
-bind(hyper .. " + K", hl.dsp.exec_cmd("hyprpicker -a -n"), "Seleccionar y copiar un color")
-bind(hyper .. " + 1", hl.dsp.exec_cmd(launch .. "1password"), "Abrir 1Password")
-bind(hyper .. " + C", hl.dsp.exec_cmd(noctalia .. "caffeine-toggle"), "Alternar cafeína")
+    "Capture a region and prepare context for Orca")
+bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"), "Open session menu")
+bind(hyper .. " + L", hl.dsp.exec_cmd(noctalia .. "session lock"), "Lock session")
+bind(hyper .. " + K", hl.dsp.exec_cmd("hyprpicker -a -n"), "Pick and copy a color")
+bind(hyper .. " + 1", hl.dsp.exec_cmd(launch .. "1password"), "Open 1Password")
+bind(hyper .. " + C", hl.dsp.exec_cmd(noctalia .. "caffeine-toggle"), "Toggle caffeine")
 bind(hyper .. " + I", hl.dsp.exec_cmd("desktop-focus-mode toggle"),
-    "Alternar modo foco")
+    "Toggle focus mode")
 bind(hyper .. " + U", hl.dsp.exec_cmd("desktop-focus-mode demo-toggle"),
-    "Alternar modo demo con grabación")
-bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Alternar panel de atajos")
+    "Toggle demo mode with recording")
+bind(hyper .. " + 7", hl.dsp.exec_cmd("hypr-keybind-help"), "Toggle keybindings panel")
 
 -- Alt+Tab has one owner: Noctalia.
 bind(alt .. " + TAB", hl.dsp.exec_cmd(noctalia .. "window-switcher"),
-    "Abrir el cambiador de ventanas de Noctalia")
+    "Open Noctalia window switcher")
 
 -- Mouse workflow retained as a secondary path.
-bind(alt .. " + mouse:272", hl.dsp.window.drag(), "Arrastrar ventana", { mouse = true })
-bind(alt .. " + mouse:273", hl.dsp.window.resize(), "Redimensionar ventana", { mouse = true })
+bind(alt .. " + mouse:272", hl.dsp.window.drag(), "Drag window", { mouse = true })
+bind(alt .. " + mouse:273", hl.dsp.window.resize(), "Resize window", { mouse = true })

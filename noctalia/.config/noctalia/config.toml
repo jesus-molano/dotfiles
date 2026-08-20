@@ -67,19 +67,19 @@ speed = 1.05
 
 [shell.launcher.dmenu.entry.projects]
 command = "desktop-launcher list projects"
-label = "Proyectos"
+label = "Projects"
 prefix = "proj"
-glyph = "code"
+glyph = "folder-code"
 global = false
-exec = "desktop-launcher run projects {selection}"
+exec = "desktop-launcher run projects \"{selection}\""
 
 [shell.launcher.dmenu.entry.project_actions]
 command = "desktop-launcher list project-actions"
-label = "Acciones de proyecto"
+label = "Project actions"
 prefix = "proj-actions"
-glyph = "code"
+glyph = "tools"
 global = false
-exec = "desktop-launcher run project-actions {selection}"
+exec = "desktop-launcher run project-actions \"{selection}\""
 
 [shell.launcher.dmenu.entry.ssh]
 command = "desktop-launcher list ssh"
@@ -87,63 +87,111 @@ label = "SSH"
 prefix = "ssh"
 glyph = "server"
 global = false
-exec = "desktop-launcher run ssh {selection}"
+exec = "desktop-launcher run ssh \"{selection}\""
 
 [shell.launcher.dmenu.entry.media]
 command = "desktop-launcher list media"
-label = "Multimedia"
+label = "Media"
 prefix = "media"
-glyph = "play"
+glyph = "device-tv"
 global = false
-exec = "desktop-launcher run media {selection}"
+exec = "desktop-launcher run media \"{selection}\""
 
 [shell.launcher.dmenu.entry.typing]
 command = "desktop-launcher list typing"
-label = "Mecanografía"
+label = "Typing"
 prefix = "typing"
 glyph = "keyboard"
 global = false
-exec = "desktop-launcher run typing {selection}"
+exec = "desktop-launcher run typing \"{selection}\""
 
 [shell.launcher.dmenu.entry.appearance]
 command = "desktop-launcher list appearance"
-label = "Apariencia"
+label = "Appearance"
 prefix = "appearance"
 glyph = "palette"
 global = false
-exec = "desktop-launcher run appearance {selection}"
+exec = "desktop-launcher run appearance \"{selection}\""
 
 [shell.launcher.dmenu.entry.keybindings]
 command = "desktop-launcher list keybindings"
-label = "Atajos"
+label = "Keybindings"
 prefix = "keys"
 glyph = "keyboard"
 global = false
-exec = "desktop-launcher run keybindings {selection}"
+exec = "desktop-launcher run keybinding-categories \"{selection}\""
+
+[shell.launcher.dmenu.entry.keybindings_windows]
+command = "desktop-launcher list keybindings-windows"
+label = "Windows and focus"
+prefix = "keys-windows"
+glyph = "keyboard"
+global = false
+exec = "true"
+
+[shell.launcher.dmenu.entry.keybindings_workspaces]
+command = "desktop-launcher list keybindings-workspaces"
+label = "Workspaces"
+prefix = "keys-workspaces"
+glyph = "keyboard"
+global = false
+exec = "true"
+
+[shell.launcher.dmenu.entry.keybindings_apps]
+command = "desktop-launcher list keybindings-apps"
+label = "Applications"
+prefix = "keys-apps"
+glyph = "keyboard"
+global = false
+exec = "true"
+
+[shell.launcher.dmenu.entry.keybindings_media]
+command = "desktop-launcher list keybindings-media"
+label = "Media and capture"
+prefix = "keys-media"
+glyph = "keyboard"
+global = false
+exec = "true"
+
+[shell.launcher.dmenu.entry.keybindings_system]
+command = "desktop-launcher list keybindings-system"
+label = "System and session"
+prefix = "keys-system"
+glyph = "keyboard"
+global = false
+exec = "true"
+
+[shell.launcher.dmenu.entry.keybindings_all]
+command = "desktop-launcher list keybindings-all"
+label = "All keybindings"
+prefix = "keys-all"
+glyph = "keyboard"
+global = false
+exec = "true"
 
 [shell.launcher.dmenu.entry.ports]
 command = "desktop-launcher list ports"
-label = "Puertos de desarrollo"
+label = "Development ports"
 prefix = "ports"
-glyph = "network"
+glyph = "world-www"
 global = false
-exec = "desktop-launcher run ports {selection}"
+exec = "desktop-launcher run ports \"{selection}\""
 
 [shell.launcher.dmenu.entry.crashes]
 command = "desktop-launcher list crashes"
-label = "Crashes recientes"
+label = "Recent crashes"
 prefix = "crash"
 glyph = "bug"
 global = false
-exec = "desktop-launcher run crashes {selection}"
+exec = "desktop-launcher run crashes \"{selection}\""
 
 [shell.launcher.dmenu.entry.commands]
 command = "desktop-launcher list commands"
-label = "Comandos"
+label = "Commands"
 prefix = "cmd"
-glyph = "terminal"
+glyph = "terminal-2"
 global = false
-exec = "desktop-launcher run commands {selection}"
+exec = "desktop-launcher run commands \"{selection}\""
 
 [shell.panel]
 open_near_click_control_center = true

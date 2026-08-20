@@ -37,12 +37,12 @@ y abre Ghostty/Zellij en el directorio del proyecto.
 
 | Opción | Uso |
 |---|---|
-| `Sesión Orca + terminal` | Repite la sesión normal de `/proj`. |
-| `Orca` | Enfoca o abre Orca después de registrar el repositorio. |
-| `Ghostty` | Abre o recupera el terminal Zellij del repositorio. |
-| `Nvim` | Abre Nvim de forma explícita. Úsalo para código, contexto o diagnóstico. |
-| `Tareas` | Muestra tareas de `justfile`, `mise.toml` y `package.json`. |
-| `Preview` | Inicia `scripts.preview` o `scripts.dev` del proyecto. |
+| `Orca session and terminal` | Repite la sesión normal de `/proj`. |
+| `Open in Orca` | Enfoca o abre Orca después de registrar el repositorio. |
+| `Open terminal` | Abre o recupera el terminal Zellij del repositorio. |
+| `Open in Nvim` | Abre Nvim de forma explícita. Úsalo para código, contexto o diagnóstico. |
+| `Open tasks` | Muestra tareas de `justfile`, `mise.toml` y `package.json`. |
+| `Open preview` | Inicia `scripts.preview` o `scripts.dev` del proyecto. |
 
 Usa `/proj-actions` solo cuando necesites una acción distinta de la sesión
 normal. Las tareas se eligen con `fzf` dentro de un terminal. Task Hub de Nvim detecta
@@ -90,25 +90,25 @@ el servidor en su terminal y muestra su salida.
 
 | Acción | Resultado |
 |---|---|
-| `capture_context` | Ejecuta la captura OCR y enfoca Orca. |
-| `capture_qr` | Selecciona un QR y copia su valor como dato sensible de un solo pegado. |
-| `bug_capsule` | Agrupa captura, OCR, metadatos limitados y el replay reciente. |
-| `media_convert` | Convierte imágenes o vídeos mediante una interfaz breve. |
-| `demo_studio` | Elige audio, webcam y fuente; la misma acción detiene su grabación. |
-| `window_width_save` / `window_width_restore` | Conserva un ancho útil por clase y workspace. |
-| `dictation_toggle` | Graba o transcribe y pega el texto. |
-| `focus_toggle` | Activa o restaura el modo foco. |
-| `demo_mode` | Activa el modo demo con grabación. |
-| `direct_scanout_toggle` | Prueba direct scanout auto para juegos. Es experimental y no cambia la configuración persistente. |
-| `doctor_host` | Abre la auditoría del host en Ghostty. |
-| `system_monitor` | Abre btop. |
+| `Capture context` | Ejecuta la captura OCR y enfoca Orca. |
+| `Read QR code` | Selecciona un QR y copia su valor como dato sensible de un solo pegado. |
+| `Create bug capsule` | Agrupa captura, OCR, metadatos limitados y el replay reciente. |
+| `Convert media` | Convierte imágenes o vídeos mediante una interfaz breve. |
+| `Demo Studio` | Elige audio, webcam y fuente; la misma acción detiene su grabación. |
+| `Save window width` / `Restore window width` | Conserva un ancho útil por clase y workspace. |
+| `Toggle local dictation` | Graba o transcribe y pega el texto. |
+| `Toggle focus mode` | Activa o restaura el modo foco. |
+| `Prepare demo mode` | Activa el modo demo con grabación. |
+| `Toggle direct scanout` | Prueba direct scanout auto para juegos. Es experimental y no cambia la configuración persistente. |
+| `Audit this computer` | Abre la auditoría del host en Ghostty. |
+| `System monitor` | Abre btop. |
 
 El launcher también ofrece estos proveedores de trabajo:
 
 | Prefijo | Resultado |
 |---|---|
 | `/appearance` | Aplica una escena de color y fondo coordinados. |
-| `/keys` | Busca los atajos que Hyprland tiene activos y copia la combinación elegida. |
+| `/keys` | Separa los atajos activos por función; cada categoría abre una lista buscable. |
 | `/ports` | Lista solo los servidores TCP del usuario y abre el puerto revalidado. |
 | `/crash` | Prepara contexto Markdown de un coredump reciente y enfoca Orca. |
 | `/typing` | Abre Ttyper en inglés, ejercicios de código o Keybr. |
@@ -351,7 +351,7 @@ O mdn AbortController
 
 ### Implementar una tarea
 
-1. `Hyper + J` y selecciona `Sesión Orca + terminal`.
+1. `Hyper + J` y selecciona `Orca session and terminal`.
 2. Ejecuta Codex CLI en Ghostty si la tarea necesita un agente.
 3. Usa `Espacio j r` en Nvim solo para una tarea, test o diagnóstico.
 4. Si aparece un fallo visual, usa `Hyper + P` y pega el contexto preparado en

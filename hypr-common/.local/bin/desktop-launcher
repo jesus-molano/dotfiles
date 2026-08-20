@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
 	printf '%s\n' \
-		'Uso: desktop-launcher {list|run} {projects|project-actions|ssh|media|typing|appearance|keybindings|ports|crashes|commands} [selección]'
+		'Usage: desktop-launcher {list|run} CATEGORY [SELECTION]'
 }
 
 notify_error() {
@@ -49,36 +49,91 @@ project_token() {
 	printf '%s_%s_%s' "$action" "$slug" "$digest"
 }
 
+project_title() {
+	local path=$1 title
+	title=$(basename -- "$path")
+	if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
+		title=${title#auto-}
+		title=$(printf '%s' "$title" | sed -E \
+			's/-run-[0-9]+-[0-9]{8}T[0-9]{4,6}$//; s/[-_]+/ /g; s/[[:space:]]+/ /g')
+		title=${title^}
+	fi
+	printf '%s' "$title"
+}
+
+project_context() {
+	local path=$1 repository
+	if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
+		repository=$(basename -- "$(dirname -- "$path")")
+		printf 'Orca workspace for %s' "$repository"
+		return
+	fi
+	safe_display "$path"
+}
+
 safe_display() {
 	local value=${1/#"$HOME"/\~}
-	printf '%s' "$value" | LC_ALL=C tr -c '[:alnum:]_./~ -' '_'
+	printf '%s' "$value" | tr '\t\r\n' '   ' | tr -d '\\"$`'
 }
 
-list_projects() {
-	local path display
-	while IFS= read -r -d '' path; do
-		display="$(safe_display "$path")"
-		printf '%s\t%s — %s\n' "$(project_token session "$path")" "$(basename -- "$path")" "$display"
-	done < <(projects)
+emit_record() {
+	local id=$1 title description
+	title=$(safe_display "$2")
+	description=$(safe_display "$3")
+	printf '%s\t%s\t%s\n' "$id" "$title" "$description"
 }
 
-list_project_actions() {
-	local path display script_dir
-	script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+render_records() {
+	local id title description
+	while IFS=$'\t' read -r id title description; do
+		[[ -n "$id" && -n "$title" ]] || continue
+		printf '%s\t%s\n' "$title" "$description"
+	done
+}
+
+record_id_for_selection() {
+	local selection=$1 generator=$2 id title description
+	while IFS=$'\t' read -r id title description; do
+		[[ "$title"$'\t'"$description" == "$selection" ]] || continue
+		printf '%s' "$id"
+		return 0
+	done < <("$generator")
+	return 1
+}
+
+project_records() {
+	local category=$1 path title context action_context
 	while IFS= read -r -d '' path; do
-		display="$(safe_display "$path")"
-		printf '%s\tSesión Orca + terminal - %s\n' "$(project_token session "$path")" "$display"
-		printf '%s\tOrca - %s\n' "$(project_token orca "$path")" "$display"
-		printf '%s\tGhostty - %s\n' "$(project_token term "$path")" "$display"
-		printf '%s\tNvim - %s\n' "$(project_token nvim "$path")" "$display"
+		title=$(project_title "$path")
+		context=$(project_context "$path")
+		if [[ "$category" == projects ]]; then
+			emit_record "$(project_token session "$path")" "$title" \
+				"Open in Orca with terminal — $context"
+			continue
+		fi
+		action_context=$context
+		if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
+			action_context="$title — $context"
+		fi
+		emit_record "$(project_token session "$path")" 'Orca session and terminal' "$action_context"
+		emit_record "$(project_token orca "$path")" 'Open in Orca' "$action_context"
+		emit_record "$(project_token term "$path")" 'Open terminal' "$action_context"
+		emit_record "$(project_token nvim "$path")" 'Open in Nvim' "$action_context"
+		local script_dir
+		script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 		if "$script_dir/project-session" has-tasks "$path" >/dev/null 2>&1; then
-			printf '%s\tTareas - %s\n' "$(project_token tasks "$path")" "$display"
+			emit_record "$(project_token tasks "$path")" 'Open tasks' "$action_context"
 		fi
 		if "$script_dir/project-session" has-preview "$path" >/dev/null 2>&1; then
-			printf '%s\tPreview - %s\n' "$(project_token preview "$path")" "$display"
+			emit_record "$(project_token preview "$path")" 'Open preview' "$action_context"
 		fi
 	done < <(projects)
 }
+
+project_records_projects() { project_records projects; }
+project_records_project_actions() { project_records project-actions; }
+list_projects() { project_records_projects | render_records; }
+list_project_actions() { project_records_project_actions | render_records; }
 
 find_project() {
 	local selection=$1 action path
@@ -111,47 +166,63 @@ ssh_hosts() {
 	}' "${files[@]}" | sort -u
 }
 
-list_ssh() {
+ssh_records() {
 	local host
 	while IFS= read -r host; do
-		[[ -n "$host" ]] && printf '%s\tSSH - %s\n' "$host" "$host"
+		[[ -n "$host" ]] && emit_record "$host" "$host" 'Open SSH session'
 	done < <(ssh_hosts)
 }
+list_ssh() { ssh_records | render_records; }
 
-list_media() {
-	printf '%s\n' \
-		$'stremio\tStremio' \
-		$'youtube\tYouTube' \
-		$'youtube_subscriptions\tYouTube - suscripciones' \
-		$'spotify\tSpotify'
+media_records() {
+	emit_record stremio 'Stremio' 'Movies and series'
+	emit_record youtube 'YouTube' 'Videos'
+	emit_record youtube_subscriptions 'YouTube subscriptions' 'Videos from followed channels'
+	emit_record spotify 'Spotify' 'Music and podcasts'
+}
+list_media() { media_records | render_records; }
+
+ttyper_records() {
+	emit_record english_quick 'Ttyper — quick English' '50 words from english1000'
+	emit_record english_long 'Ttyper — long English' '100 words from english1000'
+	emit_record python 'Ttyper — Python' '30 code words'
+	emit_record javascript 'Ttyper — JavaScript' '30 code words'
+	emit_record rust 'Ttyper — Rust' '30 code words'
+}
+
+keybr_record() {
+	emit_record keybr 'Keybr' 'Adaptive typing practice'
+}
+
+typing_records() {
+	ttyper_records
+	keybr_record
 }
 
 list_typing() {
-	if command -v "${DESKTOP_LAUNCHER_TTYPER:-ttyper}" >/dev/null 2>&1; then
-		printf '%s\n' \
-			$'english_quick\tTtyper — inglés — 50 palabras' \
-			$'english_long\tTtyper — inglés — 100 palabras' \
-			$'python\tTtyper — Python' \
-			$'javascript\tTtyper — JavaScript' \
-			$'rust\tTtyper — Rust'
-	fi
-	printf '%s\n' $'keybr\tKeybr — entrenamiento adaptativo'
+	{
+		if command -v "${DESKTOP_LAUNCHER_TTYPER:-ttyper}" >/dev/null 2>&1; then
+			ttyper_records
+		fi
+		keybr_record
+	} | render_records
 }
 
-list_appearance() {
-	local id label detail
-	while IFS=$'\t' read -r id label detail; do
+appearance_records() {
+	local id label _detail
+	while IFS=$'\t' read -r id label _detail; do
 		[[ -n "$id" && -n "$label" ]] || continue
-		printf '%s\t%s — %s\n' "$id" "$label" "$detail"
+		emit_record "$id" "$label" 'Apply coordinated palette and wallpapers'
 	done < <(appearance-switch list)
 }
+list_appearance() { appearance_records | render_records; }
 
 keybinding_records() {
 	local hyprctl_bin=${DESKTOP_LAUNCHER_HYPRCTL:-hyprctl}
 	command -v jq >/dev/null 2>&1 || return 127
 	command -v "$hyprctl_bin" >/dev/null 2>&1 || return 127
 	"$hyprctl_bin" binds -j | jq -er '
-		if type != "array" then error("hyprctl binds no devolvió una lista") else . end
+		if type != "array" then error("hyprctl binds did not return a list") else . end
 		| .[]
 		| select(
 			.has_description == true
@@ -210,66 +281,126 @@ format_keybinding() {
 	printf '%s' "$combo"
 }
 
-keybinding_token() {
-	local mask=$1 key=$2 description=$3 digest
-	digest=$(printf '%s\0%s' "$key" "$description" | sha256sum | cut -c1-16)
-	printf 'bind_%s_%s' "$mask" "$digest"
+keybinding_category() {
+	case "$1" in
+	*workspace* | *scratchpad*) printf '%s' workspaces ;;
+	'Move focus '* | 'Move window '* | 'Resize window '* | 'Close active window' | \
+		'Maximize active window' | 'Toggle floating window' | 'Toggle split direction' | \
+		'Move one column '* | 'Toggle scrolling column width' | 'Toggle fullscreen' | \
+		'Toggle window group' | 'Focus next window in group' | 'Focus previous window in group' | \
+		'Open Noctalia window switcher' | 'Drag window' | 'Resize window') printf '%s' windows ;;
+	'Open Ghostty' | 'Open qutebrowser' | 'Open Dolphin' | 'Open Yazi in Ghostty' | \
+		'Focus or open Orca' | 'Focus or open Spotify' | 'Focus or open Stremio' | \
+		'Focus or open Steam' | 'Open launcher' | 'Open launcher commands' | \
+		'Open launcher projects' | 'Open launcher media' | 'Open 1Password') printf '%s' apps ;;
+	*volume* | 'Mute audio' | 'Mute microphone' | 'Play or pause' | 'Next track' | \
+		'Previous track' | 'Capture a region' | 'Capture a region and prepare context for Orca' | \
+		*zoom* | *wallpaper* | *appearance* | 'Pick and copy a color') printf '%s' media ;;
+	*) printf '%s' system ;;
+	esac
 }
 
+keybinding_category_records() {
+	emit_record windows 'Windows and focus' 'Movement, size, and layout'
+	emit_record workspaces 'Workspaces' 'Desktops and special workspaces'
+	emit_record apps 'Applications' 'Programs and launchers'
+	emit_record media 'Media and capture' 'Audio, playback, images, and appearance'
+	emit_record system 'System and session' 'Input, session, and utilities'
+	emit_record all 'All keybindings' 'Complete list for global search'
+}
+
+list_keybinding_categories() { keybinding_category_records | render_records; }
+
 list_keybindings() {
-	local mask key description combo token
+	local wanted=${1:-all} mask key description combo category
 	while IFS=$'\t' read -r mask key description; do
 		[[ -n "$mask" && -n "$key" && -n "$description" ]] || continue
+		category=$(keybinding_category "$description")
+		[[ "$wanted" == all || "$category" == "$wanted" ]] || continue
 		combo=$(format_keybinding "$mask" "$key")
-		token=$(keybinding_token "$mask" "$key" "$description")
-		printf '%s\t%s — %s\n' "$token" "$combo" "$description"
+		printf '%s\t%s\n' "$(safe_display "$combo")" "$(safe_display "$description")"
 	done < <(keybinding_records)
 }
 
-list_ports() {
-	dev-ports list
+port_records() {
+	local token label
+	while IFS=$'\t' read -r token label; do
+		[[ -n "$token" && -n "$label" ]] || continue
+		label=${label// - / — }
+		emit_record "$token" "$label" 'Open local development server in the browser'
+	done < <(dev-ports list)
+}
+list_ports() { port_records | render_records; }
+
+crash_reason() {
+	case "$1" in
+	4 | SIGILL) printf '%s' 'Illegal instruction' ;;
+	5 | SIGTRAP) printf '%s' 'Trace or breakpoint trap' ;;
+	6 | SIGABRT) printf '%s' 'Aborted' ;;
+	7 | SIGBUS) printf '%s' 'Bus error' ;;
+	8 | SIGFPE) printf '%s' 'Arithmetic exception' ;;
+	9 | SIGKILL) printf '%s' 'Killed' ;;
+	11 | SIGSEGV) printf '%s' 'Segmentation fault' ;;
+	13 | SIGPIPE) printf '%s' 'Broken pipe' ;;
+	15 | SIGTERM) printf '%s' 'Terminated' ;;
+	*) printf '%s' 'Unexpected process failure' ;;
+	esac
 }
 
-list_crashes() {
-	local token pid signal executable timestamp
-	while IFS=$'\t' read -r token pid signal executable timestamp; do
+crash_records() {
+	local token _pid signal executable timestamp reason
+	while IFS=$'\t' read -r token _pid signal executable timestamp; do
 		[[ -n "$token" ]] || continue
-		printf '%s\tCrash %s — %s — %s — %s\n' "$token" "${pid#pid=}" \
-			"${signal#signal=}" "$(basename -- "${executable#exe=}")" "${timestamp#time=}"
+		reason=$(crash_reason "${signal#signal=}")
+		timestamp=${timestamp#time=}
+		if [[ -n "$timestamp" ]]; then
+			reason+=" — $timestamp"
+		fi
+		emit_record "$token" "Crash in $(basename -- "${executable#exe=}")" "$reason"
 	done < <(crash-context list)
 }
+list_crashes() { crash_records | render_records; }
 
-list_commands() {
-	printf '%s\n' \
-		$'doctor_host\tAuditar el host actual' \
-		$'system_monitor\tbtop en Ghostty' \
-		$'noctalia_settings\tAbrir ajustes de Noctalia' \
-		$'capture_context\tCapturar, anotar y preparar contexto para Orca' \
-		$'capture_qr\tLeer un código QR de la pantalla' \
-		$'bug_capsule\tCrear cápsula local con captura, OCR y replay' \
-		$'media_convert\tConvertir una imagen o un vídeo' \
-		$'demo_studio\tIniciar o detener Demo Studio' \
-		$'window_width_save\tGuardar el ancho de la ventana activa' \
-		$'window_width_restore\tRestaurar el ancho guardado' \
-		$'focus_toggle\tAlternar modo foco' \
-		$'demo_mode\tPreparar una demo o grabación' \
-		$'power_balanced\tPerfil energetico balanced' \
-		$'power_performance\tPerfil energetico performance'
+command_records() {
+	emit_record doctor_host 'Audit this computer' 'Check configuration and current host state'
+	emit_record system_monitor 'System monitor' 'Open btop in Ghostty'
+	emit_record noctalia_settings 'Noctalia settings' 'Open shell configuration'
+	emit_record capture_context 'Capture context' 'Capture, annotate, and prepare context for Orca'
+	emit_record capture_qr 'Read QR code' 'Scan a QR code from the screen'
+	emit_record bug_capsule 'Create bug capsule' 'Collect a screenshot, OCR, and replay locally'
+	emit_record media_convert 'Convert media' 'Convert an image or video'
+	emit_record demo_studio 'Demo Studio' 'Start or stop a presentation recording'
+	emit_record window_width_save 'Save window width' 'Remember the active window width'
+	emit_record window_width_restore 'Restore window width' 'Restore the saved width'
+	emit_record focus_toggle 'Toggle focus mode' 'Control distractions and performance'
+	emit_record demo_mode 'Prepare demo mode' 'Set up the desktop for a demo or recording'
+	emit_record power_balanced 'Use balanced power' 'Switch to the balanced power profile'
+	emit_record power_performance 'Use performance power' 'Switch to the performance power profile'
 	if command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1; then
-		printf '%s\n' $'dictation_toggle\tIniciar o terminar dictado local'
+		emit_record dictation_toggle 'Toggle local dictation' 'Start or stop speech-to-text input'
 	fi
 	if command -v game-run >/dev/null 2>&1; then
-		printf '%s\n' $'direct_scanout_toggle\tAlternar direct scanout auto (experimental)'
+		emit_record direct_scanout_toggle 'Toggle direct scanout' 'Change the experimental automatic setting'
 	fi
 }
+list_commands() { command_records | render_records; }
 
 run_project() {
-	local selection=$1 category=$2 action path script_dir session_action
-	path="$(find_project "$selection")" || {
-		notify_error 'El proyecto seleccionado ya no está disponible.'
+	local selection=$1 category=$2 token action path script_dir session_action generator
+	case "$category" in
+	projects) generator=project_records_projects ;;
+	project-actions) generator=project_records_project_actions ;;
+	*) return 2 ;;
+	esac
+	token=$(record_id_for_selection "$selection" "$generator") || {
+		notify_error 'The selected project is no longer available.'
 		return 1
 	}
-	action=${selection%%_*}
+	path="$(find_project "$token")" || {
+		notify_error 'The selected project is no longer available.'
+		return 1
+	}
+	action=${token%%_*}
 	[[ "$category" != projects || "$action" == session ]] || return 2
 	case "$action" in
 	session) session_action=resume ;;
@@ -278,7 +409,7 @@ run_project() {
 	esac
 	script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 	[[ -x "$script_dir/project-session" ]] || {
-		notify_error 'project-session no está disponible.'
+		notify_error 'Project session support is unavailable.'
 		return 127
 	}
 	if [[ "${PROJECT_SESSION_DRY_RUN:-0}" == 1 ]]; then
@@ -289,17 +420,19 @@ run_project() {
 
 run_ssh() {
 	local selection=$1 host
-	host=${selection%%[[:space:]]*}
+	host=$(record_id_for_selection "$selection" ssh_records) || return 2
 	[[ "$host" =~ ^[A-Za-z0-9._-]+$ ]] || return 2
 	ssh_hosts | grep -Fxq -- "$host" || {
-		notify_error 'El alias SSH seleccionado ya no existe.'
+		notify_error 'The selected SSH alias no longer exists.'
 		return 1
 	}
 	exec uwsm app -- ghostty -e ssh "$host"
 }
 
 run_media() {
-	case "$1" in
+	local id
+	id=$(record_id_for_selection "$1" media_records) || return 2
+	case "$id" in
 	stremio) exec hypr-stremio ;;
 	youtube) exec uwsm app -- qutebrowser 'https://www.youtube.com/' ;;
 	youtube_subscriptions) exec uwsm app -- qutebrowser 'https://www.youtube.com/feed/subscriptions' ;;
@@ -309,14 +442,15 @@ run_media() {
 }
 
 run_typing() {
-	local ttyper_bin=${DESKTOP_LAUNCHER_TTYPER:-ttyper}
-	case "$1" in
+	local ttyper_bin=${DESKTOP_LAUNCHER_TTYPER:-ttyper} id
+	id=$(record_id_for_selection "$1" typing_records) || return 2
+	case "$id" in
 	english_quick | english_long | python | javascript | rust)
 		command -v "$ttyper_bin" >/dev/null 2>&1 || {
-			notify_error 'Ttyper no está instalado en este perfil.'
+			notify_error 'Ttyper is not installed in this profile.'
 			return 127
 		}
-		case "$1" in
+		case "$id" in
 		english_quick) exec uwsm app -- ghostty -e "$ttyper_bin" -l english1000 -w 50 ;;
 		english_long) exec uwsm app -- ghostty -e "$ttyper_bin" -l english1000 -w 100 ;;
 		python) exec uwsm app -- ghostty -e "$ttyper_bin" -l python -w 30 ;;
@@ -330,44 +464,37 @@ run_typing() {
 }
 
 run_appearance() {
-	[[ "$1" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 2
-	exec appearance-switch apply "$1"
-}
-
-run_keybinding() {
-	local selection=$1 mask key description combo token
-	[[ "$selection" =~ ^bind_[0-9]+_[0-9a-f]{16}$ ]] || return 2
-	while IFS=$'\t' read -r mask key description; do
-		[[ -n "$mask" && -n "$key" && -n "$description" ]] || continue
-		token=$(keybinding_token "$mask" "$key" "$description")
-		[[ "$token" == "$selection" ]] || continue
-		combo=$(format_keybinding "$mask" "$key")
-		noctalia msg clipboard-copy "$combo"
-		return
-	done < <(keybinding_records)
-	return 1
+	local id
+	id=$(record_id_for_selection "$1" appearance_records) || return 2
+	[[ "$id" =~ ^[a-z0-9][a-z0-9-]*$ ]] || return 2
+	exec appearance-switch apply "$id"
 }
 
 run_port() {
-	[[ "$1" =~ ^port_[0-9]+_pid_[0-9]+_addr_([0-9A-Fa-f:.]+|\*)$ ]] || return 2
-	exec dev-ports open "$1"
+	local token
+	token=$(record_id_for_selection "$1" port_records) || return 2
+	[[ "$token" =~ ^port_[0-9]+_pid_[0-9]+_addr_([0-9A-Fa-f:.]+|\*)$ ]] || return 2
+	exec dev-ports open "$token"
 }
 
 run_crash() {
-	[[ "$1" =~ ^[0-9]+-[0-9]+-[0-9]+$ ]] || return 2
-	exec crash-context select "$1"
+	local token
+	token=$(record_id_for_selection "$1" crash_records) || return 2
+	[[ "$token" =~ ^[0-9]+-[0-9]+-[0-9]+$ ]] || return 2
+	exec crash-context select "$token"
 }
 
 run_command() {
-	local dotfiles_root
-	case "$1" in
+	local dotfiles_root id
+	id=$(record_id_for_selection "$1" command_records) || return 2
+	case "$id" in
 	doctor_host)
 		dotfiles_root="$(readlink -f -- "$HOME/.dotfiles" 2>/dev/null || true)"
 		[[ -d "$dotfiles_root" ]] || return 1
-		# $1 debe expandirse dentro del Bash hijo, no en este proceso.
+		# Expand $1 inside the child shell, not in this process.
 		# shellcheck disable=SC2016
 		exec uwsm app -- ghostty -e bash -lc \
-			'cd -- "$1"; just doctor-live; printf "\nPulsa Enter para cerrar... "; read -r _' \
+			'cd -- "$1"; just doctor-live; printf "\nPress Enter to close... "; read -r _' \
 			bash "$dotfiles_root"
 		;;
 	system_monitor) exec uwsm app -- ghostty -e btop ;;
@@ -400,6 +527,16 @@ run_command() {
 	esac
 }
 
+run_keybinding_category() {
+	local id
+	id=$(record_id_for_selection "$1" keybinding_category_records) || return 2
+	case "$id" in
+	windows | workspaces | apps | media | system | all) ;;
+	*) return 2 ;;
+	esac
+	exec noctalia msg panel-open launcher "/keys-$id"
+}
+
 (($# >= 2)) || {
 	usage >&2
 	exit 2
@@ -415,7 +552,13 @@ list:ssh) list_ssh ;;
 list:media) list_media ;;
 list:typing) list_typing ;;
 list:appearance) list_appearance ;;
-list:keybindings) list_keybindings ;;
+list:keybindings) list_keybinding_categories ;;
+list:keybindings-windows) list_keybindings windows ;;
+list:keybindings-workspaces) list_keybindings workspaces ;;
+list:keybindings-apps) list_keybindings apps ;;
+list:keybindings-media) list_keybindings media ;;
+list:keybindings-system) list_keybindings system ;;
+list:keybindings-all) list_keybindings all ;;
 list:ports) list_ports ;;
 list:crashes) list_crashes ;;
 list:commands) list_commands ;;
@@ -424,7 +567,7 @@ run:ssh) [[ -n "$selection" ]] && run_ssh "$selection" ;;
 run:media) [[ -n "$selection" ]] && run_media "$selection" ;;
 run:typing) [[ -n "$selection" ]] && run_typing "$selection" ;;
 run:appearance) [[ -n "$selection" ]] && run_appearance "$selection" ;;
-run:keybindings) [[ -n "$selection" ]] && run_keybinding "$selection" ;;
+run:keybinding-categories) [[ -n "$selection" ]] && run_keybinding_category "$selection" ;;
 run:ports) [[ -n "$selection" ]] && run_port "$selection" ;;
 run:crashes) [[ -n "$selection" ]] && run_crash "$selection" ;;
 run:commands) [[ -n "$selection" ]] && run_command "$selection" ;;

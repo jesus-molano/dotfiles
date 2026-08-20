@@ -18,16 +18,16 @@ EOF
 chmod +x "$test_root/bin/uwsm" "$test_root/bin/noctalia"
 
 without_ttyper=$(PATH="$test_root/bin:$PATH" DESKTOP_LAUNCHER_TTYPER=missing-ttyper "$launcher" list typing)
-[[ "$without_ttyper" == $'keybr\tKeybr — entrenamiento adaptativo' ]]
+[[ "$without_ttyper" == $'Keybr\tAdaptive typing practice' ]]
 notification_log="$test_root/notification.log"
 : >"$notification_log"
 if PATH="$test_root/bin:$PATH" DESKTOP_LAUNCHER_TTYPER=missing-ttyper \
 	TEST_NOTIFICATION_LOG="$notification_log" \
-	"$launcher" run typing english_quick >/dev/null 2>&1; then
+	"$launcher" run typing $'Ttyper — quick English\t50 words from english1000' >/dev/null 2>&1; then
 	printf '%s\n' 'FAIL: /typing ejecutó Ttyper aunque no estaba disponible.' >&2
 	exit 1
 fi
-expected_notification=$'noctalia\tmsg notification-show Launcher -- Ttyper no está instalado en este perfil.'
+expected_notification=$'noctalia\tmsg notification-show Launcher -- Ttyper is not installed in this profile.'
 [[ $(<"$notification_log") == "$expected_notification" ]] || {
 	printf '%s\n' 'FAIL: /typing no capturó el aviso de Ttyper ausente.' >&2
 	exit 1
@@ -36,18 +36,14 @@ printf '%s\n' '#!/usr/bin/env bash' 'exit 0' >"$test_root/bin/ttyper"
 chmod +x "$test_root/bin/ttyper"
 
 typing=$(PATH="$test_root/bin:$PATH" "$launcher" list typing)
-for token in english_quick english_long python javascript rust keybr; do
-	grep -q "^${token}" <<<"$typing" || {
-		printf 'FAIL: falta %s en /typing\n' "$token" >&2
-		exit 1
-	}
-done
+expected_typing=$'Ttyper — quick English\t50 words from english1000\nTtyper — long English\t100 words from english1000\nTtyper — Python\t30 code words\nTtyper — JavaScript\t30 code words\nTtyper — Rust\t30 code words\nKeybr\tAdaptive typing practice'
+[[ "$typing" == "$expected_typing" ]]
 
 log="$test_root/typing.log"
 : >"$log"
-for token in english_quick english_long python javascript rust keybr; do
-	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run typing "$token"
-done
+while IFS= read -r selection; do
+	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run typing "$selection"
+done <<<"$typing"
 
 expected=$(cat <<'EOF'
 uwsm	app -- ghostty -e ttyper -l english1000 -w 50

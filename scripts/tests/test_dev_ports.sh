@@ -54,7 +54,7 @@ common_env=(
 )
 
 listed=$(env "${common_env[@]}" "$dev_ports" list)
-expected=$'port_3000_pid_101_addr_0.0.0.0\tPuerto 3000 (0.0.0.0) - vite server - worktree\nport_4173_pid_101_addr_::\tPuerto 4173 (::) - vite server - worktree\nport_5000_pid_101_addr_192.168.1.30\tPuerto 5000 (192.168.1.30) - vite server - worktree\nport_5173_pid_101_addr_127.0.0.1\tPuerto 5173 (127.0.0.1) - vite server - worktree\nport_5174_pid_101_addr_::1\tPuerto 5174 (::1) - vite server - worktree'
+expected=$'port_3000_pid_101_addr_0.0.0.0\tPort 3000 (0.0.0.0) - vite server - worktree\nport_4173_pid_101_addr_::\tPort 4173 (::) - vite server - worktree\nport_5000_pid_101_addr_192.168.1.30\tPort 5000 (192.168.1.30) - vite server - worktree\nport_5173_pid_101_addr_127.0.0.1\tPort 5173 (127.0.0.1) - vite server - worktree\nport_5174_pid_101_addr_::1\tPort 5174 (::1) - vite server - worktree'
 [[ "$listed" == "$expected" ]] || {
 	printf 'FAIL: lista inesperada:\n%s\n' "$listed" >&2
 	exit 1

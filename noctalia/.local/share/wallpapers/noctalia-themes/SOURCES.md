@@ -30,6 +30,9 @@ logos ni marcas de agua, con ámbar `#ffc857` y naranja `#ff9f1c`:
 | `obsidian-amber/01-monolith.png` | Monolito geométrico de obsidiana mate cortado por una línea de luz ámbar. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
 | `obsidian-amber/02-strata.png` | Estratos minerales negros con vetas finas de ámbar y amarillo-naranja. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
 | `obsidian-amber/03-eclipse.png` | Eclipse casi negro con corona ámbar sobre un horizonte de obsidiana. | Reescalado y recorte central a 2560x1440; metadatos retirados. |
+| `obsidian-amber/amber-geometry.png` | [Wallhaven yqgyod](https://wallhaven.cc/w/yqgyod) | Copia local sin cambios, 1920x1080. |
+| `obsidian-amber/sunset-ride.png` | [Wallhaven w56kdr](https://wallhaven.cc/w/w56kdr) | Copia local sin cambios, 1920x1080. |
+| `obsidian-amber/golden-maples.png` | [Wallhaven 8gd1m1](https://wallhaven.cc/w/8gd1m1) | Copia local sin cambios, 1920x1080. |
 
 ## Catppuccin Mocha
 

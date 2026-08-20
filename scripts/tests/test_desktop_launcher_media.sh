@@ -23,18 +23,14 @@ EOF
 chmod +x "$test_root/bin/uwsm" "$test_root/bin/hypr-stremio" "$test_root/bin/hypr-spotify"
 
 media=$(PATH="$test_root/bin:$PATH" "$launcher" list media)
-for token in stremio youtube youtube_subscriptions spotify; do
-	grep -q "^${token}" <<<"$media" || {
-		printf 'FAIL: falta %s en /media\n' "$token" >&2
-		exit 1
-	}
-done
+expected_media=$'Stremio\tMovies and series\nYouTube\tVideos\nYouTube subscriptions\tVideos from followed channels\nSpotify\tMusic and podcasts'
+[[ "$media" == "$expected_media" ]]
 
 log="$test_root/media.log"
 : >"$log"
-for token in stremio youtube youtube_subscriptions spotify; do
-	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run media "$token"
-done
+while IFS= read -r selection; do
+	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run media "$selection"
+done <<<"$media"
 expected=$(cat <<'EOF'
 stremio
 uwsm	app -- qutebrowser https://www.youtube.com/

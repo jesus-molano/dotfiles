@@ -7,16 +7,16 @@ local launch = "uwsm app -- "
 
 -- Deliberate global shortcuts.
 HYPR_BIND(main .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-toggle clipboard"), {
-    description = "Abrir historial del portapapeles",
+    description = "Open clipboard history",
 })
 HYPR_BIND("Print", hl.dsp.exec_cmd(noctalia .. "screenshot-region"), {
-    description = "Capturar una región",
+    description = "Capture a region",
 })
 HYPR_BIND("CONTROL + SHIFT + Escape", hl.dsp.exec_cmd(launch .. TERMINAL .. " -e btop"), {
-    description = "Abrir el monitor del sistema",
+    description = "Open system monitor",
 })
 HYPR_BIND("XF86Calculator", hl.dsp.exec_cmd(launch .. CALCULATOR), {
-    description = "Abrir la calculadora",
+    description = "Open calculator",
 })
 
 -- Zoom de accesibilidad portado de cachyos-hypr-noctalia 1.2.4. Se limita al
@@ -28,55 +28,55 @@ local function change_zoom(delta)
     hl.config({ cursor = { zoom_factor = target } })
 end
 HYPR_BIND(main .. " + Minus", function() change_zoom(-0.3) end, {
-    description = "Reducir el zoom",
+    description = "Zoom out",
     repeating = true,
 })
 HYPR_BIND(main .. " + Plus", function() change_zoom(0.3) end, {
-    description = "Aumentar el zoom",
+    description = "Zoom in",
     repeating = true,
 })
 HYPR_BIND(main .. " + code:82", function() change_zoom(-0.3) end, {
-    description = "Reducir el zoom con teclado numérico",
+    description = "Zoom out with numpad",
     repeating = true,
 })
 HYPR_BIND(main .. " + code:86", function() change_zoom(0.3) end, {
-    description = "Aumentar el zoom con teclado numérico",
+    description = "Zoom in with numpad",
     repeating = true,
 })
 
 -- Hardware controls remain available while the session is locked. Volume and
 -- brightness repeat while their key is held.
 HYPR_BIND("XF86AudioRaiseVolume", hl.dsp.exec_cmd(noctalia .. "volume-up"), {
-    description = "Subir volumen",
+    description = "Raise volume",
     locked = true,
     repeating = true,
 })
 HYPR_BIND("XF86AudioLowerVolume", hl.dsp.exec_cmd(noctalia .. "volume-down"), {
-    description = "Bajar volumen",
+    description = "Lower volume",
     locked = true,
     repeating = true,
 })
 HYPR_BIND("XF86AudioMute", hl.dsp.exec_cmd(noctalia .. "volume-mute"), {
-    description = "Silenciar audio",
+    description = "Mute audio",
     locked = true,
 })
 HYPR_BIND("XF86AudioMicMute", hl.dsp.exec_cmd(noctalia .. "mic-mute"), {
-    description = "Silenciar micrófono",
+    description = "Mute microphone",
     locked = true,
 })
 HYPR_BIND("XF86AudioPlay", hl.dsp.exec_cmd(noctalia .. "media toggle"), {
-    description = "Reproducir o pausar",
+    description = "Play or pause",
     locked = true,
 })
 HYPR_BIND("XF86AudioPause", hl.dsp.exec_cmd(noctalia .. "media toggle"), {
-    description = "Reproducir o pausar",
+    description = "Play or pause",
     locked = true,
 })
 HYPR_BIND("XF86AudioNext", hl.dsp.exec_cmd(noctalia .. "media next"), {
-    description = "Pista siguiente",
+    description = "Next track",
     locked = true,
 })
 HYPR_BIND("XF86AudioPrev", hl.dsp.exec_cmd(noctalia .. "media previous"), {
-    description = "Pista anterior",
+    description = "Previous track",
     locked = true,
 })

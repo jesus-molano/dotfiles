@@ -27,9 +27,9 @@ hl.config({
 })
 
 HYPR_BIND("SUPER + Space", hl.dsp.exec_cmd("hyprctl switchxkblayout all next"), {
-    description = "Alternar teclado inglés/español",
+    description = "Toggle English and Spanish keyboard",
 })
 
 HYPR_BIND("CONTROL + ALT + SUPER + SHIFT + R", hl.dsp.exec_cmd("local-dictation toggle --paste"), {
-    description = "Alternar dictado local",
+    description = "Toggle local dictation",
 })

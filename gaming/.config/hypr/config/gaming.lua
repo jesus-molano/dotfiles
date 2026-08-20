@@ -4,7 +4,7 @@ local games_workspace = 7
 local hyper = "CONTROL + ALT + SUPER + SHIFT"
 
 HYPR_BIND(hyper .. " + G", hl.dsp.exec_cmd("hypr-gaming"), {
-    description = "Enfocar o abrir Steam",
+    description = "Focus or open Steam",
 })
 
 -- Route launcher UIs only. Anchored initial classes deliberately exclude
