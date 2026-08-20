@@ -15,6 +15,8 @@ with open(sys.argv[1], "rb") as source:
     config = tomllib.load(source)
 
 bar = config["bar"]["default"]
+assert config["audio"]["enable_sounds"] is True
+assert config["audio"]["sound_volume"] == 0.65
 assert "group:resources" in bar["end"]
 assert "screen_recorder" in bar["end"]
 assert "timer" in bar["end"]
@@ -36,6 +38,7 @@ grep -Fq 'HYPR_BIND("CONTROL + ALT + SUPER + SHIFT + R", hl.dsp.exec_cmd("local-
 
 grep -Fq 'noctalia.sound.load(ALARM_NAME, ALARM_PATH' "$timer_service"
 grep -Fq 'noctalia.sound.play(ALARM_NAME)' "$timer_service"
+grep -Fq 'event == "preview-alarm"' "$timer_service"
 grep -Fq '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga' "$timer_service"
 
 [[ ! -e "$repo_root/hypr-common/.local/bin/dev-pulse-status" ]]

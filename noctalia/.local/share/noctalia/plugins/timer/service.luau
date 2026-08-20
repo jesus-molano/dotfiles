@@ -67,11 +67,29 @@ noctalia.state.watch("timer.cmd", function(cmd)
 	end
 end)
 
-local function notifyUser()
-	noctalia.notify(noctalia.tr("ui.notify_title"), noctalia.tr("ui.notify_body"))
+local function playAlarm()
 	if alarmReady then
 		noctalia.sound.play(ALARM_NAME)
+		noctalia.log("timer: alarm playback requested")
+		return true
 	end
+
+	noctalia.log("timer: alarm playback requested before sound was ready")
+	return false
+end
+
+local function notifyUser()
+	noctalia.notify(noctalia.tr("ui.notify_title"), noctalia.tr("ui.notify_body"))
+	playAlarm()
+end
+
+function onIpc(event, _payload)
+	if event == "preview-alarm" then
+		return playAlarm()
+	end
+
+	noctalia.log(`timer: unknown IPC event: {event}`)
+	return false
 end
 
 function update()
