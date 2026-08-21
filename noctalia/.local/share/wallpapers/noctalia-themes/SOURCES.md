@@ -61,7 +61,6 @@ Fuente: [zhichaoh/catppuccin-wallpapers @ 1023077](https://github.com/zhichaoh/c
 | `catppuccin/default-clouds-night.jpg` | `landscapes/Cloudsnight.jpg` | Predeterminado; JPEG recodificado previamente a calidad 91 sin metadatos. |
 | `catppuccin/rain-night.jpg` | `landscapes/Rainnight.jpg` | Sin cambios, 3840x2160. |
 | `catppuccin/wallhaven-dpqjwj_2560x1440.png` | [Wallhaven dpqjwj](https://wallhaven.cc/w/dpqjwj) | 2560x1440. |
-| `catppuccin/wallhaven-mlyl58_1920x1080.png` | [Wallhaven mlyl58](https://wallhaven.cc/w/mlyl58) | Copia local sin cambios, 1920x1080. |
 | `catppuccin/wallhaven-p97l5e_2560x1440.png` | [Wallhaven p97l5e](https://wallhaven.cc/w/p97l5e) | 2560x1440. |
 
 ## Rosé Pine Moon
