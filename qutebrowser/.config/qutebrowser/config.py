@@ -132,10 +132,10 @@ c.editor.command = [
 
 # Search prefixes are intentionally short enough to use from normal mode with
 # `o` or `O`, for example: `O gh qutebrowser`.
-c.url.default_page = "https://start.duckduckgo.com/"
-c.url.start_pages = ["https://start.duckduckgo.com/"]
+c.url.default_page = "https://www.google.com/"
+c.url.start_pages = ["https://www.google.com/"]
 c.url.searchengines = {
-    "DEFAULT": "https://duckduckgo.com/?q={}",
+    "DEFAULT": "https://www.google.com/search?q={}",
     "aw": "https://wiki.archlinux.org/index.php?search={}",
     "archpkg": "https://archlinux.org/packages/?q={}",
     "aur": "https://aur.archlinux.org/packages?O=0&K={}",
