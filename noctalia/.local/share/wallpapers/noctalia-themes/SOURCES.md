@@ -34,6 +34,24 @@ logos ni marcas de agua, con ámbar `#ffc857` y naranja `#ff9f1c`:
 | `obsidian-amber/sunset-ride.png` | [Wallhaven w56kdr](https://wallhaven.cc/w/w56kdr) | Copia local sin cambios, 1920x1080. |
 | `obsidian-amber/golden-maples.png` | [Wallhaven 8gd1m1](https://wallhaven.cc/w/8gd1m1) | Copia local sin cambios, 1920x1080. |
 
+## Vice Afterglow
+
+Fuente: [galería oficial de artwork y fondos de Grand Theft Auto VI](https://www.rockstargames.com/VI/media/artwork-wallpapers).
+Las cuatro imágenes se descargaron a 3840x2160 desde los recursos oficiales de
+Rockstar Games el 2026-08-21.
+
+La paleta `ViceAfterglow` usa exclusivamente valores hexadecimales literales
+del CSS oficial actual de GTA VI. Las superficies principales son `#070810`,
+`#0c0d1b` y `#18182d`; los acentos principales son `#f77e9c`, `#9b89f5` y
+`#ffdf80`. El mapeo a roles ANSI adapta su uso, pero no inventa colores nuevos.
+
+| Archivo | Obra oficial | Transformación |
+| --- | --- | --- |
+| `vice-afterglow/01-jason-lucia-robbery.jpg` | Jason and Lucia Robbery | Reducido a 2560x1440; JPEG calidad 92; metadatos retirados. |
+| `vice-afterglow/02-jason-lucia-01.jpg` | Jason and Lucia 01 | Reducido a 2560x1440; JPEG calidad 92; metadatos retirados. |
+| `vice-afterglow/03-vice-city-postcard.jpg` | Vice City Postcard | Reducido a 2560x1440; JPEG calidad 92; metadatos retirados. |
+| `vice-afterglow/04-boobie-ike.jpg` | Boobie Ike | Reducido a 2560x1440; JPEG calidad 92; metadatos retirados. |
+
 ## Catppuccin Mocha
 
 Fuente: [zhichaoh/catppuccin-wallpapers @ 1023077](https://github.com/zhichaoh/catppuccin-wallpapers/tree/1023077979591cdeca76aae94e0359da1707a60e).
@@ -43,6 +61,7 @@ Fuente: [zhichaoh/catppuccin-wallpapers @ 1023077](https://github.com/zhichaoh/c
 | `catppuccin/default-clouds-night.jpg` | `landscapes/Cloudsnight.jpg` | Predeterminado; JPEG recodificado previamente a calidad 91 sin metadatos. |
 | `catppuccin/rain-night.jpg` | `landscapes/Rainnight.jpg` | Sin cambios, 3840x2160. |
 | `catppuccin/wallhaven-dpqjwj_2560x1440.png` | [Wallhaven dpqjwj](https://wallhaven.cc/w/dpqjwj) | 2560x1440. |
+| `catppuccin/wallhaven-mlyl58_1920x1080.png` | [Wallhaven mlyl58](https://wallhaven.cc/w/mlyl58) | Copia local sin cambios, 1920x1080. |
 | `catppuccin/wallhaven-p97l5e_2560x1440.png` | [Wallhaven p97l5e](https://wallhaven.cc/w/p97l5e) | 2560x1440. |
 
 ## Rosé Pine Moon

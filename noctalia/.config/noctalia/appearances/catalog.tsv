@@ -3,6 +3,7 @@
 # existe, el primer raster por nombre. `/wall` consulta solo esa carpeta.
 atlas	Atlas	custom	ProjectAtlas	-
 obsidian-amber	Obsidian Amber	custom	ObsidianAmber	-
+vice-afterglow	Vice Afterglow	custom	ViceAfterglow	-
 catppuccin	Catppuccin Mocha	builtin	Catppuccin	-
 rose-pine	Rosé Pine Moon	custom	RosePine	-
 nord	Nord Night	builtin	Nord	-

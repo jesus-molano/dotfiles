@@ -62,8 +62,8 @@ Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
 ## Apariencias y Project Atlas
 
 `ProjectAtlas` sigue siendo la escena base. `/appearance` ofrece Atlas,
-Obsidian Amber, Catppuccin Mocha, Rosé Pine Moon, Nord Night, Dracula Violet y
-Tokyo Night City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
+Obsidian Amber, Vice Afterglow, Catppuccin Mocha, Rosé Pine Moon, Nord Night,
+Dracula Violet y Tokyo Night City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
 los temas de Hyprland, GTK, Qt/KDE, Ghostty, Kitty,
 Starship, btop, Zellij, Micro, bat/delta, Codex y VS Code/VSCodium. Neovim,
 qutebrowser y Orca leen la paleta activa al iniciar. Starship usa un archivo

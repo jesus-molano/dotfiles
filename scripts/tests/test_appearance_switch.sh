@@ -217,7 +217,7 @@ assert ready_template['post_hook'].endswith('/appearance-switch template-ready')
 assert (root / 'noctalia/.config/noctalia/templates/appearance-ready.json').is_file()
 
 assert wallpaper_config['directory'].endswith('/.local/state/dotfiles/appearance-switch/visible')
-assert len(catalog) == 7
+assert len(catalog) == 8
 assert 'favorite' not in wallpaper_config
 
 with (root / 'noctalia/.config/noctalia/palettes/ObsidianAmber.json').open(encoding='utf-8') as source:
@@ -226,6 +226,29 @@ assert obsidian_amber['mPrimary'] == '#ffc857'
 assert obsidian_amber['mSecondary'] == '#ff9f1c'
 assert obsidian_amber['mSurface'] == '#0a0907'
 assert obsidian_amber['terminal']['background'] == '#070604'
+
+with (root / 'noctalia/.config/noctalia/palettes/ViceAfterglow.json').open(encoding='utf-8') as source:
+    vice_afterglow = json.load(source)['dark']
+assert vice_afterglow['mPrimary'] == '#f77e9c'
+assert vice_afterglow['mSecondary'] == '#9b89f5'
+assert vice_afterglow['mTertiary'] == '#ffdf80'
+assert vice_afterglow['mSurface'] == '#0c0d1b'
+assert vice_afterglow['terminal']['background'] == '#070810'
+official_gta_vi_css_colors = {
+    '#070810', '#0c0d1b', '#111222', '#18182d', '#1f1f38', '#252644',
+    '#2f2e52', '#433f6a', '#5a5589', '#799fec', '#89f5e3', '#9b89f5',
+    '#d263e9', '#e963c7', '#f4717c', '#f77e9c', '#fc97b1', '#fdfbff',
+    '#ffdf80',
+}
+
+def collect_hex_colors(value):
+    if isinstance(value, dict):
+        return {color for child in value.values() for color in collect_hex_colors(child)}
+    if isinstance(value, str) and re.fullmatch(r'#[0-9a-f]{6}', value):
+        return {value}
+    return set()
+
+assert collect_hex_colors(vice_afterglow) <= official_gta_vi_css_colors
 
 for scene_id, _label, palette_source, palette_name, wallpaper in catalog:
     theme_dir = asset_root / scene_id
