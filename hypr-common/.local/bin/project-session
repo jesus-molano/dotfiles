@@ -198,7 +198,7 @@ done
 
 action=$1
 path="$(project_path "$2")" || {
-	notify_error 'La ruta no es un repositorio Git disponible.'
+	printf '%s\n' 'La ruta no es un repositorio Git disponible.' >&2
 	exit 1
 }
 

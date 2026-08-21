@@ -52,6 +52,9 @@ esac
 EOF
 cat >"$test_root/bin/noctalia" <<'EOF'
 #!/usr/bin/env bash
+if [[ -n "${TEST_NOTIFICATION_LOG:-}" ]]; then
+	printf '%s\n' "$*" >>"$TEST_NOTIFICATION_LOG"
+fi
 exit 0
 EOF
 cat >"$test_root/bin/curl" <<'EOF'
@@ -138,13 +141,22 @@ default_preview=$(
 )
 assert_contains 'pnpm run dev' "$default_preview"
 
-set +e
-PATH="$test_root/bin:$PATH" \
-	"$project_session" --dry-run resume "$test_root/not-a-project" >/dev/null 2>&1
-invalid_status=$?
-set -e
-[[ $invalid_status -ne 0 ]] || {
-	printf '%s\n' 'FAIL: project-session aceptó una ruta que no es un repositorio Git.' >&2
+notification_log="$test_root/notifications.log"
+for invalid_action in resume has-tasks has-preview; do
+	set +e
+	invalid_output=$(PATH="$test_root/bin:$PATH" TEST_NOTIFICATION_LOG="$notification_log" \
+		"$project_session" --dry-run "$invalid_action" "$test_root/not-a-project" 2>&1)
+	invalid_status=$?
+	set -e
+	[[ $invalid_status -ne 0 ]] || {
+		printf 'FAIL: project-session aceptó una ruta inválida para %s.\n' "$invalid_action" >&2
+		exit 1
+	}
+	assert_contains 'La ruta no es un repositorio Git disponible.' "$invalid_output"
+done
+[[ ! -s "$notification_log" ]] || {
+	printf 'FAIL: una ruta inválida generó notificaciones de escritorio:\n%s\n' \
+		"$(<"$notification_log")" >&2
 	exit 1
 }
 
