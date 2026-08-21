@@ -101,6 +101,14 @@ record_id_for_selection() {
 	return 1
 }
 
+legacy_project_token_for_selection() {
+	local selection=$1 token
+	[[ "$selection" == *$'\t'* ]] || return 1
+	token=${selection%%$'\t'*}
+	[[ "$token" =~ ^(session|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
+	printf '%s' "$token"
+}
+
 project_records() {
 	local category=$1 path title context action_context
 	while IFS= read -r -d '' path; do
@@ -400,14 +408,17 @@ run_project() {
 	project-actions) generator=project_records_project_actions ;;
 	*) return 2 ;;
 	esac
-	token=$(record_id_for_selection "$selection" "$generator") || {
-		notify_error 'The selected project is no longer available.'
-		return 1
-	}
-	path="$(find_project "$token")" || {
-		notify_error 'The selected project is no longer available.'
-		return 1
-	}
+	# Noctalia persists recent rows. Accept the former token-first format and
+	# silently ignore entries whose project disappeared or whose format changed.
+	if token=$(record_id_for_selection "$selection" "$generator"); then
+		:
+	elif [[ "$category" == projects ]] &&
+		record_id_for_selection "$selection" project_records_project_actions >/dev/null; then
+		return 2
+	else
+		token=$(legacy_project_token_for_selection "$selection") || return 0
+	fi
+	path="$(find_project "$token")" || return 0
 	action=${token%%_*}
 	[[ "$category" != projects || "$action" == session ]] || return 2
 	case "$action" in
