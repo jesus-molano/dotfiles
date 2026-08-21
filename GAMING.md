@@ -1,43 +1,42 @@
-# Gaming en el sobremesa CachyOS
+# Gaming en CachyOS
 
-Este perfil es exclusivo del host `desktop`. Mantiene a CHWD como propietario
-del controlador NVIDIA y no despliega `system-etc` ni cambia explícitamente
-servicios, kernel, initramfs, arranque o Btrfs. Shelly sí modifica paquetes
-globales, que pueden aportar sus propios archivos y unidades del sistema.
+Gaming se divide en bundles portables que pueden seleccionarse en cualquier
+host. Mantiene a CHWD como propietario del controlador NVIDIA y no despliega
+`system-etc` ni cambia explícitamente servicios, kernel, initramfs, arranque o
+Btrfs. Shelly sí modifica paquetes globales, que pueden aportar sus propios
+archivos y unidades del sistema.
 
 ## Stack gestionado
 
-El ámbito `desktop` y la categoría `gaming` de `packages.csv` instalan:
+Los bundles `gaming-core`, `gaming-launchers` y `gaming-tools` instalan:
 
-| Componente | Función |
-|---|---|
-| `cachyos-gaming-meta` | Runtime multilib, UMU, Proton-CachyOS SLR y `wine-cachyos-opt` |
-| `steam` | Steam y Proton oficial de Valve |
-| `heroic-games-launcher-bin` | Epic, GOG y Amazon |
-| `lutris` | Gestor de juegos y launchers no Steam |
-| `faugus-launcher` | Lanzador sencillo basado en UMU |
-| `gamescope` | Microcompositor opcional por juego |
-| `mangohud`, `lib32-mangohud` | Métricas Vulkan/OpenGL de 64 y 32 bits |
-| `protonplus` | Instala y actualiza runners alternativos por launcher |
-| `cachyos-settings` | `game-performance` y wrappers DLSS mantenidos por CachyOS |
-| `cachyos-benchmarker` | Comparativa extensa de CPU, memoria y schedulers |
-| `ludusavi-bin` | Staging de partidas antes del backup Restic |
+| Bundle | Componente | Función |
+|---|---|---|
+| `gaming-core` | `cachyos-gaming-meta` | Runtime multilib, UMU, Proton-CachyOS SLR y `wine-cachyos-opt` |
+| `gaming-core` | `steam` | Steam y Proton oficial de Valve |
+| `gaming-core` | `gamescope` | Microcompositor opcional por juego |
+| `gaming-core` | `mangohud`, `lib32-mangohud` | Métricas Vulkan/OpenGL de 64 y 32 bits |
+| `gaming-core` | `cachyos-settings` | `game-performance` y wrappers DLSS mantenidos por CachyOS |
+| `gaming-launchers` | Heroic, Lutris, Faugus y ProtonPlus | Launchers no Steam y gestión de runners |
+| `gaming-tools` | `cachyos-benchmarker` | Comparativa extensa de CPU, memoria y schedulers |
+| `gaming-tools` | `ludusavi-bin` | Staging de partidas antes del backup Restic |
 
-El perfil añade además:
+`gaming-core` añade `game-run`, `hypr-gaming` y la configuración discreta de
+MangoHud. `gaming-launchers` añade el proveedor `/game` de Noctalia.
+`gaming-tools` añade `game-bench-report`. La capacidad `gpu-nvidia`, independiente
+de gaming, añade:
 
-- `game-run`, que siempre ejecuta el juego mediante `game-performance`;
-- `hypr-gaming`, que enfoca o abre Steam en el espacio 7;
-- una configuración MangoHud discreta;
-- una caché máxima de shaders NVIDIA de 12 GB mediante `environment.d`.
+- una caché máxima de shaders NVIDIA de 12 GB mediante `environment.d`;
+- el helper `dgpu` cuando CHWD proporciona `prime-run`.
 
 Consulta la selección exacta sin modificar nada:
 
 ```bash
-just packages desktop
-./install.sh desktop --list-packages
+just packages
+./install.sh --list-packages
 ```
 
-`workstation` excluye tanto estos paquetes como el módulo `gaming`.
+La selección de gaming es explícita y no depende del tipo de equipo.
 
 ## Ejecución por juego
 
@@ -71,7 +70,7 @@ Integración recomendada:
 Al iniciar un juego, `game-run` activa **No molestar** en Noctalia antes de
 ejecutar `game-performance`. Así ningún toast de notificación interfiere con el
 fullscreen o la captura del ratón. Al terminar, incluso si el juego devuelve un
-error, restaura exactamente el estado DND anterior. El perfil `performance` lo
+error, restaura exactamente el estado DND anterior. El modo `performance` lo
 mantiene CachyOS durante toda la vida del proceso del juego y no depende del
 foco de la ventana.
 
@@ -231,10 +230,10 @@ reales del panel nuevo, la regla genérica `preferred,auto,1` mantiene una ruta 
 arranque segura; después se medirá su nombre exacto con `hyprctl monitors all`.
 
 El DualSense funciona mediante `hid-playstation`, por USB o Bluetooth. Su
-ausencia en `just doctor desktop` es informativa, nunca un fallo. Decide Steam
+ausencia en `just doctor` es informativa, nunca un fallo. Decide Steam
 Input por juego: algunos títulos ofrecen mejores iconos, giroscopio o hápticos
 con entrada nativa y otros necesitan la traducción de Steam. `xpadneo` es para
-mandos Xbox y no forma parte de este perfil. El doctor también comprueba que el
+mandos Xbox y no forma parte de esta composición. El doctor también comprueba que el
 driver esté disponible y que Bluetooth esté activo; en el host desplegado pasan
 ambas comprobaciones.
 
@@ -275,19 +274,18 @@ nvidia: unknown parameter 'NVreg_UsePageAttributeTable' ignored
 ```
 
 El doctor lo muestra como aviso no fatal. No edites la configuración vendorizada
-de NVIDIA desde este repositorio; CHWD debe seguir resolviendo el perfil y una
+de NVIDIA desde este repositorio; CHWD debe seguir resolviendo el controlador y una
 actualización del driver puede retirar el parámetro.
 
 ## Diagnóstico y rollback
 
 ```bash
-just doctor desktop
-just check desktop
-just check gaming
+just doctor
+just check
 ```
 
 El bloque gaming del doctor comprueba paquetes, CHWD, `nvidia-smi`, runtimes
-NVIDIA/Vulkan de 32 bits, `game-performance`, perfil base, sched-ext, estado
+NVIDIA/Vulkan de 32 bits, `game-performance`, base instalada, sched-ext, estado
 auditable de D.O.C.P./ReBAR, Ananicy, GameMode coexistente,
 monitores activos, bibliotecas Steam, driver/conectividad DualSense y las
 variables de caché. Tras desplegar `environment.d`, cierra la sesión y vuelve a
@@ -296,17 +294,23 @@ entrar si el doctor aún no las ve cargadas en la sesión o el gestor de usuario
 Rollback de los dotfiles gaming:
 
 ```bash
-just check gaming
-just remove gaming
-hyprctl reload
+# Quita los tres bundles gaming en el selector interactivo.
+dotf host configure
+dotf host show
+just check
+just apply
+
+# O restaura la última transacción completa.
+dotf host rollback
+dotf host rollback --apply
 ```
 
-La retirada elimina únicamente los enlaces gestionados en `HOME`, incluido el
-módulo opcional que registra `Hyper + G` y las reglas de los launchers; la recarga
-lo retira también de la sesión activa. No desinstala paquetes ni borra juegos,
-prefijos, partidas, bibliotecas o cachés. Revisa por separado con Pacman o Shelly
-cualquier desinstalación de paquetes. Para volver al estado anterior, aplica de
-nuevo el perfil `desktop` después de su simulación.
+Quitar `gaming-core`, `gaming-launchers` y `gaming-tools` de `host.toml` retira
+sus enlaces gestionados en `HOME`, incluido `Hyper + G` y las reglas de los
+launchers. No desinstala paquetes ni borra juegos, prefijos, partidas,
+bibliotecas o cachés. Revisa por separado con Pacman o Shelly cualquier
+desinstalación de paquetes. El rollback previsualiza primero y restaura la
+transacción completa solo con `--apply`.
 
 ## Fuentes
 

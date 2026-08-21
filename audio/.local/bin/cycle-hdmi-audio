@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -u
+
+audio_config="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated/audio.conf"
+load_audio_config() {
+	[[ -r "$audio_config" ]] || return 0
+	local line key value
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" == \#* ]] && continue
+		IFS='=' read -r key value <<<"$line"
+		case "$key" in
+		DOTFILES_AUDIO_CARD|DOTFILES_AUDIO_BASE_PROFILE|DOTFILES_AUDIO_SECONDARY_PROFILE|DOTFILES_AUDIO_SINK_PREFIX)
+			[[ "$value" =~ ^[A-Za-z0-9_.:-]+$ && -z "${!key:-}" ]] && printf -v "$key" '%s' "$value"
+			;;
+		esac
+	done <"$audio_config"
+}
+load_audio_config
+
+readonly card="${DOTFILES_AUDIO_CARD:-}"
+readonly base_profile="${DOTFILES_AUDIO_BASE_PROFILE:-}"
+readonly right_profile="${DOTFILES_AUDIO_SECONDARY_PROFILE:-}"
+readonly sink_prefix="${DOTFILES_AUDIO_SINK_PREFIX:-}"
+
+if [[ -z "$card" || -z "$base_profile" || -z "$right_profile" || -z "$sink_prefix" ]]; then
+	noctalia msg notification-show 'Audio HDMI' -- 'No hay perfiles HDMI configurados para este host' 2>/dev/null || true
+	exit 0
+fi
+
+current_sink=$(pactl get-default-sink 2>/dev/null || true)
+if [[ "$current_sink" == "${sink_prefix}${right_profile#output:}" ]]; then
+	target_profile=$base_profile
+	target_label='Salida HDMI'
+else
+	target_profile=$right_profile
+	target_label='Salida HDMI 2 (monitor derecho)'
+fi
+target_sink="${sink_prefix}${target_profile#output:}"
+
+if ! pactl set-card-profile "$card" "$target_profile" 2>/dev/null; then
+	noctalia msg notification-show 'Audio HDMI' -- 'No se pudo cambiar el perfil' 2>/dev/null || true
+	exit 1
+fi
+
+# El nodo nuevo aparece después de cambiar el perfil de la tarjeta.
+for _ in {1..20}; do
+	if pactl list short sinks 2>/dev/null | cut -f2 | grep -Fxq "$target_sink"; then
+		pactl set-default-sink "$target_sink" || exit 1
+		target_id=$(pactl list short sinks | awk -v sink="$target_sink" '$2 == sink { print $1; exit }')
+
+		while read -r input_id current_sink_id _; do
+			if [[ -n "$input_id" && "$current_sink_id" != "$target_id" ]]; then
+				pactl move-sink-input "$input_id" "$target_sink" 2>/dev/null || true
+			fi
+		done < <(pactl list short sink-inputs 2>/dev/null)
+
+		noctalia msg notification-show 'Audio HDMI' -- "$target_label" 2>/dev/null || true
+		exit 0
+	fi
+	sleep 0.1
+done
+
+noctalia msg notification-show 'Audio HDMI' -- 'La salida no está disponible' 2>/dev/null || true
+exit 1

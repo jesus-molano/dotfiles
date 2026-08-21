@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly report=${1:-"$repo_root/gaming/.local/bin/game-bench-report"}
+readonly report=${1:-"$repo_root/gaming-tools/.local/bin/game-bench-report"}
 test_root=$(mktemp -d)
 cleanup() { rm -rf -- "$test_root"; }
 trap cleanup EXIT
@@ -24,7 +24,7 @@ for run in run-1 run-2 run-3; do
 		done
 	} >"$benchmark_root/$run/MangoHud.csv"
 	printf '%s\n' 'Average FPS,1% Min FPS' '100,50' >"$benchmark_root/$run/MangoHud_summary.csv"
-	printf '%s\n' 'kernel=6.18.3-2-cachyos' 'gpu_driver=NVIDIA 580.12.01' 'perfil=desktop' >"$benchmark_root/$run/metadata.txt"
+	printf '%s\n' 'kernel=6.18.3-2-cachyos' 'gpu_driver=NVIDIA 580.12.01' 'composition=resolved' >"$benchmark_root/$run/metadata.txt"
 done
 
 human_output=$(XDG_STATE_HOME="$test_root/state" "$report" hades)
@@ -33,7 +33,7 @@ human_output=$(XDG_STATE_HOME="$test_root/state" "$report" hades)
 [[ "$human_output" == *'1% low: 50.00 FPS'* ]]
 [[ "$human_output" == *'Kernel: 6.18.3-2-cachyos'* ]]
 [[ "$human_output" == *'Driver: NVIDIA 580.12.01'* ]]
-[[ "$human_output" == *'Perfil: desktop'* ]]
+[[ "$human_output" == *'Composición: resolved'* ]]
 
 json_output=$(XDG_STATE_HOME="$test_root/state" "$report" --json hades)
 JSON_OUTPUT="$json_output" python3 - <<'PY'
@@ -46,7 +46,7 @@ assert report['aggregate']['csv_files'] == 3
 assert report['aggregate']['samples'] == 360
 assert report['aggregate']['median_fps'] > 119
 assert report['aggregate']['one_percent_low_fps'] == 50
-assert report['metadata']['perfil'] == ['desktop']
+assert report['metadata']['composition'] == ['resolved']
 PY
 
 mkdir -p "$benchmark_root/invalid"

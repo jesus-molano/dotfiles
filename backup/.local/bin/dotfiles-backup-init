@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# shellcheck source-path=SCRIPTDIR
+set -euo pipefail
+
+if [[ ${DOTFILES_RESTIC_ENV:-0} != 1 ]]; then
+	exec "$HOME/.local/bin/with-secrets" env DOTFILES_RESTIC_ENV=1 "$0" "$@"
+fi
+
+# shellcheck source=../lib/dotfiles/restic-env.sh
+source "$HOME/.local/lib/dotfiles/restic-env.sh"
+load_dotfiles_restic_repository || true
+
+command -v restic >/dev/null 2>&1 || exit 127
+[[ -n ${RESTIC_REPOSITORY:-} ]] || {
+	printf '%s\n' 'Falta el repositorio Restic local o RESTIC_REPOSITORY.' >&2
+	exit 2
+}
+[[ -n ${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}${RESTIC_PASSWORD_COMMAND:-} ]] || {
+	printf '%s\n' 'Falta un método de contraseña Restic en with-secrets.' >&2
+	exit 2
+}
+
+if restic snapshots >/dev/null 2>&1; then
+	printf '%s\n' 'El repositorio Restic ya existe y las credenciales funcionan.'
+	exit 0
+fi
+
+printf '%s\n' 'Destino exacto: el repositorio Restic configurado para este host (valor oculto).'
+printf 'Se creará un repositorio cifrado nuevo. Escribe INICIALIZAR: '
+read -r confirmation
+[[ "$confirmation" == INICIALIZAR ]] || {
+	printf '%s\n' 'Cancelado sin cambios.'
+	exit 1
+}
+
+restic init
+printf '%s\n' 'Repositorio Restic inicializado.'

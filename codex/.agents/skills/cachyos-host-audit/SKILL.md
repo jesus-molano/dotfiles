@@ -1,6 +1,6 @@
 ---
 name: cachyos-host-audit
-description: Audita de forma no destructiva un host CachyOS con Hyprland, Noctalia, NVIDIA, gaming, Btrfs y systemd. Úsala al diagnosticar el estado del equipo, revisar cambios de dotfiles, evaluar mantenimiento o preparar una mejora que dependa del hardware y los servicios reales.
+description: Audita de forma no destructiva un host CachyOS con Hyprland, Noctalia, capacidades, bundles, NVIDIA, gaming, Btrfs y systemd. Úsala al diagnosticar el estado del equipo, revisar cambios de dotfiles, evaluar mantenimiento o preparar una mejora que dependa del hardware y los servicios reales.
 ---
 
 # Auditoría de host CachyOS
@@ -17,13 +17,13 @@ GPU, arranque, Btrfs ni dispositivos.
 2. Ejecuta primero comprobaciones reproducibles. Si existe, usa:
 
    ```bash
-   just lint desktop
+   just lint
    ```
 
 3. Ejecuta después el wrapper de solo lectura desde el directorio de la skill:
 
    ```bash
-   bash scripts/host-audit.sh desktop
+   bash scripts/host-audit.sh
    ```
 
 4. Si no está el doctor del repositorio, recopila manualmente solo la evidencia

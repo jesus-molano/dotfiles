@@ -1,0 +1,27 @@
+schema = 1
+bundles = []
+
+[hardware]
+
+[[hardware.displays]]
+name = "eDP-1"
+mode = "preferred"
+position = "auto"
+scale = 1.25
+vrr = false
+
+[input]
+keyboard_layouts = ["es"]
+
+[input.touchpad]
+tap_to_click = true
+natural_scroll = true
+disable_while_typing = true
+
+[input.gestures]
+workspace_swipe = true
+fingers = 4
+
+[[input.devices]]
+name = "syna7db5:01-06cb:7db7-touchpad"
+accel_profile = "adaptive"

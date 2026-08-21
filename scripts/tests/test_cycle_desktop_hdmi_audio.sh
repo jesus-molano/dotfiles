@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly helper=${1:-"$repo_root/hypr-desktop/.local/bin/cycle-desktop-hdmi-audio"}
+readonly helper=${1:-"$repo_root/audio/.local/bin/cycle-hdmi-audio"}
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 
@@ -59,6 +59,10 @@ run_case() {
 	printf '%s' "$current_profile" >"$selected"
 
 	PATH="$test_root/bin:$PATH" \
+		DOTFILES_AUDIO_CARD='alsa_card.pci-0000_07_00.1' \
+		DOTFILES_AUDIO_BASE_PROFILE='output:hdmi-stereo' \
+		DOTFILES_AUDIO_SECONDARY_PROFILE='output:hdmi-stereo-extra1' \
+		DOTFILES_AUDIO_SINK_PREFIX='alsa_output.pci-0000_07_00.1.' \
 		TEST_CURRENT_PROFILE="$current_profile" \
 		TEST_SELECTED_FILE="$selected" \
 		TEST_LOG="$log" \

@@ -11,7 +11,10 @@ case "$mode" in
 esac
 
 legacy_dir="$HOME/.agents/skills/linear"
-canonical_source="$(realpath -m -- "$HOME/.dotfiles/codex/.agents/skills/linear")"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+dotfiles_dir="$(cd -- "$script_dir/.." && pwd -P)"
+canonical_source="$(realpath -m -- "$dotfiles_dir/codex/.agents/skills/linear")"
+legacy_source="$(realpath -m -- "$HOME/.dotfiles/codex/.agents/skills/linear")"
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/backups"
 expected_entries=$'LICENSE.txt\nSKILL.md\nSOURCE.md\nagents\nagents/openai.yaml'
 managed_links=(LICENSE.txt SKILL.md SOURCE.md agents/openai.yaml)
@@ -49,7 +52,8 @@ for relative in "${managed_links[@]}"; do
 		exit 1
 	fi
 	resolved="$(realpath -m -- "$(dirname "$link")/$(readlink -- "$link")")"
-	if [[ "$resolved" != "$canonical_source/$relative" ]]; then
+	if [[ "$resolved" != "$canonical_source/$relative" &&
+		"$resolved" != "$legacy_source/$relative" ]]; then
 		printf 'ERROR: se conserva %s porque %s no apunta a la fuente canónica retirada.\n' \
 			"$legacy_dir" "$relative" >&2
 		exit 1

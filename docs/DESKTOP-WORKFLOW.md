@@ -1,7 +1,7 @@
 # Flujo desktop keyboard-first
 
-Esta guía describe el uso diario del perfil `desktop`. No sustituye la
-instalación del [README](../README.md). El perfil trata desarrollo, gaming y
+Esta guía describe el uso diario keyboard-first. No sustituye la
+instalación del [README](../README.md). La composición trata desarrollo, gaming y
 multimedia como flujos principales. En desarrollo usa Orca y Codex CLI como
 núcleo. Usa Neovim para editar, ejecutar tareas, diagnosticar y preparar
 contexto.
@@ -63,7 +63,7 @@ Solo se aceptan URLs `localhost` o `127.0.0.1`. El navegador espera hasta 30
 segundos a que el servidor responda. Si no defines esa clave, la acción inicia
 el servidor en su terminal y muestra su salida.
 
-## Launcher y atajos del desktop
+## Launcher y atajos
 
 | Atajo | Acción |
 |---|---|
@@ -72,11 +72,10 @@ el servidor en su terminal y muestra su salida.
 | `Hyper + Space` | Abre `/cmd`. |
 | `Hyper + V` | Abre `/media`. |
 | `Hyper + 7` | Alterna `/keys`, el panel buscable de atajos activos. |
-| `Hyper + W` | Usa el siguiente fondo del tema activo. |
 | `Hyper + [` / `Hyper + ]` | Usa el fondo anterior/siguiente del tema activo. |
-| `Hyper + T` | Rota a la siguiente apariencia completa. |
+| `Hyper + T` | Abre el selector de apariencias. |
 | `Hyper + R` | Inicia o detiene el dictado local y pega el texto. |
-| `Hyper + H` | Usa la siguiente salida de audio disponible. |
+| `Hyper + H` | Recorre las salidas configuradas; sin esa configuración, abre los controles de audio. |
 | `Hyper + O` | Enfoca o abre Orca. |
 | `Hyper + S` | Enfoca o abre Stremio. |
 | `Hyper + P` | Captura una región y prepara contexto para Orca. |
@@ -132,11 +131,11 @@ Estos flujos son independientes del cockpit de desarrollo:
 | `Hyper + M` | Enfocar o abrir Spotify. |
 | Teclas multimedia | Reproducir, pausar y cambiar pista en reproductores compatibles. |
 
-`/media` no cambia el perfil energético, No Molestar, el audio ni el modo de
+`/media` no cambia el modo energético, No Molestar, el audio ni el modo de
 ventana. No usa `game-run`. Stremio se abre desde la instalación Flatpak de
-usuario declarada por el perfil común.
+usuario declarada por la base común.
 
-Para YouTube, qutebrowser es la ruta única del perfil. `/media` abre la portada
+Para YouTube, qutebrowser es la ruta única de la base. `/media` abre la portada
 o las suscripciones y el vídeo se reproduce en la propia página.
 
 `game-run` sí pertenece al flujo gaming. Activa rendimiento y protege No
@@ -146,7 +145,7 @@ en [GAMING.md](../GAMING.md).
 
 Tras tres ejecuciones con `game-run --bench NOMBRE -- COMANDO [ARGUMENTOS...]`, `/game` muestra un
 informe. Calcula mediana FPS, 1% low, dispersión de frametimes y registra kernel,
-driver y perfil. También está disponible como `game-bench-report NOMBRE` o con
+driver y modo energético. También está disponible como `game-bench-report NOMBRE` o con
 `--json`.
 
 Los reproductores compatibles pueden inhibir el estado inactivo. Si una web o
@@ -220,7 +219,7 @@ había antes.
 Selecciona **Iniciar demo** para iniciar la grabación de la pantalla enfocada; usa
 **Cancelar** para no cambiar el estado del equipo. La barra permanece visible y muestra una cámara roja mientras
 graba. Pulsa otra vez `Hyper + U`, o haz clic en la cámara roja, para detener la
-grabación. `Hyper + U` también restaura No Molestar, cafeína, barra y perfil
+grabación. `Hyper + U` también restaura No Molestar, cafeína, barra y modo
 energético al estado anterior. Un clic en la cámara detiene solo el vídeo; pulsa
 después `Hyper + U` para salir del modo demo. La cámara desaparece cuando no hay
 una grabación activa.
@@ -241,8 +240,8 @@ La barra incluye estas herramientas de trabajo:
 - **Special Workspaces** muestra los scratchpads poblados. Usa `Alt + A` para
   IA y `Alt + Z` para logs sin abandonar el workspace principal.
 
-La base revisada fija Special Workspaces `1.4.0`. `just doctor-live desktop`
-detecta un cambio de versión antes de aceptarlo como parte del perfil.
+La base revisada fija Special Workspaces `1.4.0`. `just doctor` detecta un
+cambio de versión antes de aceptarlo como parte de la composición.
 
 El grabador de Noctalia también está disponible en el centro de control. El
 modo demo detiene solo la grabación que inició él mismo.
@@ -253,10 +252,10 @@ pantalla ni estado periódico del repositorio.
 
 ## Apariencias y RGB
 
-`/appearance` ofrece siete escenas: Atlas, Obsidian Amber, Catppuccin Mocha,
-Rosé Pine Moon, Nord Night, Dracula Violet y Tokyo Night City. Cada escena
-cambia la paleta de Noctalia y el fondo como una sola acción. `Hyper + T` rota
-estas escenas sin abrir el menú.
+`/appearance` ofrece ocho escenas: Atlas, Obsidian Amber, Catppuccin Mocha,
+Rosé Pine Moon, Nord Night, Dracula Violet, Tokyo Night City y Vice Afterglow. Cada escena
+cambia la paleta de Noctalia y el fondo como una sola acción. `Hyper + T` abre
+el selector sin cambiar la escena actual.
 Usa `appearance-switch next` o `previous` desde terminal para recorrerlas.
 El proveedor `/wall` muestra solo los fondos de la apariencia activa y cambia
 la imagen sin cambiar la paleta. Cada carpeta admite una cantidad variable de
@@ -277,7 +276,8 @@ abierta.
 SDDM mantiene Project Atlas: se ejecuta antes de la sesión y no participa en
 este cambio de apariencia.
 
-En el desktop, `reactive-rgb.service` usa dos indicadores independientes dentro
+Cuando el bundle `rgb-openrgb` está seleccionado para el hardware actual,
+`reactive-rgb.service` usa dos indicadores independientes dentro
 de `Aura Addressable 1`. Los LED 1–12 de la CPU siguen exclusivamente la
 temperatura de CPU. Los LED 13–60 de los ventiladores internos siguen
 exclusivamente la temperatura de la GPU. La CPU usa azul por debajo de 50 °C,

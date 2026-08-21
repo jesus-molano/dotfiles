@@ -1,641 +1,374 @@
 #!/usr/bin/env bash
+# Auditoría portable: composición base, capabilities y bundles, sin perfiles.
+# shellcheck disable=SC2015 # Los helpers ok/info/warn/fail siempre devuelven cero.
 set -uo pipefail
 
-repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
-readonly repo_root
-profile=''
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 mode=all
-for argument in "$@"; do
-	case "$argument" in
-	desktop | workstation)
-		[[ -z "$profile" ]] || {
-			printf 'Solo se admite un perfil.\n' >&2
-			exit 2
-		}
-		profile=$argument
-		;;
-	--config-only) mode=config ;;
-	--live-only) mode=live ;;
-	'') ;;
-	*)
-		printf 'Argumento no válido: %s\n' "$argument" >&2
-		exit 2
-		;;
-	esac
-done
-if [[ -z "$profile" ]]; then
-	active_monitors="$(readlink -f "$HOME/.config/hypr/config/monitors.lua" 2>/dev/null || true)"
-	case "$active_monitors" in
-	"$repo_root/hypr-desktop"/*) profile=desktop ;;
-	"$repo_root/hypr-laptop"/*) profile=workstation ;;
-	*) profile=workstation ;;
-	esac
-fi
-[[ "$profile" == workstation || "$profile" == desktop ]] || {
-	printf 'Perfil no válido: %s\n' "$profile" >&2
-	exit 2
-}
-readonly profile
-readonly mode
+case "${1:-}" in
+'') ;;
+--config-only) mode=config ;;
+--live-only) mode=live ;;
+*) printf 'Uso: %s [--config-only|--live-only]\n' "$0" >&2; exit 2 ;;
+esac
+
 failures=0
 warnings=0
-
 ok() { printf '✓ %s\n' "$1"; }
 info() { printf '· %s\n' "$1"; }
-fail() {
-	printf '✗ %s\n' "$1" >&2
-	failures=$((failures + 1))
-}
-warn() {
-	printf '! %s\n' "$1"
-	warnings=$((warnings + 1))
-}
-
+warn() { printf '! %s\n' "$1"; warnings=$((warnings + 1)); }
+fail() { printf '✗ %s\n' "$1" >&2; failures=$((failures + 1)); }
+check_command() { command -v "$2" >/dev/null 2>&1 && ok "$1" || fail "$1"; }
 check() {
-	local label=$1
-	shift
-	local output
-	if output="$("$@" 2>&1)"; then
-		ok "$label"
-	else
-		printf '%s\n' "$output" >&2
-		fail "$label"
-	fi
+  local label=$1 output
+  shift
+  if output="$("$@" 2>&1)"; then ok "$label"; else printf '%s\n' "$output" >&2; fail "$label"; fi
 }
 
-check_empty() {
-	local label=$1
-	shift
-	local output
-	if ! output="$("$@" 2>&1)"; then
-		printf '%s\n' "$output" >&2
-		fail "$label"
-	elif [[ -n "$output" ]]; then
-		printf '%s\n' "$output" >&2
-		fail "$label"
-	else
-		ok "$label"
-	fi
+plan_json=$(python3 "$repo_root/scripts/dotfiles_host.py" show --safe-defaults 2>&1) || {
+  printf '%s\n' "$plan_json" >&2
+  fail 'No se pudo resolver la composición local'
+  plan_json='{}'
 }
-
-check_no_warnings() {
-	local label=$1
-	shift
-	local output
-	if ! output="$("$@" 2>&1)"; then
-		printf '%s\n' "$output" >&2
-		fail "$label"
-	elif grep -Eq '(^|[[:space:]])WARN[[:space:]]' <<<"$output"; then
-		printf '%s\n' "$output" >&2
-		fail "$label"
-	else
-		ok "$label"
-	fi
+has() {
+  python3 -c 'import json,sys; print("yes" if sys.argv[2] in json.load(sys.stdin).get(sys.argv[1], []) else "no")' "$1" "$2" <<<"$plan_json" 2>/dev/null | grep -qx yes
 }
-
+bundle_packages() {
+  awk -F, -v scope="bundle:$1" '$1 == scope { print $3 }' "$repo_root/packages.csv"
+}
+check_bundle_packages() {
+  local bundle=$1 package
+  if ! has bundles "$bundle"; then info "Bundle $bundle no seleccionado"; return; fi
+  while IFS= read -r package; do
+    [[ -n "$package" ]] || continue
+    pacman -Qq "$package" >/dev/null 2>&1 && ok "$bundle: $package instalado" || fail "$bundle seleccionado: falta $package"
+  done < <(bundle_packages "$bundle")
+}
+check_minimum_versions() {
+  local package minimum stable_minimum source version floor comparison
+  command -v pacman >/dev/null 2>&1 || { fail 'Pacman no está disponible para comprobar versiones'; return; }
+  command -v vercmp >/dev/null 2>&1 || { fail 'vercmp no está disponible para comprobar versiones'; return; }
+  while IFS=$'\t' read -r package minimum stable_minimum source; do
+    [[ -n "$package" ]] || continue
+    version=$(pacman -Q "$package" 2>/dev/null | awk 'NR == 1 { print $2 }')
+    if [[ -z "$version" ]]; then
+      fail "Falta runtime compatible: $package >= $minimum ($source)"
+      continue
+    fi
+    floor=$minimum
+    if [[ "$stable_minimum" != - && "$version" != *_beta.* ]]; then
+      floor=$stable_minimum
+    fi
+    comparison=$(vercmp "$version" "$floor")
+    if [[ "$comparison" =~ ^-?[0-9]+$ ]] && ((comparison >= 0)); then
+      ok "$package $version >= $floor"
+    else
+      fail "$package $version es anterior al mínimo $floor"
+    fi
+  done < <(python3 -c '
+import json, sys
+for package, item in sorted(json.load(sys.stdin).get("compatibility", {}).get("packages", {}).items()):
+    print(package, item["minimum"], item.get("stable_minimum", "-"), item["source"], sep="\t")
+' <<<"$plan_json")
+}
+check_snapshot() {
+  local snapshot="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/hardware/capabilities.json" current
+  [[ -f "$snapshot" ]] || { info 'Sin snapshot previo de hardware'; return; }
+  current=$(python3 "$repo_root/scripts/dotfiles_host.py" detect 2>/dev/null || true)
+  [[ -n "$current" ]] || { warn 'No se pudo actualizar la detección de hardware'; return; }
+  if python3 - "$snapshot" "$current" <<'PY'
+import json, sys
+old = json.load(open(sys.argv[1], encoding="utf-8"))
+new = json.loads(sys.argv[2])
+keys = ("gpu_vendors", "monitors", "has_internal_panel", "backlights", "batteries", "pipewire", "openrgb")
+raise SystemExit(0 if all(old.get(key) == new.get(key) for key in keys) else 1)
+PY
+  then ok 'Hardware coincide con el último snapshot'
+  else warn 'El hardware cambió desde el snapshot; ejecuta dotf host refresh antes de aplicar preferencias'
+  fi
+}
+check_rgb() {
+  if ! has bundles rgb-openrgb; then info 'Bundle rgb-openrgb no seleccionado'; return; fi
+  check_command 'OpenRGB disponible para rgb-openrgb' openrgb
+  local config="${XDG_CONFIG_HOME:-$HOME/.config}/reactive-rgb/config.conf"
+  if [[ -r "$config" ]]; then ok 'Targets RGB locales presentes'
+  else warn 'rgb-openrgb sin targets locales: el servicio debe permanecer desactivado'
+  fi
+  if systemctl --user is-enabled --quiet reactive-rgb.service 2>/dev/null; then
+    [[ -r "$config" ]] && ok 'Servicio RGB habilitado con targets' || fail 'Servicio RGB habilitado sin targets exactos'
+    local rgb_health
+    if rgb_health="$("$HOME/.local/bin/reactive-rgb" health 2>/dev/null)" &&
+      grep -Fxq 'health_status=ok' <<<"$rgb_health" &&
+      grep -Fxq 'health_scope=liveness-with-periodic-hardware-reapply' <<<"$rgb_health" &&
+      grep -Fxq 'health_fresh=1' <<<"$rgb_health"; then
+      ok 'Reactive RGB activo y con aplicación reciente'
+    else
+      warn 'Reactive RGB no tiene una aplicación saludable reciente'
+    fi
+  else info 'Servicio RGB no habilitado'
+  fi
+}
+check_backup() {
+  if ! has bundles backup; then info 'Bundle backup no seleccionado'; return; fi
+  check_command 'Restic disponible para backup' restic
+  check_command 'rclone disponible para backup' rclone
+  systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer 2>/dev/null && ok 'Timers Restic habilitados' || info 'Timers Restic no habilitados'
+}
+check_base_workflows() {
+	check 'Contrato de teclado Alt/Hyper y Kanata' "$repo_root/scripts/tests/test_keyboard_contract.sh"
+	check 'Fallback portable de Hyprland' "$repo_root/scripts/tests/test_hypr_host_fallback.sh"
+	check 'Resolución y generación del host' env PYTHONDONTWRITEBYTECODE=1 python "$repo_root/scripts/tests/test_dotfiles_host.py"
+	check 'Versiones mínimas sin pins' "$repo_root/scripts/tests/test_runtime_compatibility.sh"
+	check 'CLI dotf sin perfiles' "$repo_root/scripts/tests/test_dotf_function.sh"
+	check 'Migración y rollback transaccional' "$repo_root/scripts/tests/test_install_transaction.sh"
+	check 'Superficie y atajos portables' "$repo_root/scripts/tests/test_desktop_surface.sh"
+  check 'Captura OCR a contexto' "$repo_root/scripts/tests/test_capture_context.sh"
+  check 'Modo foco y demo reversible' "$repo_root/scripts/tests/test_desktop_focus_mode.sh"
+  check 'Acciones locales del launcher' "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
+  check 'Compartir con LocalSend' "$repo_root/scripts/tests/test_local_share.sh"
+  check 'Launcher multimedia' "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
+  check 'Práctica de mecanografía' "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
+  check 'Apariencias coordinadas' "$repo_root/scripts/tests/test_appearance_switch.sh"
+  check 'Temas terminales generados' env PYTHONDONTWRITEBYTECODE=1 python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
+  check 'Colección de fondos al iniciar' "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
+  check 'Arranque único de 1Password' "$repo_root/scripts/tests/test_ensure_1password_tray.sh"
+  check 'Paleta activa de Orca' "$repo_root/scripts/tests/test_orca_safe_settings.sh"
+  check 'Orca en segundo plano' "$repo_root/scripts/tests/test_orca_background.sh"
+  check 'Caja de herramientas de captura' "$repo_root/scripts/tests/test_capture_toolbox.sh"
+  check 'Demo Studio' "$repo_root/scripts/tests/test_demo_studio.sh"
+  check 'Puertos de desarrollo' "$repo_root/scripts/tests/test_dev_ports.sh"
+  check 'Contexto de crashes' "$repo_root/scripts/tests/test_crash_context.sh"
+  check 'Anchos de ventana' "$repo_root/scripts/tests/test_window_width.sh"
+  check 'Migración de enlaces retirados' "$repo_root/scripts/tests/test_migrate_retired_desktop_links.sh"
+  check 'Direct scanout reversible' "$repo_root/scripts/tests/test_direct_scanout_toggle.sh"
+  check 'Configuración qutebrowser' env PYTHONDONTWRITEBYTECODE=1 python "$repo_root/scripts/tests/test_qutebrowser_config.py"
+  check 'Enlaces Markdown qutebrowser' "$repo_root/scripts/tests/test_qutebrowser_yank_markdown.sh"
+  check 'Kanata' kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
+}
+check_optional_config() {
+  if has bundles gaming-core; then
+    check 'Sesión gaming sin notificaciones' "$repo_root/scripts/tests/test_game_run_dnd.sh"
+  else info 'Checks gaming-core no seleccionados'; fi
+  if has bundles gaming-launchers; then
+    check 'Noctalia gaming' noctalia config validate "$repo_root/gaming-launchers/.config/noctalia/gaming.toml"
+    check 'Launcher gaming por bundles' "$repo_root/scripts/tests/test_gaming_launcher.sh"
+  else info 'Checks gaming-launchers no seleccionados'; fi
+  if has bundles gaming-tools; then
+    check 'Informes gaming' "$repo_root/scripts/tests/test_game_bench_report.sh"
+  else info 'Checks gaming-tools no seleccionados'; fi
+  if has bundles backup; then
+    check 'Unidades Restic' "$repo_root/scripts/verify-restic-units.sh"
+    check 'Backup portable' "$repo_root/scripts/tests/test_backup_portable.sh"
+  else info 'Checks backup no seleccionados'; fi
+  if has bundles rgb-openrgb; then
+    check 'RGB térmico sin targets versionados' "$repo_root/scripts/tests/test_reactive_rgb.sh"
+    check 'Unidad Reactive RGB' env HOME="$repo_root/rgb-openrgb" \
+      systemd-analyze --user verify "$repo_root/rgb-openrgb/.config/systemd/user/reactive-rgb.service"
+  else info 'Checks rgb-openrgb no seleccionados'; fi
+  check 'Acciones audio genéricas' "$repo_root/scripts/tests/test_cycle_desktop_audio_output.sh"
+  check 'Selector HDMI configurable' "$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
+  check 'Audio configurado al iniciar' "$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
+}
 check_gaming_packages() {
-	local -a required_packages=() missing_packages=()
-	local package
-
-	mapfile -t required_packages < <(
-		awk -F, '$1 == "desktop" && $2 == "gaming" { print $3 }' \
-			"$repo_root/packages.csv" | sort -u
-	)
-	if ((${#required_packages[@]} == 0)); then
-		fail "El manifiesto no declara paquetes gaming"
-		return
-	fi
-
-	for package in "${required_packages[@]}"; do
-		pacman -Qq "$package" >/dev/null 2>&1 || missing_packages+=("$package")
-	done
-	if ((${#missing_packages[@]})); then
-		fail "Paquetes gaming ausentes: ${missing_packages[*]}"
-	else
-		ok "Paquetes gaming instalados (${#required_packages[@]})"
-	fi
+  if ! has bundles gaming-core && ! has bundles gaming-launchers && ! has bundles gaming-tools; then
+    info 'Paquetes gaming no seleccionados'
+    return
+  fi
+  local -a packages=()
+  mapfile -t packages < <(bundle_packages gaming-core; bundle_packages gaming-launchers; bundle_packages gaming-tools)
+  ((${#packages[@]})) || { fail 'El manifiesto no declara paquetes gaming'; return; }
+  ok "Manifiesto gaming resuelto (${#packages[@]} paquetes)"
 }
-
 check_nvidia_stack() {
-	local gpu_info
-
-	if command -v chwd >/dev/null 2>&1; then
-		check "Perfil nvidia-open-dkms reconocido por CHWD" chwd --check nvidia-open-dkms
-	else
-		fail "CHWD no está disponible"
-	fi
-
-	if gpu_info="$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>&1)"; then
-		ok "NVIDIA operativo: $gpu_info"
-	else
-		printf '%s\n' "$gpu_info" >&2
-		fail "nvidia-smi no puede consultar la GPU"
-	fi
-
-	check "Runtime NVIDIA/Vulkan de 32 bits" pacman -Qq \
-		lib32-nvidia-utils lib32-vulkan-icd-loader
+  has capabilities gpu-nvidia || { info 'Stack NVIDIA no seleccionado'; return; }
+  if command -v chwd >/dev/null 2>&1; then
+    chwd --check 2>/dev/null && ok 'CHWD reconoce un driver NVIDIA' || warn 'CHWD no confirmó el driver NVIDIA activo'
+  else
+    info 'CHWD no está disponible para revisar NVIDIA'
+  fi
+  if nvidia-smi --query-gpu=name,driver_version --format=csv,noheader >/dev/null 2>&1; then
+    ok 'NVIDIA operativo'
+  else
+    fail 'gpu-nvidia seleccionado pero nvidia-smi no puede consultar la GPU'
+  fi
+  if has bundles gaming-core; then
+    pacman -Qq lib32-nvidia-utils lib32-vulkan-icd-loader >/dev/null 2>&1 && ok 'Runtime NVIDIA/Vulkan de 32 bits' || fail 'Falta runtime NVIDIA/Vulkan de 32 bits'
+  else
+    info 'Runtime NVIDIA de 32 bits no requerido sin gaming-core'
+  fi
 }
-
 check_gaming_scheduler() {
-	local ananicy_active=0
-	local gamemode_present=0
-	local power_profile sched_ext_state
-
-	if systemctl is-active --quiet ananicy-cpp.service; then
-		ananicy_active=1
-		ok "ananicy-cpp activo"
-	else
-		fail "ananicy-cpp no está activo"
-	fi
-
-	if pacman -Qq gamemode >/dev/null 2>&1 || command -v gamemoderun >/dev/null 2>&1 ||
-		pgrep -x gamemoded >/dev/null 2>&1; then
-		gamemode_present=1
-	fi
-	if ((ananicy_active && gamemode_present)); then
-		warn "GameMode coexiste con ananicy-cpp; no los envuelvas juntos"
-	else
-		ok "Sin coexistencia activa de GameMode y ananicy-cpp"
-	fi
-
-	if command -v game-performance >/dev/null 2>&1; then
-		ok "game-performance disponible"
-	else
-		fail "game-performance no está disponible"
-	fi
-
-	if power_profile="$(powerprofilesctl get 2>/dev/null)"; then
-		case "$power_profile" in
-		balanced) ok "Perfil base balanced; game-performance eleva solo cada juego" ;;
-		performance) warn "Perfil base performance; balanced evita consumo constante fuera del juego" ;;
-		*) info "Perfil energético actual: $power_profile" ;;
-		esac
-	else
-		fail "No se pudo consultar el perfil energético"
-	fi
-
-	sched_ext_state="$(cat /sys/kernel/sched_ext/state 2>/dev/null || true)"
-	if [[ "$sched_ext_state" == enabled ]]; then
-		ok "sched-ext activo; conserva el resultado solo si supera el benchmark base"
-	else
-		info "sched-ext sin scheduler activo; el kernel base sigue como referencia"
-	fi
+  has bundles gaming-core || { info 'Scheduler gaming no seleccionado'; return; }
+  if systemctl is-active --quiet ananicy-cpp.service; then ok 'ananicy-cpp activo'; else fail 'ananicy-cpp no está activo'; fi
+  if pacman -Qq gamemode >/dev/null 2>&1 || command -v gamemoderun >/dev/null 2>&1 || pgrep -x gamemoded >/dev/null 2>&1; then
+    warn 'GameMode coexiste con ananicy-cpp; no los envuelvas juntos'
+  else
+    ok 'Sin coexistencia activa de GameMode y ananicy-cpp'
+  fi
+  command -v game-performance >/dev/null 2>&1 && ok 'game-performance disponible' || fail 'game-performance no está disponible'
+  if command -v powerprofilesctl >/dev/null 2>&1; then
+    powerprofilesctl get >/dev/null 2>&1 && ok 'Perfil energético consultable' || fail 'No se pudo consultar el perfil energético'
+  else
+    info 'powerprofilesctl no disponible en este host'
+  fi
+  if [[ "$(cat /sys/kernel/sched_ext/state 2>/dev/null || true)" == enabled ]]; then ok 'sched-ext activo'; else info 'sched-ext sin scheduler activo'; fi
 }
-
 check_gaming_firmware_state() {
-	local memory_info bar_total bar_amount bar_unit board bios
-
-	if memory_info="$(inxi -mxxx --no-host --filter --color 0 2>/dev/null)"; then
-		if grep -Fq 'part-no: KF3200C16D4/16GX' <<<"$memory_info"; then
-			if grep -Fq 'speed: 3200 MT/s' <<<"$memory_info"; then
-				ok "DDR4 Kingston funcionando a 3200 MT/s"
-			else
-				warn "DDR4-3200 funcionando por debajo de 3200 MT/s; DOCP sigue pendiente"
-			fi
-		else
-			info "RAM distinta de la auditada; revisa su perfil nominal antes de usar DOCP"
-		fi
-	else
-		info "No se pudo leer la velocidad efectiva de la RAM"
-	fi
-
-	bar_total="$(nvidia-smi -q 2>/dev/null | awk '
-		/BAR1 Memory Usage/ { in_bar = 1; next }
-		in_bar && /Total/ { print $(NF - 1), $NF; exit }
-	')"
-	read -r bar_amount bar_unit <<<"$bar_total"
-	if [[ "$bar_amount" =~ ^[0-9]+$ ]]; then
-		if [[ "$bar_unit" == GiB || "$bar_unit" == TiB ||
-			("$bar_unit" == MiB && "$bar_amount" -gt 256) ]]; then
-			ok "BAR1 NVIDIA ampliada: $bar_total"
-		else
-			warn "BAR1 NVIDIA limitada a $bar_total; ReBAR sigue pendiente"
-		fi
-	else
-		info "No se pudo determinar el tamaño BAR1 de NVIDIA"
-	fi
-
-	board="$(cat /sys/class/dmi/id/board_name 2>/dev/null || true)"
-	bios="$(cat /sys/class/dmi/id/bios_version 2>/dev/null || true)"
-	if [[ "$board" == 'TUF GAMING B550-PLUS (WI-FI)' && "$bios" == 3636 ]]; then
-		ok "UEFI ASUS 3636, base auditada para las pruebas de firmware"
-	elif [[ -n "$board$bios" ]]; then
-		info "UEFI detectada: ${board:-placa desconocida}, BIOS ${bios:-desconocida}"
-	fi
+  has capabilities gpu-nvidia || { info 'Firmware NVIDIA no seleccionado'; return; }
+  if command -v inxi >/dev/null 2>&1; then
+    inxi -mxxx --no-host --filter --color 0 >/dev/null 2>&1 && ok 'Memoria consultable para auditoría' || warn 'No se pudo leer la memoria efectiva'
+  else
+    info 'inxi no disponible para auditar memoria'
+  fi
+  local bar_total bar_amount bar_unit
+  bar_total="$(nvidia-smi -q 2>/dev/null | awk '/BAR1 Memory Usage/ { in_bar = 1; next } in_bar && /Total/ { print $(NF - 1), $NF; exit }')"
+  read -r bar_amount bar_unit <<<"$bar_total"
+  if [[ "$bar_amount" =~ ^[0-9]+$ ]]; then
+    if [[ "$bar_unit" == GiB || "$bar_unit" == TiB || ( "$bar_unit" == MiB && "$bar_amount" -gt 256 ) ]]; then ok "BAR1 NVIDIA ampliada: $bar_total"; else warn "BAR1 NVIDIA limitada: $bar_total"; fi
+  else info 'No se pudo determinar BAR1 NVIDIA'; fi
 }
-
 check_gaming_monitors() {
-	local monitor_json workspace_json monitor_summary workspace_summary desktop_monitor_count
-
-	if [[ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-		info "Monitor gaming no comprobado: Hyprland no está accesible"
-		return
-	fi
-	if ! monitor_json="$(hyprctl -j monitors 2>/dev/null)"; then
-		fail "No se pudieron consultar los monitores activos"
-		return
-	fi
-	if ! workspace_json="$(hyprctl -j workspaces 2>/dev/null)"; then
-		fail "No se pudieron consultar los workspaces activos"
-		return
-	fi
-	if jq -e --argjson workspaces "$workspace_json" '
-		type == "array" and
-		([.[] | select(.name == "HDMI-A-1" or .name == "HDMI-A-2")] as $monitors |
-			($monitors | length) >= 1 and ($monitors | length) <= 2 and
-			all($monitors[];
-				.refreshRate >= 74.8 and .refreshRate <= 75.1 and .vrr == false) and
-			if ($monitors | length) == 2 then
-				all(range(1; 5); . as $id |
-					any($workspaces[]; .id == $id and .monitor == "HDMI-A-1")) and
-				all(range(5; 9); . as $id |
-					any($workspaces[]; .id == $id and .monitor == "HDMI-A-2")) and
-				($monitors | any(.name == "HDMI-A-1" and
-					.activeWorkspace.id >= 1 and .activeWorkspace.id <= 4)) and
-				($monitors | any(.name == "HDMI-A-2" and
-					.activeWorkspace.id >= 5 and .activeWorkspace.id <= 8))
-			else
-				($monitors[0].name) as $only |
-				all(range(1; 9); . as $id |
-					any($workspaces[]; .id == $id and .monitor == $only)) and
-				($monitors[0].activeWorkspace.id >= 1 and
-					$monitors[0].activeWorkspace.id <= 8)
-			end)
-	' >/dev/null 2>&1 <<<"$monitor_json"; then
-		desktop_monitor_count="$(
-			jq '[.[] | select(.name == "HDMI-A-1" or .name == "HDMI-A-2")] | length' \
-				<<<"$monitor_json"
-		)"
-		if [[ "$desktop_monitor_count" -eq 1 ]]; then
-			ok "Ocho workspaces en el único monitor activo a 74.97/75 Hz, VRR desactivado"
-		else
-			ok "Workspaces 1-4 a la izquierda y 5-8 a la derecha, 74.97/75 Hz, VRR desactivado"
-		fi
-	else
-		monitor_summary="$(
-			jq -r '.[] | "\(.name): \(.refreshRate) Hz, VRR=\(.vrr)"' \
-				<<<"$monitor_json" 2>/dev/null || true
-		)"
-		workspace_summary="$(
-			jq -r '.[] | select(.id >= 1 and .id <= 8) | "workspace \(.id): \(.monitor)"' \
-				<<<"$workspace_json" 2>/dev/null || true
-		)"
-		[[ -z "$monitor_summary" ]] || printf '%s\n' "$monitor_summary" >&2
-		[[ -z "$workspace_summary" ]] || printf '%s\n' "$workspace_summary" >&2
-		fail "La topología de monitores y workspaces del desktop no coincide con la política adaptativa"
-	fi
+  has bundles gaming-core || { info 'Monitores gaming no seleccionados'; return; }
+  [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]] || { info 'Monitor gaming no comprobado: Hyprland no está accesible'; return; }
+  local monitor_json workspace_json
+  monitor_json="$(hyprctl -j monitors 2>/dev/null)" || { fail 'No se pudieron consultar los monitores activos'; return; }
+  workspace_json="$(hyprctl -j workspaces 2>/dev/null)" || { fail 'No se pudieron consultar los workspaces activos'; return; }
+  if jq -e 'type == "array" and length > 0 and all(.[]; (.name | type) == "string" and (.activeWorkspace.id | type) == "number")' >/dev/null 2>&1 <<<"$monitor_json" && jq -e 'type == "array"' >/dev/null 2>&1 <<<"$workspace_json"; then
+    ok 'Topología Hyprland disponible para gaming'
+  else fail 'Topología Hyprland inválida para gaming'; fi
 }
-
 check_steam_filesystems() {
-	local -a steam_paths=(
-		"$HOME/.local/share/Steam"
-		"$HOME/.steam/steam"
-		"$HOME/.var/app/com.valvesoftware.Steam/data/Steam"
-	)
-	local -a library_files=()
-	local steam_path library_file resolved fstype
-	local found=0
-	local -A seen_paths=()
-
-	for steam_path in "${steam_paths[@]}"; do
-		[[ -f "$steam_path/steamapps/libraryfolders.vdf" ]] &&
-			library_files+=("$steam_path/steamapps/libraryfolders.vdf")
-	done
-	for library_file in "${library_files[@]}"; do
-		while IFS= read -r steam_path; do
-			[[ -z "$steam_path" ]] || steam_paths+=("$steam_path")
-		done < <(
-			sed -nE 's/^[[:space:]]*"path"[[:space:]]*"([^"]+)".*/\1/p' \
-				"$library_file"
-		)
-	done
-
-	for steam_path in "${steam_paths[@]}"; do
-		[[ -d "$steam_path" ]] || continue
-		resolved="$(readlink -f -- "$steam_path" 2>/dev/null || true)"
-		[[ -n "$resolved" ]] || continue
-		[[ -z "${seen_paths[$resolved]+x}" ]] || continue
-		seen_paths["$resolved"]=1
-		found=$((found + 1))
-		fstype="$(findmnt -n -o FSTYPE -T "$resolved" 2>/dev/null || true)"
-		case "$fstype" in
-		btrfs)
-			ok "Biblioteca Steam en Btrfs: $resolved"
-			;;
-		ntfs | ntfs3 | fuseblk)
-			fail "Biblioteca Steam en NTFS no admitida: $resolved"
-			;;
-		*)
-			warn "Biblioteca Steam fuera de Btrfs ($fstype): $resolved"
-			;;
-		esac
-	done
-	((found > 0)) || info "Steam aún no tiene una biblioteca local que comprobar"
+  has bundles gaming-core || { info 'Bibliotecas Steam no seleccionadas'; return; }
+  local -a steam_paths=("$HOME/.local/share/Steam" "$HOME/.steam/steam" "$HOME/.var/app/com.valvesoftware.Steam/data/Steam") library_files=()
+  local steam_path library_file resolved fstype found=0
+  local -A seen_paths=()
+  for steam_path in "${steam_paths[@]}"; do [[ -f "$steam_path/steamapps/libraryfolders.vdf" ]] && library_files+=("$steam_path/steamapps/libraryfolders.vdf"); done
+  for library_file in "${library_files[@]}"; do while IFS= read -r steam_path; do [[ -n "$steam_path" ]] && steam_paths+=("$steam_path"); done < <(sed -nE 's/^[[:space:]]*"path"[[:space:]]*"([^"]+)".*/\1/p' "$library_file"); done
+  for steam_path in "${steam_paths[@]}"; do
+    [[ -d "$steam_path" ]] || continue; resolved="$(readlink -f -- "$steam_path" 2>/dev/null || true)"; [[ -n "$resolved" && -z "${seen_paths[$resolved]+x}" ]] || continue; seen_paths["$resolved"]=1; found=$((found + 1)); fstype="$(findmnt -n -o FSTYPE -T "$resolved" 2>/dev/null || true)"
+    case "$fstype" in btrfs) ok "Biblioteca Steam en Btrfs: $resolved" ;; ntfs|ntfs3|fuseblk) fail "Biblioteca Steam en NTFS no admitida: $resolved" ;; *) warn "Biblioteca Steam fuera de Btrfs ($fstype): $resolved" ;; esac
+  done
+  ((found > 0)) || info 'Steam aún no tiene una biblioteca local que comprobar'
 }
-
 check_dualsense() {
-	if modinfo hid_playstation >/dev/null 2>&1; then
-		ok "Driver hid-playstation disponible"
-	else
-		fail "Driver hid-playstation no disponible"
-	fi
-
-	if systemctl is-active --quiet bluetooth.service; then
-		ok "Bluetooth activo para DualSense"
-	else
-		warn "Bluetooth no está activo; DualSense queda disponible por USB"
-	fi
-
-	if grep -Eiq 'Name=.*(DualSense|Sony Interactive Entertainment.*Wireless Controller)' \
-		/proc/bus/input/devices 2>/dev/null ||
-		{ command -v lsusb >/dev/null 2>&1 && lsusb | grep -Eiq '054c:(0ce6|0df2)'; }; then
-		ok "DualSense conectado"
-	else
-		info "DualSense no conectado (comprobación opcional)"
-	fi
+  has bundles gaming-core || { info 'DualSense no requerido sin gaming-core'; return; }
+  modinfo hid_playstation >/dev/null 2>&1 && ok 'Driver hid-playstation disponible' || info 'Driver hid-playstation no disponible (mando opcional)'
+  systemctl is-active --quiet bluetooth.service && ok 'Bluetooth activo para mando' || warn 'Bluetooth no está activo; el mando queda disponible por USB'
+  if grep -Eiq 'Name=.*(DualSense|Sony Interactive Entertainment.*Wireless Controller)' /proc/bus/input/devices 2>/dev/null || { command -v lsusb >/dev/null 2>&1 && lsusb | grep -Eiq '054c:(0ce6|0df2)'; }; then ok 'DualSense conectado'; else info 'DualSense no conectado (opcional)'; fi
 }
-
 check_nvidia_cache() {
-	local cache_config="$HOME/.config/environment.d/90-nvidia-game-cache.conf"
-	local manager_cache=''
-
-	if [[ ! -f "$cache_config" ]]; then
-		fail "Falta la configuración de caché NVIDIA: $cache_config"
-	elif ! grep -qx '__GL_SHADER_DISK_CACHE=1' "$cache_config" ||
-		! grep -qx '__GL_SHADER_DISK_CACHE_SIZE=12000000000' "$cache_config"; then
-		fail "La configuración de caché NVIDIA no coincide con 12 GB"
-	else
-		ok "Caché de shaders NVIDIA configurada a 12 GB"
-	fi
-
-	if [[ "${__GL_SHADER_DISK_CACHE:-}" == 1 &&
-		"${__GL_SHADER_DISK_CACHE_SIZE:-}" == 12000000000 ]]; then
-		ok "Variables de caché NVIDIA cargadas en la sesión"
-	elif manager_cache="$(
-		systemctl --user show-environment 2>/dev/null |
-			grep -E '^__GL_SHADER_DISK_CACHE(=1|_SIZE=12000000000)$' || true
-	)" && [[ "$manager_cache" == *'__GL_SHADER_DISK_CACHE=1'* &&
-		"$manager_cache" == *'__GL_SHADER_DISK_CACHE_SIZE=12000000000'* ]]; then
-		ok "Variables de caché NVIDIA cargadas para nuevas aplicaciones UWSM"
-	else
-		warn "La sesión aún no cargó las variables de caché NVIDIA; vuelve a entrar"
-	fi
+  has capabilities gpu-nvidia || { info 'Caché NVIDIA no seleccionada'; return; }
+  local cache_config="${XDG_CONFIG_HOME:-$HOME/.config}/environment.d/90-nvidia-game-cache.conf" manager_cache=''
+  if [[ ! -f "$cache_config" ]]; then fail "Falta configuración de caché NVIDIA: $cache_config"
+  elif grep -qx '__GL_SHADER_DISK_CACHE=1' "$cache_config" && grep -qx '__GL_SHADER_DISK_CACHE_SIZE=12000000000' "$cache_config"; then ok 'Caché de shaders NVIDIA configurada'
+  else fail 'La configuración de caché NVIDIA no coincide con la política'; fi
+  if [[ "${__GL_SHADER_DISK_CACHE:-}" == 1 && "${__GL_SHADER_DISK_CACHE_SIZE:-}" == 12000000000 ]]; then ok 'Variables de caché NVIDIA cargadas en sesión'
+  elif manager_cache="$(systemctl --user show-environment 2>/dev/null | grep -E '^__GL_SHADER_DISK_CACHE(=1|_SIZE=12000000000)$' || true)" && [[ "$manager_cache" == *'__GL_SHADER_DISK_CACHE=1'* && "$manager_cache" == *'__GL_SHADER_DISK_CACHE_SIZE=12000000000'* ]]; then ok 'Variables NVIDIA cargadas para UWSM'
+  else warn 'La sesión aún no cargó variables de caché NVIDIA'; fi
 }
-
 check_ignored_nvidia_parameter() {
-	local kernel_log
-
-	if ! command -v journalctl >/dev/null 2>&1; then
-		info "Journal no disponible para revisar parámetros NVIDIA"
-		return
-	fi
-	if ! kernel_log="$(journalctl -b -k --no-pager 2>/dev/null)"; then
-		info "Journal del kernel no accesible; parámetro NVIDIA no comprobado"
-		return
-	fi
-	if grep -Fq "nvidia: unknown parameter 'NVreg_UsePageAttributeTable' ignored" \
-		<<<"$kernel_log"; then
-		warn "NVIDIA ignoró NVreg_UsePageAttributeTable en este arranque (no fatal)"
-	else
-		ok "Sin parámetros NVIDIA ignorados conocidos en este arranque"
-	fi
+  has capabilities gpu-nvidia || return
+  local kernel_log
+  kernel_log="$(journalctl -b -k --no-pager 2>/dev/null || true)"
+  [[ -n "$kernel_log" ]] || { info 'Journal del kernel no accesible'; return; }
+  grep -Fq "nvidia: unknown parameter 'NVreg_UsePageAttributeTable' ignored" <<<"$kernel_log" && warn 'NVIDIA ignoró un parámetro conocido' || ok 'Sin parámetros NVIDIA ignorados conocidos'
 }
-
-check_gaming() {
-	printf '\nGaming (solo desktop)\n'
-	check_gaming_packages
-	check_nvidia_stack
-	check_gaming_scheduler
-	check_gaming_firmware_state
-	check_gaming_monitors
-	check_steam_filesystems
-	check_dualsense
-	check_nvidia_cache
-	check_ignored_nvidia_parameter
-}
-
 check_backup_runtime() {
-	local package
-	for package in restic rclone ludusavi-bin; do
-		if pacman -Qq "$package" >/dev/null 2>&1; then
-			ok "Backup: paquete $package instalado"
-		else
-			fail "Backup: falta el paquete $package"
-		fi
-	done
-
-	if [[ -f "$HOME/.env.op" ]]; then
-		ok "Backup: fichero local de referencias presente (contenido no leído)"
-	else
-		warn "Backup: falta ~/.env.op; configura referencias Restic en 1Password"
-	fi
-	if [[ -f "$HOME/.local/share/systemd/credentials/restic-password.cred" ]]; then
-		ok "Backup: credencial cifrada de systemd presente (contenido no leído)"
-	else
-		warn "Backup: falta la credencial cifrada para ejecución desatendida"
-	fi
-	if systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer; then
-		ok "Timers Restic de usuario activos"
-	else
-		warn "Timers Restic de usuario todavía desactivados"
-	fi
+  has bundles backup || { info 'Runtime backup no seleccionado'; return; }
+  local repository_file="${XDG_CONFIG_HOME:-$HOME/.config}/restic/repository"
+  [[ -f "$HOME/.env.op" ]] && ok 'Referencias secretas locales presentes (sin leer)' || warn 'Faltan referencias secretas locales para Restic'
+  [[ -s "$repository_file" && ! -L "$repository_file" ]] && ok 'Repositorio Restic local configurado (sin mostrarlo)' || fail 'Falta el repositorio Restic local generado'
+  if systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer; then
+    [[ -f "$HOME/.local/share/systemd/credentials/restic-password.cred" ]] && ok 'Credencial Restic cifrada presente (sin leer)' || fail 'Timers Restic activos sin credencial cifrada'
+    ok 'Timers Restic activos'
+  else
+    [[ -f "$HOME/.local/share/systemd/credentials/restic-password.cred" ]] && ok 'Credencial Restic cifrada presente (sin leer)' || info 'Credencial Restic aún no creada'
+    info 'Timers Restic no activados'
+  fi
 }
-
 check_desktop_runtime() {
-	local command plugin_list rgb_health timer_manifest
-	for command in zenity localsend wl-paste systemd-run whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl codexbar qmd; do
-		if command -v "$command" >/dev/null 2>&1; then
-			ok "Flujo desktop: $command disponible"
-		else
-			fail "Flujo desktop: falta $command"
-		fi
-	done
-	if pacman -Qq ggml-cpu ggml-vulkan >/dev/null 2>&1; then
-		ok "Whisper: backends GGML CPU y Vulkan instalados"
-	else
-		fail "Whisper: faltan backends GGML CPU o Vulkan"
-	fi
-	if [[ -s "$HOME/.local/share/whisper.cpp/ggml-base.bin" ]]; then
-		ok "Whisper: modelo base local presente"
-	else
-		warn "Whisper: falta el modelo base; ejecuta just dictation-setup"
-	fi
-	if plugin_list="$(noctalia msg plugins list 2>/dev/null)"; then
-		if grep -Fxq 'jamesfeeder/special-workspaces [community] 1.4.0 enabled' <<<"$plugin_list"; then
-			ok "Noctalia: versión revisada de Special Workspaces"
-		else
-			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
-		fi
-		if grep -Fxq 'salemsayed/codexbar-meter [community] 1.0.0 enabled' <<<"$plugin_list"; then
-			ok "Noctalia: CodexBar Meter habilitado"
-		else
-			fail "Noctalia: CodexBar Meter no está habilitado"
-		fi
-		if grep -Fxq 'noctalia/notes [official] 1.0.3 enabled' <<<"$plugin_list"; then
-			ok "Noctalia: Notes oficial habilitado"
-		else
-			fail "Noctalia: Notes oficial 1.0.3 no está habilitado"
-		fi
-		timer_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
-		if grep -Fxq 'noctalia/timer [local] 1.2.1 enabled' <<<"$plugin_list" &&
-			[[ -f "$timer_manifest" ]]; then
-			ok "Noctalia: Timer local con alarma habilitado"
-		else
-			fail "Noctalia: Timer local con alarma no está habilitado o desplegado"
-		fi
-	else
-		fail "Noctalia: no se pudo consultar el catálogo de plugins activo"
-	fi
-	if command -v ddcutil >/dev/null 2>&1; then
-		if ddcutil detect --brief >/dev/null 2>&1; then
-			ok "DDC/CI responde para gestionar brillo externo"
-		else
-			warn "ddcutil no detectó una pantalla DDC/CI accesible"
-		fi
-	else
-		fail "ddcutil no está instalado"
-	fi
-	if command -v gpu-screen-recorder >/dev/null 2>&1; then
-		ok "gpu-screen-recorder disponible"
-	else
-		fail "gpu-screen-recorder no está instalado"
-	fi
-	if command -v openrgb >/dev/null 2>&1 && command -v liquidctl >/dev/null 2>&1; then
-		ok "RGB: OpenRGB y liquidctl disponibles"
-	else
-		fail "RGB: faltan OpenRGB o liquidctl"
-	fi
-	if systemctl --user is-enabled --quiet reactive-rgb.service &&
-		systemctl --user is-active --quiet reactive-rgb.service &&
-		rgb_health="$("$HOME/.local/bin/reactive-rgb" health 2>/dev/null)" &&
-		grep -Fxq 'health_status=ok' <<<"$rgb_health" &&
-		grep -Fxq 'health_scope=liveness-with-periodic-hardware-reapply' <<<"$rgb_health" &&
-		grep -Fxq 'health_fresh=1' <<<"$rgb_health"; then
-		ok "RGB: bucle activo; última aplicación completa y revalidación periódica configurada"
-	else
-		warn "RGB: reactive-rgb.service no tiene actividad reciente o una aplicación completa"
-	fi
-	check_backup_runtime
-}
-
-check_desktop_workflows() {
-	check "Superficie limpia y atajos" "$repo_root/scripts/tests/test_desktop_surface.sh"
-	check "Captura OCR a contexto" "$repo_root/scripts/tests/test_capture_context.sh"
-	check "Modo foco y demo reversible" "$repo_root/scripts/tests/test_desktop_focus_mode.sh"
-	check "Acciones locales del launcher" "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
-	check "Compartir con LocalSend" "$repo_root/scripts/tests/test_local_share.sh"
-	check "Launcher multimedia" "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
-	check "Práctica de mecanografía" "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
-	check "Apariencias coordinadas" "$repo_root/scripts/tests/test_appearance_switch.sh"
-	check "Temas terminales generados" env PYTHONDONTWRITEBYTECODE=1 \
-		python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
-	check "Colección de fondos al iniciar" "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
-	check "Arranque único de 1Password" "$repo_root/scripts/tests/test_ensure_1password_tray.sh"
-	check "Paleta activa de Orca" "$repo_root/scripts/tests/test_orca_safe_settings.sh"
-	check "Orca en segundo plano" "$repo_root/scripts/tests/test_orca_background.sh"
-	check "Caja de herramientas de captura" "$repo_root/scripts/tests/test_capture_toolbox.sh"
-	check "Demo Studio" "$repo_root/scripts/tests/test_demo_studio.sh"
-	check "Puertos de desarrollo" "$repo_root/scripts/tests/test_dev_ports.sh"
-	check "Contexto de crashes" "$repo_root/scripts/tests/test_crash_context.sh"
-	check "Anchos de ventana" "$repo_root/scripts/tests/test_window_width.sh"
-	check "RGB térmico" "$repo_root/scripts/tests/test_reactive_rgb.sh"
-	check "Ciclo de servicio del perfil" "$repo_root/scripts/tests/test_profile_service_lifecycle.sh"
-	check "Informes de benchmark" "$repo_root/scripts/tests/test_game_bench_report.sh"
-	check "Launcher de benchmarks" "$repo_root/scripts/tests/test_gaming_launcher.sh"
-	check "Migración de enlaces retirados" "$repo_root/scripts/tests/test_migrate_retired_desktop_links.sh"
-	check "Direct scanout reversible" "$repo_root/scripts/tests/test_direct_scanout_toggle.sh"
-	check "Dictado local" "$repo_root/scripts/tests/test_local_dictation.sh"
-	check "Project Cockpit" "$repo_root/scripts/tests/test_project_session.sh"
-	check "Proveedor de proyectos" "$repo_root/scripts/tests/test_project_launcher.sh"
-	check "Configuración de qutebrowser" env PYTHONDONTWRITEBYTECODE=1 \
-		python "$repo_root/scripts/tests/test_qutebrowser_config.py"
-	check "Enlaces Markdown de qutebrowser" "$repo_root/scripts/tests/test_qutebrowser_yank_markdown.sh"
+  local command plugin_list timer_manifest
+  for command in zenity localsend wl-paste systemd-run tesseract zbarimg ffmpeg magick mpv ss coredumpctl; do command -v "$command" >/dev/null 2>&1 && ok "Base runtime: $command" || fail "Falta base runtime: $command"; done
+  if has bundles local-ai; then
+    command -v whisper-cli >/dev/null 2>&1 && ok 'Whisper disponible' || fail 'Falta whisper-cli para local-ai'
+    command -v wtype >/dev/null 2>&1 && ok 'Pegado de dictado disponible' || fail 'Falta wtype para local-ai'
+    pacman -Qq ggml-cpu ggml-vulkan >/dev/null 2>&1 && ok 'Backends GGML instalados' || fail 'Faltan backends GGML'
+    [[ -s "${XDG_DATA_HOME:-$HOME/.local/share}/whisper.cpp/ggml-base.bin" ]] && ok 'Modelo Whisper base presente' || warn 'Falta modelo Whisper base'
+  else info 'Runtime local-ai no seleccionado'; fi
+  if has bundles productivity-extra; then for command in ttyper codexbar qmd; do command -v "$command" >/dev/null 2>&1 && ok "Productividad: $command" || fail "Falta productividad: $command"; done; else info 'Runtime productivity-extra no seleccionado'; fi
+  command -v gpu-screen-recorder >/dev/null 2>&1 && ok 'gpu-screen-recorder disponible' || fail 'Falta gpu-screen-recorder'
+  if command -v ddcutil >/dev/null 2>&1; then ddcutil detect --brief >/dev/null 2>&1 && ok 'DDC/CI responde' || warn 'No hay pantalla DDC/CI accesible'; else info 'ddcutil no disponible'; fi
+  if plugin_list="$(noctalia msg plugins list 2>/dev/null)"; then
+    grep -Fxq 'jamesfeeder/special-workspaces [community] 1.4.0 enabled' <<<"$plugin_list" && ok 'Noctalia Special Workspaces 1.4.0 habilitado' || fail 'Noctalia Special Workspaces cambió o no está habilitado'
+    grep -Fxq 'noctalia/notes [official] 1.0.3 enabled' <<<"$plugin_list" && ok 'Noctalia Notes 1.0.3 habilitado' || fail 'Noctalia Notes 1.0.3 no está habilitado'
+    timer_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
+    grep -Fxq 'noctalia/timer [local] 1.2.1 enabled' <<<"$plugin_list" && [[ -f "$timer_manifest" ]] && ok 'Noctalia Timer 1.2.1 habilitado' || fail 'Noctalia Timer 1.2.1 no está habilitado o desplegado'
+    if has bundles productivity-extra; then grep -Fxq 'salemsayed/codexbar-meter [community] 1.0.0 enabled' <<<"$plugin_list" && ok 'Noctalia CodexBar 1.0.0 habilitado' || fail 'Noctalia CodexBar 1.0.0 no está habilitado'; fi
+  else warn 'No se pudo consultar plugins Noctalia activos'; fi
 }
 
 if [[ "$mode" != live ]]; then
-	printf 'Configuración reproducible\n'
-	check "Hyprland workstation" env HYPR_PROFILE_DIR="$repo_root/hypr-laptop/.config/hypr" \
+  printf 'Configuración reproducible\n'
+  check_command 'Python 3 para resolver el host' python3
+  check_command 'GNU Stow disponible' stow
+  check_command 'Hyprland disponible' Hyprland
+  check_command 'Noctalia disponible' noctalia
+  check_minimum_versions
+  if command -v noctalia >/dev/null 2>&1; then
+    noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml" >/dev/null 2>&1 && ok 'Noctalia base válido' || fail 'Noctalia base inválido'
+  fi
+	check 'Hyprland host genérico' env \
+		HYPR_HOST_DIR="$repo_root/hypr-host/.config/hypr" \
+		DOTFILES_DEPLOYED_HYPR_DIR="$repo_root/hypr-host/.config/hypr" \
+		DOTFILES_GENERATED_HYPR_DIR="$repo_root/hypr-host/.config/hypr" \
 		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
-	check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
-		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
-	check_no_warnings "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
-	check_no_warnings "Noctalia gaming desktop" noctalia config validate \
-		"$repo_root/gaming/.config/noctalia/gaming.toml"
-	check_no_warnings "Noctalia audio desktop" noctalia config validate \
-		"$repo_root/hypr-desktop/.config/noctalia/desktop-audio.toml"
-	check "Audio HDMI del monitor derecho" \
-		"$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
-	check "Selector HDMI desde Noctalia" \
-		"$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
-	check "Selector de salida entre Bluetooth y HDMI" \
-		"$repo_root/scripts/tests/test_cycle_desktop_audio_output.sh"
-	check "Sesión gaming sin notificaciones" \
-		"$repo_root/scripts/tests/test_game_run_dnd.sh"
-	check_desktop_workflows
-	check "Kanata" kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
-	check "Unidades Restic" "$repo_root/scripts/verify-restic-units.sh"
-	check "Unidad Reactive RGB" systemd-analyze --user verify \
-		"$repo_root/hypr-desktop/.config/systemd/user/reactive-rgb.service"
-	if [[ "$mode" == config ]]; then
-		check "Stow hermético $profile" "$repo_root/scripts/stow-lint.sh" "$profile"
-	else
-		check "Stow desplegado $profile" just --justfile "$repo_root/justfile" check "$profile"
-	fi
-	check "Whitespace Git" git -C "$repo_root" diff --check
+	check_base_workflows
+	check_optional_config
+  for bundle in gaming-core gaming-launchers gaming-tools backup rgb-openrgb local-ai productivity-extra; do check_bundle_packages "$bundle"; done
+  if has capabilities gpu-nvidia; then
+    command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi --query-gpu=name --format=csv,noheader >/dev/null 2>&1 && ok 'Capacidad gpu-nvidia operativa' || fail 'Capacidad gpu-nvidia seleccionada pero no operativa'
+  else info 'Capacidad gpu-nvidia no seleccionada'
+  fi
+  "$repo_root/scripts/tests/test_qmd_template.sh" && ok 'Plantilla QMD portable' || fail 'Plantilla QMD no portable'
+	check 'Stow hermético resuelto' "$repo_root/scripts/stow-lint.sh"
+  git -C "$repo_root" diff --check && ok 'Whitespace Git' || fail 'Whitespace Git'
 fi
 
 if [[ "$mode" != config ]]; then
-	printf '\nHost vivo\n'
-	if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
-		check_empty "Hyprland sin errores activos" hyprctl configerrors
-	else
-		warn "Hyprland no está disponible en esta sesión"
-	fi
-	check "Base CachyOS" "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
-
+  printf '\nHost vivo\n'
+  check_snapshot
+	check 'Base CachyOS' "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
 	system_failed="$(systemctl --failed --no-legend --plain 2>/dev/null || true)"
-	if [[ -z "$system_failed" ]]; then
-		ok "Sin unidades del sistema fallidas"
-	else
-		fail "Hay unidades del sistema fallidas"
-		printf '%s\n' "$system_failed"
-	fi
+	[[ -z "$system_failed" ]] && ok 'Sin unidades del sistema fallidas' || fail 'Hay unidades del sistema fallidas'
 	user_failed="$(systemctl --user --failed --no-legend --plain 2>/dev/null || true)"
-	if [[ -z "$user_failed" ]]; then
-		ok "Sin unidades de usuario fallidas"
-	else
-		fail "Hay unidades de usuario fallidas"
-		printf '%s\n' "$user_failed"
-	fi
-
-	if systemctl is-enabled --quiet btrfs-scrub@-.timer; then
-		ok "Scrub Btrfs periódico activo"
-	else
-		warn "Scrub Btrfs periódico desactivado"
-	fi
-	if systemctl is-enabled --quiet smartd.service; then
-		ok "SMART periódico activo"
-	else
-		warn "smartd.service desactivado"
-	fi
-
-	if journalctl -b --no-pager 2>/dev/null | grep -q 'Timed out waiting for device /dev/tpm'; then
-		warn "El arranque esperó por un dispositivo TPM inexistente"
-	else
-		ok "Sin timeout TPM en este arranque"
-	fi
-
-	mapfile -t orphans < <(pacman -Qdtq 2>/dev/null)
-	if ((${#orphans[@]})); then
-		warn "Paquetes huérfanos: ${orphans[*]}"
-	else
-		ok "Sin paquetes huérfanos"
-	fi
-
-	if [[ "$profile" == desktop ]]; then
-		check_desktop_runtime
-		check_gaming
-	fi
+	[[ -z "$user_failed" ]] && ok 'Sin unidades de usuario fallidas' || fail 'Hay unidades de usuario fallidas'
+	systemctl is-enabled --quiet btrfs-scrub@-.timer && ok 'Scrub Btrfs periódico activo' || warn 'Scrub Btrfs periódico desactivado'
+	systemctl is-enabled --quiet smartd.service && ok 'SMART periódico activo' || warn 'smartd.service desactivado'
+	if journalctl -b --no-pager 2>/dev/null | grep -q 'Timed out waiting for device /dev/tpm'; then warn 'El arranque esperó por un TPM inexistente'; else ok 'Sin timeout TPM'; fi
+  if [[ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]]; then
+    if hyprctl configerrors 2>/dev/null | grep -q .; then fail 'Hyprland tiene errores activos'; else ok 'Hyprland sin errores activos'; fi
+  else info 'Hyprland no está disponible en esta sesión'
+  fi
+  check_rgb
+  check_backup
+  check_desktop_runtime
+  check_backup_runtime
+  check_gaming_packages
+  check_nvidia_stack
+  check_gaming_scheduler
+  check_gaming_firmware_state
+  check_gaming_monitors
+  check_steam_filesystems
+  check_dualsense
+  check_nvidia_cache
+  check_ignored_nvidia_parameter
+  if has bundles local-ai; then check_command 'Whisper disponible para local-ai' whisper-cli; else info 'Bundle local-ai no seleccionado'; fi
+  if has bundles productivity-extra; then check_command 'QMD disponible para productivity-extra' qmd; else info 'Bundle productivity-extra no seleccionado'; fi
+  if has bundles gaming-core; then
+    check_command 'Steam disponible para gaming-core' steam
+    check_command 'Gamescope disponible para gaming-core' gamescope
+  else info 'Bundle gaming-core no seleccionado'
+  fi
 fi
 
 printf '\nResultado: %d fallo(s), %d aviso(s)\n' "$failures" "$warnings"

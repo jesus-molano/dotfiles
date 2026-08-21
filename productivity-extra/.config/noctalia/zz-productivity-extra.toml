@@ -1,0 +1,15 @@
+# Noctalia merges fragments lexicographically and replaces arrays. Keep these
+# lists in sync with config.toml while adding the optional CodexBar surface.
+[bar.default]
+end = [ "group:resources", "codexbar", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
+
+[widget.codexbar]
+type = "salemsayed/codexbar-meter:bar"
+
+[plugins]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "salemsayed/codexbar-meter", "noctalia/notes" ]
+
+[plugin_settings."salemsayed/codexbar-meter"]
+codexbarPath = "/usr/bin/codexbar"
+refreshIntervalSec = 300
+barProviderLimit = 1

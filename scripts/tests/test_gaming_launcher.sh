@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly launcher=${1:-"$repo_root/gaming/.local/bin/gaming-launcher"}
+readonly launcher=${1:-"$repo_root/gaming-launchers/.local/bin/gaming-launcher"}
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 mkdir -p "$test_root/bin" "$test_root/state/gaming/benchmarks/demo/run-1"
@@ -11,9 +11,11 @@ printf '%s\n' 'fps,frametime' '60,16.6' >"$test_root/state/gaming/benchmarks/dem
 printf '%s\n' 'Average FPS,1% Min FPS' '60,55' >"$test_root/state/gaming/benchmarks/demo/run-1/MangoHud_summary.csv"
 
 printf '%s\n' '#!/usr/bin/env bash' 'printf "%s\\n" "$*" >"$TEST_LOG"' >"$test_root/bin/uwsm"
+printf '%s\n' '#!/usr/bin/env bash' 'exit 0' >"$test_root/bin/game-bench-report"
 chmod +x "$test_root/bin/uwsm"
+chmod +x "$test_root/bin/game-bench-report"
 
-entries=$(XDG_STATE_HOME="$test_root/state" "$launcher" list)
+entries=$(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" "$launcher" list)
 [[ "$entries" != *'Benchmark report — demo'* ]] || {
 	printf '%s\n' 'FAIL: mostró un informe antes de tener tres CSV.' >&2
 	exit 1
@@ -21,7 +23,7 @@ entries=$(XDG_STATE_HOME="$test_root/state" "$launcher" list)
 
 printf '%s\n' 'fps,frametime' '61,16.4' >"$test_root/state/gaming/benchmarks/demo/run-1/extra-1.csv"
 printf '%s\n' 'fps,frametime' '62,16.1' >"$test_root/state/gaming/benchmarks/demo/run-1/extra-2.csv"
-entries=$(XDG_STATE_HOME="$test_root/state" "$launcher" list)
+entries=$(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" "$launcher" list)
 [[ "$entries" != *'Benchmark report — demo'* ]] || {
 	printf '%s\n' 'FAIL: contó tres CSV de un mismo directorio como tres ejecuciones.' >&2
 	exit 1
@@ -32,14 +34,14 @@ for run in run-2 run-3; do
 	printf '%s\n' 'fps,frametime' '60,16.6' >"$test_root/state/gaming/benchmarks/demo/$run/MangoHud.csv"
 	printf '%s\n' 'Average FPS,1% Min FPS' '60,55' >"$test_root/state/gaming/benchmarks/demo/$run/MangoHud_summary.csv"
 	if [[ $run == run-2 ]]; then
-		entries=$(XDG_STATE_HOME="$test_root/state" "$launcher" list)
+		entries=$(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" "$launcher" list)
 		[[ "$entries" != *'Benchmark report — demo'* ]] || {
 			printf '%s\n' 'FAIL: contó los CSV summary como ejecuciones.' >&2
 			exit 1
 		}
 	fi
 done
-entries=$(XDG_STATE_HOME="$test_root/state" "$launcher" list)
+entries=$(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" "$launcher" list)
 benchmark_selection=$(awk -F '\t' '$1 == "Benchmark report — demo" { print; exit }' <<<"$entries")
 [[ "$benchmark_selection" == $'Benchmark report — demo\tOpen results from three or more runs' ]]
 [[ "$entries" != *'report_demo'* && "$entries" != *'scx_manager'* ]]
@@ -60,13 +62,16 @@ import sys
 import tomllib
 
 root = Path(sys.argv[1])
-with (root / "gaming/.config/noctalia/gaming.toml").open("rb") as source:
+with (root / "gaming-launchers/.config/noctalia/gaming.toml").open("rb") as source:
     entry = tomllib.load(source)["shell"]["launcher"]["dmenu"]["entry"]["games"]
 assert entry["label"] == "Games"
 assert entry["glyph"] == "device-gamepad-2"
 assert entry["exec"] == 'gaming-launcher run "{selection}"'
 
-gaming = (root / "gaming/.config/hypr/config/gaming.lua").read_text(encoding="utf-8")
+gaming = (root / "gaming-core/.config/hypr/config/gaming.lua").read_text(encoding="utf-8")
+launcher = (root / "gaming-launchers/.local/bin/gaming-launcher").read_text(encoding="utf-8")
+assert "command -v hypr-gaming" in launcher
+assert "exec uwsm app -- steam" in launcher
 assert 'match = { content = "game" }' in gaming
 assert 'match = { xdg_tag = "^(.*game.*)$" }' in gaming
 assert 'match = { class = "^(steam_app_.*|gamescope)$" }' in gaming

@@ -1,0 +1,91 @@
+# Test-only contract for the host that existed before the profileless migration.
+# The installer never selects this fixture for unknown hardware.
+schema = 1
+bundles = [
+  "gaming-core",
+  "gaming-launchers",
+  "gaming-tools",
+  "backup",
+  "rgb-openrgb",
+  "local-ai",
+  "productivity-extra",
+]
+
+[hardware]
+
+[[hardware.displays]]
+name = "HDMI-A-1"
+role = "left"
+mode = "1920x1080@74.97"
+position = "0x0"
+scale = 1.0
+vrr = false
+
+[[hardware.displays]]
+name = "HDMI-A-2"
+role = "right"
+mode = "1920x1080@74.97"
+position = "1920x0"
+scale = 1.0
+vrr = false
+
+[input]
+keyboard_layouts = ["us", "es"]
+toggle_layouts = true
+local_dictation = true
+
+[[input.devices]]
+name = "logitech-m720-triathlon-multi-device-mouse-1"
+accel_profile = "flat"
+
+[workspaces]
+left = "HDMI-A-1"
+right = "HDMI-A-2"
+split_after = 4
+music = 3
+scrolling = 6
+
+[workspaces.icons]
+"1" = ""
+"2" = ""
+"3" = ""
+"4" = ""
+"5" = ""
+"6" = ""
+"7" = ""
+
+[audio]
+cycle = true
+ensure_on_start = true
+card = "alsa_card.pci-0000_07_00.1"
+base_profile = "output:hdmi-stereo"
+secondary_profile = "output:hdmi-stereo-extra1"
+sink_prefix = "alsa_output.pci-0000_07_00.1."
+base_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo"
+secondary_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1"
+default_profile = "output:hdmi-stereo-extra1"
+default_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1"
+
+[backup]
+repository = "/mnt/backups/restic-desktop"
+
+[rgb]
+enabled = true
+mode = "thermal"
+ambient_color = "FF5B4D"
+openrgb_device = "ASUS TUF GAMING B550-PLUS (WI-FI)"
+nzxt_device = "NZXT Smart Device V2"
+static_color = "FFFFFF"
+openrgb_zone = 1
+openrgb_zone_size = 60
+cpu_led_count = 12
+cpu_green_threshold = 50
+cpu_orange_threshold = 70
+cpu_red_threshold = 85
+gpu_green_threshold = 50
+gpu_orange_threshold = 70
+gpu_red_threshold = 83
+interval = 5
+debounce = 2
+hysteresis = 2
+reapply_interval = 300

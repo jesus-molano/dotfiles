@@ -3,8 +3,8 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly helper=${1:-"$repo_root/hypr-desktop/.local/bin/cycle-desktop-audio-output"}
-readonly audio_config="$repo_root/hypr-desktop/.config/noctalia/desktop-audio.toml"
+readonly helper=${1:-"$repo_root/audio/.local/bin/cycle-audio-output"}
+readonly audio_config="$repo_root/audio/.config/noctalia/audio-actions.toml"
 readonly user_binds="$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
@@ -60,6 +60,12 @@ run_case() {
 	: >"$log"
 
 	PATH="$test_root/bin:$PATH" \
+		DOTFILES_AUDIO_CARD='alsa_card.pci-0000_07_00.1' \
+		DOTFILES_AUDIO_BASE_PROFILE='output:hdmi-stereo' \
+		DOTFILES_AUDIO_SECONDARY_PROFILE='output:hdmi-stereo-extra1' \
+		DOTFILES_AUDIO_SINK_PREFIX='alsa_output.pci-0000_07_00.1.' \
+		DOTFILES_AUDIO_BASE_SINK="$base_sink" \
+		DOTFILES_AUDIO_SECONDARY_SINK="$right_sink" \
 		TEST_CURRENT_SINK="$current_sink" \
 		TEST_SINKS="$TEST_ALL_SINKS" \
 		TEST_EXTRA_SINK="$bluetooth_sink" \
@@ -89,7 +95,10 @@ run_case right_to_bluetooth "$right_sink" \
 run_case bluetooth_to_base "$bluetooth_sink" \
 	"$(printf 'profile=alsa_card.pci-0000_07_00.1:output:hdmi-stereo\ndefault=%s\nmove=7:%s\nnoctalia=msg notification-show Audio -- HDMI · 1/3' "$base_sink" "$base_sink")"
 
-grep -Fq 'middle = "exec cycle-desktop-audio-output"' "$audio_config"
-grep -Fq 'bind(hyper .. " + H", hl.dsp.exec_cmd("cycle-desktop-audio-output")' "$user_binds"
+grep -Fq 'middle = "exec cycle-audio-output"' "$audio_config"
+if grep -Fq 'cycle-audio-output' "$user_binds"; then
+	printf '%s\n' 'El binding común no debe duplicar el comando portable directo.' >&2
+	exit 1
+fi
 
 printf '%s\n' 'PASS: Hyper+H y Noctalia recorren todas las salidas disponibles'

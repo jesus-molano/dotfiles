@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+safe_display() {
+	printf '%s' "$1" | tr '\t\r\n' '   ' | tr -d '\\"$`'
+}
+
+emit_record() {
+	printf '%s\t%s\t%s\n' "$1" "$(safe_display "$2")" "$(safe_display "$3")"
+}
+
+game_records() {
+	command -v steam >/dev/null 2>&1 && emit_record steam 'Steam' 'Open the game library'
+	command -v heroic >/dev/null 2>&1 && emit_record heroic 'Heroic Games Launcher' 'Open Epic and GOG libraries'
+	command -v lutris >/dev/null 2>&1 && emit_record lutris 'Lutris' 'Open the game manager'
+	command -v faugus-launcher >/dev/null 2>&1 && emit_record faugus 'Faugus Launcher' 'Open Windows game shortcuts'
+	command -v scx-manager >/dev/null 2>&1 && emit_record scx_manager 'SCX Manager' 'Use only for measured scheduler tests'
+	local benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks" path name run_count
+	[[ -d "$benchmark_root" ]] || return 0
+	while IFS= read -r -d '' path; do
+		name=${path##*/}
+		[[ "$name" =~ ^[[:alnum:]_.-]+$ && "$name" != . && "$name" != .. ]] || continue
+		run_count=$(find "$path" -type f -name '*.csv' ! -name '*_summary.csv' -printf '%h\n' 2>/dev/null | sort -u | wc -l)
+		if ((run_count >= 3)) && command -v game-bench-report >/dev/null 2>&1; then
+			emit_record "report_$name" "Benchmark report — $name" 'Open results from three or more runs'
+		fi
+	done < <(find "$benchmark_root" -mindepth 1 -maxdepth 1 -type d -print0 | sort -z)
+}
+
+list_games() {
+	local id title description
+	while IFS=$'\t' read -r id title description; do
+		[[ -n "$id" && -n "$title" ]] || continue
+		printf '%s\t%s\n' "$title" "$description"
+	done < <(game_records)
+}
+
+game_id_for_selection() {
+	local selection=$1 id title description
+	while IFS=$'\t' read -r id title description; do
+		[[ "$title"$'\t'"$description" == "$selection" ]] || continue
+		printf '%s' "$id"
+		return 0
+	done < <(game_records)
+	return 1
+}
+
+run_game() {
+	local selection=$1 id
+	id=$(game_id_for_selection "$selection") || return 2
+	case "$id" in
+	steam)
+		if command -v hypr-gaming >/dev/null 2>&1; then
+			exec hypr-gaming
+		fi
+		exec uwsm app -- steam
+		;;
+	heroic) exec uwsm app -- heroic ;;
+	lutris) exec uwsm app -- lutris ;;
+	faugus) exec uwsm app -- faugus-launcher ;;
+	scx_manager) exec uwsm app -- scx-manager ;;
+	report_*)
+		local name=${id#report_}
+		local benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks"
+		[[ "$name" =~ ^[[:alnum:]_.-]+$ && "$name" != . && "$name" != .. ]] || return 2
+		[[ -d "$benchmark_root/$name" ]] || return 1
+		# El nombre se vuelve a validar y se pasa como argumento, nunca como código shell.
+		# shellcheck disable=SC2016
+		exec uwsm app -- ghostty -e bash -lc \
+			'game-bench-report "$1"; status=$?; printf "\nPress Enter to close... "; read -r _; exit "$status"' \
+			bash "$name"
+		;;
+	*) return 2 ;;
+	esac
+}
+
+case "${1:-}" in
+list) list_games ;;
+run) [[ -n "${2:-}" ]] && run_game "$2" ;;
+*)
+	printf '%s\n' 'Usage: gaming-launcher {list|run SELECTION}' >&2
+	exit 2
+	;;
+esac

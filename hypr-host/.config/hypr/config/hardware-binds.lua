@@ -1,0 +1,2 @@
+-- Hardware-specific binds are generated outside the repository. Hyper+H stays
+-- in the common map and calls a portable compatibility helper from audio/.

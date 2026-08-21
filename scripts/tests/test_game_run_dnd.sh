@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly game_run=${1:-"$repo_root/gaming/.local/bin/game-run"}
+readonly game_run=${1:-"$repo_root/gaming-core/.local/bin/game-run"}
 test_root=$(mktemp -d)
 a_pid=''
 b_pid=''

@@ -27,7 +27,7 @@ padding = 8
 widget_spacing = 4
 start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "codexbar", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
+end = [ "group:resources", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -54,16 +54,13 @@ inactive_style = "ghost"
 [widget.screen_recorder]
 type = "noctalia/screen_recorder:recorder"
 
-[widget.codexbar]
-type = "salemsayed/codexbar-meter:bar"
-
 [widget.timer]
 type = "noctalia/timer:bar"
 show_idle_on_horizontal = false
 
 [shell]
 font_family = "Inter"
-avatar_path = "/home/jesus-molano/.local/share/noctalia/avatar.svg"
+avatar_path = "~/.local/share/noctalia/avatar.svg"
 clipboard_enabled = true
 clipboard_confirm_clear_history = true
 clipboard_history_max_entries = 100
@@ -347,16 +344,11 @@ enabled = true
 
 [plugins]
 auto_update = "none"
-enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "salemsayed/codexbar-meter", "noctalia/notes" ]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "noctalia/notes" ]
 
 [plugin_settings."noctalia/notes"]
 extension = "md"
 notes_dir = "~/Documents/Notes"
-
-[plugin_settings."salemsayed/codexbar-meter"]
-codexbarPath = "/usr/bin/codexbar"
-refreshIntervalSec = 300
-barProviderLimit = 1
 
 [plugin_settings."noctalia/screen_recorder"]
 audio_bitrate = 0
@@ -383,12 +375,12 @@ video_source = "focused"
 enabled = true
 fill_mode = "crop"
 fill_color = "surface"
-directory = "/home/jesus-molano/.local/state/dotfiles/appearance-switch/visible"
+directory = "~/.local/state/dotfiles/appearance-switch/visible"
 transition = [ "fade" ]
 transition_duration = 900
 
 [wallpaper.default]
-path = "/home/jesus-molano/.local/share/wallpapers/noctalia-themes/atlas/default.png"
+path = "~/.local/share/wallpapers/noctalia-themes/atlas/default.png"
 
 [theme]
 mode = "dark"

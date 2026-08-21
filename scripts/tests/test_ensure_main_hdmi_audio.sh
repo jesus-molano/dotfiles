@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly helper=${1:-"$repo_root/hypr-desktop/.local/bin/ensure-main-hdmi-audio"}
+readonly helper=${1:-"$repo_root/audio/.local/bin/ensure-configured-audio"}
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 
@@ -43,7 +43,11 @@ EOF
 
 chmod +x "$test_root/bin/pactl"
 
-PATH="$test_root/bin:$PATH" TEST_STATE="$test_root/state" TEST_LOG="$test_root/log" \
+PATH="$test_root/bin:$PATH" \
+	DOTFILES_AUDIO_CARD='alsa_card.pci-0000_07_00.1' \
+	DOTFILES_AUDIO_DEFAULT_PROFILE='output:hdmi-stereo-extra1' \
+	DOTFILES_AUDIO_DEFAULT_SINK='alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1' \
+	TEST_STATE="$test_root/state" TEST_LOG="$test_root/log" \
 	"$helper"
 
 expected=$'profile=output:hdmi-stereo-extra1\ndefault=alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1\nmove=7:alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1'

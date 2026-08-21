@@ -6,7 +6,5 @@
 ^packages\.csv
 ^flatpaks\.csv
 ^flatpak-remotes\.csv
-^profiles\.sh
-^PROFILES\.md
 ^LICENSE
 ^system-etc

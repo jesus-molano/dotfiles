@@ -1,121 +1,122 @@
 # Dotfiles de CachyOS + Hyprland
 
-Configuración de los perfiles `workstation` y `desktop`, gestionada con GNU
-Stow. Ambos reutilizan los mismos módulos comunes; `desktop` añade su hardware y
-el perfil gaming, mientras `workstation` conserva la configuración del portátil.
+Configuración portable de CachyOS, Hyprland y Noctalia gestionada con GNU Stow.
+Cada instalación se compone como:
+
+```text
+base + capacidades detectadas + bundles elegidos + preferencias locales
+```
+
+No hay perfiles por tipo de equipo. Un portátil puede seleccionar gaming y un
+sobremesa puede omitirlo. La detección describe el hardware; no decide
+preferencias físicas, dispositivos de audio, RGB ni qué aplicaciones instalar.
 
 ## Stack
 
 | Componente | Configuración |
 |---|---|
-| Compositor | Hyprland Lua |
+| Compositor | Hyprland Lua + UWSM |
 | Shell de escritorio | Noctalia v5 |
-| Terminal | Ghostty + Fish, Yazi y Television |
-| Shell | Fish + Starship + Zoxide + Atuin |
-| Archivos | Dolphin |
+| Terminal y shell | Ghostty, Fish, Starship, Yazi, Television y Zellij |
 | Editor | Neovim/LazyVim |
-| Multiplexor | Zellij |
-| Teclado | US/ES + Kanata |
-| Navegador | qutebrowser + Brave como respaldo |
-| Aplicaciones comunes | Spotify, LocalSend, Micro, calculadora y Stremio (`flathub/stable`) |
+| Navegación | qutebrowser, con Brave como respaldo |
+| Archivos y multimedia | Dolphin, Spotify, LocalSend, Stremio, VLC y MPV |
+| Teclado | Kanata, layouts configurables y bindings keyboard-first |
+| Desarrollo | mise, pnpm, uv, Ruff, Difftastic, watchexec e hyperfine |
 | Credenciales | 1Password CLI y agente SSH |
-| Toolchain | mise, pnpm, uv, Ruff, Difftastic, watchexec e hyperfine |
-| Gaming (`desktop`) | Steam, Heroic, Lutris, Faugus, ProtonPlus, Gamescope, MangoHud y benchmarker CachyOS |
-| Backup (`desktop`) | Ludusavi + Restic + rclone, con timers desactivados por defecto |
+| Opcionales | Gaming, backup Restic, RGB OpenRGB, IA local y productividad |
 
-## Perfiles y módulos
+La composición declara mínimos, no versiones fijas: Noctalia acepta builds
+beta `>= 5.0.0_beta.9` y releases estables `>= 5.0.0`; Hyprland `>= 0.56.2`,
+Kanata `>= 1.12.0` y el paquete CachyOS `cachyos-hypr-noctalia >= 1.2.5`.
+Versiones posteriores se aceptan solo después de validar la configuración con
+sus binarios reales. El instalador no congela paquetes, no hace downgrade y no
+fuerza una actualización parcial. Si debe añadir un paquete nativo o AUR,
+Shelly actualiza primero todo el sistema; si ya está todo instalado, un `apply`
+no actualiza CachyOS.
 
-Módulos compartidos:
+## Composición y estado local
 
-```text
-codex fish fonts ghostty git hypr-common kanata mimeapps noctalia
-nvim qutebrowser shell starship vscode zellij
-```
+La fuente declarativa es [dotfiles.toml](dotfiles.toml). La base contiene los
+módulos de shell, Hyprland, Noctalia, Kanata, terminal, navegador, editor y
+aplicaciones comunes. Los manifests [packages.csv](packages.csv),
+[flatpaks.csv](flatpaks.csv) y [flatpak-remotes.csv](flatpak-remotes.csv)
+describen paquetes y procedencia.
 
-Cada perfil añade sus módulos específicos:
+Las preferencias de una máquina nunca se versionan:
 
-| Perfil | Módulos | Hardware |
-|---|---|---|
-| `workstation` | `hypr-laptop` | eDP, touchpad, entrada y brillo del portátil |
-| `desktop` | `hypr-desktop gaming backup` | uno o dos Philips 273V7 a 74.97 Hz, RTX 3060 Ti y entrada Keychron/Logitech |
+| Ubicación | Contenido |
+|---|---|
+| `$XDG_CONFIG_HOME/dotfiles/host.toml` | bundles y preferencias confirmadas |
+| `$XDG_CONFIG_HOME/dotfiles/repo` | checkout canónico registrado localmente |
+| `$XDG_STATE_HOME/dotfiles/hardware/capabilities.json` | detección reemplazable |
+| `$XDG_STATE_HOME/dotfiles/generated/` | fragmentos Hypr y audio generados |
+| `$XDG_STATE_HOME/dotfiles/migrations/` | snapshots y rollback de despliegues |
 
-El módulo Hyprland de `desktop` no configura touchpad ni teclas de brillo porque
-el informe real de este equipo no detectó touchpad, batería interna ni
-backlight. Los widgets adaptativos de Noctalia siguen compartidos y detectan los
-dispositivos disponibles. GPU, CHWD, initramfs, arranque, Btrfs, ZRAM, `/etc` y
-servicios del sistema quedan fuera de ambos perfiles.
+No se guardan en Git el usuario, hostname, seriales, destino privado de backup
+ni una topología de pantalla. Consulta [COMPOSITION.md](COMPOSITION.md) para el
+contrato, las garantías y el rollback.
 
-`gaming` y `backup` son exclusivos del sobremesa y solo gestionan archivos en
-`HOME`. CHWD continúa siendo el propietario del controlador NVIDIA.
+La ruta de `HOME` puede ser cualquiera. Como los módulos Stow contienen
+`.config`, el instalador exige el layout XDG habitual (`$HOME/.config`) y
+rechaza otro `XDG_CONFIG_HOME` antes de modificar el equipo.
 
-Project Cockpit, el puente Nvim–Orca, qutebrowser, captura OCR, scratchpads y
-el hub `/media` son comunes. Stremio, Spotify,
-YouTube y las suscripciones funcionan en ambos perfiles. El backend
-Whisper/Vulkan, el pegado del dictado y direct scanout permanecen en `desktop`;
-no cargan el portátil antiguo con herramientas que dependen de su rendimiento.
+### Bundles
 
-La arquitectura completa está documentada en [PROFILES.md](PROFILES.md).
-`profiles.sh` es la fuente única de módulos; `packages.csv` declara paquetes
-Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
-`flatpak-remotes.csv` declara las aplicaciones Flatpak y su procedencia.
+| Bundle | Función |
+|---|---|
+| `gaming-core` | Steam, runtime CachyOS, Gamescope, MangoHud y wrappers |
+| `gaming-launchers` | Heroic, Lutris, Faugus y ProtonPlus |
+| `gaming-tools` | Ludusavi, benchmarker e informes |
+| `backup` | Restic, rclone y unidades de usuario sin activar timers |
+| `rgb-openrgb` | OpenRGB/liquidctl con targets exactos confirmados |
+| `local-ai` | Whisper, backends locales y pegado del dictado con wtype |
+| `productivity-extra` | QMD, CodexBar, ttyper y utilidades extra |
+
+Los bundles son independientes. Si no se seleccionan, el doctor los informa sin
+fallar. Si se seleccionan y faltan paquetes, configuración o un target exigido,
+el doctor falla para que no haya una instalación parcialmente funcional.
+
+La capacidad `gpu-nvidia` solo se resuelve cuando la detección encuentra
+NVIDIA. CHWD conserva siempre la propiedad de drivers; esta configuración no
+modifica CHWD, initramfs, arranque, Btrfs, ZRAM, firmware, PWM ni `/etc`.
 
 ## Apariencias y Project Atlas
 
-`ProjectAtlas` sigue siendo la escena base. `Hyper+T` abre `/appearance`, que ofrece Atlas,
+Project Atlas es la escena base. `Hyper + T` abre `/appearance`; Atlas,
 Obsidian Amber, Vice Afterglow, Catppuccin Mocha, Rosé Pine Moon, Nord Night,
-Dracula Violet y Tokyo Night City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
-los temas de Hyprland, GTK, Qt/KDE, Ghostty, Kitty,
-Starship, btop, Zellij, Micro, bat/delta, Codex y VS Code/VSCodium. Neovim,
-qutebrowser y Orca leen la paleta activa al iniciar. Starship usa un archivo
-generado fuera del checkout para que rotar el tema no ensucie Git.
-El proveedor `/wall` muestra solo la colección del tema activo y cambia la
-imagen sin tocar la paleta. Cada carpeta admite una cantidad variable de
-fondos. SDDM conserva su tema Project Atlas estático porque se
-ejecuta fuera de la sesión del usuario.
-Cada tema recuerda el último fondo usado. Las colecciones se editan en
-`noctalia/.local/share/wallpapers/noctalia-themes/<tema>/`; los formatos
-admitidos son PNG, JPEG y WebP.
+Dracula Violet y Tokyo Night City coordinan paleta y fondo.
+
+Noctalia genera temas para Hyprland, GTK, Qt/KDE, Ghostty, Starship, btop,
+Zellij, Micro, bat/delta, Codex y VS Code/VSCodium sin ensuciar Git. Neovim,
+qutebrowser y Orca leen la paleta al iniciar. `Hyper + [` y `Hyper + ]`
+cambian solo el fondo de la colección activa.
+
+Las colecciones viven bajo
+`noctalia/.local/share/wallpapers/noctalia-themes/<tema>/` y aceptan PNG,
+JPEG y WebP. Cada tema recuerda el último fondo. SDDM mantiene una apariencia
+Project Atlas estática porque se ejecuta fuera de la sesión del usuario.
 
 `start-orca-background` actualiza con backup el tema de terminal de Orca y
-mantiene su runtime disponible para las automatizaciones. Hyprland envía la
-ventana inicial silenciosamente a `special:orca`; `Hyper+O` muestra u oculta ese
-workspace sin ocupar uno normal. `hypr-orca` conserva el enfoque tradicional si
-encuentra una ventana anterior fuera del workspace especial.
-1Password arranca de forma silenciosa después del `StatusNotifierWatcher` de
-Noctalia y permanece accesible como icono inline en su bandeja.
+mantiene su runtime listo. `Hyper + O` muestra u oculta su workspace especial.
+1Password arranca silenciosamente tras la bandeja de Noctalia.
 
-La [guía del flujo desktop](docs/DESKTOP-WORKFLOW.md) describe el uso diario
-keyboard-first: Project Cockpit, Orca, Codex CLI, Task Hub, captura OCR,
-dictado, Noctalia y qutebrowser.
+## Instalación nueva
 
-## Instalación paso a paso
-
-Ejecuta todo como tu usuario normal, nunca como `root`. Elige un único perfil:
-
-- `workstation`: portátil, sin paquetes ni configuración gaming;
-- `desktop`: sobremesa inspeccionado, dos monitores y perfil gaming completo.
-
-### 1. Preparar CachyOS
-
-El instalador necesita Git, GNU Stow, Shelly y, para los atajos de gestión,
-Just. En una instalación nueva de CachyOS:
+Ejecuta todo como usuario normal, nunca como `root`. En CachyOS prepara las
+herramientas con Polkit:
 
 ```bash
 pkexec /usr/bin/shelly install standard --no-confirm git base-devel stow just
 ```
 
-Si la imagen instalada aún no incluye Shelly, usa Pacman una sola vez mediante
-el diálogo gráfico de Polkit:
+Si la imagen aún no incluye Shelly:
 
 ```bash
 pkexec /usr/bin/pacman -S --needed shelly git base-devel stow just
 ```
 
-No instales manualmente otro controlador NVIDIA: CHWD conserva su propiedad.
-
-### 2. Obtener la rama canónica
-
-Instalación nueva mediante SSH (requiere que la clave de GitHub ya funcione):
+Clona una copia canónica de `main` mediante SSH o HTTPS:
 
 ```bash
 git clone --branch main git@github.com:jesus-molano/dotfiles.git ~/.dotfiles
@@ -123,158 +124,119 @@ cd ~/.dotfiles
 git status --short --branch
 ```
 
-Si prefieres HTTPS y tu cuenta tiene acceso al repositorio:
+No borres una copia existente para forzar una actualización. Conserva cambios
+locales y actualiza solo una rama `main` limpia con `git pull --ff-only`.
+
+Antes de modificar nada:
 
 ```bash
-git clone --branch main https://github.com/jesus-molano/dotfiles.git ~/.dotfiles
-cd ~/.dotfiles
-git status --short --branch
+./scripts/dotfiles_host.py detect
+./scripts/dotfiles_host.py configure
+./scripts/dotfiles_host.py show
+just packages
+./install.sh --check
+just check
 ```
 
-Si `~/.dotfiles` ya existe, conserva primero cualquier cambio local y actualiza
-solo una copia limpia de `main`:
+`dotf host configure` pregunta únicamente por decisiones que no se pueden
+deducir: disposición/escala de pantallas, layouts, touchpad y bundles. Conserva
+las decisiones existentes de audio, RGB, workspaces y dispositivos; confírmalas
+o edítalas directamente en `host.toml`. Si eliges `backup`, exige el repositorio
+Restic local. Escribe `base` o `none` para dejar solo la base común. Si Hyprland
+no expone las pantallas, el asistente lo avisa y conserva el fallback automático.
+En una ejecución no interactiva proporciona un `host.toml`
+existente o usa `--safe-defaults`; el instalador no adivina preferencias.
+
+Después de una simulación limpia:
 
 ```bash
-cd ~/.dotfiles
-git status --short --branch
-git switch main
-git pull --ff-only
+just apply
+# equivalente: ./install.sh
 ```
 
-No borres ni sobrescribas una copia existente para forzar la actualización.
+El instalador usa Shelly para paquetes, añade Flatpaks de usuario y despliega
+Stow. Antes de sustituir conflictos crea backups recuperables. Si falla Stow,
+la generación de configuración, Hyprland o un servicio gestionado, restaura
+enlaces, archivos generados y el estado previo del servicio. Los paquetes,
+Flatpaks, juegos y bibliotecas no se desinstalan durante el rollback.
 
-### 3. Inspeccionar antes de modificar
-
-Para el sobremesa:
+Cierra sesión y vuelve a entrar si se añadieron variables de entorno o servicios
+de usuario. Después valida:
 
 ```bash
-just list
-just packages desktop
-./install.sh desktop --check
-```
-
-Para el portátil, sustituye `desktop` por `workstation`. `--check` valida los
-manifiestos y la disponibilidad de paquetes nativos y Flatpak cuando el remoto
-ya existe, muestra los paquetes AUR para revisión y después simula Stow sin
-instalar ni escribir en `HOME`. Revisa
-especialmente cualquier línea `BACKUP:`: identifica un archivo existente que el
-despliegue moverá a una copia de seguridad. La disponibilidad AUR se confirma al
-aplicar, cuando Shelly presenta su procedencia antes de cada instalación.
-
-`just check desktop` y `just check workstation` permiten repetir únicamente la
-simulación de Stow, sin consultar los repositorios de paquetes.
-
-### 4. Aplicar el perfil completo
-
-Después de revisar una simulación limpia:
-
-```bash
-just apply desktop
-```
-
-Para el portátil usa `just apply workstation`. El comando vuelve a mostrar el
-perfil y el destino, espera una confirmación `s`, instala solo los paquetes que
-falten mediante Shelly —con diálogo Polkit para los nativos—, añade los remotos
-y aplicaciones Flatpak declarados para el usuario, crea la copia
-reversible de los conflictos en `HOME` y finalmente ejecuta Stow. Los paquetes
-AUR se compilan como usuario y Shelly puede solicitar `sudo` únicamente al
-instalar el artefacto construido; elevar toda la compilación no es apropiado.
-También se puede invocar directamente como `./install.sh desktop`. La
-transacción de paquetes modifica el sistema global y no se revierte mediante el
-backup de Stow. Las aplicaciones Flatpak tampoco forman parte de ese backup;
-su rollback exacto está documentado en [PROFILES.md](PROFILES.md).
-
-Cuando existen conflictos en `HOME`, sus backups se guardan bajo:
-
-```text
-~/.local/state/dotfiles/backups/<perfil>-<fecha>/
-```
-
-Si Stow falla, el instalador intenta restaurar automáticamente los destinos que
-acababa de respaldar.
-
-### 5. Cerrar sesión y validar
-
-Cierra la sesión y vuelve a entrar para que systemd y las aplicaciones reciban
-el entorno nuevo —incluida la caché de shaders del perfil gaming—. Después:
-
-```bash
-just doctor desktop
 hyprctl configerrors
+noctalia config validate noctalia/.config/noctalia/config.toml
+kanata --check -c kanata/.config/kanata/config.kbd
+just doctor
+git diff --check
 ```
 
-En el portátil usa `just doctor workstation`. El doctor es de solo lectura y
-distingue entre errores, avisos y dispositivos opcionales ausentes, como un
-DualSense desconectado. La configuración de Kanata que requiere `/etc` se aplica
-por separado siguiendo la sección [Teclado](#teclado).
+## Migración desde los módulos legacy: dos commits obligatorios
 
-La secuencia completa de cada perfil queda, por tanto:
+La eliminación de módulos legacy se hace en dos fases para no romper un checkout
+canónico que siga desplegado.
 
-| Acción | Portátil | Sobremesa |
-|---|---|---|
-| Ver paquetes | `just packages workstation` | `just packages desktop` |
-| Simular | `./install.sh workstation --check` | `./install.sh desktop --check` |
-| Aplicar | `just apply workstation` | `just apply desktop` |
-| Diagnosticar | `just doctor workstation` | `just doctor desktop` |
+1. **Commit A: compatibilidad y migración.** Añade el resolvedor
+   base+capacidades+bundles, los módulos portables, renderizado local, migración
+   transaccional y tests. Aplica y verifica este commit en el checkout canónico
+   que está desplegado: `just check`, `just apply`, `just doctor`, apariencia,
+   teclado, audio, Noctalia, gaming, backup y RGB si están seleccionados.
+2. **Commit B: retirada.** Solo tras esa verificación en vivo, elimina los
+   módulos, aliases y documentación legacy. El snapshot de la transacción de A
+   debe seguir pudiendo restaurar enlaces incluso cuando B ya no contenga los
+   ficheros antiguos.
 
-### Qué cambia y qué queda fuera
+No combines ambas fases. Si A no tiene paridad demostrada, no borres módulos
+legacy. `dotf host rollback` previsualiza la última transacción;
+`dotf host rollback --apply` restaura solo después de verificar que no
+sobrescribe cambios posteriores.
 
-El instalador gestiona paquetes globales, aplicaciones Flatpak del usuario y
-enlaces en `HOME`. En `desktop` también recarga systemd de usuario y habilita
-`reactive-rgb.service`; no habilita otras unidades. No despliega
-`system-etc`, no cambia explícitamente el controlador NVIDIA, CHWD, initramfs,
-arranque, Btrfs, ZRAM o firmware. Pacman/Shelly sí pueden
-instalar archivos, hooks o unidades proporcionados por sus paquetes; esa parte
-no queda cubierta por el backup de `HOME`. El perfil tampoco mueve o borra
-bibliotecas de juegos. Los módulos propios de `/etc` siempre requieren los
-comandos y la confirmación explícita de su sección.
+## Adaptación segura de hardware
 
-### Cambiar de perfil
+En hardware nuevo el fallback usa `preferred`, posición automática, escala
+`1`, VRR desactivado, teclado US, workspaces genéricos y no fuerza salida de
+audio ni RGB. Tras confirmar preferencias, los fragmentos generados añaden
+monitores, layouts, teclas de brillo, dispositivos, workspaces y audio.
 
-Retira primero los enlaces del perfil anterior, simula el nuevo y solo entonces
-aplícalo. Por ejemplo, para pasar del portátil al sobremesa:
+Los adaptadores opcionales son no-op seguros cuando falta un periférico. RGB
+nunca elige el primer controlador: requiere opt-in, coincidencia exacta de
+dispositivo y zona; no controla GPU, RAM, PWM, ventiladores ni bombas. El
+doctor marca cambios de hardware como aviso y deja las preferencias intactas.
+
+Para revisar cambios sin desplegar:
 
 ```bash
-just remove workstation
-./install.sh desktop --check
-just apply desktop
+dotf host refresh
+dotf host show
+just doctor
+dotf host export nombre
 ```
 
-La retirada no desinstala paquetes ni elimina datos personales. Para el cambio
-inverso usa `just remove desktop` y después valida y aplica `workstation`. Esa
-retirada también detiene y deshabilita `reactive-rgb.service`; si Stow falla,
-intenta restaurar el estado anterior de la unidad.
+El export es saneado: no publica identidad de máquina ni destino privado de
+backup.
 
-## Gestión
+## Gestión diaria y validación
 
 ```bash
-just list                  # módulos permitidos
-just packages desktop      # paquetes y app IDs efectivos, sin modificar nada
-just lint desktop          # validación hermética de la rama
-just plan desktop          # simulación contra el HOME real
-just check workstation     # simulación del perfil completo
-just check desktop         # simulación del perfil de sobremesa
-just check gaming          # simulación aislada de los dotfiles gaming
-just check hypr-desktop    # simulación de un módulo de hardware
-just doctor                # diagnóstico; autodetecta el perfil desplegado
-just doctor desktop        # diagnóstico explícito del sobremesa
-just doctor-live desktop   # solo estado del host ya desplegado
-just apply workstation     # simular y desplegar
-just apply desktop         # simular y desplegar desktop
-just remove workstation    # simular y retirar enlaces
-just remove gaming         # retirar solo enlaces gaming, nunca datos de juegos
+just list                  # plan resuelto, sin escribir
+just packages              # paquetes y Flatpaks efectivos
+./install.sh --list-packages
+just check                 # simulación Stow hermética
+just plan                  # simulación contra el HOME actual
+just apply                 # instalación y despliegue
+just doctor                # configuración y estado vivo, solo lectura
+just lint                  # configuración reproducible
+just doctor-live           # solo estado vivo
+dotf host detect
+dotf host configure
+dotf host show
+dotf host refresh
+dotf host export nombre
+dotf host rollback
+dotf host rollback --apply
 ```
 
-`dotf status` también exige el perfil (`dotf status desktop` o
-`dotf status workstation`) para no asumir el hardware del equipo actual.
-
-Los módulos `hypr-common`, `hypr-laptop` y `hypr-desktop` se pueden comprobar
-por separado, pero `just apply` obliga a usar un perfil completo. Para cambiar
-de hardware, retira primero el perfil anterior y revisa la simulación del nuevo.
-
-La configuración de `/etc` se gestiona por separado. Los módulos disponibles
-son la regla udev de Kanata, el tema Project Atlas de SDDM y la retención
-acotada de Snapper para `root`:
+La configuración de `/etc` permanece separada y pide confirmación explícita:
 
 ```bash
 just check-system udev
@@ -283,40 +245,45 @@ just check-system sddm
 just apply-system sddm
 just check-system snapper
 just apply-system snapper
-just check-system systemd       # automount de /mnt/backups en desktop
-just apply-system systemd
 ```
 
-El último comando muestra la diferencia, identifica `/etc/snapper/configs/root`
-como destino y crea una copia antes de sustituirlo. Los servicios siguen una
-guarda distinta: `just check-maintenance` no escribe y `just apply-maintenance`
-activa únicamente `btrfs-scrub@-.timer` y `smartd.service` tras confirmar su
-nombre. El rollback se imprime antes de aplicar.
+También están disponibles `just check-maintenance` y
+`just apply-maintenance` para Btrfs/SMART, con confirmación antes de activar
+servicios.
 
-## Teclado
+## Teclado, ventanas y espacios
 
-Kanata convierte Caps Lock en:
+Kanata convierte Caps Lock en Escape al pulsar y Hyper al mantener
+(`Ctrl + Alt + Super + Shift`). La salida de emergencia es
+`Ctrl + Space + Esc`.
 
-- pulsación: `Esc`
-- mantenida: `Hyper` (`Ctrl + Alt + Super + Shift`)
-- salida de emergencia: `Ctrl + Space + Esc`
+Los bindings comunes no dependen de un monitor o teclado exactos:
 
-En el perfil `desktop`, el layout inicial es US para el Keychron ANSI y
-`Super + Space` alterna entre US y español.
+| Atajo | Acción |
+|---|---|
+| `Alt + H/J/K/L` | Mover foco |
+| `Alt + Shift + H/J/K/L` | Mover ventana |
+| `Alt + Ctrl + H/J/K/L` | Redimensionar |
+| `Alt + Q/W/E/R/U/I/O/P` | Ir a espacios 1–8 |
+| `Alt + Shift + Q/W/E/R/U/I/O/P` | Enviar ventana a un espacio |
+| `Alt + Tab` | Selector de ventanas |
+| `Alt + X` | Cerrar ventana |
+| `Alt + M` | Maximizar |
+| `Alt + F` | Alternar flotante |
+| `Hyper + D` | Alternar dirección de división |
+| `Hyper + F` | Pantalla completa |
+| `Alt + S` / `Alt + Shift + S` | Mostrar o enviar al scratchpad |
+| `Alt + A` / `Alt + Shift + A` | Scratchpad de IA |
+| `Alt + Z` / `Alt + Shift + Z` | Scratchpad de logs |
+| `Alt + G` / `Alt + N` | Grupo de ventanas |
 
-Con los dos monitores conectados, los espacios del sobremesa se agrupan por
-mano: `Q/W/E/R` pertenecen a la pantalla izquierda y `U/I/O/P` a la principal
-situada a la derecha. Q y U son los espacios iniciales. Si solo permanece
-`HDMI-A-1` o `HDMI-A-2`, los ocho espacios persistentes se muestran en esa
-pantalla. Hyprland recalcula la distribución al conectar o desconectar una
-salida, sin cambiar los atajos. En el desktop sus funciones son terminal,
-archivos, música, comunicación, navegador, código, juegos y miscelánea. El
-workspace 6 (`I`, código) usa el layout `scrolling`: `Hyper + ,/.` cambia de
-columna y `Hyper + ;` recorre anchos 1/3, 1/2, 2/3 y completo.
+Los fragmentos de host pueden activar layouts extra, el cambio con
+`Super + Space`, distribución de workspaces, brillo, dictado o ciclo de audio
+solo si fueron confirmados. Si desaparece una pantalla, los workspaces continúan
+en una salida disponible.
 
-La primera instalación de Kanata requiere cargar `uinput`, añadir el usuario al
-grupo `input`, aplicar el módulo udev y habilitar el servicio. Usa Polkit y vuelve
-a iniciar sesión para que systemd herede el grupo:
+La primera instalación de Kanata requiere aplicar la regla udev y volver a
+entrar para heredar el grupo:
 
 ```bash
 pkexec /usr/bin/modprobe uinput
@@ -326,77 +293,7 @@ systemctl --user daemon-reload
 systemctl --user enable kanata.service
 ```
 
-## Gaming
-
-El perfil `desktop` instala el runtime de CachyOS y los launchers Steam, Heroic,
-Lutris y Faugus. `game-run` aplica `game-performance` y permite activar MangoHud
-o una superficie Gamescope de 1920x1080 a 75 Hz por juego:
-
-```bash
-game-run -- juego
-game-run --hud -- juego
-game-run --gamescope --hud -- juego
-game-run --dlss --hud -- juego
-
-# Opciones de lanzamiento de Steam
-game-run -- %command%
-
-# Arma Reforger en este desktop: evita el fallo de follaje en Linux/NVIDIA
-VKD3D_SWAPCHAIN_LATENCY_FRAMES=1 game-run -- %command%
-```
-
-Steam conserva Proton oficial de Valve como valor global; Proton-CachyOS SLR se
-elige solo para el título que lo necesite. Las bibliotecas deben permanecer en
-el NVMe Btrfs y no en NTFS. El DualSense es opcional y el soporte anti-cheat
-depende del publisher. La auditoría de ReBAR y DOCP se documenta, pero no cambia
-firmware ni configuración de sistema.
-
-`game-run` comparte la propiedad de No Molestar entre sesiones simultáneas. La
-primera sesión guarda el estado y la última lo restaura. Terminar un juego no
-puede reactivar notificaciones mientras otro siga abierto.
-
-Consulta [GAMING.md](GAMING.md) para launchers, almacenamiento, diagnóstico,
-rollback seguro, limitaciones y fuentes.
-
-## Multimedia
-
-Stremio es una aplicación Flatpak común. `Hyper + S` enfoca la ventana
-existente o abre la instalación de usuario. `Hyper + V` abre `/media`, con
-Stremio, Spotify, YouTube y las suscripciones de YouTube.
-
-YouTube y las suscripciones se abren directamente en qutebrowser. El widget
-central de Noctalia y las teclas físicas controlan los reproductores
-compatibles.
-
-El hub multimedia no cambia DND, potencia, audio ni fullscreen. Si un
-reproductor no inhibe el bloqueo durante una película, usa `Hyper + C` para
-activar cafeína y desactívala al terminar.
-
-## Atajos
-
-### Ventanas y espacios
-
-| Atajo | Acción |
-|---|---|
-| `Alt + H/J/K/L` | Mover el foco |
-| `Alt + Shift + H/J/K/L` | Mover la ventana |
-| `Alt + Ctrl + H/J/K/L` | Redimensionar la ventana |
-| `Alt + Q/W/E/R/U/I/O/P` | Ir a los espacios 1–8 |
-| `Alt + Shift + Q/W/E/R/U/I/O/P` | Enviar la ventana a un espacio |
-| `Alt + Tab` | Selector de ventanas |
-| `Alt + X` | Cerrar la ventana activa |
-| `Alt + M` | Maximizar |
-| `Alt + F` | Alternar flotante |
-| `Hyper + D` | Alternar la dirección de la división |
-| `Hyper + F` | Alternar pantalla completa |
-| `Alt + S` | Mostrar u ocultar el scratchpad |
-| `Alt + Shift + S` | Enviar al scratchpad |
-| `Alt + A` / `Alt + Shift + A` | Mostrar o enviar al scratchpad de IA |
-| `Alt + Z` / `Alt + Shift + Z` | Mostrar o enviar al scratchpad de logs |
-| `Alt + G` | Alternar grupo de ventanas |
-| `Alt + N` / `Alt + Shift + N` | Recorrer ventanas del grupo |
-
-### Aplicaciones y sistema
+## Escritorio, captura y multimedia
 
 | Atajo | Acción |
 |---|---|
@@ -404,108 +301,105 @@ activar cafeína y desactívala al terminar.
 | `Hyper + B` | qutebrowser |
 | `Hyper + E` | Dolphin |
 | `Hyper + Y` | Yazi en Ghostty |
-| `Hyper + O` | Enfocar o abrir Orca |
-| `Hyper + M` | Enfocar o abrir Spotify |
-| `Hyper + S` | Enfocar o abrir Stremio |
-| `Hyper + G` | Enfocar o abrir Steam (`desktop`) |
+| `Hyper + O` | Orca |
+| `Hyper + M` | Spotify |
+| `Hyper + S` | Stremio |
 | `Hyper + 1` | 1Password |
-| `Alt + Space` | Launcher de Noctalia |
-| `Hyper + Space` | Abrir `/cmd` |
-| `Hyper + J` | Abrir `/proj` |
-| `Hyper + V` | Abrir `/media` |
-| `Hyper + [` / `Hyper + ]` | Fondo anterior/siguiente del tema activo |
-| `Hyper + T` | Abrir el selector de apariencias (`/appearance`) |
-| `Hyper + R` | Iniciar o detener el dictado local |
+| `Alt + Space` | Launcher Noctalia |
+| `Hyper + Space` | `/cmd` |
+| `Hyper + J` | `/proj` |
+| `Hyper + V` | `/media` |
+| `Hyper + T` | Apariencias |
 | `Hyper + N` | Notificaciones |
-| `Hyper + H` | Usar la siguiente salida de audio disponible |
-| `Hyper + P` | Capturar una región y preparar contexto para Orca |
+| `Hyper + P` | Captura y contexto para Orca |
 | `Hyper + K` | Selector de color |
 | `Hyper + C` | Cafeína |
-| `Hyper + I` | Alternar modo foco |
-| `Hyper + U` | Activar modo demo con grabación |
-| `Hyper + L` | Bloquear la sesión |
+| `Hyper + I` | Modo foco |
+| `Hyper + U` | Modo demo/grabación |
+| `Hyper + L` | Bloquear sesión |
 | `Hyper + Q` | Menú de sesión |
-| `Hyper + 7` | Alternar el panel buscable de atajos (`/keys`) |
-| `Super + Space` | Alternar teclado US/ES (`desktop`) |
-| `Super + V` | Historial del portapapeles |
+| `Hyper + 7` | Panel buscable de atajos |
 
-`Super` se limita al historial del portapapeles y al cambio de layout. El archivo
-`hypr-common/.config/hypr/config/binds.lua` conserva además `Print`, el monitor
-del sistema y las teclas físicas de calculadora y multimedia. Las teclas de
-brillo viven solo en `hypr-laptop`.
+Stremio es Flatpak de usuario. `Hyper + V` abre el hub multimedia con Stremio,
+Spotify, YouTube y suscripciones. El hub no cambia DND, audio, potencia ni
+fullscreen. Usa `Hyper + C` si un reproductor no inhibe el bloqueo.
 
-### qutebrowser
+Noctalia ofrece grabación mediante `gpu-screen-recorder`, replay en RAM,
+captura OCR/QR y temporizador con alarma. Las métricas de recursos se adaptan a
+los dispositivos presentes. La guía completa está en
+[docs/DESKTOP-WORKFLOW.md](docs/DESKTOP-WORKFLOW.md).
 
-qutebrowser usa la paleta Project Atlas, navegación Vim y el líder local `,`.
-La tabla completa de buffers, sesiones, Markdown, aplicaciones externas,
-DevTools, descargas y búsquedas técnicas está en la
-[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#qutebrowser).
+qutebrowser usa navegación Vim y el líder local `,`. `/proj`,
+`/proj-actions`, `/ssh`, `/media`, `/typing`, `/appearance`, `/keys`,
+`/ports`, `/crash` y `/cmd` exponen acciones keyboard-first. `/game` aparece
+solo cuando está seleccionado `gaming-launchers`.
+Consulta la [guía de qutebrowser](docs/DESKTOP-WORKFLOW.md#qutebrowser).
 
-El launcher ofrece `/proj`, `/proj-actions`, `/ssh`, `/media`, `/typing`, `/appearance`,
-`/keys`, `/ports`, `/crash`, `/game` y `/cmd`.
-`/proj` muestra una fila por repositorio, con nombre y ruta, y abre Orca con un
-terminal del repositorio. `/proj-actions` conserva las acciones explícitas como
-Nvim, tareas y preview. Consulta la
-[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#proyectos-y-acciones-avanzadas) para cada
-acción disponible.
+## Gaming
 
-## Secretos
+Gaming se selecciona por bundle, no por clase de equipo. `gaming-core` añade
+Steam, Gamescope, MangoHud y `game-run`; `gaming-launchers` añade Heroic,
+Lutris, Faugus y ProtonPlus; `gaming-tools` añade Ludusavi, benchmarker e
+informes.
 
-`with-secrets` ejecuta un comando con las referencias locales de 1Password sin
-exportarlas a la sesión padre. No lee un `.env` con valores: `~/.env.op` contiene
-solo referencias `op://` y nunca se versiona.
+```bash
+game-run -- juego argumentos
+game-run --hud -- juego argumentos
+game-run --gamescope --hud -- juego argumentos
+game-run --dlss -- juego argumentos
+game-run --bench nombre --duration 120 -- juego argumentos
+game-run -- %command%              # opciones de lanzamiento de Steam
+game-bench-report nombre
+```
+
+`game-run` usa `game-performance`, activa No molestar durante todas las
+sesiones simultáneas y restaura el estado original al terminar la última. No
+combines `gamemoderun` con este flujo. Mantén bibliotecas Steam en un
+filesystem Linux; el doctor avisa de NTFS. DualSense y anti-cheat son
+compatibilidades opcionales y dependen del juego/editor.
+
+MangoHud y Gamescope son herramientas de medición o aislamiento por juego, no
+valores globales. No se fuerzan HDR, tearing, Wine Wayland, DXVK ni límites de
+FPS. Para detalles, almacenamiento, benchmarks, limitaciones y rollback, consulta
+[GAMING.md](GAMING.md).
+
+## Secretos, backup y toolchain
+
+`with-secrets` ejecuta un comando con referencias locales de 1Password sin
+exportarlas a la sesión padre. `.env.op` contiene solo referencias `op://` y
+nunca se versiona.
 
 ```bash
 with-secrets pnpm run deploy
 ```
 
-### Backup cifrado del desktop
-
-El módulo `backup` prepara Ludusavi, Restic y rclone, pero no inventa un destino
-remoto ni habilita timers. Crea primero un ítem de 1Password con la URL de
-repositorio Restic y su contraseña; después copia la plantilla y sustituye solo
-los nombres de referencia:
+El bundle `backup` instala Restic y rclone, pero no inventa un repositorio ni
+activa timers. Configura las referencias locales, inicializa el repositorio y
+activa timers solo cuando el backup se haya probado:
 
 ```bash
-install -m 600 .env.op.example ~/.env.op
-micro ~/.env.op
-desktop-backup-init
-desktop-backup
-desktop-backup-credential-init
+install -m 600 .env.op.example "$HOME/.env.op"
+micro "$HOME/.env.op"
+dotfiles-backup-init
+dotfiles-backup
+dotfiles-backup-credential-init
 just apply-user-timers
 ```
 
-`desktop-backup-init` muestra el destino de forma oculta y exige
-`INICIALIZAR`. El backup diario guarda el canario, documentos/proyectos,
-dotfiles y el staging de partidas de Ludusavi; omite cachés, dependencias y
-objetos Git. La retención es 7 diarios, 5 semanales y 12 mensuales. Cada mes se
-ejecutan `restic check --read-data-subset=5%`, `prune` y una restauración del
-canario. `desktop-backup-credential-init` convierte la contraseña inyectada por
-1Password en una credencial cifrada y ligada al usuario/equipo mediante
-`systemd-creds`; los timers la descifran solo dentro de cada unidad, por lo que
-no dependen de que 1Password esté desbloqueado de madrugada. Ningún timer se
-habilita durante Stow.
-La retención y `restore latest` quedan además acotados al hostname que creó el
-snapshot, incluso si varios equipos comparten el mismo repositorio.
-
-Revisa el estado con:
+Los wrappers `desktop-backup*` se conservan por compatibilidad, pero los
+comandos nuevos son `dotfiles-backup*`. El backup incluye el checkout
+registrado, documentos/proyectos, canario y staging Ludusavi cuando existe;
+omite cachés, dependencias y objetos Git. La retención es 7 diarios, 5
+semanales y 12 mensuales. Los timers siguen desactivados después de Stow.
 
 ```bash
 just check-user-timers
 systemctl --user status restic-backup.service restic-maintenance.service
 ```
 
-### Toolchain y shell
-
-`mise` fija Node 26.5.1, `uv` y Ruff cubren Python, y Atuin reemplaza la búsqueda
-de historial sin sincronización ni IA. Su filtro excluye comandos con
-`with-secrets`, `op`, contraseñas, tokens o claves. Tras desplegar esta rama,
-migra Atlas fuera de `fnm` en una transacción separada:
-
-Fish detecta el Android SDK local en `~/.local/share/android-sdk`, exporta
-`ANDROID_HOME`, `ANDROID_SDK_ROOT` y `ANDROID_AVD_HOME`, y añade
-`platform-tools` y `cmdline-tools/latest/bin` al `PATH`. El perfil `desktop`
-publica las mismas rutas Android en la sesión gráfica para Orca.
+`mise`, `uv`, Ruff y Atuin cubren el toolchain local. Android usa
+`$HOME/.local/share/android-sdk` y publica `ANDROID_HOME`,
+`ANDROID_SDK_ROOT` y `ANDROID_AVD_HOME` sin fijar un usuario.
 
 ```bash
 just toolchain-check
@@ -513,33 +407,16 @@ just toolchain-migrate
 just atlas-check
 ```
 
-La migración valida primero el Node de mise, retira solo el paquete `fnm`,
-reregistra `[mcp_servers.component-atlas]` y trata de reinstalar `fnm` si la
-validación final falla.
+Yazi se integra como `y`: al salir, Fish cambia al directorio seleccionado.
+Television ofrece `tv`, `tvg` y `tvt`. Delta conserva el diff lineal;
+Difftastic queda disponible bajo demanda con `git dft`, `git dshow`,
+`git dlog` o `git difftool`.
 
-Yazi queda integrado como función `y`: al salir cambia Fish al directorio
-seleccionado. Television se prueba con `tv`, `tvg` (repositorios Git) y `tvt`
-(contenido), sin apropiarse de `Ctrl + R`, que continúa siendo de Atuin.
-Delta conserva el `git diff` lineal y Difftastic queda disponible bajo demanda
-con `git dft`, `git dshow`, `git dlog` o `git difftool`.
+## Codex, Orca y Atlas
 
-### Codex y Orca
-
-El repositorio añade revisores especializados de solo lectura, las skills locales
-`$cachyos-host-audit` y `$linear-workflow`, y un flujo componible de aclaración,
-modelado, tickets desde una especificación, diseño, TDD, diagnóstico,
-implementación, verificación, revisión e intercambio de contexto.
-`$linear-workflow` se activa por una petición clara sobre Linear; consulta
-primero y exige autorización inmediatamente antes de cualquier escritura.
-También incorpora reglas de auditoría estrechas y notificaciones que nunca
-incluyen el prompt ni la respuesta. La configuración viva se fusiona para
-conservar trusts, hooks de Orca y MCP:
-
-En el uso diario, Orca y Codex CLI son el núcleo: Project Cockpit abre Orca y
-un terminal reutilizable por repositorio; Codex se ejecuta desde ese terminal.
-Nvim sirve para edición, tareas, diagnósticos y preparación de contexto. La
-[guía del flujo desktop](docs/DESKTOP-WORKFLOW.md#orca-y-codex-cli) define
-este reparto.
+Orca y Codex CLI forman el flujo diario: Project Cockpit abre Orca y un terminal
+reutilizable por repositorio; Codex se ejecuta desde ese terminal. Nvim sirve
+para edición, tareas, diagnósticos y preparación de contexto.
 
 ```bash
 just codex-skills-check
@@ -549,152 +426,35 @@ just codex-config-sync
 just codex-clean-rules
 ```
 
-`just codex-skills-check` valida sin escribir la estructura y los metadatos de
-las skills y agentes versionados. `just codex-tests` ejecuta las regresiones del
-tooling sin dejar `__pycache__`; `just codex-check` reúne ambas comprobaciones y
-añade la configuración y las reglas gestionadas.
+Las skills y agentes versionados se validan sin escribir. La sincronización de
+Codex conserva trusts, hooks de Orca y MCP existentes. Linear es opcional:
+su servidor de escritura permanece deshabilitado hasta una petición explícita y
+una confirmación nueva. No se versiona OAuth ni se publica automáticamente.
 
-`just codex-config-sync` muestra el destino de `config.toml` y requiere escribir
-`APLICAR`; con backup, propone Sol `medium` cuando aún no existe una selección,
-pero conserva el modelo y razonamiento elegidos en Codex. Sincroniza el modo
-local YOLO (`never` y `danger-full-access`), hooks y memorias, agentes, estado
-TUI y notificaciones. Conserva hooks de Orca, trusts,
-MCP y las demás claves existentes. Los perfiles `fast`, `deep` y `ultra` solo
-sobrescriben modelo y razonamiento.
-
-Antes de un push, Codex ejecuta comprobaciones recientes, vuelve a validar el
-estado y solicita autorización para el repositorio, remoto, rama y OID exactos.
-No usa force, borrado, tags, mirror ni varios refspecs. Este contrato permanece
-en instrucciones y skills; no añade un runtime de publicación propio.
-
-Linear se conecta personalmente, sin versionar OAuth ni sustituir la
-configuración que mantiene Orca. El servidor habitual es técnicamente de solo
-lectura y el servidor capaz de escribir queda deshabilitado:
-
-```bash
-codex mcp add linear --url https://mcp.linear.app/mcp/readonly
-codex mcp login linear
-codex mcp add linear-write --url https://mcp.linear.app/mcp
-codex mcp login linear-write
-# En ~/.codex/config.toml: [mcp_servers.linear-write] enabled = false
-```
-
-Tras autenticar, abre una sesión nueva de Codex. `$to-tickets` crea borradores
-locales y `$linear-workflow` prepara en lectura. Para escribir, abre
-`codex -c 'mcp_servers.linear-write.enabled=true'`; esa sesión relee Linear,
-muestra el preview actualizado y pide una confirmación nueva. El permiso de
-capacidad no persiste ni la autorización cruza sesiones. `just codex-clean-rules`
-retira reglas temporales detectadas y conserva una copia previa.
-
-Al aplicar el módulo `codex`, las skills locales se despliegan como enlaces de
-carpeta, el formato enlazado que Codex descubre oficialmente. La migración de
-`$linear` a `$linear-workflow` retira únicamente los cuatro enlaces heredados que
-todavía apunten a la fuente canónica antigua. Cada árbol sustituido se mueve a
-una copia reversible bajo el estado de dotfiles; si aparece contenido ajeno o
-inesperado, se conserva y la operación se detiene. Las tres skills de Atlas
-continúan siendo copias reales gestionadas por `just atlas-sync`.
-
-La sincronización de configuración activa `features.memories`. Es memoria
-auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica
-de instrucciones y el estado generado bajo `~/.codex/memories` no se versiona.
-Las sesiones que consultan web, MCP u otras fuentes externas no generan memoria
-automática.
-
-Consulta la [guía diaria de Codex](docs/codex/guia-diaria.md) para prompts,
-perfiles y consejos de uso. El [modelo operativo](docs/codex/operating-model.md)
-documenta el enrutamiento de skills, la autonomía segura y la verificación.
-Linear es opcional y explícito; ninguna skill o plugin de terceros se instala
-automáticamente.
-
-Las tres automatizaciones de Orca creadas para este host —auditoría semanal,
-radar upstream y auditoría mensual Restic— usan un worktree nuevo basado en
-`origin/main`. Las semanales recuperan una ejecución perdida durante siete días;
-la mensual, durante treinta. Revísalas con `orca-ide automations list --json`.
-
-### Escritorio y captura
-
-Noctalia usa un horario privado local para luz nocturna, brillo DDC/CI para los
-dos Philips y el plugin oficial `noctalia/screen_recorder`. Este se materializa
-desde la fuente oficial al arrancar la configuración desplegada y usa
-`gpu-screen-recorder`: 1080p60 H.264, audio de salida y replay de 90 segundos en
-RAM. El acceso está en el centro de control. La barra muestra una cámara roja
-solo mientras hay una grabación activa; un clic la detiene. No se ejecuta
-`hyprsunset` en paralelo. La cápsula de recursos muestra uso y temperatura de la
-CPU, uso y temperatura de GPU y porcentaje de RAM. Estas métricas se actualizan
-cada tres segundos. Se retiraron el espejo de pantalla y el estado periódico del
-repositorio para reducir ruido visual.
-El temporizador de Noctalia muestra su cuenta atrás junto al reloj y abre sus
-controles con un clic, con `Hyper+A` o desde `/cmd Timer`. Al terminar, cambia a
-estado de alerta, envía una notificación y reproduce una vez la alarma de
-freedesktop al 65 % del volumen interno de Noctalia. Una sobreescritura local
-pequeña conserva este sonido frente a la copia oficial, que todavía solo
-implementa la notificación.
-`start-noctalia-ready` retrasa como mínimo tres segundos el inicio de la shell y
-espera hasta veinte segundos a que todas las salidas externas activas aparezcan
-en DDC; evita que uno de dos monitores idénticos quede marcado como deshabilitado
-por una carrera de detección durante el arranque.
-
-En el perfil `desktop`, `ensure-main-hdmi-audio` selecciona al iniciar el perfil
-NVIDIA `hdmi-stereo-extra1`, confirmado mediante prueba auditiva como el Philips
-principal de la derecha. Es el único monitor cuyo jack está conectado a los
-altavoces. El helper espera a PipeWire durante un máximo de veinte segundos y
-mueve también las aplicaciones que hayan abierto un stream antes de que aparezca
-el monitor. Un clic central sobre el icono de volumen de Noctalia o `Hyper+H`
-avanza por los dos perfiles HDMI y por el resto de las salidas que PipeWire tenga
-disponibles, incluidos los cascos Bluetooth conectados. Una notificación indica
-la salida activa y su posición en el ciclo. El clic normal abre el panel de
-audio. En el icono de Bluetooth, el clic derecho abre su panel y ya no apaga el
-adaptador.
-
-El desktop separa dos indicadores térmicos en `Aura Addressable 1`: los 12 LED
-de la CPU siguen su temperatura y los 48 LED de los ventiladores internos
-siguen la temperatura de la GPU. Azul indica frío; verde, carga normal;
-naranja, carga alta estable; y rojo, cercanía al límite térmico. Las
-líneas frontal y superior quedan blancas. No controla PWM ni la iluminación de
-la GPU o la RAM. La guía diaria de apariencias, captura OCR/QR, cápsulas de
-errores, dictado, modo foco/demo, puertos y scratchpads está en
-[docs/DESKTOP-WORKFLOW.md](docs/DESKTOP-WORKFLOW.md).
-
-## Validación
-
-```bash
-just lint desktop
-just lint workstation
-./install.sh desktop --list-packages
-./install.sh workstation --list-packages
-HYPR_PROFILE_DIR="$PWD/hypr-laptop/.config/hypr" \
-  Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
-HYPR_PROFILE_DIR="$PWD/hypr-desktop/.config/hypr" \
-  Hyprland --verify-config -c hypr-common/.config/hypr/hyprland.lua
-hyprctl configerrors
-noctalia config validate noctalia/.config/noctalia/config.toml
-kanata --check -c kanata/.config/kanata/config.kbd
-just check desktop
-just check gaming
-just doctor desktop
-just doctor-live desktop
-git diff --check
-```
+El repositorio mantiene flujos para aclaración, modelado, tickets, diseño, TDD,
+diagnóstico, implementación, revisión, verificación y handoff. Consulta la
+[guía diaria de Codex](docs/codex/guia-diaria.md) y el
+[modelo operativo](docs/codex/operating-model.md).
 
 ## Rutas principales
 
 ```text
-hypr-common/.config/hypr/       configuración compartida de Hyprland
-profiles.sh                     composición canónica de módulos Stow
-packages.csv                    paquetes Pacman/AUR por ámbito
-flatpaks.csv                    aplicaciones Flatpak por remoto y rama
-flatpak-remotes.csv             URLs canónicas de remotos Flatpak
-hypr-laptop/.config/hypr/       hardware del portátil
-hypr-desktop/.config/hypr/      hardware del sobremesa
-gaming/                         wrappers y configuración gaming del sobremesa
-backup/                         Restic, Ludusavi y timers de usuario del sobremesa
-noctalia/.config/noctalia/      Noctalia y paleta
-kanata/.config/kanata/          teclado
-ghostty/.config/ghostty/        terminal
-fish/.config/fish/              shell y funciones
-nvim/.config/nvim/              editor
-vscode/                         VS Code y VSCodium
-system-etc/                     archivos destinados a /etc
+dotfiles.toml                    base, bundles y capacidades declarativas
+scripts/dotfiles_host.py         detección, configuración, generación y rollback
+hypr-common/.config/hypr/        base común de Hyprland
+hypr-host/.config/hypr/          fallback portable de Hyprland
+audio/                           acciones y helpers PipeWire configurables
+gpu-nvidia/                      caché y helper PRIME, solo con NVIDIA
+gaming-core/                     runtime y wrappers gaming
+gaming-launchers/                launcher Noctalia y launchers de juegos
+gaming-tools/                    benchmark e informes
+backup/                          Restic, rclone y unidades de usuario
+rgb-openrgb/                     servicio RGB sin targets versionados
+android/                         variables Android portables
+templates/qmd/                   plantilla QMD renderizada localmente
+noctalia/.config/noctalia/       Noctalia, paleta y colecciones
+kanata/.config/kanata/           teclado
+system-etc/                      archivos separados destinados a /etc
 ```
 
 Orca se instala fuera de Pacman y debe proporcionar `orca-ide` en `PATH`.

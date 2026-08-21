@@ -16,7 +16,7 @@ fi
 # Ignora únicamente la ausencia esperada de nuestros dos ejecutables; cualquier
 # otro diagnóstico de sintaxis o dependencia sigue haciendo fallar la prueba.
 unexpected="$(grep -Ev \
-	'^restic-(backup|maintenance)\.service: Command .*/\.local/bin/desktop-backup(-maintenance)? is not executable: No such file or directory$' \
+	'^restic-(backup|maintenance)\.service: Command .*/\.local/bin/(desktop-backup(-maintenance)?|dotfiles-backup(-maintenance)?) is not executable: No such file or directory$' \
 	<<<"$output" || true)"
 if [[ -z "$unexpected" ]]; then
 	exit 0

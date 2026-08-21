@@ -13,9 +13,9 @@ MIGRATOR = SCRIPTS / "migrate-codex-skill-paths.sh"
 MANAGED_LINKS = ("LICENSE.txt", "SKILL.md", "SOURCE.md", "agents/openai.yaml")
 
 
-def create_managed_legacy(home: Path) -> Path:
+def create_managed_legacy(home: Path, source: Path | None = None) -> Path:
     legacy = home / ".agents/skills/linear"
-    source = home / ".dotfiles/codex/.agents/skills/linear"
+    source = source or home / ".dotfiles/codex/.agents/skills/linear"
     for relative in MANAGED_LINKS:
         link = legacy / relative
         link.parent.mkdir(parents=True, exist_ok=True)
@@ -41,6 +41,18 @@ class MigrateCodexSkillPathsTest(unittest.TestCase):
             root = Path(temporary)
             legacy = create_managed_legacy(root / "home")
             checked = run_migrator(root / "home", root / "state", "--check")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            self.assertIn("MIGRATE:", checked.stdout)
+            self.assertTrue(legacy.is_dir())
+
+    def test_check_accepts_links_to_the_checkout_running_the_migration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            legacy = create_managed_legacy(
+                home, MIGRATOR.parent.parent / "codex/.agents/skills/linear"
+            )
+            checked = run_migrator(home, root / "state", "--check")
             self.assertEqual(checked.returncode, 0, checked.stderr)
             self.assertIn("MIGRATE:", checked.stdout)
             self.assertTrue(legacy.is_dir())

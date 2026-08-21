@@ -3,7 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
-readonly helper=${1:-"$repo_root/hypr-desktop/.local/bin/reactive-rgb"}
+readonly helper=${1:-"$repo_root/rgb-openrgb/.local/bin/reactive-rgb"}
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 mkdir -p "$test_root/bin" "$test_root/config/reactive-rgb" "$test_root/hwmon/hwmon0"
@@ -13,7 +13,7 @@ printf '%s\n' '#!/usr/bin/env bash' \
 	'if [[ "$*" == *"--list-devices"* ]]; then [[ -z "${TEST_LIST_LOG:-}" ]] || printf "list\n" >>"$TEST_LIST_LOG"; printf "%s\n" "0: Kingston FURY" "1: ASUS TUF GAMING B550-PLUS (WI-FI)" "  Type: Motherboard" "2: NVIDIA GeForce RTX 3060 Ti" "3: NZXT Smart Device V2"; elif [[ "${TEST_OPENRGB_FAIL:-0}" == 1 ]]; then exit 1; else printf "openrgb:%s\n" "$*" >>"$TEST_LOG"; fi' \
 	>"$test_root/bin/openrgb"
 printf '%s\n' '#!/usr/bin/env bash' \
-	'if [[ "${TEST_GPU_HANG:-0}" == 1 ]]; then sleep 2; else printf "%s\n" "${TEST_GPU_TEMP:-85}"; fi' \
+	'if [[ "${TEST_NVIDIA_UNAVAILABLE:-0}" == 1 ]]; then exit 1; elif [[ "${TEST_GPU_HANG:-0}" == 1 ]]; then sleep 2; else printf "%s\n" "${TEST_GPU_TEMP:-85}"; fi' \
 	>"$test_root/bin/nvidia-smi"
 chmod +x "$test_root/bin/"*
 printf '%s\n' \
@@ -164,6 +164,13 @@ grep -Fxq 'health_status=error' <<<"$health"
 grep -Fxq 'health_consecutive_failures=3' <<<"$health"
 grep -Fxq 'health_fresh=0' <<<"$health"
 [[ $(grep -Fxc list "$test_root/list-log") -eq 1 ]] || { printf '%s\n' 'FAIL: OpenRGB se enumeró más de una vez durante run' >&2; exit 1; }
+
+# En una GPU AMD/Intel el modo térmico usa hwmon y no depende de nvidia-smi.
+mkdir -p "$test_root/hwmon/hwmon1"
+printf '%s\n' amdgpu >"$test_root/hwmon/hwmon1/name"
+printf '%s\n' 72000 >"$test_root/hwmon/hwmon1/temp1_input"
+amd_plan=$(env "${env_base[@]}" TEST_NVIDIA_UNAVAILABLE=1 "$helper" dry-run --mode thermal)
+grep -Fxq 'gpu_color=FF4000' <<<"$amd_plan"
 
 rm -f "$test_root/config/reactive-rgb/config.conf"
 set +e

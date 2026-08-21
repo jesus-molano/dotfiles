@@ -1,0 +1,59 @@
+# Composición portable. Las decisiones de una máquina viven fuera de Git en
+# $XDG_CONFIG_HOME/dotfiles/host.toml; este archivo no contiene identidad local.
+schema = 1
+
+[base]
+modules = [
+  "android", "audio", "codex", "fish", "fonts", "ghostty", "git", "hypr-common", "hypr-host", "kanata",
+  "mimeapps", "noctalia", "nvim", "qutebrowser", "shell", "starship",
+  "vscode", "zellij",
+]
+
+[bundles.gaming-core]
+modules = ["gaming-core"]
+
+[bundles.gaming-launchers]
+modules = ["gaming-launchers"]
+
+[bundles.gaming-tools]
+modules = ["gaming-tools"]
+
+[bundles.backup]
+modules = ["backup"]
+
+[bundles.rgb-openrgb]
+modules = ["rgb-openrgb"]
+
+[bundles.local-ai]
+modules = []
+requires = []
+
+[bundles.productivity-extra]
+modules = ["productivity-extra"]
+
+[capabilities.gpu-nvidia]
+detector_key = "gpu_vendors"
+detector_value = "nvidia"
+modules = ["gpu-nvidia"]
+
+# Mínimos con los que se valida esta generación de configuración. No son pins:
+# Pacman/Shelly pueden instalar cualquier versión igual o posterior.
+[compatibility.packages.cachyos-hypr-noctalia]
+minimum = "1.2.5"
+source = "native"
+
+[compatibility.packages.hyprland]
+minimum = "0.56.2"
+source = "native"
+
+[compatibility.packages.noctalia]
+# Pacman considera una release final 5.0.0 inferior a 5.0.0_beta.9. Ambas
+# ramas son compatibles con esta configuración; el consumidor debe aceptar
+# minimum O stable_minimum, nunca una beta anterior.
+minimum = "5.0.0_beta.9"
+stable_minimum = "5.0.0"
+source = "native"
+
+[compatibility.packages.kanata-bin]
+minimum = "1.12.0"
+source = "aur"

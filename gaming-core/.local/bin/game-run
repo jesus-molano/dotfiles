@@ -1,0 +1,280 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf '%s\n' \
+		'Uso: game-run [--hud] [--gamescope] [--dlss] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
+}
+
+hud=false
+use_gamescope=false
+use_dlss=false
+dry_run=false
+benchmark_name=''
+benchmark_duration=120
+
+while (($#)); do
+	case "$1" in
+	--hud)
+		hud=true
+		;;
+	--gamescope)
+		use_gamescope=true
+		;;
+	--dlss)
+		use_dlss=true
+		;;
+	--dry-run)
+		dry_run=true
+		;;
+	--bench)
+		(($# >= 2)) || {
+			printf '%s\n' 'Falta el nombre del benchmark.' >&2
+			exit 2
+		}
+		benchmark_name=$2
+		shift
+		;;
+	--duration)
+		(($# >= 2)) || {
+			printf '%s\n' 'Falta la duración del benchmark.' >&2
+			exit 2
+		}
+		benchmark_duration=$2
+		shift
+		;;
+	--help | -h)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		break
+		;;
+	-*)
+		printf 'Opción desconocida: %s\n' "$1" >&2
+		usage >&2
+		exit 2
+		;;
+	*)
+		break
+		;;
+	esac
+	shift
+done
+
+if (($# == 0)); then
+	printf '%s\n' 'Falta el comando del juego.' >&2
+	usage >&2
+	exit 2
+fi
+
+if [[ -n "$benchmark_name" ]]; then
+	[[ "$benchmark_name" =~ ^[[:alnum:]_.-]+$ && "$benchmark_name" != . && "$benchmark_name" != .. ]] || {
+		printf '%s\n' 'El nombre admite letras, números, punto, guion y guion bajo; no puede ser uno o dos puntos.' >&2
+		exit 2
+	}
+	if [[ ! "$benchmark_duration" =~ ^[0-9]+$ ]] ||
+		((benchmark_duration < 10 || benchmark_duration > 3600)); then
+		printf '%s\n' 'La duración debe ser un entero entre 10 y 3600 segundos.' >&2
+		exit 2
+	fi
+	hud=true
+	benchmark_root="${XDG_STATE_HOME:-$HOME/.local/state}/gaming/benchmarks/$benchmark_name"
+	benchmark_run="$benchmark_root/$(date +%Y%m%d-%H%M%S)"
+	benchmark_config="autostart_log=1,log_duration=$benchmark_duration,log_interval=100,output_folder=$benchmark_run,permit_upload=0,benchmark_percentiles=97+AVG+1+0.1"
+fi
+
+game_command=("$@")
+launch_command=(game-performance)
+if [[ "$use_dlss" == true ]]; then
+	launch_command+=(dlss-swapper)
+fi
+
+if [[ "$use_gamescope" == true ]]; then
+	launch_command+=(gamescope -W 1920 -H 1080 -r 75 -f)
+	if [[ "$hud" == true ]]; then
+		launch_command+=(--mangoapp)
+	fi
+	launch_command+=(-- "${game_command[@]}")
+elif [[ "$hud" == true ]]; then
+	launch_command+=(mangohud "${game_command[@]}")
+else
+	launch_command+=("${game_command[@]}")
+fi
+
+if [[ "$dry_run" == true ]]; then
+	if [[ -n "$benchmark_name" ]]; then
+		printf 'MANGOHUD_CONFIG=%q\n' "$benchmark_config"
+		printf 'Benchmark: %q\n' "$benchmark_run"
+	fi
+	printf 'Comando:'
+	printf ' %q' "${launch_command[@]}"
+	printf '\n'
+	exit 0
+fi
+
+require_command() {
+	command -v "$1" >/dev/null || {
+		printf 'No se encuentra el comando requerido: %s\n' "$1" >&2
+		exit 127
+	}
+}
+
+require_command game-performance
+if [[ "$use_dlss" == true ]]; then
+	require_command dlss-swapper
+fi
+if [[ "$use_gamescope" == true ]]; then
+	require_command gamescope
+elif [[ "$hud" == true ]]; then
+	require_command mangohud
+fi
+
+if [[ -n "$benchmark_name" ]]; then
+	mkdir -p -- "$benchmark_run"
+	export MANGOHUD_CONFIG="${MANGOHUD_CONFIG:+$MANGOHUD_CONFIG,}$benchmark_config"
+	{
+		printf 'fecha=%s\n' "$(date --iso-8601=seconds)"
+		printf 'kernel=%s\n' "$(uname -r)"
+		printf 'programa=%s\n' "${game_command[0]##*/}"
+		printf 'duracion=%s\n' "$benchmark_duration"
+		printf '%s\n' 'composition=resolved'
+		printf 'dlss_swapper=%s\n' "$use_dlss"
+		driver=$(nvidia-smi --query-gpu=name,driver_version --format=csv,noheader 2>/dev/null || true)
+		[[ -z "$driver" ]] || printf 'gpu_driver=%s\n' "$driver"
+	} >"$benchmark_run/metadata.txt"
+	printf 'Benchmark MangoHud: %s\n' "$benchmark_run"
+fi
+
+process_starttime() {
+	local pid=$1 stat_line remainder
+	local -a fields
+	[[ "$pid" =~ ^[0-9]+$ && -r "/proc/$pid/stat" ]] || return 1
+	stat_line=$(<"/proc/$pid/stat")
+	remainder=${stat_line##*) }
+	read -r -a fields <<<"$remainder"
+	((${#fields[@]} >= 20)) && [[ "${fields[19]}" =~ ^[0-9]+$ ]] || return 1
+	printf '%s\n' "${fields[19]}"
+}
+
+gaming_sessions="${XDG_RUNTIME_DIR:-/tmp}/dotfiles-gaming-sessions"
+gaming_lock="$gaming_sessions/.lock"
+dnd_state_file="$gaming_sessions/.dnd-initial"
+gaming_marker=''
+mkdir -p -- "$gaming_sessions"
+chmod 700 "$gaming_sessions"
+require_command flock
+
+marker_is_live() {
+	local marker=$1 pid expected extra current
+	read -r pid expected extra <"$marker" || return 1
+	[[ "$pid" =~ ^[0-9]+$ && "$expected" =~ ^[0-9]+$ && -z "${extra:-}" ]] || return 1
+	current="$(process_starttime "$pid" 2>/dev/null || true)"
+	[[ "$current" == "$expected" ]]
+}
+
+prune_stale_markers() {
+	local marker
+	for marker in "$gaming_sessions"/[0-9]*; do
+		[[ -f "$marker" ]] || continue
+		marker_is_live "$marker" || rm -f -- "$marker"
+	done
+}
+
+live_marker_exists() {
+	local marker
+	for marker in "$gaming_sessions"/[0-9]*; do
+		[[ -f "$marker" ]] || continue
+		marker_is_live "$marker" && return 0
+	done
+	return 1
+}
+
+acquire_gaming_session() {
+	local lock_fd first_session=true initial_dnd='' current_dnd marker
+	exec {lock_fd}>"$gaming_lock"
+	flock "$lock_fd"
+	prune_stale_markers
+	live_marker_exists && first_session=false
+
+	if "$first_session" && command -v desktop-focus-mode >/dev/null 2>&1 &&
+		[[ "$(desktop-focus-mode status 2>/dev/null || true)" == on ]]; then
+		if ! desktop-focus-mode off; then
+			flock -u "$lock_fd"
+			exec {lock_fd}>&-
+			printf '%s\n' 'No se pudo cerrar el modo foco antes de iniciar el juego.' >&2
+			return 1
+		fi
+	fi
+
+	if "$first_session"; then
+		if [[ -s "$dnd_state_file" ]]; then
+			read -r initial_dnd <"$dnd_state_file" || true
+		fi
+		if [[ "$initial_dnd" != on && "$initial_dnd" != off ]]; then
+			rm -f -- "$dnd_state_file"
+			if command -v noctalia >/dev/null 2>&1; then
+				current_dnd="$(noctalia msg notification-dnd-status 2>/dev/null || true)"
+				if [[ "$current_dnd" == on || "$current_dnd" == off ]]; then
+					initial_dnd=$current_dnd
+					printf '%s\n' "$initial_dnd" >"$dnd_state_file"
+				fi
+			fi
+		fi
+	fi
+
+	marker="$gaming_sessions/$$"
+	printf '%s %s\n' "$$" "$(process_starttime "$$")" >"$marker"
+	gaming_marker=$marker
+
+	if "$first_session" && command -v noctalia >/dev/null 2>&1; then
+		current_dnd="$(noctalia msg notification-dnd-status 2>/dev/null || true)"
+		if [[ "$current_dnd" == off ]]; then
+			noctalia msg notification-dnd-set on >/dev/null 2>&1 || true
+		fi
+	fi
+
+	flock -u "$lock_fd"
+	exec {lock_fd}>&-
+}
+
+# Invoked by the EXIT trap below. The last live wrapper restores the shared
+# DND snapshot; an earlier wrapper only removes its own ownership marker.
+# shellcheck disable=SC2329
+restore_gaming_session() {
+	local exit_status=$? lock_fd restore_dnd='' current_dnd=''
+	trap - EXIT
+	set +e
+	if [[ -n "$gaming_marker" ]]; then
+		exec {lock_fd}>"$gaming_lock"
+		flock "$lock_fd"
+		rm -f -- "$gaming_marker"
+		prune_stale_markers
+		if ! live_marker_exists; then
+			if [[ -s "$dnd_state_file" ]]; then
+				read -r restore_dnd <"$dnd_state_file" || true
+			fi
+			if [[ "$restore_dnd" == on || "$restore_dnd" == off ]]; then
+				current_dnd="$(noctalia msg notification-dnd-status 2>/dev/null || true)"
+				if [[ "$current_dnd" != "$restore_dnd" ]]; then
+					noctalia msg notification-dnd-set "$restore_dnd" >/dev/null 2>&1 || true
+				fi
+			fi
+			rm -f -- "$dnd_state_file"
+		fi
+		flock -u "$lock_fd"
+		exec {lock_fd}>&-
+	fi
+	exit "$exit_status"
+}
+trap restore_gaming_session EXIT
+
+acquire_gaming_session
+
+if "${launch_command[@]}"; then
+	game_status=0
+else
+	game_status=$?
+fi
+exit "$game_status"

@@ -6,11 +6,32 @@
 local source = debug.getinfo(1, "S").source
 local config_file = source:sub(1, 1) == "@" and source:sub(2) or source
 local hypr_config = config_file:match("^(.*[/\\])") or "./"
-package.path = hypr_config .. "?.lua;" .. hypr_config .. "?/init.lua;" .. package.path
-local profile_dir = os.getenv("HYPR_PROFILE_DIR")
-if profile_dir and profile_dir ~= "" then
-    package.path = profile_dir .. "/?.lua;" .. profile_dir .. "/?/init.lua;" .. package.path
+local function add_module_dir(directory)
+    if directory and directory ~= "" then
+        package.path = directory .. "/?.lua;" .. directory .. "/?/init.lua;" .. package.path
+    end
 end
+
+-- Hardware choices are generated outside the repository. They take precedence
+-- over the merged Stow directory so a machine can retain its own displays,
+-- inputs and optional adapters without committing its identity. The deployed
+-- directory remains on the path for optional modules such as gaming.lua and
+-- Noctalia's generated theme, even when Hyprland resolves this entrypoint's
+-- symlink back to the canonical checkout.
+local state_home = os.getenv("XDG_STATE_HOME")
+    or ((os.getenv("HOME") or ".") .. "/.local/state")
+local config_home = os.getenv("XDG_CONFIG_HOME")
+    or ((os.getenv("HOME") or ".") .. "/.config")
+local generated_dir = os.getenv("DOTFILES_GENERATED_HYPR_DIR")
+    or (state_home .. "/dotfiles/generated/hypr")
+local deployed_dir = os.getenv("DOTFILES_DEPLOYED_HYPR_DIR")
+    or (config_home .. "/hypr")
+local host_dir = os.getenv("HYPR_HOST_DIR")
+
+add_module_dir(hypr_config)
+add_module_dir(host_dir)
+add_module_dir(deployed_dir)
+add_module_dir(generated_dir)
 
 local function require_optional(module)
     local loaded, result = pcall(require, module)
@@ -80,8 +101,8 @@ require("config.misc")
 require("config.monitors")
 require("config.windowrules")
 require("config.workspaces")
--- The desktop-only gaming module contributes this file. Removing that Stow
--- module also removes its bind and window rules on the next Hyprland reload.
+-- The optional gaming-core module contributes this file. Removing that bundle
+-- also removes its bind and window rules on the next Hyprland reload.
 require_optional("config.gaming")
 
 -- Noctalia owns the live palette. Keep the tracked colors above as a fallback

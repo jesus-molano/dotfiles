@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Stable command name used by the common Hyper+H binding. The implementation
+# is portable and reads optional host-specific audio preferences from XDG state.
+exec cycle-audio-output "$@"

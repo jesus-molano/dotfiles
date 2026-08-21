@@ -1,0 +1,10 @@
+**/.cache
+**/.direnv
+**/.git/objects
+**/.mise
+**/.venv
+**/node_modules
+**/target
+**/venv
+**/.Trash-*
+**/*.iso

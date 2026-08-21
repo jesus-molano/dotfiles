@@ -1,0 +1,17 @@
+[Unit]
+Description=RGB térmico CPU/GPU y líneas blancas para targets confirmados
+Documentation=file:%h/.config/reactive-rgb/config.conf
+After=graphical-session.target
+StartLimitIntervalSec=30min
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/reactive-rgb run
+Restart=on-failure
+RestartSec=5min
+Nice=10
+StandardOutput=null
+
+[Install]
+WantedBy=default.target

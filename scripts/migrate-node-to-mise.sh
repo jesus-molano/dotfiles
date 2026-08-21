@@ -7,7 +7,7 @@ mode=check
 node_version=26.5.1
 
 command -v mise >/dev/null 2>&1 || {
-	printf '%s\n' 'Falta mise; instala primero el perfil desktop.' >&2
+	printf '%s\n' 'Falta mise; instala primero la composición base.' >&2
 	exit 1
 }
 

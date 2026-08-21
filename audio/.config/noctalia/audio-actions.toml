@@ -1,0 +1,7 @@
+# Acciones de audio opcionales. El clic normal conserva el panel de audio.
+[widget.volume.actions]
+middle = "exec cycle-audio-output"
+
+# Evita apagar el adaptador con un clic derecho accidental en la barra.
+[widget.bluetooth.actions]
+right = "panel-toggle control-center bluetooth"

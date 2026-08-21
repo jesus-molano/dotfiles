@@ -6,202 +6,51 @@ system_packages := "sddm udev snapper systemd"
 default:
     @just --justfile "{{ justfile() }}" --list
 
-# Lista el perfil y los módulos permitidos (los paquetes heredados no se despliegan).
+# Lista la composición resuelta; no necesita perfiles.
 list:
+    @python3 "{{ dotfiles_dir }}/scripts/dotfiles_host.py" --repo "{{ dotfiles_dir }}" show --safe-defaults
+
+# Simula la composición local contra un HOME temporal. No acepta perfiles.
+check:
     #!/usr/bin/env bash
     set -euo pipefail
-    source "{{ dotfiles_dir }}/profiles.sh"
-    for profile in workstation desktop; do
-        printf '%s\n' "$profile"
-        while IFS= read -r package; do printf '  %s\n' "$package"; done < <(profile_modules "$profile")
-    done
+    "{{ dotfiles_dir }}/scripts/stow-lint.sh"
 
-# Simula de forma verbosa un perfil o un módulo permitido.
-check target:
+apply:
+    "{{ dotfiles_dir }}/install.sh"
+
+# Retira exactamente la última composición aplicada, no una detección actual.
+# También retira sus artefactos generados registrados; conserva paquetes y backups.
+remove:
     #!/usr/bin/env bash
     set -euo pipefail
-    cd "{{ dotfiles_dir }}"
-    target={{ quote(target) }}
-    source "{{ dotfiles_dir }}/profiles.sh"
+    python3 "{{ dotfiles_dir }}/scripts/dotfiles_host.py" --repo "{{ dotfiles_dir }}" retire
+    printf '%s\n' 'Se retirarán solo los enlaces y generados del último plan aplicado.'
+    printf '%s\n' 'No se desinstalan paquetes ni se eliminan backups; dotf host rollback puede restaurar el estado anterior.'
+    printf 'Escribe RETIRAR: '
+    read -r confirmation
+    [[ "$confirmation" == RETIRAR ]] || { printf '%s\n' 'Cancelado sin cambios.'; exit 1; }
+    python3 "{{ dotfiles_dir }}/scripts/dotfiles_host.py" --repo "{{ dotfiles_dir }}" retire --apply
 
-    if profile_is_valid "$target"; then
-        mapfile -t packages < <(profile_modules "$target")
-    elif home_module_is_allowed "$target"; then
-        packages=("$target")
-    else
-        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
-        exit 2
-    fi
+# Muestra de solo lectura qué cambiaría en el host actual.
+status:
+    "{{ dotfiles_dir }}/install.sh" --check
 
-    for package in "${packages[@]}"; do
-        [[ -d "$package" ]] || {
-            printf 'No existe el módulo: %s\n' "$package" >&2
-            exit 2
-        }
-    done
-
-    for package in "${packages[@]}"; do
-        if [[ "$package" == codex ]]; then
-            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
-            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
-            break
-        fi
-    done
-
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --adopt --simulate --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
-
-# Aplica un perfil o módulo permitido; siempre simula antes y requiere destino.
-apply target:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd "{{ dotfiles_dir }}"
-    target={{ quote(target) }}
-    source "{{ dotfiles_dir }}/profiles.sh"
-
-    if profile_is_valid "$target"; then
-        exec "{{ dotfiles_dir }}/install.sh" "$target"
-    fi
-
-    [[ "$target" != gaming && "$target" != backup ]] || {
-        printf 'Los módulos gaming y backup solo se aplican con el perfil desktop: usa just apply desktop.\n' >&2
-        exit 2
-    }
-
-    [[ "$target" != hypr-common && "$target" != hypr-laptop && "$target" != hypr-desktop ]] || {
-        printf 'Los módulos Hyprland se aplican juntos: usa workstation o desktop.\n' >&2
-        exit 2
-    }
-
-    home_module_is_allowed "$target" || {
-        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
-        exit 2
-    }
-    packages=("$target")
-
-    for package in "${packages[@]}"; do
-        [[ -d "$package" ]] || {
-            printf 'No existe el módulo: %s\n' "$package" >&2
-            exit 2
-        }
-    done
-
-    if [[ "$target" == codex ]]; then
-        "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
-        "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
-    fi
-
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
-
-    if [[ "$target" == codex ]]; then
-        "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --apply
-        "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --apply
-    fi
-
-# Retira enlaces de un perfil o módulo permitido; nunca acepta una llamada vacía.
-remove target:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd "{{ dotfiles_dir }}"
-    target={{ quote(target) }}
-    source "{{ dotfiles_dir }}/profiles.sh"
-
-    if profile_is_valid "$target"; then
-        mapfile -t packages < <(profile_modules "$target")
-    elif home_module_is_allowed "$target"; then
-        packages=("$target")
-    else
-        printf 'Módulo no permitido para HOME: %s\n' "$target" >&2
-        exit 2
-    fi
-
-    for package in "${packages[@]}"; do
-        if [[ "$package" == codex ]]; then
-            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --check
-            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check-remove
-            break
-        fi
-    done
-
-    manage_rgb_service=false
-    for package in "${packages[@]}"; do
-        [[ "$package" == hypr-desktop ]] && manage_rgb_service=true
-    done
-
-    stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --simulate --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"
-
-    rgb_service_changed=false
-    rgb_was_enabled=false
-    rgb_was_active=false
-    restore_rgb_service() {
-        systemctl --user disable --now reactive-rgb.service >/dev/null 2>&1 || true
-        if "$rgb_was_enabled"; then
-            systemctl --user enable reactive-rgb.service >/dev/null 2>&1 || true
-        fi
-        if "$rgb_was_active"; then
-            systemctl --user start reactive-rgb.service >/dev/null 2>&1 || true
-        fi
-    }
-    if "$manage_rgb_service"; then
-        command -v systemctl >/dev/null 2>&1 || {
-            printf '%s\n' 'systemctl no está disponible para retirar Reactive RGB.' >&2
-            exit 1
-        }
-        systemctl --user is-enabled reactive-rgb.service >/dev/null 2>&1 && rgb_was_enabled=true
-        systemctl --user is-active reactive-rgb.service >/dev/null 2>&1 && rgb_was_active=true
-        if "$rgb_was_enabled" || "$rgb_was_active" || systemctl --user cat reactive-rgb.service >/dev/null 2>&1; then
-            if ! systemctl --user disable --now reactive-rgb.service; then
-                restore_rgb_service
-                printf '%s\n' 'No se pudo desactivar Reactive RGB; se restauró su estado anterior.' >&2
-                exit 1
-            fi
-            rgb_service_changed=true
-        fi
-    fi
-
-    if ! stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --delete --verbose=2 \
-        --dir "{{ dotfiles_dir }}" --target "$HOME" "${packages[@]}"; then
-        if "$rgb_service_changed"; then
-            restore_rgb_service
-        fi
-        exit 1
-    fi
-
-    if "$manage_rgb_service"; then
-        systemctl --user daemon-reload
-    fi
-
-    for package in "${packages[@]}"; do
-        if [[ "$package" == codex ]]; then
-            "{{ dotfiles_dir }}/scripts/migrate-codex-skill-paths.sh" --apply
-            "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --remove
-            break
-        fi
-    done
-
-# Muestra de solo lectura qué cambiaría en el perfil indicado.
-status profile:
-    @just --justfile "{{ justfile() }}" check {{ quote(profile) }}
-
-# Diagnóstico de solo lectura del perfil y del sistema anfitrión.
-doctor profile="":
-    "{{ dotfiles_dir }}/scripts/doctor.sh" "{{ profile }}"
+# Diagnóstico de solo lectura de la composición local y del sistema anfitrión.
+doctor:
+    "{{ dotfiles_dir }}/scripts/doctor.sh"
 
 # Valida la rama en un HOME temporal, sin depender del despliegue activo.
-lint profile="desktop":
-    "{{ dotfiles_dir }}/scripts/doctor.sh" {{ quote(profile) }} --config-only
+lint:
+    "{{ dotfiles_dir }}/scripts/doctor.sh" --config-only
 
-# Simula el despliegue contra el HOME real sin escribir.
-plan profile="desktop":
-    @just --justfile "{{ justfile() }}" check {{ quote(profile) }}
+# Simula el despliegue contra HOME sin escribir.
+plan:
+    @just --justfile "{{ justfile() }}" status
 
 # Audita solo el estado vivo del host ya desplegado.
-doctor-live profile="desktop":
-    "{{ dotfiles_dir }}/scripts/doctor.sh" {{ quote(profile) }} --live-only
+doctor-live:
+    "{{ dotfiles_dir }}/scripts/doctor.sh" --live-only
 
 # Descarga de forma explícita el modelo local de dictado. No se ejecuta durante Stow.
 dictation-setup model="base":
@@ -378,10 +227,10 @@ apply-system module:
     printf '%s\n' "$backup_root" > "$state_root/last-system-backup"
     printf 'Backup: %s\n' "$backup_root"
 
-# Ejecuta el instalador explícito de un perfil permitido.
-install profile="workstation":
-    "{{ dotfiles_dir }}/install.sh" {{ quote(profile) }}
+# Ejecuta el instalador de la composición local.
+install:
+    "{{ dotfiles_dir }}/install.sh"
 
-# Lista, sin modificar nada, los paquetes seleccionados para un perfil.
-packages profile:
-    @"{{ dotfiles_dir }}/install.sh" {{ quote(profile) }} --list-packages
+# Lista, sin modificar nada, los paquetes seleccionados.
+packages:
+    @"{{ dotfiles_dir }}/install.sh" --list-packages
