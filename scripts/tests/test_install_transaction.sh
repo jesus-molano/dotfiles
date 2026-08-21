@@ -26,6 +26,7 @@ mkdir -p \
 	"$fixture_repo/unit-test/.config/systemd/user" \
 	"$fixture_repo/mise-test/.config/mise" \
 	"$fixture_repo/codex/.agents/skills/example-skill" \
+	"$fixture_repo/qutebrowser/.config/qutebrowser/__pycache__" \
 	"$fixture_repo/hypr-desktop/.config/reactive-rgb" \
 	"$fixture_repo/gaming/.local/bin" \
 	"$fixture_repo/backup/.local/bin"
@@ -44,6 +45,11 @@ printf '%s\n' split-monitors >"$fixture_repo/split-new/.config/hypr/config/monit
 printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-test.service"
 printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
 printf '%s\n' '# fixture skill' >"$fixture_repo/codex/.agents/skills/example-skill/SKILL.md"
+printf '%s\n' retired >"$fixture_repo/codex/.agents/retired-skills.txt"
+printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.agents/retired-skills\.txt$' >"$fixture_repo/codex/.stow-local-ignore"
+printf '%s\n' 'c = c' >"$fixture_repo/qutebrowser/.config/qutebrowser/config.py"
+printf '%s\n' bytecode >"$fixture_repo/qutebrowser/.config/qutebrowser/__pycache__/config.cpython-314.pyc"
+printf '%s\n' '__pycache__' '.*\.py[co]' >"$fixture_repo/qutebrowser/.stow-local-ignore"
 
 git -C "$fixture_repo" init -q
 git -C "$fixture_repo" add .
@@ -129,7 +135,7 @@ cat >"$wants_runner" <<'EOF'
 set -euo pipefail
 export DOTFILES_INSTALL_SOURCE_ONLY=1
 source "$FIXTURE_REPO/install.sh"
-PLAN_MODULES=(unit-test mise-test codex)
+PLAN_MODULES=(unit-test mise-test codex qutebrowser)
 validate_resolved_runtime() { return 0; }
 unit_source="$DOTFILES_DIR/unit-test/.config/systemd/user/unit-test.service"
 unit_target="$HOME/.config/systemd/user/unit-test.service"
@@ -144,6 +150,10 @@ ln -s "$mise_expected" "$mise_target"
 ln -s "$unit_source" "$HOME/.config/systemd/user/default.target.wants/unit-test.service"
 ln -s "$mise_target" "$HOME/.local/state/mise/tracked-configs/0123456789abcdef"
 ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+intent="$XDG_STATE_HOME/stow-intent.tsv"
+build_check_plan_intent "$intent"
+grep -Fq $'.config/qutebrowser/config.py\t' "$intent"
+if grep -Eq 'retired-skills|__pycache__|SKILL\.md' "$intent"; then exit 9; fi
 home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 check_dotfiles
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]

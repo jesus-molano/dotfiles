@@ -891,8 +891,37 @@ is_stow_ignored_path() {
 }
 
 module_sources() {
-	local module=$1
-	find "$DOTFILES_DIR/$module" \( -type f -o -type l \) -print0
+	local module=$1 package_root
+	package_root="$DOTFILES_DIR/$module"
+	if [[ ! -f "$package_root/.stow-local-ignore" ]]; then
+		find "$package_root" \( -type f -o -type l \) -print0
+		return
+	fi
+
+	# `.stow-local-ignore` contiene expresiones regulares de Perl. No dupliques
+	# aquí esa semántica con Bash o Python: materializa el paquete en un destino
+	# privado y deja que el propio Stow decida sus fuentes exactas. Esto mantiene
+	# los manifests/checkpoints alineados con Stow incluso si aparece estado local
+	# ignorado dentro del checkout (por ejemplo __pycache__ o retired-skills.txt).
+	(
+		set -euo pipefail
+		local temporary_root=${TMPDIR:-/tmp} probe_root target relative
+		temporary_root="$(realpath -e -- "$temporary_root")"
+		probe_root="$(mktemp -d "$temporary_root/dotfiles-stow-sources.XXXXXX")"
+		# shellcheck disable=SC2329 # invoked by the EXIT trap below
+		cleanup_stow_sources() {
+			[[ "$probe_root" == "$temporary_root"/dotfiles-stow-sources.* ]] || return 1
+			find "$probe_root" -depth -delete
+		}
+		trap cleanup_stow_sources EXIT
+
+		command stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' \
+			--dir "$DOTFILES_DIR" --target "$probe_root" "$module" >/dev/null
+		while IFS= read -r -d '' target; do
+			relative=${target#"$probe_root/"}
+			printf '%s\0' "$package_root/$relative"
+		done < <(find "$probe_root" -type l -print0)
+	)
 }
 
 target_is_managed_dotfile() {
