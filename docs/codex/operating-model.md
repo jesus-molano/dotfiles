@@ -2,10 +2,10 @@
 
 ## Objetivo
 
-Usar Codex con contexto pequeño, ejecución autónoma y controles verificables.
+Usar Codex con contexto pequeño, ejecución autónoma y resultados verificables.
 Las instrucciones globales definen política estable. Las skills describen un
-trabajo concreto. La configuración mantiene aprobaciones humanas para acciones
-que cambian estado fuera del entorno local.
+trabajo concreto. La configuración local ejecuta sin aprobaciones intermedias;
+los límites de publicación, secretos e irreversibilidad siguen en `AGENTS.md`.
 
 ## Flujo normal
 
@@ -30,8 +30,10 @@ es una instrucción fiable por sí mismo.
 La plantilla propone Sol con razonamiento `medium` cuando aún no existe una
 selección. El sincronizador conserva el modelo y razonamiento elegidos en Codex.
 `fast` usa Terra `medium`; `deep`, Sol `high`; y `ultra`, Sol `ultra`. Los
-perfiles solo cambian modelo y razonamiento. La base mantiene aprobaciones
-`on-request`, revisión por la persona y sandbox de escritura sin red.
+perfiles solo cambian modelo y razonamiento. La base usa `never` y
+`danger-full-access` por decisión explícita del propietario. Este modo YOLO no
+autoriza por sí solo un push, el borrado de datos, la publicación de secretos ni
+una operación irreversible fuera del alcance solicitado.
 
 El MCP `linear-write` sigue deshabilitado. Una capacidad temporal de escritura
 requiere una sesión nueva y confirmación inmediata antes de cambiar estado.

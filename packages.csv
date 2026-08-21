@@ -131,6 +131,8 @@ desktop,hardware,liquidctl,native
 desktop,development,whisper-cpp,native
 desktop,development,ggml-cpu,native
 desktop,development,ggml-vulkan,native
+desktop,development,codexbar-cli,aur
+desktop,development,qmd,aur
 desktop,utility,ttyper,native
 desktop,utility,wtype,native
 common,development,1password,aur

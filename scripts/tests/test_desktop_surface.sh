@@ -19,6 +19,7 @@ bar = config["bar"]["default"]
 assert config["audio"]["enable_sounds"] is True
 assert config["audio"]["sound_volume"] == 0.65
 assert "group:resources" in bar["end"]
+assert "codexbar" in bar["end"]
 assert "screen_recorder" in bar["end"]
 assert "timer" in bar["end"]
 assert "screen_mirror" not in bar["end"]
@@ -26,8 +27,14 @@ assert "dev_pulse" not in bar["end"]
 assert config["widget"]["ram"]["stat"] == "ram_pct"
 assert config["widget"]["timer"]["type"] == "noctalia/timer:bar"
 assert config["widget"]["timer"]["show_idle_on_horizontal"] is False
+assert config["widget"]["codexbar"]["type"] == "salemsayed/codexbar-meter:bar"
 assert all("dev-pulse" not in plugin for plugin in config["plugins"]["enabled"])
 assert "noctalia/timer" in config["plugins"]["enabled"]
+assert "salemsayed/codexbar-meter" in config["plugins"]["enabled"]
+codexbar = config["plugin_settings"]["salemsayed/codexbar-meter"]
+assert codexbar["codexbarPath"] == "/usr/bin/codexbar"
+assert codexbar["refreshIntervalSec"] == 300
+assert codexbar["barProviderLimit"] == 1
 assert config["plugins"]["auto_update"] == "none"
 assert config["shell"]["avatar_path"].endswith("/avatar.svg")
 PY

@@ -7,7 +7,7 @@ readonly -a COMMON_MODULES=(
 	noctalia nvim qutebrowser shell starship vscode zellij
 )
 readonly -a WORKSTATION_MODULES=(hypr-laptop)
-readonly -a DESKTOP_MODULES=(hypr-desktop gaming backup)
+readonly -a DESKTOP_MODULES=(hypr-desktop gaming backup qmd)
 
 profile_is_valid() {
 	[[ "${1:-}" == workstation || "${1:-}" == desktop ]]

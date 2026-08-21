@@ -2,17 +2,20 @@
 # y hashes específicos de esta máquina.
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
-approval_policy = "on-request"
+approval_policy = "never"
 approvals_reviewer = "user"
-sandbox_mode = "workspace-write"
+sandbox_mode = "danger-full-access"
 notify = ["codex-notify"]
 
 [features]
 hooks = true
 memories = true
 
+[memories]
+disable_on_external_context = true
+
 [sandbox_workspace_write]
-network_access = false
+network_access = true
 
 [agents]
 enabled = true
@@ -22,7 +25,8 @@ default_subagent_reasoning_effort = "medium"
 
 [tui]
 theme = "project-atlas"
-status_line = ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]
+status_line = ["model-with-reasoning", "context-remaining", "used-tokens", "five-hour-limit", "weekly-limit", "git-branch"]
+terminal_title = ["spinner", "project", "task-progress"]
 notifications = ["agent-turn-complete", "approval-requested"]
 
 # Project Atlas se genera con `just atlas-sync`: Node y el clon requieren rutas

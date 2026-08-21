@@ -27,7 +27,7 @@ padding = 8
 widget_spacing = 4
 start = [ "workspaces", "special_workspaces", "active_window" ]
 center = [ "media" ]
-end = [ "group:resources", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
+end = [ "group:resources", "codexbar", "screen_recorder", "privacy", "tray", "notifications", "network", "bluetooth", "volume", "brightness", "power_profile", "battery", "timer", "clock" ]
 
 [[bar.default.capsule_group]]
 id = "resources"
@@ -53,6 +53,9 @@ inactive_style = "ghost"
 
 [widget.screen_recorder]
 type = "noctalia/screen_recorder:recorder"
+
+[widget.codexbar]
+type = "salemsayed/codexbar-meter:bar"
 
 [widget.timer]
 type = "noctalia/timer:bar"
@@ -344,7 +347,12 @@ enabled = true
 
 [plugins]
 auto_update = "none"
-enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer" ]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "salemsayed/codexbar-meter" ]
+
+[plugin_settings."salemsayed/codexbar-meter"]
+codexbarPath = "/usr/bin/codexbar"
+refreshIntervalSec = 300
+barProviderLimit = 1
 
 [plugin_settings."noctalia/screen_recorder"]
 audio_bitrate = 0

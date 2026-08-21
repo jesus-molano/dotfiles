@@ -557,9 +557,9 @@ añade la configuración y las reglas gestionadas.
 
 `just codex-config-sync` muestra el destino de `config.toml` y requiere escribir
 `APLICAR`; con backup, propone Sol `medium` cuando aún no existe una selección,
-pero conserva el modelo y razonamiento elegidos en Codex. Sincroniza aprobaciones
-`on-request` revisadas por la persona, sandbox de escritura sin red, hooks y
-memorias, agentes, estado TUI y notificaciones. Conserva hooks de Orca, trusts,
+pero conserva el modelo y razonamiento elegidos en Codex. Sincroniza el modo
+local YOLO (`never` y `danger-full-access`), hooks y memorias, agentes, estado
+TUI y notificaciones. Conserva hooks de Orca, trusts,
 MCP y las demás claves existentes. Los perfiles `fast`, `deep` y `ultra` solo
 sobrescriben modelo y razonamiento.
 
@@ -598,6 +598,8 @@ continúan siendo copias reales gestionadas por `just atlas-sync`.
 La sincronización de configuración activa `features.memories`. Es memoria
 auxiliar local generada por Codex; `AGENTS.md` continúa siendo la fuente canónica
 de instrucciones y el estado generado bajo `~/.codex/memories` no se versiona.
+Las sesiones que consultan web, MCP u otras fuentes externas no generan memoria
+automática.
 
 Consulta la [guía diaria de Codex](docs/codex/guia-diaria.md) para prompts,
 perfiles y consejos de uso. El [modelo operativo](docs/codex/operating-model.md)

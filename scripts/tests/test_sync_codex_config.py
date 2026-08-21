@@ -25,19 +25,33 @@ class SyncCodexConfigTest(unittest.TestCase):
 
         self.assertEqual(document["model"], "gpt-5.6-sol")
         self.assertEqual(document["model_reasoning_effort"], "xhigh")
-        self.assertEqual(document["approval_policy"], "on-request")
+        self.assertEqual(document["approval_policy"], "never")
         self.assertEqual(document["approvals_reviewer"], "user")
-        self.assertEqual(document["sandbox_mode"], "workspace-write")
-        self.assertFalse(document["sandbox_workspace_write"]["network_access"])
+        self.assertEqual(document["sandbox_mode"], "danger-full-access")
+        self.assertTrue(document["sandbox_workspace_write"]["network_access"])
         self.assertEqual(document["notify"], ["codex-notify"])
         self.assertTrue(document["features"]["hooks"])
         self.assertTrue(document["features"]["memories"])
+        self.assertTrue(document["memories"]["disable_on_external_context"])
         self.assertEqual(document["agents"]["max_concurrent_threads_per_session"], 3)
         self.assertEqual(document["agents"]["default_subagent_model"], "gpt-5.6-terra")
-        self.assertEqual(document["agents"]["default_subagent_reasoning_effort"], "medium")
+        self.assertEqual(
+            document["agents"]["default_subagent_reasoning_effort"], "medium"
+        )
         self.assertEqual(
             document["tui"]["status_line"],
-            ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"],
+            [
+                "model-with-reasoning",
+                "context-remaining",
+                "used-tokens",
+                "five-hour-limit",
+                "weekly-limit",
+                "git-branch",
+            ],
+        )
+        self.assertEqual(
+            document["tui"]["terminal_title"],
+            ["spinner", "project", "task-progress"],
         )
 
     def test_render_preserves_personal_mcp_sections(self) -> None:
@@ -75,9 +89,12 @@ args = ["/opt/atlas/server.js"]
             "/opt/atlas/node",
         )
         self.assertTrue(document["features"]["memories"])
+        self.assertTrue(document["memories"]["disable_on_external_context"])
 
-    def test_render_preserves_hooks_trusts_and_unknown_values_idempotently(self) -> None:
-        original = '''\
+    def test_render_preserves_hooks_trusts_and_unknown_values_idempotently(
+        self,
+    ) -> None:
+        original = """\
 model = "custom"
 approval_policy = "never"
 
@@ -92,7 +109,7 @@ url = "https://mcp.linear.app/mcp/readonly"
 
 [custom]
 keep = "yes"
-'''
+"""
 
         rendered = SYNC["render"](original)
         self.assertEqual(SYNC["render"](rendered), rendered)
@@ -107,7 +124,7 @@ keep = "yes"
         self.assertEqual(document["custom"], {"keep": "yes"})
 
     def test_render_preserves_official_inline_hook_arrays(self) -> None:
-        original = '''\
+        original = """\
 [[hooks.PreToolUse]]
 matcher = "^Bash$"
 
@@ -115,7 +132,7 @@ matcher = "^Bash$"
 type = "command"
 command = "/opt/orca/pre-tool-use"
 timeout = 30
-'''
+"""
 
         rendered = SYNC["render"](original)
         document = tomllib.loads(rendered)

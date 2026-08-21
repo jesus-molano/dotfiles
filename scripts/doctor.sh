@@ -443,7 +443,7 @@ check_backup_runtime() {
 
 check_desktop_runtime() {
 	local command plugin_list rgb_health timer_manifest
-	for command in zenity localsend wl-paste systemd-run whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl; do
+	for command in zenity localsend wl-paste systemd-run whisper-cli tesseract wtype zbarimg ffmpeg magick mpv ss coredumpctl codexbar qmd; do
 		if command -v "$command" >/dev/null 2>&1; then
 			ok "Flujo desktop: $command disponible"
 		else
@@ -465,6 +465,11 @@ check_desktop_runtime() {
 			ok "Noctalia: versión revisada de Special Workspaces"
 		else
 			fail "Noctalia: cambió una versión de plugin; revísala antes de actualizar la base"
+		fi
+		if grep -Fxq 'salemsayed/codexbar-meter [community] 1.0.0 enabled' <<<"$plugin_list"; then
+			ok "Noctalia: CodexBar Meter habilitado"
+		else
+			fail "Noctalia: CodexBar Meter no está habilitado"
 		fi
 		timer_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
 		if grep -Fxq 'noctalia/timer [local] 1.2.1 enabled' <<<"$plugin_list" &&

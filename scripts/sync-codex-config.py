@@ -19,9 +19,9 @@ DEFAULT_TOP = {
     "model_reasoning_effort": '"medium"',
 }
 DESIRED_TOP = {
-    "approval_policy": '"on-request"',
+    "approval_policy": '"never"',
     "approvals_reviewer": '"user"',
-    "sandbox_mode": '"workspace-write"',
+    "sandbox_mode": '"danger-full-access"',
     "notify": '["codex-notify"]',
 }
 DESIRED_SECTIONS = {
@@ -29,8 +29,11 @@ DESIRED_SECTIONS = {
         "hooks": "true",
         "memories": "true",
     },
+    "memories": {
+        "disable_on_external_context": "true",
+    },
     "sandbox_workspace_write": {
-        "network_access": "false",
+        "network_access": "true",
     },
     "agents": {
         "enabled": "true",
@@ -39,7 +42,8 @@ DESIRED_SECTIONS = {
         "default_subagent_reasoning_effort": '"medium"',
     },
     "tui": {
-        "status_line": '["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]',
+        "status_line": '["model-with-reasoning", "context-remaining", "used-tokens", "five-hour-limit", "weekly-limit", "git-branch"]',
+        "terminal_title": '["spinner", "project", "task-progress"]',
         "notifications": '["agent-turn-complete", "approval-requested"]',
     },
 }
@@ -63,9 +67,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def section_bounds(lines: list[str], name: str | None) -> tuple[int, int] | None:
-    table = re.compile(
-        r"^\s*(?:\[\[([^\[\]]+)\]\]|\[([^\[\]]+)\])\s*(?:#.*)?$"
-    )
+    table = re.compile(r"^\s*(?:\[\[([^\[\]]+)\]\]|\[([^\[\]]+)\])\s*(?:#.*)?$")
     starts = [
         (index, match.group(1) or match.group(2), match.group(1) is not None)
         for index, line in enumerate(lines)
@@ -119,19 +121,22 @@ def render(original: str) -> str:
     rendered = "".join(lines)
     document = tomllib.loads(rendered)
     if not desired_state(document):
-        raise ValueError("la configuración renderizada no contiene la política gestionada")
+        raise ValueError(
+            "la configuración renderizada no contiene la política gestionada"
+        )
     return rendered
 
 
 def desired_state(document: dict) -> bool:
     return (
-        document.get("approval_policy") == "on-request"
+        document.get("approval_policy") == "never"
         and document.get("approvals_reviewer") == "user"
-        and document.get("sandbox_mode") == "workspace-write"
+        and document.get("sandbox_mode") == "danger-full-access"
         and document.get("notify") == ["codex-notify"]
-        and document.get("sandbox_workspace_write", {}).get("network_access") is False
+        and document.get("sandbox_workspace_write", {}).get("network_access") is True
         and document.get("features", {}).get("hooks") is True
         and document.get("features", {}).get("memories") is True
+        and document.get("memories", {}).get("disable_on_external_context") is True
         and document.get("agents", {}).get("enabled") is True
         and document.get("agents", {}).get("max_concurrent_threads_per_session") == 3
         and document.get("agents", {}).get("default_subagent_model") == "gpt-5.6-terra"
@@ -140,7 +145,16 @@ def desired_state(document: dict) -> bool:
         and document.get("tui", {}).get("notifications")
         == ["agent-turn-complete", "approval-requested"]
         and document.get("tui", {}).get("status_line")
-        == ["model-with-reasoning", "context-remaining", "git-branch", "current-dir"]
+        == [
+            "model-with-reasoning",
+            "context-remaining",
+            "used-tokens",
+            "five-hour-limit",
+            "weekly-limit",
+            "git-branch",
+        ]
+        and document.get("tui", {}).get("terminal_title")
+        == ["spinner", "project", "task-progress"]
     )
 
 

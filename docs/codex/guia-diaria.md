@@ -55,6 +55,23 @@ codex -p ultra     # Sol ultra
 
 El sincronizador conserva el modelo y el razonamiento que elijas en Codex.
 
+## Dicta prompts y vigila la cuota
+
+Pulsa `Super+R` para iniciar una grabación y vuelve a pulsarlo para transcribirla
+con Whisper `small` y pegar el texto en la ventana activa. Revisa el texto y
+pulsa `Enter` para enviarlo a Codex. La transcripción es local.
+
+La cápsula de CodexBar está junto a los recursos de Noctalia:
+
+- clic izquierdo: abre el panel detallado;
+- clic derecho: actualiza el uso ahora;
+- actualización automática: cada cinco minutos.
+
+`Codex Spark` es una cuota separada para GPT-5.3-Codex-Spark; no indica el
+modelo de la sesión activa. `5h` y `7d` identifican sus ventanas de cuota de
+cinco horas y semanal. CodexBar usa la autenticación OAuth local de Codex; no
+requiere copiar claves ni cookies.
+
 ## Routing de skills
 
 Codex activa automáticamente las skills comunes a partir de la intención del
@@ -109,6 +126,52 @@ No inventes nuevos patrones si el repositorio ya resuelve el mismo problema.
 - Pide un `handoff` si pausas un trabajo complejo.
 - Usa subagentes solo para tareas independientes o una revisión con valor real.
 - Prefiere un criterio de aceptación concreto a frases como «hazlo mejor».
+
+### Busca documentación local con QMD
+
+QMD indexa solo la documentación canónica de dotfiles y Project Atlas. No
+indexa sesiones de agentes, memoria de Codex, secretos ni todo el directorio
+personal. Usa primero la búsqueda textual, que es rápida y no carga modelos:
+
+```bash
+qmd search "Noctalia plugin"
+qmd search "token budget" -c project-atlas
+qmd get qmd://dotfiles/codex/operating-model.md --full
+```
+
+Usa búsqueda semántica cuando no recuerdes las palabras exactas y la consulta
+híbrida solo cuando la pregunta justifique cargar los modelos locales:
+
+```bash
+qmd vsearch "cómo conservamos la configuración de Orca"
+qmd query "decisiones para reducir el coste de contexto"
+```
+
+Para Codex, pide una recuperación acotada en vez de pegar documentos completos:
+
+```text
+Usa qmd search para localizar la documentación local relevante. Recupera solo
+los dos resultados mejores y contrástalos con el código actual antes de actuar.
+```
+
+Actualiza el índice después de cambiar documentación con `qmd update`. El timer
+automático permanece deshabilitado para no mantener procesos o modelos activos.
+
+### Añade Context7 solo al proyecto que lo necesite
+
+Context7 aporta documentación remota y específica de versión. No se configura
+globalmente. Añádelo en `<repositorio>/.codex/config.toml` cuando una dependencia
+cambiante lo justifique:
+
+```toml
+[mcp_servers.context7]
+url = "https://mcp.context7.com/mcp"
+```
+
+Si el proyecto necesita límites autenticados, configura OAuth o una cabecera
+fuera del repositorio; nunca versiones la clave. Abre una sesión nueva de Codex
+y pide, por ejemplo: `Usa Context7 para la API de Next.js 16 de este proyecto`.
+Retira el bloque cuando el proyecto ya no lo necesite.
 
 ## Preguntas y autonomía
 
