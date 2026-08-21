@@ -196,12 +196,33 @@ HOME="$wants_home" XDG_CONFIG_HOME="$wants_config" XDG_STATE_HOME="$wants_state"
 
 cat >"$test_root/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
+if [[ -n ${TEST_SYSTEMCTL_LOG:-} ]]; then
+	printf '%s\n' "$*" >>"$TEST_SYSTEMCTL_LOG"
+fi
 case "$*" in
+'--user show-environment') [[ ${TEST_NO_USER_MANAGER:-0} != 1 ]] ;;
 '--user is-enabled reactive-rgb.service' | '--user is-active reactive-rgb.service') exit 1 ;;
 *) exit 0 ;;
 esac
 EOF
 chmod +x "$test_root/bin/systemctl"
+
+# Un despliegue sin un gestor systemd de usuario accesible no debe fallar. Las
+# unidades se cargarán en la próxima sesión, y no se intenta daemon-reload.
+reload_runner="$test_root/reload-user-manager.sh"
+cat >"$reload_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+reload_user_manager prueba
+EOF
+chmod +x "$reload_runner"
+unavailable_systemctl_log="$test_root/systemctl-unavailable.log"
+PATH="$test_root/bin:$PATH" TEST_NO_USER_MANAGER=1 TEST_SYSTEMCTL_LOG="$unavailable_systemctl_log" \
+	FIXTURE_REPO="$fixture_repo" "$reload_runner"
+grep -Fxq -- '--user show-environment' "$unavailable_systemctl_log"
+if grep -Fxq -- '--user daemon-reload' "$unavailable_systemctl_log"; then exit 9; fi
 
 plan="$test_root/plan.json"
 printf '%s\n' \
@@ -237,15 +258,18 @@ EOF
 chmod +x "$runner"
 
 set +e
+transaction_systemctl_log="$test_root/systemctl-transaction.log"
 PATH="$test_root/bin:$PATH" \
 	HOME="$fixture_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$fixture_state" \
-	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" "$runner" >"$test_root/run.log" 2>&1
+	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" TEST_SYSTEMCTL_LOG="$transaction_systemctl_log" \
+	"$runner" >"$test_root/run.log" 2>&1
 code=$?
 set -e
 [[ $code -ne 0 ]] || {
 	printf '%s\n' 'FAIL: el instalador aceptó un fallo posterior a Stow.' >&2
 	exit 1
 }
+[[ $(grep -Fxc -- '--user daemon-reload' "$transaction_systemctl_log") -eq 2 ]]
 
 migration=$(<"$fixture_state/dotfiles/last-migration")
 [[ "$migration" == "$fixture_state/dotfiles/migrations/"* ]]

@@ -2331,6 +2331,7 @@ rollback_migration() {
 			"$MIGRATION_DIR/symlinks.tsv" \
 			"$MIGRATION_DIR/legacy-links-removed" || failed=1
 	fi
+	reload_user_manager 'durante el rollback' || failed=1
 	restore_rgb_service_state || failed=1
 	if ((failed)); then
 		printf '%s\n' rollback-incomplete >"$MIGRATION_DIR/status"
@@ -2454,6 +2455,22 @@ validate_deployed_config() {
 	fi
 }
 
+reload_user_manager() {
+	local context=${1:-'después del despliegue'}
+	if ! command -v systemctl >/dev/null 2>&1; then
+		info 'systemctl no está disponible; las unidades se cargarán cuando exista una sesión systemd de usuario.'
+		return 0
+	fi
+	if ! systemctl --user show-environment >/dev/null 2>&1; then
+		info 'No hay un gestor systemd de usuario accesible; las unidades se cargarán en la próxima sesión.'
+		return 0
+	fi
+	if ! systemctl --user daemon-reload; then
+		warn "No se pudo recargar systemd de usuario $context."
+		return 1
+	fi
+}
+
 configure_user_services() {
 	if ! plan_has_bundle rgb-openrgb || ! plan_rgb_enabled; then
 		if command -v systemctl >/dev/null 2>&1 && {
@@ -2502,6 +2519,7 @@ apply_dotfiles_transaction() {
 		deploy_dotfiles || exit 1
 		install_staged_configs || exit 1
 		validate_deployed_config || exit 1
+		reload_user_manager 'después del despliegue' || exit 1
 		configure_user_services || exit 1
 	); then
 		if rollback_migration; then
