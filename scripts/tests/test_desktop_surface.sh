@@ -43,11 +43,11 @@ assert config["plugins"]["auto_update"] == "none"
 assert config["shell"]["avatar_path"].endswith("/avatar.svg")
 PY
 
-grep -Fq 'bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"
+! grep -Fq 'bind(hyper .. " + W",' "$common_binds"
 grep -Fq 'if status is-interactive; and command -q mise' "$fish_config"
 grep -Fq 'bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper-previous")' "$common_binds"
 grep -Fq 'bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"
-grep -Fq 'bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next")' "$common_binds"
+grep -Fq 'bind(hyper .. " + T", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /appearance")' "$common_binds"
 grep -Fq 'bind(hyper .. " + A", hl.dsp.exec_cmd("desktop-launcher open timer")' "$common_binds"
 grep -Fq 'HYPR_BIND("CONTROL + ALT + SUPER + SHIFT + R", hl.dsp.exec_cmd("local-dictation toggle --paste")' "$desktop_binds"
 
@@ -59,4 +59,4 @@ grep -Fq '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga' "$timer_
 [[ ! -e "$repo_root/hypr-common/.local/bin/dev-pulse-status" ]]
 [[ ! -e "$repo_root/noctalia/.local/share/noctalia/plugins/dev-pulse/plugin.toml" ]]
 
-printf '%s\n' 'PASS: barra útil, Notes, Timer visible y atajos W/T/A/[ ]/R estables'
+printf '%s\n' 'PASS: barra útil, Notes, Timer visible y paneles T/A/[ ]/R estables'

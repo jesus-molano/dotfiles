@@ -390,6 +390,7 @@ command_records() {
 	emit_record focus_toggle 'Toggle focus mode' 'Control distractions and performance'
 	emit_record demo_mode 'Prepare demo mode' 'Set up the desktop for a demo or recording'
 	emit_record timer 'Timer' 'Start or manage a countdown'
+	emit_record appearance_next 'Next appearance' 'Cycle coordinated palette and wallpapers'
 	emit_record power_balanced 'Use balanced power' 'Switch to the balanced power profile'
 	emit_record power_performance 'Use performance power' 'Switch to the performance power profile'
 	if command -v whisper-cli >/dev/null 2>&1 && command -v wtype >/dev/null 2>&1; then
@@ -589,6 +590,7 @@ run_command() {
 	focus_toggle) exec desktop-focus-mode toggle ;;
 	demo_mode) exec desktop-focus-mode demo-toggle ;;
 	timer) open_noctalia_timer ;;
+	appearance_next) exec appearance-switch next ;;
 	direct_scanout_toggle)
 		command -v game-run >/dev/null 2>&1 || return 127
 		exec direct-scanout-toggle toggle

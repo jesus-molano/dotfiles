@@ -86,14 +86,12 @@ bind(hyper .. " + J", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /proj"),
     "Open launcher projects")
 bind(hyper .. " + V", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /media"),
     "Open launcher media")
-bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
-    "Use next theme wallpaper")
 bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper-previous"),
     "Use previous theme wallpaper")
 bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next"),
     "Use next theme wallpaper")
-bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next"),
-    "Use next appearance")
+bind(hyper .. " + T", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /appearance"),
+    "Open appearance panel")
 bind(hyper .. " + A", hl.dsp.exec_cmd("desktop-launcher open timer"),
     "Open timer")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),

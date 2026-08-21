@@ -105,7 +105,7 @@ commands=$(PATH="$test_root/bin:$PATH" "$launcher" list commands)
 for title in 'Capture context' 'Read QR code' 'Create bug capsule' \
 	'Convert media' 'Demo Studio' 'Save window width' \
 	'Restore window width' 'Toggle local dictation' 'Toggle focus mode' \
-	'Prepare demo mode' 'Toggle direct scanout' 'Timer'; do
+	'Prepare demo mode' 'Toggle direct scanout' 'Timer' 'Next appearance'; do
 	grep -q "^${title}"$'\t' <<<"$commands" || {
 		printf 'FAIL: falta %s en /cmd\n' "$title" >&2
 		exit 1
@@ -118,7 +118,7 @@ log=$test_root/actions.log
 for title in 'Capture context' 'Read QR code' 'Create bug capsule' \
 	'Convert media' 'Demo Studio' 'Save window width' \
 	'Restore window width' 'Toggle local dictation' 'Toggle focus mode' \
-	'Prepare demo mode' 'Toggle direct scanout' 'Timer'; do
+	'Prepare demo mode' 'Toggle direct scanout' 'Timer' 'Next appearance'; do
 	selection=$(grep "^${title}"$'\t' <<<"$commands")
 	PATH="$test_root/bin:$PATH" TEST_LOG="$log" "$launcher" run commands "$selection"
 done
@@ -136,6 +136,7 @@ desktop-focus-mode	toggle
 desktop-focus-mode	demo-toggle
 direct-scanout-toggle	toggle
 noctalia	msg panel-toggle noctalia/timer:panel
+appearance-switch	next
 EOF
 )
 actual=$(<"$log")

@@ -61,7 +61,7 @@ Pacman/AUR con ámbito explícito y `flatpaks.csv` junto a
 
 ## Apariencias y Project Atlas
 
-`ProjectAtlas` sigue siendo la escena base. `/appearance` ofrece Atlas,
+`ProjectAtlas` sigue siendo la escena base. `Hyper+T` abre `/appearance`, que ofrece Atlas,
 Obsidian Amber, Vice Afterglow, Catppuccin Mocha, Rosé Pine Moon, Nord Night,
 Dracula Violet y Tokyo Night City. Cada opción coordina paleta y el fondo elegido. Noctalia regenera
 los temas de Hyprland, GTK, Qt/KDE, Ghostty, Kitty,
@@ -413,9 +413,8 @@ activar cafeína y desactívala al terminar.
 | `Hyper + Space` | Abrir `/cmd` |
 | `Hyper + J` | Abrir `/proj` |
 | `Hyper + V` | Abrir `/media` |
-| `Hyper + W` | Siguiente fondo del tema activo |
 | `Hyper + [` / `Hyper + ]` | Fondo anterior/siguiente del tema activo |
-| `Hyper + T` | Siguiente apariencia completa |
+| `Hyper + T` | Abrir el selector de apariencias (`/appearance`) |
 | `Hyper + R` | Iniciar o detener el dictado local |
 | `Hyper + N` | Notificaciones |
 | `Hyper + H` | Usar la siguiente salida de audio disponible |
