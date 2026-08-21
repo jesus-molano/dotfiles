@@ -1,6 +1,6 @@
-# Acción exclusiva del desktop NVIDIA. El clic normal conserva el panel de audio.
+# Acción exclusiva del desktop. El clic normal conserva el panel de audio.
 [widget.volume.actions]
-middle = "exec cycle-desktop-hdmi-audio"
+middle = "exec cycle-desktop-audio-output"
 
 # Evita apagar el adaptador con un clic derecho accidental en la barra.
 [widget.bluetooth.actions]

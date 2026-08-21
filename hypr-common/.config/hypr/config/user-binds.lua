@@ -98,6 +98,8 @@ bind(hyper .. " + A", hl.dsp.exec_cmd("desktop-launcher open timer"),
     "Open timer")
 bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center notifications"),
     "Open notifications")
+bind(hyper .. " + H", hl.dsp.exec_cmd("cycle-desktop-audio-output"),
+    "Use next audio output")
 bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),
     "Capture a region and prepare context for Orca")
 bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"), "Open session menu")

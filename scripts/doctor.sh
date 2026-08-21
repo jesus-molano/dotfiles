@@ -541,6 +541,8 @@ if [[ "$mode" != live ]]; then
 		"$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
 	check "Selector HDMI desde Noctalia" \
 		"$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
+	check "Selector de salida entre Bluetooth y HDMI" \
+		"$repo_root/scripts/tests/test_cycle_desktop_audio_output.sh"
 	check "Sesión gaming sin notificaciones" \
 		"$repo_root/scripts/tests/test_game_run_dnd.sh"
 	check_desktop_workflows

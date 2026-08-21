@@ -76,6 +76,7 @@ el servidor en su terminal y muestra su salida.
 | `Hyper + [` / `Hyper + ]` | Usa el fondo anterior/siguiente del tema activo. |
 | `Hyper + T` | Rota a la siguiente apariencia completa. |
 | `Hyper + R` | Inicia o detiene el dictado local y pega el texto. |
+| `Hyper + H` | Usa la siguiente salida de audio disponible. |
 | `Hyper + O` | Enfoca o abre Orca. |
 | `Hyper + S` | Enfoca o abre Stremio. |
 | `Hyper + P` | Captura una región y prepara contexto para Orca. |

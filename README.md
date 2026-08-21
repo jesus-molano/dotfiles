@@ -418,6 +418,7 @@ activar cafeína y desactívala al terminar.
 | `Hyper + T` | Siguiente apariencia completa |
 | `Hyper + R` | Iniciar o detener el dictado local |
 | `Hyper + N` | Notificaciones |
+| `Hyper + H` | Usar la siguiente salida de audio disponible |
 | `Hyper + P` | Capturar una región y preparar contexto para Orca |
 | `Hyper + K` | Selector de color |
 | `Hyper + C` | Cafeína |
@@ -637,9 +638,12 @@ NVIDIA `hdmi-stereo-extra1`, confirmado mediante prueba auditiva como el Philips
 principal de la derecha. Es el único monitor cuyo jack está conectado a los
 altavoces. El helper espera a PipeWire durante un máximo de veinte segundos y
 mueve también las aplicaciones que hayan abierto un stream antes de que aparezca
-el monitor. Un clic central sobre el icono de volumen de Noctalia alterna entre
-los perfiles `HDMI` y `HDMI 2`. El clic normal conserva el panel de audio. En el
-icono de Bluetooth, el clic derecho abre su panel y ya no apaga el adaptador.
+el monitor. Un clic central sobre el icono de volumen de Noctalia o `Hyper+H`
+avanza por los dos perfiles HDMI y por el resto de las salidas que PipeWire tenga
+disponibles, incluidos los cascos Bluetooth conectados. Una notificación indica
+la salida activa y su posición en el ciclo. El clic normal abre el panel de
+audio. En el icono de Bluetooth, el clic derecho abre su panel y ya no apaga el
+adaptador.
 
 El desktop separa dos indicadores térmicos en `Aura Addressable 1`: los 12 LED
 de la CPU siguen su temperatura y los 48 LED de los ventiladores internos
