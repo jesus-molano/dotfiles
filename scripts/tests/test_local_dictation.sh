@@ -31,6 +31,7 @@ cat >"$test_root/bin/whisper-cli" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 prefix=''
+printf '%s\n' "$@" >"$TEST_WHISPER_ARGS"
 while (($#)); do
 	if [[ "$1" == -of ]]; then
 		prefix=$2
@@ -40,7 +41,9 @@ while (($#)); do
 	shift
 done
 [[ -n "$prefix" ]]
-printf '%s\n' 'texto dictado de prueba' >"${prefix}.txt"
+printf '%s\n' \
+	' texto dictado de prueba' \
+	' con acento ningún' >"${prefix}.txt"
 EOF
 
 cat >"$test_root/bin/wl-copy" <<'EOF'
@@ -70,18 +73,36 @@ common_env=(
 	LOCAL_DICTATION_MODEL="$test_root/data/model.bin"
 	TEST_CLIPBOARD="$test_root/clipboard"
 	TEST_TYPED="$test_root/typed"
+	TEST_WHISPER_ARGS="$test_root/whisper-args"
 )
 
 env "${common_env[@]}" "$helper" start
 env "${common_env[@]}" "$helper" status | grep -Fxq recording
 env "${common_env[@]}" "$helper" stop --paste
 
-[[ "$(<"$test_root/clipboard")" == 'texto dictado de prueba' ]] || {
+awk '
+	previous == "-l" && $0 == "es" { found = 1 }
+	{ previous = $0 }
+	END { exit !found }
+' "$test_root/whisper-args" || {
+	printf '%s\n' 'FAIL: Whisper no recibió el idioma español' >&2
+	exit 1
+}
+awk '
+	previous == "--prompt" && /Codex/ && /commit/ && /push/ && /TypeScript/ && /npm/ && /package.json/ { found = 1 }
+	{ previous = $0 }
+	END { exit !found }
+' "$test_root/whisper-args" || {
+	printf '%s\n' 'FAIL: Whisper no recibió el contexto técnico' >&2
+	exit 1
+}
+
+[[ "$(<"$test_root/clipboard")" == 'texto dictado de prueba con acento ningún' ]] || {
 	printf '%s\n' 'FAIL: la transcripción no llegó al portapapeles' >&2
 	exit 1
 }
-[[ "$(<"$test_root/typed")" == 'texto dictado de prueba' ]] || {
-	printf '%s\n' 'FAIL: --paste no escribió la transcripción' >&2
+[[ "$(<"$test_root/typed")" == 'texto dictado de prueba con acento ningún' ]] || {
+	printf '%s\n' 'FAIL: --paste no escribió la transcripción normalizada' >&2
 	exit 1
 }
 env "${common_env[@]}" "$helper" status | grep -Fxq idle
@@ -103,7 +124,7 @@ selected_model=$(env \
 
 env "${common_env[@]}" "$helper" toggle
 env "${common_env[@]}" "$helper" toggle
-[[ "$(<"$test_root/clipboard")" == 'texto dictado de prueba' ]]
+[[ "$(<"$test_root/clipboard")" == 'texto dictado de prueba con acento ningún' ]]
 
 # Una PID reutilizada u obsoleta nunca debe recibir señales.
 sleep 30 &

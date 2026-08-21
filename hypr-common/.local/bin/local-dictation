@@ -121,6 +121,8 @@ whisper_binary() {
 
 stop_recording() {
 	local paste=${1:-0} identity pid starttime whisper prefix transcript model
+	local whisper_language=es
+	local whisper_prompt='Transcripción literal de órdenes en español de España para Codex y desarrollo de software. Conserva términos técnicos en inglés. Vocabulario frecuente: Git, commit, push, pull, branch, tests, build, deploy, frontend, backend, API, MCP, TypeScript, JavaScript, npm, package.json, ponlo, añade, comprueba, revisa y ejecuta. Ejemplos: haz commit y push de todo; ejecuta npm test; corrige el error de TypeScript; comprueba los cambios; revisa la rama actual.'
 	identity="$(recorder_identity)" || fail 'No hay una grabación activa o su PID quedó obsoleta.' 2
 	read -r pid starttime <<<"$identity"
 	kill -INT "$pid" 2>/dev/null || true
@@ -146,10 +148,22 @@ stop_recording() {
 	printf '%s\n' transcribing >"$phase_file"
 	prefix="$state_dir/transcript"
 	rm -f -- "${prefix}.txt"
-	"$whisper" -m "$model" -f "$audio_file" -l auto -otxt -of "$prefix" --no-timestamps \
+	"$whisper" -m "$model" -f "$audio_file" -l "$whisper_language" --prompt "$whisper_prompt" \
+		-otxt -of "$prefix" --no-timestamps \
 		>/dev/null 2>&1 || fail 'Whisper no pudo transcribir el audio.'
 	[[ -s "${prefix}.txt" ]] || fail 'Whisper no devolvió texto.'
-	transcript=$(sed -e 's/\r$//' -e '/^[[:space:]]*$/d' "${prefix}.txt")
+	transcript=$(awk '
+		{
+			sub(/\r$/, "")
+			gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+			if (length) {
+				if (found) printf " "
+				printf "%s", $0
+				found = 1
+			}
+		}
+		END { if (found) print "" }
+	' "${prefix}.txt")
 	[[ -n "$transcript" ]] || fail 'La transcripción está vacía.'
 	printf '%s\n' "$transcript" >"$history_dir/latest.txt"
 
@@ -157,8 +171,7 @@ stop_recording() {
 	printf '%s' "$transcript" | wl-copy
 	if ((paste)); then
 		command -v wtype >/dev/null 2>&1 || fail 'Falta wtype para pegar el texto.' 127
-		# Stdin mantiene saltos de línea y evita que un texto que empiece por
-		# guion se interprete como una opción de wtype.
+		# Stdin evita que un texto que empiece por guion se interprete como opción.
 		printf '%s' "$transcript" | wtype -
 	fi
 	printf '%s\n' idle >"$phase_file"
