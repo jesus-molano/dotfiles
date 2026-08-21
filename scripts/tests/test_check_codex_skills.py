@@ -96,7 +96,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_requires_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "frontend-task")
+            skills, agents, skill = roots(Path(temporary), "reuse-first")
             write_metadata(skill, implicit=True)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
@@ -104,14 +104,14 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_accepts_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "frontend-task")
+            skills, agents, skill = roots(Path(temporary), "reuse-first")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "research-primary-sources")
+            skills, agents, skill = roots(Path(temporary), "frontend-task")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)

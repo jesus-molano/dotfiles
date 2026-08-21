@@ -78,6 +78,8 @@ Codex activa automáticamente las skills comunes a partir de la intención del
 prompt. No necesitas memorizar sus nombres.
 
 - Implementación ordinaria: `engineering-flow`.
+- Implementación frontend compleja con varias autoridades, límites compartidos,
+  migraciones amplias o una continuación Atlas: `frontend-task`.
 - Diagnóstico general: `systematic-debugging`.
 - Flujo web entre navegador y servidor: `debug-web-flow`.
 - Ambigüedad material: `clarify-change`.
@@ -87,7 +89,8 @@ prompt. No necesitas memorizar sus nombres.
 - Evidencia final: `verification-before-completion`.
 - Continuación en otra sesión: `handoff`.
 
-Usa una skill explícita cuando quieras imponer ese proceso:
+Usa una invocación explícita cuando quieras imponer un proceso, incluido Atlas
+para una tarea que no active sus señales automáticas:
 
 ```text
 $frontend-task Implementa el ticket ATLAS-123.
@@ -206,7 +209,7 @@ trailers `Co-authored-by`.
 
 ```bash
 just codex-check       # skills, agentes, pruebas, enlaces y configuración
-just atlas-check       # Project Atlas y sus tres skills explícitas
+just atlas-check       # Project Atlas y sus tres skills gestionadas
 just codex-config-sync # fusiona preferencias estables con backup
 ```
 

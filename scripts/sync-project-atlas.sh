@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Sincroniza exclusivamente las tres skills explícitas de Project Atlas y su
-# sección MCP. No ejecuta git pull, no recompila Atlas y no toca otros MCP.
+# Sincroniza las tres skills de Project Atlas y su sección MCP. No ejecuta git
+# pull, no recompila Atlas y no toca otros MCP.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIR
 DOTFILES_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 readonly DOTFILES_DIR
-readonly PINNED_ATLAS_COMMIT="2cfc15d4c7508f1f3244cba5f12e3b1682d86529"
+readonly PINNED_ATLAS_COMMIT="9bccbde8ac6ebcefb59d192a27ef744a453313b7"
 readonly PINNED_ATLAS_DIST_HASH="966e12105e64cd5b38f9fd2ca546fa2e1381551d59f1eb132e4118445affb63d"
 readonly -a ATLAS_SKILLS=(frontend-task reuse-first visual-direction)
 

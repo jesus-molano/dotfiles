@@ -26,6 +26,7 @@ IMPLICIT_SKILLS = {
     "debug-web-flow",
     "domain-modeling",
     "engineering-flow",
+    "frontend-task",
     "handoff",
     "linear-workflow",
     "research-primary-sources",
@@ -36,7 +37,6 @@ IMPLICIT_SKILLS = {
     "verification-before-completion",
 }
 EXPLICIT_SKILLS = {
-    "frontend-task",
     "reuse-first",
     "test-driven-development",
     "verify-web-change",
