@@ -274,6 +274,8 @@ sync_all_monitors = false
 [location]
 address = ""
 auto_locate = false
+latitude = 28.4636296
+longitude = -16.2518467
 custom_schedule = true
 sunrise = "07:30"
 sunset = "20:30"
@@ -337,7 +339,7 @@ resume_command = ""
 timeout = 1800.0
 
 [weather]
-enabled = false
+enabled = true
 
 [plugins]
 auto_update = false
