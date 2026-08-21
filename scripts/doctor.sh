@@ -471,6 +471,11 @@ check_desktop_runtime() {
 		else
 			fail "Noctalia: CodexBar Meter no está habilitado"
 		fi
+		if grep -Fxq 'noctalia/notes [official] 1.0.3 enabled' <<<"$plugin_list"; then
+			ok "Noctalia: Notes oficial habilitado"
+		else
+			fail "Noctalia: Notes oficial 1.0.3 no está habilitado"
+		fi
 		timer_manifest="${XDG_DATA_HOME:-$HOME/.local/share}/noctalia/plugins/timer/plugin.toml"
 		if grep -Fxq 'noctalia/timer [local] 1.2.1 enabled' <<<"$plugin_list" &&
 			[[ -f "$timer_manifest" ]]; then

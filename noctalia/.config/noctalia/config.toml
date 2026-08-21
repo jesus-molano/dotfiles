@@ -347,7 +347,11 @@ enabled = true
 
 [plugins]
 auto_update = "none"
-enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "salemsayed/codexbar-meter" ]
+enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer", "salemsayed/codexbar-meter", "noctalia/notes" ]
+
+[plugin_settings."noctalia/notes"]
+extension = "md"
+notes_dir = "~/Documents/Notes"
 
 [plugin_settings."salemsayed/codexbar-meter"]
 codexbarPath = "/usr/bin/codexbar"

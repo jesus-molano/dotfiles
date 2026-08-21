@@ -31,6 +31,10 @@ assert config["widget"]["codexbar"]["type"] == "salemsayed/codexbar-meter:bar"
 assert all("dev-pulse" not in plugin for plugin in config["plugins"]["enabled"])
 assert "noctalia/timer" in config["plugins"]["enabled"]
 assert "salemsayed/codexbar-meter" in config["plugins"]["enabled"]
+assert "noctalia/notes" in config["plugins"]["enabled"]
+notes = config["plugin_settings"]["noctalia/notes"]
+assert notes["notes_dir"] == "~/Documents/Notes"
+assert notes["extension"] == "md"
 codexbar = config["plugin_settings"]["salemsayed/codexbar-meter"]
 assert codexbar["codexbarPath"] == "/usr/bin/codexbar"
 assert codexbar["refreshIntervalSec"] == 300
@@ -55,4 +59,4 @@ grep -Fq '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga' "$timer_
 [[ ! -e "$repo_root/hypr-common/.local/bin/dev-pulse-status" ]]
 [[ ! -e "$repo_root/noctalia/.local/share/noctalia/plugins/dev-pulse/plugin.toml" ]]
 
-printf '%s\n' 'PASS: barra útil, Timer visible y atajos W/T/A/[ ]/R estables'
+printf '%s\n' 'PASS: barra útil, Notes, Timer visible y atajos W/T/A/[ ]/R estables'
