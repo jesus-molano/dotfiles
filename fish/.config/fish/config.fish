@@ -17,7 +17,7 @@ if not test -r "$STARSHIP_CONFIG"
 end
 
 # mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
-if command -q mise
+if status is-interactive; and command -q mise
     mise activate fish | source
 end
 

@@ -78,6 +78,21 @@ check_empty() {
 	fi
 }
 
+check_no_warnings() {
+	local label=$1
+	shift
+	local output
+	if ! output="$("$@" 2>&1)"; then
+		printf '%s\n' "$output" >&2
+		fail "$label"
+	elif grep -Eq '(^|[[:space:]])WARN[[:space:]]' <<<"$output"; then
+		printf '%s\n' "$output" >&2
+		fail "$label"
+	else
+		ok "$label"
+	fi
+}
+
 check_gaming_packages() {
 	local -a required_packages=() missing_packages=()
 	local package
@@ -505,6 +520,7 @@ check_desktop_workflows() {
 	check "Temas terminales generados" env PYTHONDONTWRITEBYTECODE=1 \
 		python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
 	check "Colección de fondos al iniciar" "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
+	check "Arranque único de 1Password" "$repo_root/scripts/tests/test_ensure_1password_tray.sh"
 	check "Paleta activa de Orca" "$repo_root/scripts/tests/test_orca_safe_settings.sh"
 	check "Orca en segundo plano" "$repo_root/scripts/tests/test_orca_background.sh"
 	check "Caja de herramientas de captura" "$repo_root/scripts/tests/test_capture_toolbox.sh"
@@ -532,10 +548,10 @@ if [[ "$mode" != live ]]; then
 		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
 	check "Hyprland desktop" env HYPR_PROFILE_DIR="$repo_root/hypr-desktop/.config/hypr" \
 		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
-	check "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
-	check "Noctalia gaming desktop" noctalia config validate \
+	check_no_warnings "Noctalia" noctalia config validate "$repo_root/noctalia/.config/noctalia/config.toml"
+	check_no_warnings "Noctalia gaming desktop" noctalia config validate \
 		"$repo_root/gaming/.config/noctalia/gaming.toml"
-	check "Noctalia audio desktop" noctalia config validate \
+	check_no_warnings "Noctalia audio desktop" noctalia config validate \
 		"$repo_root/hypr-desktop/.config/noctalia/desktop-audio.toml"
 	check "Audio HDMI del monitor derecho" \
 		"$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"

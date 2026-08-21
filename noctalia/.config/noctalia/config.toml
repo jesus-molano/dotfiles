@@ -60,6 +60,7 @@ show_idle_on_horizontal = false
 
 [shell]
 font_family = "Inter"
+avatar_path = "/home/jesus-molano/.local/share/noctalia/avatar.svg"
 clipboard_enabled = true
 clipboard_confirm_clear_history = true
 clipboard_history_max_entries = 100
@@ -342,7 +343,7 @@ timeout = 1800.0
 enabled = true
 
 [plugins]
-auto_update = false
+auto_update = "none"
 enabled = [ "noctalia/screen_recorder", "jamesfeeder/special-workspaces", "noctalia/timer" ]
 
 [plugin_settings."noctalia/screen_recorder"]

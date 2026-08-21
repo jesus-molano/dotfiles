@@ -2,6 +2,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+fish_config="$repo_root/fish/.config/fish/config.fish"
 noctalia="$repo_root/noctalia/.config/noctalia/config.toml"
 common_binds="$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 desktop_binds="$repo_root/hypr-desktop/.config/hypr/config/user-inputs.lua"
@@ -27,9 +28,12 @@ assert config["widget"]["timer"]["type"] == "noctalia/timer:bar"
 assert config["widget"]["timer"]["show_idle_on_horizontal"] is False
 assert all("dev-pulse" not in plugin for plugin in config["plugins"]["enabled"])
 assert "noctalia/timer" in config["plugins"]["enabled"]
+assert config["plugins"]["auto_update"] == "none"
+assert config["shell"]["avatar_path"].endswith("/avatar.svg")
 PY
 
 grep -Fq 'bind(hyper .. " + W", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"
+grep -Fq 'if status is-interactive; and command -q mise' "$fish_config"
 grep -Fq 'bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper-previous")' "$common_binds"
 grep -Fq 'bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"
 grep -Fq 'bind(hyper .. " + T", hl.dsp.exec_cmd("appearance-switch next")' "$common_binds"
