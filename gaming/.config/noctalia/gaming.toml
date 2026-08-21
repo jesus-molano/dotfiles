@@ -1,8 +1,0 @@
-# Proveedor exclusivo del desktop. No se despliega con el perfil workstation.
-[shell.launcher.dmenu.entry.games]
-command = "gaming-launcher list"
-label = "Games"
-prefix = "game"
-glyph = "device-gamepad-2"
-global = false
-exec = "gaming-launcher run \"{selection}\""

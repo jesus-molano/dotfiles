@@ -39,5 +39,7 @@ chmod +x "$test_root/bin/"* "$test_root/home/.local/bin/desktop-notify"
 grep -Fxq "$test_root/alternate-checkout" "$test_root/paths"
 grep -Fxq '/mnt/backups/restic-desktop' "$test_root/config/restic/repository"
 if grep -Fq '.dotfiles' "$repo_root/backup/.config/restic/dotfiles.paths"; then exit 1; fi
+if grep -Fq 'RESTIC_REPOSITORY=' "$repo_root/backup/.config/systemd/user/restic-backup.service"; then exit 1; fi
+if grep -Fq 'RESTIC_REPOSITORY=' "$repo_root/backup/.config/systemd/user/restic-maintenance.service"; then exit 1; fi
 grep -Fq 'restore latest --tag desktop' "$repo_root/backup/.local/bin/dotfiles-backup-maintenance"
 printf '%s\n' 'PASS: backup incluye el checkout registrado sin fijar HOME'

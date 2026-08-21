@@ -1,5 +1,5 @@
 [Unit]
-Description=Backup Restic diario del desktop
+Description=Backup Restic diario
 
 [Timer]
 OnCalendar=*-*-* 03:15:00
