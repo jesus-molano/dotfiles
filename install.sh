@@ -474,17 +474,368 @@ install_flatpaks() {
 	done
 }
 
+is_safe_home_relative() {
+	# Manifiestos y checkpoints solo pueden nombrar un descendiente léxico de
+	# HOME.  No normalices aquí con realpath: un padre enlazado es una condición
+	# distinta que se comprueba antes de mutar el destino.
+	local relative=$1
+	[[ -n "$relative" && "$relative" != /* && "$relative" != */ &&
+		"$relative" != *//* && "$relative" != *$'\n'* && "$relative" != *$'\t'* &&
+		"/$relative/" != *'/./'* && "/$relative/" != *'/../'* ]]
+}
+
+build_check_plan_intent() {
+	local manifest=$1 module source relative target expected
+	declare -A seen=()
+	: >"$manifest"
+	for module in "${PLAN_MODULES[@]}"; do
+		while IFS= read -r -d '' source; do
+			relative=${source#"$DOTFILES_DIR/$module/"}
+			is_stow_ignored_path "$module" "$relative" && continue
+			if ! is_safe_home_relative "$relative"; then
+				warn "La composición Stow tiene una ruta de destino no válida: $relative"
+				return 1
+			fi
+			if [[ -n "${seen[$relative]+x}" ]]; then
+				warn "La composición Stow solapa el destino: $relative"
+				return 1
+			fi
+			seen[$relative]=1
+			target="$HOME/$relative"
+			expected="$(expected_stow_destination "$source" "$target")" || {
+				warn "No se pudo calcular la intención Stow: $relative"
+				return 1
+			}
+			printf '%s\t%s\t%s\n' "$relative" "$expected" "$source" >>"$manifest"
+		done < <(module_sources "$module")
+	done
+	sort -u -o "$manifest" "$manifest"
+}
+
+plan_intent_has_exact_link() {
+	local manifest=$1 relative=$2 destination=$3
+	is_safe_home_relative "$relative" || return 1
+	awk -F $'\t' -v relative="$relative" -v destination="$destination" \
+		'$1 == relative && $2 == destination && NF == 3 { found = 1 } END { exit !found }' \
+		"$manifest"
+}
+
+reject_untracked_checkout_links() {
+	local plan_manifest=$1 previous_manifest=$2 legacy_manifest=$3 module codex_selected=0
+	for module in "${PLAN_MODULES[@]}"; do
+		[[ "$module" == codex ]] && codex_selected=1
+	done
+	# Una shell readlink por cada enlace de HOME convierte un preflight corto en
+	# minutos en perfiles con Steam, repositorios o cachés. Python recorre el
+	# árbol una única vez, no sigue enlaces de directorio y conserva el destino
+	# léxico exacto para no ampliar la propiedad de la composición.
+	python3 - "$HOME" "$DOTFILES_DIR" "$STATE_DIR" \
+		"$plan_manifest" "$previous_manifest" "$legacy_manifest" "$codex_selected" <<'PY'
+import os
+import re
+import stat
+import sys
+
+
+def valid_relative(value: str) -> bool:
+    return (
+        bool(value)
+        and not value.startswith("/")
+        and not value.endswith("/")
+        and "//" not in value
+        and "\n" not in value
+        and "\t" not in value
+        and all(part not in ("", ".", "..") for part in value.split("/"))
+    )
+
+
+def load_manifest(path: str, fields: int) -> set[tuple[str, str]]:
+    entries: set[tuple[str, str]] = set()
+    if not os.path.isfile(path):
+        return entries
+    with open(path, encoding="utf-8", errors="surrogateescape") as handle:
+        for number, line in enumerate(handle, 1):
+            line = line.rstrip("\n")
+            if not line:
+                continue
+            values = line.split("\t")
+            if len(values) != fields or not valid_relative(values[0]) or not values[1]:
+                print(f"[AVISO] Manifiesto de enlaces no válido: {path}:{number}")
+                raise SystemExit(1)
+            entries.add((values[0], values[1]))
+    return entries
+
+
+def is_under(path: str, root: str) -> bool:
+    try:
+        return os.path.commonpath((path, root)) == root and path != root
+    except ValueError:
+        return False
+
+
+def is_declared_systemd_dependency(link: str, relative: str, destination: str, known: set[tuple[str, str]]) -> bool:
+    """Allow only systemd's derived wants/requires link for an exact unit.
+
+    `systemctl --user enable` can create either ``../unit.service`` or an
+    absolute link to the resolved source of that unit.  Both forms are safe
+    only when the direct user-unit link is itself an exact declared Stow link.
+    This deliberately does not make checkout sources a generic allowlist.
+    """
+    parts = relative.split("/")
+    if (
+        len(parts) != 5
+        or parts[:3] != [".config", "systemd", "user"]
+        or not (parts[3].endswith(".wants") or parts[3].endswith(".requires"))
+    ):
+        return False
+    unit = parts[4]
+    expected_relative = f".config/systemd/user/{unit}"
+    direct_targets = {value for key, value in known if key == expected_relative}
+    # A collision across plan/previous/legacy is ambiguous.  Do not bless an
+    # auxiliary systemd link until normal transaction validation resolves it.
+    if len(direct_targets) != 1:
+        return False
+    direct_link = os.path.normpath(os.path.join(home, expected_relative))
+    if not os.path.islink(direct_link):
+        return False
+    direct_destination = os.readlink(direct_link)
+    if direct_destination not in direct_targets:
+        return False
+
+    logical_target = os.path.normpath(os.path.join(os.path.dirname(link), destination))
+    # The regular relative unit dependency is the preferred and most obvious
+    # form.  Some systemctl releases instead record the direct unit referent
+    # as an absolute path; require it to resolve to that *same* declared unit.
+    if logical_target == direct_link:
+        return True
+    try:
+        return os.path.realpath(logical_target) == os.path.realpath(direct_link)
+    except OSError:
+        return False
+
+
+def is_declared_mise_tracked_config(link: str, relative: str, destination: str, known: set[tuple[str, str]]) -> bool:
+    """Allow mise's hashed cache link only when it indexes a declared link.
+
+    mise records tracked configuration files under its state directory.  The
+    cache must point first to a direct symlink below HOME, and that symlink
+    must be an exact plan/previous/legacy entry.  A direct checkout source,
+    an arbitrary cache path, or an arbitrary hash is never accepted.
+    """
+    parts = relative.split("/")
+    if (
+        len(parts) != 5
+        or parts[:4] != [".local", "state", "mise", "tracked-configs"]
+        or re.fullmatch(r"[0-9a-f]{16}", parts[4]) is None
+    ):
+        return False
+    logical_target = os.path.normpath(os.path.join(os.path.dirname(link), destination))
+    if not is_under(logical_target, home) or not os.path.islink(logical_target):
+        return False
+    direct_relative = os.path.relpath(logical_target, home)
+    if not valid_relative(direct_relative):
+        return False
+    try:
+        if (direct_relative, os.readlink(logical_target)) not in known:
+            return False
+        return os.path.realpath(link) == os.path.realpath(logical_target)
+    except OSError:
+        return False
+
+
+def is_declared_codex_skill_link(link: str, relative: str, destination: str, codex_selected: bool) -> bool:
+    """Allow only the exact directory links owned by the Codex skill manager.
+
+    They are deliberately ignored by Stow and checked later by
+    manage-codex-skill-links.sh.  Requiring both the selected module and the
+    exact source path prevents this from becoming an alias for checkout trees.
+    """
+    if not codex_selected:
+        return False
+    parts = relative.split("/")
+    if len(parts) != 3 or parts[:2] != [".agents", "skills"] or not parts[2]:
+        return False
+    source = os.path.join(checkout, "codex", ".agents", "skills", parts[2])
+    if not os.path.isdir(source) or os.path.islink(source):
+        return False
+    # The manager writes this exact absolute source.  Do not accept a relative
+    # spelling, HOME/.dotfiles alias, or a symlink chain that happens to end
+    # at the same directory.
+    return destination == source
+
+
+home, checkout, state, plan_path, previous_path, legacy_path = map(os.path.abspath, sys.argv[1:7])
+codex_selected = sys.argv[7] == "1"
+try:
+    home_device = os.stat(home).st_dev
+except OSError as error:
+    print(f"[AVISO] No se pudo inspeccionar HOME para el preflight: {error}")
+    raise SystemExit(1)
+known = (
+    load_manifest(plan_path, 3)
+    | load_manifest(previous_path, 2)
+    | load_manifest(legacy_path, 2)
+)
+pruned = {
+    os.path.normpath(path)
+    for path in (
+        checkout,
+        state,
+        os.path.join(home, ".dotfiles"),
+        os.path.join(home, "orca", "workspaces", ".dotfiles"),
+    )
+}
+
+def walk_error(error: OSError) -> None:
+    print(f"[AVISO] No se pudo inspeccionar HOME durante el preflight: {error}")
+    raise SystemExit(1)
+
+
+for directory, names, files in os.walk(home, topdown=True, followlinks=False, onerror=walk_error):
+    kept_names: list[str] = []
+    for name in names:
+        candidate = os.path.normpath(os.path.join(directory, name))
+        if candidate in pruned:
+            continue
+        try:
+            metadata = os.lstat(candidate)
+        except OSError as error:
+            print(f"[AVISO] No se pudo inspeccionar HOME durante el preflight: {error}")
+            raise SystemExit(1)
+        # Preserve find -xdev semantics. A directory symlink is still checked
+        # as a leaf below, but it is never followed by os.walk.
+        if not stat.S_ISLNK(metadata.st_mode) and metadata.st_dev != home_device:
+            continue
+        kept_names.append(name)
+    names[:] = kept_names
+    for name in (*names, *files):
+        link = os.path.join(directory, name)
+        if not os.path.islink(link):
+            continue
+        # realpath(strict=False) is the Python equivalent of readlink -m here:
+        # it classifies a dangling checkout referent without following a
+        # directory link during traversal.
+        resolved = os.path.realpath(link)
+        if not is_under(resolved, checkout):
+            continue
+        relative = os.path.relpath(link, home)
+        destination = os.readlink(link)
+        if (relative, destination) in known:
+            continue
+        if is_declared_systemd_dependency(link, relative, destination, known):
+            continue
+        if is_declared_mise_tracked_config(link, relative, destination, known):
+            continue
+        if is_declared_codex_skill_link(link, relative, destination, codex_selected):
+            continue
+        print(f"[AVISO] Enlace del checkout fuera de la composición declarada: {link}")
+        raise SystemExit(1)
+PY
+}
+
+materialize_check_shadow() {
+	local plan_manifest=$1 shadow_home=$2 previous_manifest=$3 legacy_manifest=$4
+	local relative expected source target destination shadow_target shadow_destination
+	while IFS=$'\t' read -r relative expected source; do
+		[[ -n "$relative" && -n "$expected" && -n "$source" ]] || continue
+		if ! is_safe_home_relative "$relative"; then
+			warn "La intención Stow temporal tiene una ruta no válida: $relative"
+			return 1
+		fi
+		target="$HOME/$relative"
+		[[ -L "$target" ]] || continue
+		destination="$(readlink -- "$target")"
+		# The real transaction removes both previous and legacy links before
+		# Stow.  Every other non-current target is moved to its reversible backup.
+		if manifest_has_exact_link "$previous_manifest" "$relative" "$destination" ||
+			manifest_has_exact_link "$legacy_manifest" "$relative" "$destination"; then
+			continue
+		fi
+		[[ "$destination" == "$expected" ]] || continue
+		shadow_target="$shadow_home/$relative"
+		mkdir -p "$(dirname "$shadow_target")" || return 1
+		# The target directory moved, so recompute Stow's lexical relative link.
+		# Copying the original raw destination would create a false conflict.
+		shadow_destination="$(expected_stow_destination "$source" "$shadow_target")" || return 1
+		ln -s -- "$shadow_destination" "$shadow_target" || return 1
+	done <"$plan_manifest"
+}
+
+check_stow_shadow() (
+	set -euo pipefail
+	local temporary_root=${TMPDIR:-/tmp} check_dir shadow_home plan_manifest migration_dir
+	temporary_root="$(realpath -e -- "$temporary_root")"
+	check_dir="$(mktemp -d "$temporary_root/dotfiles-check.XXXXXX")"
+	# shellcheck disable=SC2329 # invoked by the EXIT trap below
+	cleanup_check_shadow() {
+		[[ "$check_dir" == "$temporary_root"/dotfiles-check.* ]] || return 1
+		find "$check_dir" -depth -delete
+	}
+	trap cleanup_check_shadow EXIT
+	shadow_home="$check_dir/home"
+	migration_dir="$check_dir/migration"
+	mkdir -p "$shadow_home" "$migration_dir"
+	: >"$migration_dir/symlinks.tsv"
+
+	# This reuses the exact previous-composition loader from apply, but every
+	# temporary manifest lives outside HOME/XDG.  Legacy sources are checked by
+	# their live raw links; apply will snapshot them before it unlinks anything.
+	detect_legacy_modules
+	record_legacy_links_to "$migration_dir/symlinks.tsv" || return 1
+	copy_previous_applied_links_to "$migration_dir" "$migration_dir/symlinks.tsv" || return 1
+	preflight_link_removal_manifest \
+		"$migration_dir/previous-applied-links.tsv" \
+		"$migration_dir/previous-restore-links.tsv" previous || return 1
+	preflight_live_link_removal_manifest "$migration_dir/symlinks.tsv" legacy || return 1
+	validate_distinct_link_removal_manifests \
+		"$migration_dir/previous-applied-links.tsv" \
+		"$migration_dir/symlinks.tsv" || return 1
+
+	plan_manifest="$migration_dir/plan-intent.tsv"
+	build_check_plan_intent "$plan_manifest" || return 1
+	reject_untracked_checkout_links \
+		"$plan_manifest" \
+		"$migration_dir/previous-applied-links.tsv" \
+		"$migration_dir/symlinks.tsv" || return 1
+	materialize_check_shadow \
+		"$plan_manifest" "$shadow_home" \
+		"$migration_dir/previous-applied-links.tsv" "$migration_dir/symlinks.tsv" || return 1
+
+	info "Simulación verbosa de Stow en HOME temporal tras retiradas y backups exactos..."
+	stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --simulate --verbose=2 \
+		--dir "$DOTFILES_DIR" --target "$shadow_home" "${PLAN_MODULES[@]}"
+)
+
+preflight_migration_checkout_links() (
+	set -euo pipefail
+	local temporary_root=${TMPDIR:-/tmp} plan_manifest
+	temporary_root="$(realpath -e -- "$temporary_root")"
+	plan_manifest="$(mktemp "$temporary_root/dotfiles-plan-intent.XXXXXX")"
+	# shellcheck disable=SC2329 # invoked by the EXIT trap below
+	cleanup_plan_intent() {
+		[[ "$plan_manifest" == "$temporary_root"/dotfiles-plan-intent.* ]] || return 1
+		rm -f -- "$plan_manifest"
+	}
+	trap cleanup_plan_intent EXIT
+
+	# Package and Flatpak installation can take place after the interactive
+	# preflight. Re-read the live checkout links after begin_migration and before
+	# generated state, backups, Stow or services can change anything.
+	build_check_plan_intent "$plan_manifest" || return 1
+	reject_untracked_checkout_links \
+		"$plan_manifest" \
+		"$MIGRATION_DIR/previous-applied-links.tsv" \
+		"$MIGRATION_DIR/symlinks.tsv"
+)
+
 check_dotfiles() {
 	validate_target_safety
+	detect_legacy_modules
 	report_legacy_targets
 	report_backup_targets
 	info "Validando la composición hermética con los runtimes disponibles..."
-	validate_resolved_runtime 0
-	info "Simulación verbosa de Stow para la composición resuelta (los destinos listados se respaldarían)..."
-	# --adopt solo permite modelar los destinos que el despliegue moverá al backup.
-	# --simulate garantiza que ni HOME ni las fuentes del repositorio cambian.
-	stow --no-folding --ignore='\.env.*' --ignore='btrfs-snapshots' --restow --adopt --simulate --verbose=2 \
-		--dir "$DOTFILES_DIR" --target "$HOME" "${PLAN_MODULES[@]}"
+	validate_resolved_runtime 0 || return 1
+	check_stow_shadow || return 1
 }
 
 plan_has_module() {
@@ -571,14 +922,122 @@ validate_target_safety() {
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'El módulo Stow tiene una ruta no admitida.'
 			target="$HOME/$relative"
-			[[ -e "$target" || -L "$target" ]] || continue
-			target_is_managed_dotfile "$target" && continue
 			if target_has_symlink_parent "$target"; then
 				die "Destino bajo un directorio enlazado; revísalo manualmente: $target"
 			fi
+			[[ -e "$target" || -L "$target" ]] || continue
+			target_is_managed_dotfile "$target" && continue
 		done < <(module_sources "$module")
 	done
+}
+
+manifest_has_exact_link() {
+	local manifest=$1 relative=$2 destination=$3
+	is_safe_home_relative "$relative" || return 1
+	[[ -f "$manifest" ]] || return 1
+	awk -F $'\t' -v relative="$relative" -v destination="$destination" \
+		'$1 == relative && $2 == destination && NF == 2 { found = 1 } END { exit !found }' \
+		"$manifest"
+}
+
+preflight_live_link_removal_manifest() {
+	local live_manifest=$1 label=$2
+	local relative destination target actual failed=0
+	declare -A seen=()
+	[[ -f "$live_manifest" ]] || return 0
+	while IFS=$'\t' read -r relative destination; do
+		[[ -n "$relative" || -n "$destination" ]] || continue
+		if [[ -z "$destination" || "$destination" == *$'\n'* ||
+			"$destination" == *$'\t'* || -n "${seen[$relative]+x}" ]] ||
+			! is_safe_home_relative "$relative"; then
+			warn "El manifiesto de retirada $label no es válido: $live_manifest"
+			failed=1
+			continue
+		fi
+		seen[$relative]=1
+		target="$HOME/$relative"
+		if target_has_symlink_parent "$target"; then
+			warn "El enlace programado para retirada tiene un padre enlazado: $target"
+			failed=1
+			continue
+		fi
+		if [[ ! -L "$target" ]]; then
+			warn "Falta el enlace programado para retirada $label: $target"
+			failed=1
+			continue
+		fi
+		actual="$(readlink -- "$target")"
+		if [[ "$actual" != "$destination" ]]; then
+			warn "El enlace programado para retirada cambió $label: $target"
+			failed=1
+		fi
+	done <"$live_manifest"
+	return "$failed"
+}
+
+preflight_link_removal_manifest() {
+	local live_manifest=$1 snapshot_manifest=$2 label=$3 failed=0
+	preflight_live_link_removal_manifest "$live_manifest" "$label" || failed=1
+	[[ -s "$live_manifest" ]] || return "$failed"
+	if [[ ! -f "$snapshot_manifest" ]]; then
+		warn "Falta el snapshot de la retirada $label: $snapshot_manifest"
+		return 1
+	fi
+	if ! manifest_relatives_match "$live_manifest" "$snapshot_manifest"; then
+		warn "El snapshot de la retirada $label no coincide con los enlaces vivos."
+		failed=1
+	fi
+	if ! validate_restore_link_manifests "$snapshot_manifest"; then
+		warn "El snapshot de la retirada $label no es privado o no es válido."
+		failed=1
+	fi
+	return "$failed"
+}
+
+validate_distinct_link_removal_manifests() {
+	local manifest relative destination failed=0
+	declare -A seen=()
+	for manifest in "$@"; do
+		[[ -f "$manifest" ]] || continue
+		while IFS=$'\t' read -r relative destination; do
+			[[ -n "$relative" || -n "$destination" ]] || continue
+			if [[ -z "$destination" ]] || ! is_safe_home_relative "$relative"; then
+				warn "Un manifiesto de retirada tiene una ruta no válida: $manifest"
+				failed=1
+				continue
+			fi
+			if [[ -n "${seen[$relative]+x}" ]]; then
+				warn "Un enlace está programado dos veces para retirada: $HOME/$relative"
+				failed=1
+			fi
+			seen[$relative]=1
+		done <"$manifest"
+	done
+	return "$failed"
+}
+
+preflight_scheduled_link_removals() {
+	local failed=0
+	validate_distinct_link_removal_manifests \
+		"$MIGRATION_DIR/previous-applied-links.tsv" \
+		"$MIGRATION_DIR/symlinks.tsv" || failed=1
+	preflight_link_removal_manifest \
+		"$MIGRATION_DIR/previous-applied-links.tsv" \
+		"$MIGRATION_DIR/previous-restore-links.tsv" previous || failed=1
+	preflight_link_removal_manifest \
+		"$MIGRATION_DIR/symlinks.tsv" \
+		"$MIGRATION_DIR/legacy-links.tsv" legacy || failed=1
+	return "$failed"
+}
+
+target_is_scheduled_for_exact_removal() {
+	local relative=$1 target=$2 destination
+	[[ -L "$target" ]] || return 1
+	destination="$(readlink -- "$target")"
+	manifest_has_exact_link "$MIGRATION_DIR/previous-applied-links.tsv" "$relative" "$destination" ||
+		manifest_has_exact_link "$MIGRATION_DIR/symlinks.tsv" "$relative" "$destination"
 }
 
 report_backup_targets() {
@@ -587,6 +1046,7 @@ report_backup_targets() {
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'El módulo Stow tiene una ruta no admitida.'
 			target="$HOME/$relative"
 			[[ -e "$target" || -L "$target" ]] || continue
 			target_is_managed_dotfile "$target" && continue
@@ -601,24 +1061,33 @@ backup_targets() {
 	local backed_up=0
 
 	validate_target_safety
+	# The exact former composition is removed later by deploy_dotfiles.  Validate
+	# it before moving any personal target, then leave matching links in place so
+	# the guarded removal can consume them.  This matters after a rollback: its
+	# live links deliberately point at private migration snapshots, not checkout.
+	preflight_scheduled_link_removals || return 1
 	if legacy_dgpu_target_is_managed; then
 		relative=.config/fish/functions/dgpu.fish
 		target="$HOME/$relative"
-		mkdir -p "$BACKUP_DIR/$(dirname "$relative")"
-		record_backup_move_intent "$relative"
-		mv "$target" "$BACKUP_DIR/$relative" || die "No se pudo mover al backup: $target"
-		backed_up=1
+		if ! target_is_scheduled_for_exact_removal "$relative" "$target"; then
+			mkdir -p "$BACKUP_DIR/$(dirname "$relative")"
+			record_backup_move_intent "$relative"
+			mv "$target" "$BACKUP_DIR/$relative" || die "No se pudo mover al backup: $target"
+			backed_up=1
+		fi
 	fi
 
 	for module in "${PLAN_MODULES[@]}"; do
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'El módulo Stow tiene una ruta no admitida.'
 			target="$HOME/$relative"
 
 			if [[ ! -e "$target" && ! -L "$target" ]]; then
 				continue
 			fi
+			target_is_scheduled_for_exact_removal "$relative" "$target" && continue
 			target_is_managed_dotfile "$target" && continue
 
 			mkdir -p "$BACKUP_DIR/$(dirname "$relative")"
@@ -639,6 +1108,7 @@ backup_targets() {
 
 record_backup_move_intent() {
 	local relative=$1 manifest="$BACKUP_DIR/manifest.txt" migration_manifest="$MIGRATION_DIR/backup-moves.tsv"
+	is_safe_home_relative "$relative" || die 'El journal de backup tiene una ruta no admitida.'
 	if grep -Fxq -- "$relative" "$migration_manifest" 2>/dev/null; then
 		return 0
 	fi
@@ -660,6 +1130,11 @@ restore_backup() {
 
 	local relative backup target failed=0
 	while IFS= read -r relative; do
+		if ! is_safe_home_relative "$relative"; then
+			warn "El manifiesto de backup tiene una ruta no válida: $relative"
+			failed=1
+			continue
+		fi
 		backup="$BACKUP_DIR/$relative"
 		target="$HOME/$relative"
 		[[ -e "$backup" || -L "$backup" ]] || continue
@@ -691,6 +1166,7 @@ legacy_module_is_deployed() {
 	while IFS= read -r -d '' source; do
 		relative=${source#"$DOTFILES_DIR/$module/"}
 		is_stow_ignored_path "$module" "$relative" && continue
+		is_safe_home_relative "$relative" || die 'Un módulo legacy tiene una ruta no admitida.'
 		target="$HOME/$relative"
 		[[ -L "$target" ]] || continue
 		resolved="$(readlink -f -- "$target" 2>/dev/null || true)"
@@ -736,12 +1212,13 @@ snapshot_generated_target() {
 	printf '%s\t%s\n' "$key" "$status" >>"$MIGRATION_DIR/generated-targets.tsv"
 }
 
-record_legacy_links() {
-	local module source relative target resolved destination
+record_legacy_links_to() {
+	local manifest=$1 module source relative target resolved destination
 	for module in "${LEGACY_MODULES[@]}"; do
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'Un enlace legacy tiene una ruta no admitida.'
 			target="$HOME/$relative"
 			[[ -L "$target" ]] || continue
 			resolved="$(readlink -f -- "$target" 2>/dev/null || true)"
@@ -749,9 +1226,13 @@ record_legacy_links() {
 			[[ "$relative" != *$'\n'* && "$relative" != *$'\t'* ]] || die 'Un enlace legacy contiene caracteres no admitidos.'
 			destination="$(readlink -- "$target")"
 			[[ "$destination" != *$'\n'* && "$destination" != *$'\t'* ]] || die 'Un enlace legacy contiene un destino no admitido.'
-			printf '%s\t%s\n' "$relative" "$destination" >>"$MIGRATION_DIR/symlinks.tsv"
+			printf '%s\t%s\n' "$relative" "$destination" >>"$manifest"
 		done < <(module_sources "$module")
 	done
+}
+
+record_legacy_links() {
+	record_legacy_links_to "$MIGRATION_DIR/symlinks.tsv"
 }
 
 expected_stow_destination() {
@@ -787,6 +1268,7 @@ snapshot_applied_link_referents() {
 	: >"$MIGRATION_DIR/applied-snapshot-links.tsv"
 	while IFS=$'\t' read -r relative expected; do
 		[[ -n "$relative" ]] || continue
+		is_safe_home_relative "$relative" || die 'El manifiesto aplicado contiene una ruta no admitida.'
 		source="$(intent_value_for_relative "$MIGRATION_DIR/stow-sources.tsv" "$relative")" ||
 			die "Falta la fuente de la intención Stow: $relative"
 		[[ -f "$source" ]] || die "No se pudo snapshot de la fuente Stow: $source"
@@ -811,6 +1293,7 @@ prepare_stow_checkpoint() {
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'La intención Stow tiene una ruta no admitida.'
 			[[ -z "${seen[$relative]+x}" ]] || die "La composición Stow solapa el destino: $relative"
 			seen[$relative]=1
 			target="$HOME/$relative"
@@ -825,6 +1308,7 @@ prepare_stow_checkpoint() {
 	sort -u -o "$MIGRATION_DIR/stow-sources.tsv" "$MIGRATION_DIR/stow-sources.tsv"
 	while IFS=$'\t' read -r relative expected; do
 		[[ -n "$relative" ]] || continue
+		is_safe_home_relative "$relative" || die 'La intención Stow contiene una ruta no admitida.'
 		target="$HOME/$relative"
 		if [[ -L "$target" ]]; then
 			before="$(readlink -- "$target")"
@@ -865,6 +1349,7 @@ snapshot_legacy_link_manifest() {
 		while IFS= read -r -d '' source; do
 			relative=${source#"$DOTFILES_DIR/$module/"}
 			is_stow_ignored_path "$module" "$relative" && continue
+			is_safe_home_relative "$relative" || die 'El snapshot legacy tiene una ruta no admitida.'
 			# Only restore the exact links that were active before the transaction.
 			grep -Fq -- "$relative"$'\t' "$MIGRATION_DIR/symlinks.tsv" || continue
 			destination="$MIGRATION_DIR/modules/$module/$relative"
@@ -874,11 +1359,11 @@ snapshot_legacy_link_manifest() {
 	sort -u -o "$manifest" "$manifest"
 }
 
-copy_manifest_without_current_legacy() {
-	local source=$1 destination=$2
+copy_manifest_without_legacy() {
+	local source=$1 legacy_manifest=$2 destination=$3
 	: >"$destination"
 	[[ -f "$source" ]] || return 0
-	if [[ ! -s "$MIGRATION_DIR/symlinks.tsv" ]]; then
+	if [[ ! -s "$legacy_manifest" ]]; then
 		cp -- "$source" "$destination"
 		return 0
 	fi
@@ -886,7 +1371,7 @@ copy_manifest_without_current_legacy() {
 	# legacy links that never left HOME.  The latter belong to this transaction's
 	# legacy manifest, otherwise deploy_dotfiles would try to remove them twice.
 	awk -F $'\t' 'NR == FNR { legacy[$1] = 1; next } !($1 in legacy)' \
-		"$MIGRATION_DIR/symlinks.tsv" "$source" >"$destination"
+		"$legacy_manifest" "$source" >"$destination"
 }
 
 manifest_relatives_match() {
@@ -896,10 +1381,11 @@ manifest_relatives_match() {
 		<(cut -f1 "$snapshots" | sort -u)
 }
 
-copy_previous_applied_links() {
+copy_previous_applied_links_to() {
+	local destination_dir=$1 legacy_manifest=$2
 	local previous="${STATE_DIR}/last-migration" previous_dir live_manifest snapshot_manifest snapshot_fallback
-	: >"$MIGRATION_DIR/previous-applied-links.tsv"
-	: >"$MIGRATION_DIR/previous-restore-links.tsv"
+	: >"$destination_dir/previous-applied-links.tsv"
+	: >"$destination_dir/previous-restore-links.tsv"
 	[[ -f "$previous" ]] || return 0
 	previous_dir="$(<"$previous")"
 	[[ "$previous_dir" == "$STATE_DIR/migrations/"* && -f "$previous_dir/status" ]] ||
@@ -915,7 +1401,7 @@ copy_previous_applied_links() {
 		if [[ ! -f "$snapshot_manifest" ]]; then
 			# Migrations written before restored-snapshot-links.tsv can still be
 			# retried only if both of their private snapshot manifests survive.
-			snapshot_fallback="$MIGRATION_DIR/previous-snapshot-fallback.tsv"
+			snapshot_fallback="$destination_dir/previous-snapshot-fallback.tsv"
 			: >"$snapshot_fallback"
 			[[ -f "$previous_dir/previous-restore-links.tsv" ]] && cat "$previous_dir/previous-restore-links.tsv" >>"$snapshot_fallback"
 			[[ -f "$previous_dir/legacy-links.tsv" ]] && cat "$previous_dir/legacy-links.tsv" >>"$snapshot_fallback"
@@ -926,20 +1412,24 @@ copy_previous_applied_links() {
 	*) die "La última migración no terminó de forma segura ($(<"$previous_dir/status")); ejecuta rollback antes de volver a desplegar." ;;
 	esac
 	[[ -f "$live_manifest" ]] || return 0
-	copy_manifest_without_current_legacy "$live_manifest" "$MIGRATION_DIR/previous-applied-links.tsv"
-	if [[ -s "$MIGRATION_DIR/previous-applied-links.tsv" && ! -f "$snapshot_manifest" ]]; then
+	copy_manifest_without_legacy "$live_manifest" "$legacy_manifest" "$destination_dir/previous-applied-links.tsv"
+	if [[ -s "$destination_dir/previous-applied-links.tsv" && ! -f "$snapshot_manifest" ]]; then
 		die "La composición aplicada anterior no tiene snapshot de enlaces: $previous_dir"
 	fi
 	[[ -f "$snapshot_manifest" ]] || return 0
-	copy_manifest_without_current_legacy "$snapshot_manifest" "$MIGRATION_DIR/previous-restore-links.tsv"
-	if [[ -s "$MIGRATION_DIR/previous-applied-links.tsv" && ! -s "$MIGRATION_DIR/previous-restore-links.tsv" ]]; then
+	copy_manifest_without_legacy "$snapshot_manifest" "$legacy_manifest" "$destination_dir/previous-restore-links.tsv"
+	if [[ -s "$destination_dir/previous-applied-links.tsv" && ! -s "$destination_dir/previous-restore-links.tsv" ]]; then
 		die "El snapshot de enlaces anterior no cubre la composición activa: $previous_dir"
 	fi
-	if ! manifest_relatives_match "$MIGRATION_DIR/previous-applied-links.tsv" "$MIGRATION_DIR/previous-restore-links.tsv"; then
+	if ! manifest_relatives_match "$destination_dir/previous-applied-links.tsv" "$destination_dir/previous-restore-links.tsv"; then
 		die "El snapshot de enlaces anterior no coincide con la composición activa: $previous_dir"
 	fi
-	validate_restore_link_manifests "$MIGRATION_DIR/previous-restore-links.tsv" ||
+	validate_restore_link_manifests "$destination_dir/previous-restore-links.tsv" ||
 		die "El snapshot de enlaces anterior no es restaurable: $previous_dir"
+}
+
+copy_previous_applied_links() {
+	copy_previous_applied_links_to "$MIGRATION_DIR" "$MIGRATION_DIR/symlinks.tsv"
 }
 
 copy_previous_generated_targets() {
@@ -969,6 +1459,10 @@ write_restored_active_links() {
 	# foreign link in the next migration.
 	while IFS=$'\t' read -r relative destination; do
 		[[ -n "$relative" && -n "$destination" ]] || continue
+		if ! is_safe_home_relative "$relative"; then
+			warn "La composición restaurada contiene una ruta no válida: $relative"
+			return 1
+		fi
 		allowed[$relative]+="$destination"$'\n'
 	done < <(cat \
 		"$MIGRATION_DIR/previous-applied-links.tsv" \
@@ -980,6 +1474,7 @@ write_restored_active_links() {
 	: >"$MIGRATION_DIR/restored-active-links.tsv"
 	for relative in "${!allowed[@]}"; do
 		[[ -n "$relative" && -z "${seen[$relative]+x}" ]] || continue
+		is_safe_home_relative "$relative" || return 1
 		seen[$relative]=1
 		target="$HOME/$relative"
 		[[ -L "$target" ]] || continue
@@ -1033,26 +1528,43 @@ write_restored_active_generated() {
 }
 
 remove_link_manifest() {
-	local manifest=$1 relative destination target failed=0
+	local manifest=$1 line relative destination target failed=0
+	local -a destinations=() targets=()
 	[[ -f "$manifest" ]] || return 0
 	# Validate every entry before unlinking anything. A later manual edit must
 	# leave the whole composition intact rather than produce a partial removal.
-	while IFS=$'\t' read -r relative destination; do
-		[[ -n "$relative" ]] || continue
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -n "$line" ]] || continue
+		relative=${line%%$'\t'*}
+		destination=${line#*$'\t'}
+		if [[ "$line" == "$relative" || -z "$destination" || "$destination" == *$'\t'* ]] ||
+			! is_safe_home_relative "$relative"; then
+			warn "El manifiesto de enlaces gestionados no es válido: $manifest"
+			failed=1
+			continue
+		fi
 		target="$HOME/$relative"
 		if [[ ! -L "$target" || "$(readlink -- "$target")" != "$destination" ]]; then
 			warn "El enlace gestionado cambió y no se retira: $target"
 			failed=1
+			continue
 		fi
+		destinations+=("$destination")
+		targets+=("$target")
 	done <"$manifest"
 	((failed == 0)) || return 1
-	while IFS=$'\t' read -r relative destination; do
-		[[ -n "$relative" ]] || continue
-		if ! rm -- "$HOME/$relative"; then
-			warn "No se pudo retirar el enlace gestionado: $HOME/$relative"
+	local index
+	for ((index = 0; index < ${#targets[@]}; index++)); do
+		target=${targets[index]}
+		if [[ ! -L "$target" || "$(readlink -- "$target")" != "${destinations[index]}" ]]; then
+			warn "El enlace gestionado cambió durante la retirada: $target"
 			return 1
 		fi
-	done <"$manifest"
+		if ! rm -- "$target"; then
+			warn "No se pudo retirar el enlace gestionado: $target"
+			return 1
+		fi
+	done
 }
 
 restore_link_manifest() {
@@ -1060,6 +1572,11 @@ restore_link_manifest() {
 	[[ -f "$manifest" ]] || return 0
 	while IFS=$'\t' read -r relative destination; do
 		[[ -n "$relative" ]] || continue
+		if ! is_safe_home_relative "$relative"; then
+			warn "No se restaura una ruta fuera de HOME: $relative"
+			failed=1
+			continue
+		fi
 		resolved="$(readlink -f -- "$destination" 2>/dev/null || :)"
 		if [[ "$resolved" != "$STATE_DIR/migrations/"* || ! -f "$resolved" ]]; then
 			warn "No se restaura un enlace cuyo snapshot no existe: $destination"
@@ -1075,6 +1592,7 @@ restore_link_manifest() {
 	((failed == 0)) || return 1
 	while IFS=$'\t' read -r relative destination; do
 		[[ -n "$relative" ]] || continue
+		is_safe_home_relative "$relative" || return 1
 		target="$HOME/$relative"
 		mkdir -p "$(dirname "$target")"
 		ln -s -- "$destination" "$target"
@@ -1087,17 +1605,19 @@ restore_removed_link_manifest() {
 	declare -A live_destinations=() seen=()
 	[[ -f "$snapshots" && -f "$live" ]] || return 0
 	while IFS=$'\t' read -r relative expected; do
-		[[ -n "$relative" && -n "$expected" && -z "${live_destinations[$relative]+x}" ]] || {
+		if ! [[ -n "$relative" && -n "$expected" && -z "${live_destinations[$relative]+x}" ]] ||
+			! is_safe_home_relative "$relative"; then
 			warn "El manifiesto vivo de retirada no es válido: $live"
 			return 1
-		}
+		fi
 		live_destinations[$relative]=$expected
 	done <"$live"
 	while IFS=$'\t' read -r relative snapshot; do
-		[[ -n "$relative" && -n "$snapshot" && -n "${live_destinations[$relative]+x}" && -z "${seen[$relative]+x}" ]] || {
+		if ! [[ -n "$relative" && -n "$snapshot" && -n "${live_destinations[$relative]+x}" && -z "${seen[$relative]+x}" ]] ||
+			! is_safe_home_relative "$relative"; then
 			warn "El manifiesto de snapshot de retirada no es válido: $snapshots"
 			return 1
-		}
+		fi
 		seen[$relative]=1
 		valid_private_checkpoint_snapshot "$snapshot" || {
 			warn "Falta el snapshot de retirada: $snapshot"
@@ -1162,6 +1682,11 @@ validate_restore_link_manifests() {
 		[[ -f "$manifest" ]] || continue
 		while IFS=$'\t' read -r relative destination; do
 			[[ -n "$relative" ]] || continue
+			if ! is_safe_home_relative "$relative"; then
+				warn "El snapshot de rollback tiene una ruta no válida: $relative"
+				failed=1
+				continue
+			fi
 			if [[ -n "${seen[$relative]+x}" ]]; then
 				warn "Los snapshots de rollback se solapan en: $relative"
 				failed=1
@@ -1210,17 +1735,19 @@ rollback_stow_checkpoint() {
 		return
 	fi
 	while IFS=$'\t' read -r relative expected; do
-		[[ -n "$relative" && -n "$expected" && -z "${intents[$relative]+x}" ]] || {
+		if ! [[ -n "$relative" && -n "$expected" && -z "${intents[$relative]+x}" ]] ||
+			! is_safe_home_relative "$relative"; then
 			warn 'La intención Stow del checkpoint no es válida.'
 			return 1
-		}
+		fi
 		intents[$relative]=$expected
 	done <"$MIGRATION_DIR/stow-intent.tsv"
 	while IFS=$'\t' read -r relative kind before; do
-		[[ -n "$relative" && -n "$kind" && -n "${intents[$relative]+x}" && -z "${before_kind[$relative]+x}" ]] || {
+		if ! [[ -n "$relative" && -n "$kind" && -n "${intents[$relative]+x}" && -z "${before_kind[$relative]+x}" ]] ||
+			! is_safe_home_relative "$relative"; then
 			warn 'El estado previo Stow del checkpoint no es válido.'
 			return 1
-		}
+		fi
 		[[ "$kind" == absent || "$kind" == link ]] || {
 			warn 'El tipo del estado previo Stow no es válido.'
 			return 1
@@ -1229,10 +1756,10 @@ rollback_stow_checkpoint() {
 		before_destination[$relative]=$before
 	done <"$MIGRATION_DIR/stow-before.tsv"
 	for relative in "${!intents[@]}"; do
-		[[ -n "${before_kind[$relative]+x}" ]] || {
+		if ! is_safe_home_relative "$relative" || ! [[ -n "${before_kind[$relative]+x}" ]]; then
 			warn "Falta el estado previo Stow: $relative"
 			return 1
-		}
+		fi
 		expected=${intents[$relative]}
 		kind=${before_kind[$relative]}
 		before=${before_destination[$relative]}
@@ -1281,6 +1808,7 @@ rollback_stow_checkpoint() {
 	done
 	((failed == 0)) || return 1
 	for relative in "${remove_relatives[@]}"; do
+		is_safe_home_relative "$relative" || return 1
 		if ! rm -- "$HOME/$relative"; then
 			warn "No se pudo retirar el enlace Stow del checkpoint: $HOME/$relative"
 			return 1
@@ -1304,6 +1832,11 @@ verify_stow_checkpoint_applied() {
 	local relative expected target failed=0
 	while IFS=$'\t' read -r relative expected; do
 		[[ -n "$relative" ]] || continue
+		if ! is_safe_home_relative "$relative"; then
+			warn "El checkpoint Stow contiene una ruta no válida: $relative"
+			failed=1
+			continue
+		fi
 		target="$HOME/$relative"
 		if [[ ! -L "$target" || "$(readlink -- "$target")" != "$expected" ]]; then
 			warn "Stow no creó el enlace esperado del checkpoint: $target"
@@ -1320,6 +1853,11 @@ write_checkpoint_restored_links() {
 	[[ -f "$MIGRATION_DIR/stow-checkpoint" ]] || return 0
 	while IFS=$'\t' read -r relative kind before; do
 		[[ "$kind" == link ]] || continue
+		if ! is_safe_home_relative "$relative"; then
+			warn "El checkpoint Stow contiene una ruta no válida: $relative"
+			failed=1
+			continue
+		fi
 		expected="$(intent_value_for_relative "$MIGRATION_DIR/stow-intent.tsv" "$relative" || :)"
 		if [[ -z "$expected" || "$before" != "$expected" ]]; then
 			warn "El checkpoint Stow no puede promocionar un enlace previo ajeno: $HOME/$relative"
@@ -1793,6 +2331,7 @@ deploy_dotfiles() {
 	# A later deployment may deselect optional bundles. Remove only the exact
 	# links recorded by the last successful transaction, after a full manifest
 	# check, so a user edit never causes a partial retirement.
+	preflight_scheduled_link_removals || return 1
 	record_link_removal_intent "$MIGRATION_DIR/previous-links-removal-intent" "$MIGRATION_DIR/previous-applied-links.tsv"
 	remove_link_manifest "$MIGRATION_DIR/previous-applied-links.tsv"
 	record_link_removal_complete "$MIGRATION_DIR/previous-links-removed" "$MIGRATION_DIR/previous-applied-links.tsv"
@@ -1925,12 +2464,16 @@ apply_dotfiles_transaction() {
 	begin_migration
 	if ! (
 		set -euo pipefail
-		generate_derived_state
-		backup_targets
-		deploy_dotfiles
-		install_staged_configs
-		validate_deployed_config
-		configure_user_services
+		# Bash suppresses errexit when this subshell is the condition of `if !`.
+		# Guard every phase explicitly so a failed preflight can never fall through
+		# into generated state, HOME moves, Stow, validation or service changes.
+		preflight_migration_checkout_links || exit 1
+		generate_derived_state || exit 1
+		backup_targets || exit 1
+		deploy_dotfiles || exit 1
+		install_staged_configs || exit 1
+		validate_deployed_config || exit 1
+		configure_user_services || exit 1
 	); then
 		if rollback_migration; then
 			die 'El despliegue falló y se restauró el estado anterior.'
@@ -1959,16 +2502,16 @@ main() {
 
 	check_prerequisites
 	validate_plan_modules
+	# Inspect the exact live composition before querying package availability.
+	# A changed prior link must fail here, before any later installation path can
+	# start, and --check still performs the package/compatibility report below.
+	check_dotfiles
 	check_packages
 	check_runtime_compatibility available
 	if plan_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
 		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --check
 	fi
-	# La ruta interactiva incluye el mismo preflight que --check. Así no se
-	# instalan paquetes antes de descubrir un conflicto de enlaces en HOME.
-	check_dotfiles
-
 	if ((CHECK_ONLY)); then
 		ok "Validación terminada sin cambios."
 		exit 0

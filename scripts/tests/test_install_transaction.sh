@@ -22,6 +22,10 @@ mkdir -p \
 	"$fixture_repo/hypr-common/.config/hypr/config" \
 	"$fixture_repo/qmd/.config/qmd" \
 	"$fixture_repo/hypr-host/.config/hypr/config" \
+	"$fixture_repo/split-new/.config/hypr/config" \
+	"$fixture_repo/unit-test/.config/systemd/user" \
+	"$fixture_repo/mise-test/.config/mise" \
+	"$fixture_repo/codex/.agents/skills/example-skill" \
 	"$fixture_repo/hypr-desktop/.config/reactive-rgb" \
 	"$fixture_repo/gaming/.local/bin" \
 	"$fixture_repo/backup/.local/bin"
@@ -34,7 +38,12 @@ printf '%s\n' old-backup >"$fixture_repo/backup/.local/bin/desktop-backup"
 printf '%s\n' old-qmd >"$fixture_repo/qmd/.config/qmd/index.yml"
 printf '%s\n' common-before >"$fixture_repo/hypr-common/.config/hypr/config/common.lua"
 printf '%s\n' new-host >"$fixture_repo/hypr-host/.config/hypr/config/host.lua"
+printf '%s\n' new-host-legacy >"$fixture_repo/hypr-host/.config/hypr/config/legacy.lua"
 printf '%s\n' new-managed >"$fixture_repo/hypr-host/.config/personal.conf"
+printf '%s\n' split-monitors >"$fixture_repo/split-new/.config/hypr/config/monitors.lua"
+printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-test.service"
+printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
+printf '%s\n' '# fixture skill' >"$fixture_repo/codex/.agents/skills/example-skill/SKILL.md"
 
 git -C "$fixture_repo" init -q
 git -C "$fixture_repo" add .
@@ -60,6 +69,121 @@ chmod +x "$readonly_runner"
 HOME="$fixture_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$fixture_state" \
 	FIXTURE_REPO="$fixture_repo" "$readonly_runner"
 
+# --check must model the legacy withdrawal and the new split module in one
+# simulation. A direct Stow restow conflicts with the currently deployed
+# hypr-desktop link, while check_dotfiles keeps HOME unchanged and succeeds.
+check_runner="$test_root/check-legacy-split.sh"
+cat >"$check_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_MODULES=(split-new backup)
+validate_resolved_runtime() { return 0; }
+rm -- "$HOME/.config/hypr/config/monitors.lua"
+ln -s "$DOTFILES_DIR/hypr-desktop/.config/hypr/config/monitors.lua" "$HOME/.config/hypr/config/monitors.lua"
+legacy_before="$(readlink "$HOME/.config/hypr/config/monitors.lua")"
+home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if command stow --no-folding --restow --adopt --simulate --dir "$DOTFILES_DIR" --target "$HOME" split-new >/dev/null 2>&1; then
+    printf '%s\n' 'FAIL: la colisión legacy/split no se reprodujo.' >&2
+    exit 1
+fi
+stow() {
+    printf '%s\n' "$@" >"$TEST_STOW_ARGS"
+    command stow "$@"
+}
+check_dotfiles
+[[ -L "$HOME/.config/hypr/config/monitors.lua" ]]
+[[ $(readlink "$HOME/.config/hypr/config/monitors.lua") == "$legacy_before" ]]
+[[ $(<"$HOME/.config/hypr/config/monitors.lua") == old-monitors ]]
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]
+# The checker models exact removals in a private shadow. It must never use
+# Stow package deletion or --adopt against the real HOME.
+if grep -Fxq -- --adopt "$TEST_STOW_ARGS" || grep -Fxq -- --delete "$TEST_STOW_ARGS"; then exit 9; fi
+grep -Fxq -- --restow "$TEST_STOW_ARGS"
+grep -Fxq -- --simulate "$TEST_STOW_ARGS"
+grep -Fxq split-new "$TEST_STOW_ARGS"
+grep -Fxq backup "$TEST_STOW_ARGS"
+shadow_target=$(awk '$0 == "--target" { getline; print; exit }' "$TEST_STOW_ARGS")
+[[ -n "$shadow_target" && "$shadow_target" != "$HOME" ]]
+EOF
+chmod +x "$check_runner"
+HOME="$fixture_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$fixture_state" \
+	FIXTURE_REPO="$fixture_repo" TEST_STOW_ARGS="$test_root/check-stow-args" "$check_runner"
+
+# systemctl creates a second .wants link when it enables a unit. It is not a
+# Stow target.  Its target may be the direct unit link or the absolute
+# referent that systemctl resolved from that link; both are safe only for the
+# exact declared unit.  A mismatched basename must remain an untracked link.
+# mise has an analogous hashed state index, but it may only reference an exact
+# direct link below HOME; a checkout source or an invalid index name is foreign.
+# Codex skills are deliberately outside Stow, so only its exact manager-owned
+# top-level directory link is accepted while the codex module is selected.
+wants_home="$test_root/systemd-wants-home"
+wants_state="$test_root/systemd-wants-state"
+wants_config="$test_root/systemd-wants-config"
+mkdir -p "$wants_home/.config/systemd/user/default.target.wants" "$wants_state" "$wants_config"
+wants_runner="$test_root/systemd-wants-check.sh"
+cat >"$wants_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_MODULES=(unit-test mise-test codex)
+validate_resolved_runtime() { return 0; }
+unit_source="$DOTFILES_DIR/unit-test/.config/systemd/user/unit-test.service"
+unit_target="$HOME/.config/systemd/user/unit-test.service"
+unit_expected="$(expected_stow_destination "$unit_source" "$unit_target")"
+mise_source="$DOTFILES_DIR/mise-test/.config/mise/config.toml"
+mise_target="$HOME/.config/mise/config.toml"
+mise_expected="$(expected_stow_destination "$mise_source" "$mise_target")"
+ln -s "$unit_expected" "$unit_target"
+mkdir -p "$HOME/.config/mise" "$HOME/.local/state/mise/tracked-configs"
+mkdir -p "$HOME/.agents/skills"
+ln -s "$mise_expected" "$mise_target"
+ln -s "$unit_source" "$HOME/.config/systemd/user/default.target.wants/unit-test.service"
+ln -s "$mise_target" "$HOME/.local/state/mise/tracked-configs/0123456789abcdef"
+ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+check_dotfiles
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]
+ln -s ../unit-test.service "$HOME/.config/systemd/user/default.target.wants/not-unit-test.service"
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+rm -- "$HOME/.config/systemd/user/default.target.wants/not-unit-test.service"
+ln -s "$mise_source" "$HOME/.local/state/mise/tracked-configs/fedcba9876543210"
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+rm -- "$HOME/.local/state/mise/tracked-configs/fedcba9876543210"
+ln -s "$mise_target" "$HOME/.local/state/mise/tracked-configs/not-a-valid-hash"
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+rm -- "$HOME/.local/state/mise/tracked-configs/not-a-valid-hash"
+ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/not-example-skill"
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+rm -- "$HOME/.agents/skills/not-example-skill"
+rm -- "$HOME/.agents/skills/example-skill"
+ln -s "$DOTFILES_DIR" "$HOME/.dotfiles"
+ln -s "$HOME/.dotfiles/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+rm -- "$HOME/.agents/skills/example-skill"
+ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+PLAN_MODULES=(unit-test mise-test)
+bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
+EOF
+chmod +x "$wants_runner"
+HOME="$wants_home" XDG_CONFIG_HOME="$wants_config" XDG_STATE_HOME="$wants_state" \
+	FIXTURE_REPO="$fixture_repo" "$wants_runner"
+
 cat >"$test_root/bin/systemctl" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
@@ -71,7 +195,7 @@ chmod +x "$test_root/bin/systemctl"
 
 plan="$test_root/plan.json"
 printf '%s\n' \
-	'{"schema":1,"repo":"fixture","modules":["hypr-host"],"bundles":["productivity-extra"],"package_scopes":["base","bundle:productivity-extra"]}' \
+	'{"schema":1,"repo":"fixture","modules":["hypr-host","backup"],"bundles":["productivity-extra"],"package_scopes":["base","bundle:productivity-extra"]}' \
 	>"$plan"
 mkdir -p "$fixture_state/dotfiles/staged/qmd"
 printf '%s\n' generated-qmd >"$fixture_state/dotfiles/staged/qmd/index.yml"
@@ -86,7 +210,7 @@ set -euo pipefail
 export DOTFILES_INSTALL_SOURCE_ONLY=1
 source "$FIXTURE_REPO/install.sh"
 PLAN_JSON=$TEST_PLAN
-PLAN_MODULES=(hypr-host)
+PLAN_MODULES=(hypr-host backup)
 PACKAGE_SCOPES=(base bundle:productivity-extra)
 BACKUP_DIR="$STATE_DIR/backups/test"
 seed_exact_legacy_host "$XDG_CONFIG_HOME/dotfiles/host.toml"
@@ -148,19 +272,111 @@ set -euo pipefail
 export DOTFILES_INSTALL_SOURCE_ONLY=1
 source "$FIXTURE_REPO/install.sh"
 PLAN_JSON=$TEST_PLAN
-PLAN_MODULES=(hypr-host)
+PLAN_MODULES=(hypr-host backup)
 BACKUP_DIR="$STATE_DIR/backups/restored-active"
+validate_resolved_runtime() { return 0; }
+home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+check_dotfiles
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]
+PLAN_MODULES=(hypr-host)
 begin_migration
 grep -Fq '.config/hypr/config/legacy.lua' "$MIGRATION_DIR/previous-applied-links.tsv"
+legacy_before="$(readlink "$HOME/.config/hypr/config/legacy.lua")"
+backup_targets
+[[ -L "$HOME/.config/hypr/config/legacy.lua" ]]
+[[ $(readlink "$HOME/.config/hypr/config/legacy.lua") == "$legacy_before" ]]
+[[ ! -e "$BACKUP_DIR/.config/hypr/config/legacy.lua" && ! -L "$BACKUP_DIR/.config/hypr/config/legacy.lua" ]]
 deploy_dotfiles
-[[ ! -L "$HOME/.config/hypr/config/legacy.lua" ]]
+[[ -L "$HOME/.config/hypr/config/legacy.lua" ]]
+[[ $(<"$HOME/.config/hypr/config/legacy.lua") == new-host-legacy ]]
 rollback_migration
 [[ -L "$HOME/.config/hypr/config/legacy.lua" ]]
+[[ $(readlink "$HOME/.config/hypr/config/legacy.lua") == "$legacy_before" ]]
 rollback_migration
 EOF
 chmod +x "$restored_runner"
 PATH="$test_root/bin:$PATH" HOME="$fixture_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$fixture_state" \
 	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" "$restored_runner"
+
+# --check consumes the exact previous live manifest even for a deselected
+# target. It must validate the private snapshot and leave HOME byte-for-byte
+# alone; a changed target outside the new plan or an untracked checkout link
+# must fail before Stow can hide either condition.
+check_previous_home="$test_root/check-previous-home"
+check_previous_state="$test_root/check-previous-state"
+check_previous_config="$test_root/check-previous-config"
+check_previous_migration="$check_previous_state/dotfiles/migrations/deployment-check-previous"
+mkdir -p "$check_previous_home/.config" "$check_previous_config" "$check_previous_migration/applied-referents/.config"
+printf '%s\n' previous-snapshot >"$check_previous_migration/applied-referents/.config/previous-only.conf"
+printf '%s\n' applied >"$check_previous_migration/status"
+printf '.config/previous-only.conf\t%s\n' "$check_previous_migration/applied-referents/.config/previous-only.conf" >"$check_previous_migration/applied-links.tsv"
+printf '.config/previous-only.conf\t%s\n' "$check_previous_migration/applied-referents/.config/previous-only.conf" >"$check_previous_migration/applied-snapshot-links.tsv"
+printf '%s\n' "$check_previous_migration" >"$check_previous_state/dotfiles/last-migration"
+ln -s "$check_previous_migration/applied-referents/.config/previous-only.conf" "$check_previous_home/.config/previous-only.conf"
+check_previous_runner="$test_root/check-previous.sh"
+cat >"$check_previous_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_PLAN
+PLAN_MODULES=(hypr-host)
+validate_resolved_runtime() { return 0; }
+home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+check_dotfiles
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]
+[[ $(readlink "$HOME/.config/previous-only.conf") == "$TEST_SNAPSHOT" ]]
+
+rm -- "$HOME/.config/previous-only.conf"
+ln -s /foreign/changed-previous "$HOME/.config/previous-only.conf"
+changed_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$changed_before" ]]
+
+rm -- "$HOME/.config/previous-only.conf"
+ln -s "$TEST_SNAPSHOT" "$HOME/.config/previous-only.conf"
+ln -s "$DOTFILES_DIR/hypr-host/.config/hypr/config/host.lua" "$HOME/.config/untracked-managed.lua"
+foreign_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
+if check_dotfiles; then exit 9; fi
+[[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$foreign_before" ]]
+EOF
+chmod +x "$check_previous_runner"
+HOME="$check_previous_home" XDG_CONFIG_HOME="$check_previous_config" XDG_STATE_HOME="$check_previous_state" \
+	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" \
+	TEST_SNAPSHOT="$check_previous_migration/applied-referents/.config/previous-only.conf" "$check_previous_runner"
+
+# A link can appear after the interactive/read-only check while package or
+# Flatpak work is still running. The transaction must repeat checkout ownership
+# validation after begin_migration and abort before derived state or HOME moves.
+apply_recheck_home="$test_root/apply-recheck-home"
+apply_recheck_state="$test_root/apply-recheck-state"
+apply_recheck_config="$test_root/apply-recheck-config"
+mkdir -p "$apply_recheck_home/.config" "$apply_recheck_state" "$apply_recheck_config"
+apply_recheck_runner="$test_root/apply-recheck.sh"
+cat >"$apply_recheck_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_PLAN
+PLAN_MODULES=(hypr-host)
+BACKUP_DIR="$STATE_DIR/backups/apply-recheck"
+validate_resolved_runtime() { return 0; }
+check_dotfiles
+ln -s "$DOTFILES_DIR/hypr-host/.config/hypr/config/host.lua" "$HOME/.config/untracked-after-check.lua"
+generate_derived_state() {
+    : >"$TEST_DERIVED_MARKER"
+}
+if ( apply_dotfiles_transaction ); then exit 9; fi
+[[ ! -e "$TEST_DERIVED_MARKER" ]]
+[[ -L "$HOME/.config/untracked-after-check.lua" ]]
+migration=$(<"$STATE_DIR/last-migration")
+[[ $(<"$migration/status") == rolled-back ]]
+EOF
+chmod +x "$apply_recheck_runner"
+PATH="$test_root/bin:$PATH" HOME="$apply_recheck_home" XDG_CONFIG_HOME="$apply_recheck_config" \
+	XDG_STATE_HOME="$apply_recheck_state" FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" \
+	TEST_DERIVED_MARKER="$test_root/apply-recheck-derived" "$apply_recheck_runner"
 
 # If resolve --write fails after writing a prefix, its exact derived state is
 # captured and the pre-transaction snapshot is restored.
@@ -319,6 +535,11 @@ printf '%s\n' old-optional >"$previous/applied-referents/.config/old-bundle.conf
 printf '.config/old-bundle.conf\t%s\n' "$previous/applied-referents/.config/old-bundle.conf" >"$previous/applied-snapshot-links.tsv"
 ln -s /old/optional-bundle.conf "$fixture_home/.config/old-bundle.conf"
 printf '%s\n' "$previous" >"$fixture_state/dotfiles/last-migration"
+# The preceding rollback deliberately restored legacy links from its private
+# snapshot. This independent transition instead models a still-deployed legacy
+# package so detection owns the collision with hypr-host/legacy.lua.
+rm -- "$fixture_home/.config/hypr/config/legacy.lua"
+ln -s "$fixture_repo/hypr-desktop/.config/hypr/config/legacy.lua" "$fixture_home/.config/hypr/config/legacy.lua"
 
 transition_runner="$test_root/transition.sh"
 cat >"$transition_runner" <<'EOF'
@@ -840,12 +1061,80 @@ chmod +x "$legacy_conflict_runner"
 HOME="$legacy_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$legacy_state" \
 	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$empty_plan" "$legacy_conflict_runner"
 
-# The implementation must enumerate only known module targets. A broad HOME
-# scan would be slow and would cross unrelated user data on large machines.
-# shellcheck disable=SC2016 # The test searches for this literal shell fragment.
-if grep -Fq 'find "$HOME"' "$fixture_repo/install.sh"; then
-	printf '%s\n' 'FAIL: la migración vuelve a recorrer HOME completo.' >&2
-	exit 1
-fi
+# --check needs one lexical HOME walk to reject a checkout link that is not in
+# either the active, legacy, or requested composition. It must not fork shell
+# readlink once or twice per link: a real HOME can contain tens of thousands of
+# symlinks under Steam, projects, and caches.
+scan_home="$test_root/scan-home"
+scan_state="$test_root/scan-state"
+scan_config="$test_root/scan-config"
+mkdir -p "$scan_home/cache" "$scan_state" "$scan_config"
+python3 - "$scan_home/cache" <<'PY'
+import os
+import sys
+
+for index in range(4096):
+    os.symlink(f"/outside/{index}", os.path.join(sys.argv[1], str(index)))
+PY
+scan_runner="$test_root/scan-untracked-checkout.sh"
+cat >"$scan_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+plan_manifest="$TEST_SCAN_ROOT/plan.tsv"
+previous_manifest="$TEST_SCAN_ROOT/previous.tsv"
+legacy_manifest="$TEST_SCAN_ROOT/legacy.tsv"
+: >"$plan_manifest"
+: >"$previous_manifest"
+: >"$legacy_manifest"
+: >"$TEST_READLINK_LOG"
+readlink() {
+    printf x >>"$TEST_READLINK_LOG"
+    command readlink "$@"
+}
+reject_untracked_checkout_links "$plan_manifest" "$previous_manifest" "$legacy_manifest"
+[[ ! -s "$TEST_READLINK_LOG" ]]
+mkdir -p "$HOME/.config"
+ln -s "$DOTFILES_DIR/hypr-host/.config/hypr/config/host.lua" "$HOME/.config/untracked-managed.lua"
+if reject_untracked_checkout_links "$plan_manifest" "$previous_manifest" "$legacy_manifest"; then exit 9; fi
+[[ ! -s "$TEST_READLINK_LOG" ]]
+EOF
+chmod +x "$scan_runner"
+timeout 15s env \
+	HOME="$scan_home" XDG_CONFIG_HOME="$scan_config" XDG_STATE_HOME="$scan_state" \
+	FIXTURE_REPO="$fixture_repo" TEST_SCAN_ROOT="$test_root" TEST_READLINK_LOG="$test_root/scan-readlink.log" \
+	"$scan_runner"
+
+# Corrupted state must not turn a rollback/remove manifest into a path outside
+# HOME. Check `..`, an explicit dot component, and the HOME root itself; the
+# rejection must leave the attempted outside target untouched.
+path_guard_home="$test_root/path-guard-home"
+path_guard_state="$test_root/path-guard-state"
+path_guard_config="$test_root/path-guard-config"
+mkdir -p "$path_guard_home/.config" "$path_guard_state" "$path_guard_config"
+ln -s /managed/outside "$test_root/path-guard-outside"
+ln -s /managed/normal "$path_guard_home/normal"
+path_guard_runner="$test_root/path-guard.sh"
+cat >"$path_guard_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+manifest="$TEST_PATH_GUARD_MANIFEST"
+for relative in '../path-guard-outside' '.config/../normal' '.'; do
+    printf '%s\t%s\n' "$relative" /managed/expected >"$manifest"
+    if preflight_live_link_removal_manifest "$manifest" corrupt; then exit 9; fi
+    if remove_link_manifest "$manifest"; then exit 9; fi
+done
+[[ -L "$TEST_PATH_GUARD_OUTSIDE" ]]
+[[ $(command readlink "$TEST_PATH_GUARD_OUTSIDE") == /managed/outside ]]
+[[ -L "$HOME/normal" ]]
+[[ $(command readlink "$HOME/normal") == /managed/normal ]]
+EOF
+chmod +x "$path_guard_runner"
+HOME="$path_guard_home" XDG_CONFIG_HOME="$path_guard_config" XDG_STATE_HOME="$path_guard_state" \
+	FIXTURE_REPO="$fixture_repo" TEST_PATH_GUARD_MANIFEST="$test_root/path-guard.tsv" \
+	TEST_PATH_GUARD_OUTSIDE="$test_root/path-guard-outside" "$path_guard_runner"
 
 printf '%s\n' 'PASS: la transacción revierte Stow, generados y archivos personales desde su snapshot'

@@ -974,6 +974,20 @@ def persist_migration_checkpoint(target: Path) -> None:
     fsync_path(target.parent)
 
 
+def valid_link_relative(relative: str) -> bool:
+    """Return true only for a normalized lexical descendant of HOME."""
+    return (
+        bool(relative)
+        and not relative.startswith("/")
+        and not relative.endswith("/")
+        and "//" not in relative
+        and "\x00" not in relative
+        and "\n" not in relative
+        and "\t" not in relative
+        and all(part not in ("", ".", "..") for part in relative.split("/"))
+    )
+
+
 def read_link_manifest(path: Path, label: str) -> list[tuple[str, str]]:
     if not path.is_file():
         raise ValueError(f"Falta {label}; esta migración no tiene un rollback seguro")
@@ -986,8 +1000,7 @@ def read_link_manifest(path: Path, label: str) -> list[tuple[str, str]]:
         if len(parts) != 2:
             raise ValueError(f"{label} inválido")
         relative, link = parts
-        relative_path = Path(relative)
-        if (not relative or relative_path.is_absolute() or ".." in relative_path.parts or "\x00" in link or not link or relative in seen):
+        if (not valid_link_relative(relative) or "\x00" in link or not link or relative in seen):
             raise ValueError(f"{label} inválido")
         seen.add(relative)
         entries.append((relative, link))
@@ -995,6 +1008,8 @@ def read_link_manifest(path: Path, label: str) -> list[tuple[str, str]]:
 
 
 def link_path(home: Path, relative: str) -> Path:
+    if not valid_link_relative(relative):
+        raise ValueError("Destino de enlace fuera de HOME")
     path = home / relative
     if home not in path.parents:
         raise ValueError("Destino de enlace fuera de HOME")
@@ -1075,8 +1090,7 @@ def read_stow_before(path: Path, intents: dict[str, str]) -> dict[str, tuple[str
         if len(parts) != 3:
             raise ValueError("stow-before.tsv inválido")
         relative, kind, destination = parts
-        relative_path = Path(relative)
-        if (not relative or relative_path.is_absolute() or ".." in relative_path.parts
+        if (not valid_link_relative(relative)
                 or relative not in intents or relative in entries or kind not in ("absent", "link")):
             raise ValueError("stow-before.tsv inválido")
         if kind == "link" and not destination:

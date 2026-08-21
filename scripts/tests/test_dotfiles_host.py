@@ -776,6 +776,20 @@ keybord_layouts = ["es"]
             self.assertIn("snapshot de enlace", result.stderr)
             self.assertTrue(current.is_symlink())
 
+    def test_manual_link_manifests_reject_non_normalized_home_paths(self) -> None:
+        """Rollback and retire never map a manifest entry outside HOME."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / "links.tsv"
+            home = root / "home"
+            home.mkdir()
+            for relative in ("../outside", ".", "./.config/test", ".config/../normal", "one//two"):
+                manifest.write_text(f"{relative}\t/managed/source\n", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "inválido"):
+                    HOST_MODULE.read_link_manifest(manifest, "links.tsv")
+                with self.assertRaisesRegex(ValueError, "fuera de HOME"):
+                    HOST_MODULE.link_path(home, relative)
+
 
 if __name__ == "__main__":
     unittest.main()
