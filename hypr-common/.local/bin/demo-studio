@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-	printf '%s\n' 'Uso: demo-studio {status|start|stop|toggle|show}'
+	printf '%s\n' 'Uso: demo-studio {status|start|stop|toggle|show} [--resolution ANCHOxALTO] [--frame-rate HZ]'
 }
 
 readonly runtime_root="${DEMO_STUDIO_RUNTIME_DIR:-${XDG_RUNTIME_DIR:-/tmp}/demo-studio}"
@@ -140,6 +140,8 @@ validate_options() {
 	case "${DEMO_STUDIO_AUDIO:-desktop}" in desktop | mic | both | none) : ;; *) fail 'DEMO_STUDIO_AUDIO no es válido.' 2 ;; esac
 	case "${DEMO_STUDIO_CAPTURE:-focused}" in focused | portal) : ;; *) fail 'DEMO_STUDIO_CAPTURE no es válido.' 2 ;; esac
 	case "${DEMO_STUDIO_WEBCAM:-false}" in true | false | 1 | 0) : ;; *) fail 'DEMO_STUDIO_WEBCAM no es válido.' 2 ;; esac
+	[[ "${DEMO_STUDIO_RESOLUTION:-1920x1080}" =~ ^[1-9][0-9]*x[1-9][0-9]*$ ]] || fail 'DEMO_STUDIO_RESOLUTION debe usar ANCHOxALTO.' 2
+	[[ "${DEMO_STUDIO_FRAME_RATE:-60}" =~ ^[1-9][0-9]*$ ]] || fail 'DEMO_STUDIO_FRAME_RATE debe ser un entero positivo.' 2
 }
 
 start_webcam() {
@@ -164,7 +166,7 @@ wait_for_identity() {
 
 start_recording() {
 	local interactive=${1:-false} audio=${DEMO_STUDIO_AUDIO:-desktop} capture=${DEMO_STUDIO_CAPTURE:-focused}
-	local webcam=${DEMO_STUDIO_WEBCAM:-false} output stamp webcam_pid=0 webcam_starttime=0 pid starttime
+	local webcam=${DEMO_STUDIO_WEBCAM:-false} resolution=${DEMO_STUDIO_RESOLUTION:-1920x1080} frame_rate=${DEMO_STUDIO_FRAME_RATE:-60} output stamp webcam_pid=0 webcam_starttime=0 pid starttime
 	local -a args audio_args=()
 	clear_stale_state
 	! is_active || fail 'Demo Studio ya está grabando.' 2
@@ -185,7 +187,7 @@ start_recording() {
 	both) audio_args=(-a 'default_output|default_input') ;;
 	none) : ;;
 	esac
-	args=(-w "$capture" -c mp4 -s 1920x1080 -f 60 -k h264 -o "$output")
+	args=(-w "$capture" -c mp4 -s "$resolution" -f "$frame_rate" -k h264 -o "$output")
 	if [[ "${DEMO_STUDIO_DRY_RUN:-0}" == 1 ]]; then
 		printf 'DRY-RUN '
 		printf '%q ' "$gsr_bin" "${args[@]}" "${audio_args[@]}"
@@ -241,7 +243,22 @@ toggle() {
 }
 
 action=${1:-show}
-[[ $# -le 1 ]] || { usage >&2; exit 2; }
+shift || true
+while (($#)); do
+	case "$1" in
+	--resolution)
+		(($# >= 2)) || { usage >&2; exit 2; }
+		export DEMO_STUDIO_RESOLUTION=$2
+		shift 2
+		;;
+	--frame-rate)
+		(($# >= 2)) || { usage >&2; exit 2; }
+		export DEMO_STUDIO_FRAME_RATE=$2
+		shift 2
+		;;
+	*) usage >&2; exit 2 ;;
+	esac
+done
 case "$action" in
 status) with_session_lock status ;;
 start) with_session_lock start_recording false ;;

@@ -48,6 +48,15 @@ require_text "$user_binds" 'local workspace_keys = { "Q", "W", "E", "R", "U", "I
 require_text "$user_binds" 'hl.dsp.focus({ workspace = workspace })'
 require_text "$user_binds" 'hl.dsp.window.move({ workspace = workspace })'
 
+# Alt+Z belongs to Hyprland's logs scratchpad. Zellij uses a Control-only
+# prefix so Hyprland does not intercept either action.
+require_text "$user_binds" 'bind(alt .. " + Z", hl.dsp.workspace.toggle_special("logs")'
+require_text "$repo_root/zellij/.config/zellij/config.kdl" 'bind "Ctrl g" { SwitchToMode "normal"; }'
+if grep -Eq 'bind "Alt (x|z)"' "$repo_root/zellij/.config/zellij/config.kdl"; then
+    printf '%s\n' 'FAIL: Zellij no puede reservar Alt+X ni Alt+Z de Hyprland.' >&2
+    exit 1
+fi
+
 # Every tracked Hyper binding has an explicit regression assertion. Hyper + R
 # is rendered only when local dictation is selected and Hyper + G is optional
 # with the gaming bundle. Hyper + H remains common across every host.

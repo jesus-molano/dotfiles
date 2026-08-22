@@ -50,12 +50,14 @@ Las preferencias de una máquina nunca se versionan:
 | `$XDG_CONFIG_HOME/dotfiles/host.toml` | bundles y preferencias confirmadas |
 | `$XDG_CONFIG_HOME/dotfiles/repo` | checkout canónico registrado localmente |
 | `$XDG_STATE_HOME/dotfiles/hardware/capabilities.json` | detección reemplazable |
-| `$XDG_STATE_HOME/dotfiles/generated/` | fragmentos Hypr y audio generados |
+| `$XDG_STATE_HOME/dotfiles/generated/` | fragmentos Hypr, audio y Noctalia generados |
 | `$XDG_STATE_HOME/dotfiles/migrations/` | snapshots y rollback de despliegues |
 
-No se guardan en Git el usuario, hostname, seriales, destino privado de backup
-ni una topología de pantalla. Consulta [COMPOSITION.md](COMPOSITION.md) para el
-contrato, las garantías y el rollback.
+No se guardan en Git el nombre del host, seriales, destino privado de backup,
+ubicación física ni una topología de pantalla. La identidad pública de Git y la
+referencia pública de firma sí son parte deliberada de estos dotfiles
+personales; la clave privada no lo es. Consulta [COMPOSITION.md](COMPOSITION.md)
+para el contrato, las garantías y el rollback.
 
 La ruta de `HOME` puede ser cualquiera. Como los módulos Stow contienen
 `.config`, el instalador exige el layout XDG habitual (`$HOME/.config`) y
@@ -141,13 +143,16 @@ just check
 ```
 
 `dotf host configure` pregunta únicamente por decisiones que no se pueden
-deducir: disposición/escala de pantallas, layouts, touchpad y bundles. Conserva
-las decisiones existentes de audio, RGB, workspaces y dispositivos; confírmalas
-o edítalas directamente en `host.toml`. Si eliges `backup`, exige el repositorio
-Restic local. Escribe `base` o `none` para dejar solo la base común. Si Hyprland
-no expone las pantallas, el asistente lo avisa y conserva el fallback automático.
-En una ejecución no interactiva proporciona un `host.toml`
-existente o usa `--safe-defaults`; el instalador no adivina preferencias.
+deducir: disposición/escala de pantallas, layouts, touchpad, bundles, ubicación
+y horario de Noctalia y formato del grabador. Conserva las decisiones existentes
+de audio, RGB, workspaces y dispositivos; confírmalas o edítalas directamente en
+`host.toml`. El instalador genera el override privado
+`$XDG_CONFIG_HOME/noctalia/zz-host-overrides.toml`; la configuración base no
+contiene la ubicación del host. Si eliges `backup`, exige el repositorio Restic
+local. Escribe `base` o `none` para dejar solo la base común. Si Hyprland no
+expone las pantallas, el asistente lo avisa y conserva el fallback automático.
+En una ejecución no interactiva proporciona un `host.toml` existente o usa
+`--safe-defaults`; el instalador no adivina preferencias.
 
 Después de una simulación limpia:
 
@@ -169,7 +174,7 @@ de usuario. Después valida:
 
 ```bash
 hyprctl configerrors
-noctalia config validate noctalia/.config/noctalia/config.toml
+noctalia config validate "$HOME/.config/noctalia"
 kanata --check -c kanata/.config/kanata/config.kbd
 just doctor
 git diff --check
@@ -249,7 +254,16 @@ just check-system sddm
 just apply-system sddm
 just check-system snapper
 just apply-system snapper
+just check-system systemd
+just apply-system systemd
 ```
+
+Cada `apply-system` guarda preimágenes, registra los destinos que antes no
+existían y revierte en orden inverso si una copia falla. El módulo `systemd`
+renderiza la unidad de montaje desde
+`$XDG_CONFIG_HOME/dotfiles/systemd-mnt-backups.conf`; ese archivo privado debe
+definir `MNT_BACKUPS_UUID`, `MNT_BACKUPS_UID` y `MNT_BACKUPS_GID`. La simulación
+no escribe en `/etc` y la aplicación sigue requiriendo `APLICAR` y Polkit.
 
 También están disponibles `just check-maintenance` y
 `just apply-maintenance` para Btrfs/SMART, con confirmación antes de activar
@@ -280,6 +294,7 @@ Los bindings comunes no dependen de un monitor o teclado exactos:
 | `Alt + A` / `Alt + Shift + A` | Scratchpad de IA |
 | `Alt + Z` / `Alt + Shift + Z` | Scratchpad de logs |
 | `Alt + G` / `Alt + N` | Grupo de ventanas |
+| `Ctrl + G` dentro de Zellij | Abrir su hub de comandos; `Esc` vuelve al modo transparente |
 
 Los fragmentos de host pueden activar layouts extra, el cambio con
 `Super + Space`, distribución de workspaces, brillo, dictado o ciclo de audio
@@ -350,6 +365,7 @@ informes.
 game-run -- juego argumentos
 game-run --hud -- juego argumentos
 game-run --gamescope --hud -- juego argumentos
+game-run --gamescope --gamescope-mode 2560x1440@120 -- juego argumentos
 game-run --dlss -- juego argumentos
 game-run --bench nombre --duration 120 -- juego argumentos
 game-run -- %command%              # opciones de lanzamiento de Steam
@@ -357,10 +373,13 @@ game-bench-report nombre
 ```
 
 `game-run` usa `game-performance`, activa No molestar durante todas las
-sesiones simultáneas y restaura el estado original al terminar la última. No
-combines `gamemoderun` con este flujo. Mantén bibliotecas Steam en un
-filesystem Linux; el doctor avisa de NTFS. DualSense y anti-cheat son
-compatibilidades opcionales y dependen del juego/editor.
+sesiones simultáneas y restaura el estado original al terminar la última. Si
+Noctalia no confirma el cambio, avisa y ejecuta el juego sin bloquearlo. El modo
+de Gamescope mantiene `1920x1080@75` por defecto y acepta un valor por juego con
+`--gamescope-mode` o `GAME_RUN_GAMESCOPE_MODE`. No combines `gamemoderun` con
+este flujo. Mantén bibliotecas Steam en un filesystem Linux; el doctor avisa de
+NTFS. DualSense y anti-cheat son compatibilidades opcionales y dependen del
+juego/editor.
 
 MangoHud y Gamescope son herramientas de medición o aislamiento por juego, no
 valores globales. No se fuerzan HDR, tearing, Wine Wayland, DXVK ni límites de
@@ -391,10 +410,12 @@ just apply-user-timers
 ```
 
 Los wrappers `desktop-backup*` se conservan por compatibilidad, pero los
-comandos nuevos son `dotfiles-backup*`. El backup incluye el checkout
-registrado, documentos/proyectos, canario y staging Ludusavi cuando existe;
-omite cachés, dependencias y objetos Git. La retención es 7 diarios, 5
-semanales y 12 mensuales. Los timers siguen desactivados después de Stow.
+comandos nuevos son `dotfiles-backup*`. El backup incluye el checkout completo
+con sus objetos Git, `$XDG_CONFIG_HOME/dotfiles`, documentos, las variantes
+habituales de proyectos (`Projects`, `projects`, `Work`, `work` y `dev`), el
+canario y el staging Ludusavi cuando existe. Omite cachés, dependencias y
+artefactos regenerables. La retención es 7 diarios, 5 semanales y 12 mensuales.
+Los timers siguen desactivados después de Stow.
 
 ```bash
 just check-user-timers
@@ -403,12 +424,17 @@ systemctl --user status restic-backup.service restic-maintenance.service
 
 `mise`, `uv`, Ruff y Atuin cubren el toolchain local. Android usa
 `$HOME/.local/share/android-sdk` y publica `ANDROID_HOME`,
-`ANDROID_SDK_ROOT` y `ANDROID_AVD_HOME` sin fijar un usuario.
+`ANDROID_SDK_ROOT`, `ANDROID_AVD_HOME` y las rutas de herramientas sin fijar un
+usuario. Instala las [Command-line Tools oficiales de
+Android](https://developer.android.com/studio#command-line-tools-only) y acepta
+las licencias de Google de forma explícita; estos dotfiles no descargan el SDK
+ni aceptan licencias por ti.
 
 ```bash
 just toolchain-check
 just toolchain-migrate
 just atlas-check
+just android-check
 ```
 
 Yazi se integra como `y`: al salir, Fish cambia al directorio seleccionado.
@@ -440,6 +466,22 @@ diagnóstico, implementación, revisión, verificación y handoff. Consulta la
 [guía diaria de Codex](docs/codex/guia-diaria.md) y el
 [modelo operativo](docs/codex/operating-model.md).
 
+`start-orca-background` comprueba `orca-ide` antes de preparar la integración.
+Si Orca no está instalado, muestra un aviso y deja el resto del escritorio
+operativo. Su instalación y actualización permanecen fuera de este repositorio.
+
+## Validación continua y licencia
+
+`just ci` ejecuta validación de shell, Python, Fish y Zellij, regresiones del
+resolvedor y contratos críticos en un entorno sin sesión gráfica. GitHub
+Actions repite esa suite en una imagen Arch actual y como usuario sin
+privilegios. La validación local completa sigue siendo `just lint`, `just check`
+y `just doctor`; CI no demuestra compatibilidad con hardware físico.
+
+Este es un repositorio personal y no declara una licencia de software. El
+código visible no concede por sí mismo permiso de redistribución. Añadir una
+licencia pública requiere una decisión explícita del propietario.
+
 ## Rutas principales
 
 ```text
@@ -456,6 +498,7 @@ backup/                          Restic, rclone y unidades de usuario
 rgb-openrgb/                     servicio RGB sin targets versionados
 android/                         variables Android portables
 templates/qmd/                   plantilla QMD renderizada localmente
+templates/noctalia/              override de host renderizado localmente
 noctalia/.config/noctalia/       Noctalia, paleta y colecciones
 kanata/.config/kanata/           teclado
 system-etc/                      archivos separados destinados a /etc

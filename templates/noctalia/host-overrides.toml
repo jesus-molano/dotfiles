@@ -1,0 +1,17 @@
+# Plantilla para generar $XDG_CONFIG_HOME/noctalia/zz-host-overrides.toml.
+# No se despliega con Stow. El instalador debe copiarla y sustituir únicamente
+# los valores definidos por [noctalia] en host.toml.
+
+[location]
+address = ""
+auto_locate = false
+latitude = 0.0
+longitude = 0.0
+custom_schedule = false
+sunrise = "07:30"
+sunset = "20:30"
+
+[plugin_settings."noctalia/screen_recorder"]
+# Presets conservadores del desktop actual; cada host puede sobrescribirlos.
+frame_rate = 60
+resolution = "1920x1080"

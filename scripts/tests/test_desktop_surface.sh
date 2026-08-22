@@ -7,6 +7,8 @@ noctalia="$repo_root/noctalia/.config/noctalia/config.toml"
 productivity="$repo_root/productivity-extra/.config/noctalia/zz-productivity-extra.toml"
 common_binds="$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 timer_service="$repo_root/noctalia/.local/share/noctalia/plugins/timer/service.luau"
+timer_manifest="$repo_root/noctalia/.local/share/noctalia/plugins/timer/plugin.toml"
+dap_configs="$repo_root/nvim/.config/nvim/lua/plugins/dap-configs.lua"
 
 python3 - "$noctalia" <<'PY'
 import sys
@@ -40,18 +42,19 @@ assert config["plugins"]["auto_update"] == "none"
 assert config["shell"]["avatar_path"].endswith("/avatar.svg")
 PY
 
-test_root=$(mktemp -d)
-trap 'rm -rf -- "$test_root"' EXIT
-mkdir -p -- "$test_root/home" "$test_root/config/noctalia" \
-	"$test_root/state" "$test_root/data" "$test_root/cache"
-cp -- "$noctalia" "$test_root/config/noctalia/config.toml"
-cp -- "$productivity" "$test_root/config/noctalia/zz-productivity-extra.toml"
-merged=$(
-	env HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config" \
-		XDG_STATE_HOME="$test_root/state" XDG_DATA_HOME="$test_root/data" \
-		XDG_CACHE_HOME="$test_root/cache" noctalia config export merged
-)
-python3 -c '
+if command -v noctalia >/dev/null 2>&1; then
+	test_root=$(mktemp -d)
+	trap 'rm -rf -- "$test_root"' EXIT
+	mkdir -p -- "$test_root/home" "$test_root/config/noctalia" \
+		"$test_root/state" "$test_root/data" "$test_root/cache"
+	cp -- "$noctalia" "$test_root/config/noctalia/config.toml"
+	cp -- "$productivity" "$test_root/config/noctalia/zz-productivity-extra.toml"
+	merged=$(
+		env HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config" \
+			XDG_STATE_HOME="$test_root/state" XDG_DATA_HOME="$test_root/data" \
+			XDG_CACHE_HOME="$test_root/cache" noctalia config export merged
+	)
+	python3 -c '
 import sys, tomllib
 config = tomllib.loads(sys.stdin.read())
 assert "codexbar" in config["bar"]["default"]["end"]
@@ -62,6 +65,9 @@ assert settings["codexbarPath"] == "/usr/bin/codexbar"
 assert settings["refreshIntervalSec"] == 300
 assert settings["barProviderLimit"] == 1
 ' <<<"$merged"
+else
+	printf '%s\n' 'SKIP: merge Noctalia requiere el runtime; los contratos TOML estáticos continúan validados.'
+fi
 
 if grep -Fq 'bind(hyper .. " + W",' "$common_binds"; then
 	printf '%s\n' 'Hyper+W debe quedar libre.' >&2
@@ -105,6 +111,9 @@ grep -Fq 'noctalia.sound.load(ALARM_NAME, ALARM_PATH' "$timer_service"
 grep -Fq 'noctalia.sound.play(ALARM_NAME)' "$timer_service"
 grep -Fq 'event == "preview-alarm"' "$timer_service"
 grep -Fq '/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga' "$timer_service"
+grep -Fq 'plugin_api = 20' "$timer_manifest"
+grep -Fq 'name = "Vite: dev server (Brave)"' "$dap_configs"
+grep -Fq 'runtimeExecutable = brave ~= "" and brave or "/usr/bin/brave"' "$dap_configs"
 
 [[ ! -e "$repo_root/hypr-common/.local/bin/dev-pulse-status" ]]
 [[ ! -e "$repo_root/noctalia/.local/share/noctalia/plugins/dev-pulse/plugin.toml" ]]

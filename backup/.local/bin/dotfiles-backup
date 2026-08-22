@@ -86,6 +86,14 @@ if [[ -r "$repo_registry" ]]; then
 	fi
 fi
 
+# La composición elegida y el registro del checkout también son estado de host.
+# Se añaden como directorio XDG para que host.toml y repo se recuperen juntos,
+# sin leerlos ni mostrarlos en la salida del backup.
+dotfiles_config_root="${XDG_CONFIG_HOME:-$HOME/.config}/dotfiles"
+if [[ -d "$dotfiles_config_root" ]] && ! grep -Fxq -- "$dotfiles_config_root" "$paths_file"; then
+	printf '%s\n' "$dotfiles_config_root" >>"$paths_file"
+fi
+
 # Ludusavi respeta XDG_STATE_HOME, que no tiene por qué estar bajo ~/.local/state.
 if [[ -e "$staging_root" ]] && ! grep -Fxq -- "$staging_root" "$paths_file"; then
 	printf '%s\n' "$staging_root" >>"$paths_file"

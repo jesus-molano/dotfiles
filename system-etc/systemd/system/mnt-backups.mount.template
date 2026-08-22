@@ -3,8 +3,8 @@ Description=Disco NTFS interno para backups Restic
 Documentation=man:systemd.mount(5)
 
 [Mount]
-What=/dev/disk/by-uuid/86A8188EA8187F3D
+What=/dev/disk/by-uuid/@MNT_BACKUPS_UUID@
 Where=/mnt/backups
 Type=ntfs3
-Options=rw,nosuid,nodev,noexec,noatime,uid=1000,gid=1000,umask=0077,prealloc
+Options=rw,nosuid,nodev,noexec,noatime,uid=@MNT_BACKUPS_UID@,gid=@MNT_BACKUPS_GID@,umask=0077,prealloc
 TimeoutSec=90

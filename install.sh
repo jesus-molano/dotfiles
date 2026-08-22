@@ -1219,6 +1219,7 @@ generated_target_path() {
 	qmd) printf '%s/qmd/index.yml\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	rgb) printf '%s/reactive-rgb/config.conf\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	restic) printf '%s/restic/repository\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
+	noctalia) printf '%s/noctalia/zz-host-overrides.toml\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	*) return 2 ;;
 	esac
 }
@@ -2081,6 +2082,7 @@ begin_migration() {
 	snapshot_generated_target qmd
 	snapshot_generated_target rgb
 	snapshot_generated_target restic
+	snapshot_generated_target noctalia
 	snapshot_derived_state
 	if user_manager_available; then
 		local enabled_state
@@ -2133,7 +2135,7 @@ restore_generated_targets() {
 	declare -A statuses=() installed=() removed=() remove_after=()
 	while IFS=$'\t' read -r key status; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic)$ && "$status" =~ ^(absent|legacy|copy)$ && -z "${statuses[$key]+x}" ]] || {
+		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$status" =~ ^(absent|legacy|copy)$ && -z "${statuses[$key]+x}" ]] || {
 			warn "Estado generado no reconocido: $key/$status"
 			return 1
 		}
@@ -2141,7 +2143,7 @@ restore_generated_targets() {
 	done <"$MIGRATION_DIR/generated-targets.tsv"
 	while IFS=$'\t' read -r key expected; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${installed[$key]+x}" ]] || {
+		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${installed[$key]+x}" ]] || {
 			warn "Journal de instalación generado inválido: $key"
 			return 1
 		}
@@ -2149,7 +2151,7 @@ restore_generated_targets() {
 	done <"$MIGRATION_DIR/generated-installed.tsv"
 	while IFS=$'\t' read -r key expected; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${removed[$key]+x}" && -z "${installed[$key]+x}" ]] || {
+		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${removed[$key]+x}" && -z "${installed[$key]+x}" ]] || {
 			warn "Journal de retirada generado inválido: $key"
 			return 1
 		}
@@ -2249,6 +2251,7 @@ generated_key_selected() {
 	qmd) plan_has_bundle productivity-extra ;;
 	rgb) plan_has_bundle rgb-openrgb && plan_rgb_enabled ;;
 	restic) plan_has_bundle backup ;;
+	noctalia) python3 -c 'import json,sys; raise SystemExit(json.load(open(sys.argv[1])).get("noctalia_configured") is not True)' "$PLAN_JSON" ;;
 	*) return 1 ;;
 	esac
 }
@@ -2488,6 +2491,9 @@ install_staged_configs() {
 	fi
 	if plan_has_bundle backup; then
 		install_staged_file restic "$STATE_DIR/staged/restic/repository"
+	fi
+	if generated_key_selected noctalia; then
+		install_staged_file noctalia "$STATE_DIR/staged/noctalia/zz-host-overrides.toml"
 	fi
 }
 

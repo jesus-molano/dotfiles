@@ -17,13 +17,15 @@ gaming y un equipo de sobremesa puede omitirlo.
 - `$XDG_CONFIG_HOME/dotfiles/host.toml` guarda elecciones locales con permisos
   privados.
 - `$XDG_STATE_HOME/dotfiles/hardware/capabilities.json` y
-  `$XDG_STATE_HOME/dotfiles/generated/hypr/` contienen estado derivado y
+  `$XDG_STATE_HOME/dotfiles/generated/` contienen estado derivado y
   reemplazable.
 - `packages.csv`, `flatpaks.csv` y `flatpak-remotes.csv` declaran paquetes y
   procedencia.
 
-La detección no almacena ni exporta identidad sensible. Un export de host se
-sanea antes de convertirse en candidato de configuración compartida.
+La detección no almacena ni exporta identidad sensible. Se ejecuta con HOME y
+directorios XDG temporales para que una consulta de hardware no genere cachés o
+estado en la sesión real. Un export de host se sanea antes de convertirse en
+candidato de configuración compartida.
 
 El usuario y la ruta de `HOME` son dinámicos. Los módulos GNU Stow modelan
 `.config` dentro de ese HOME, por lo que el instalador exige
@@ -52,10 +54,13 @@ provoca una actualización del sistema.
 ## Resolución segura
 
 `dotf host detect` no modifica el sistema. `dotf host configure` confirma solo
-preferencias no deducibles: disposición física de pantallas, teclado, touchpad
-y bundles. Conserva las secciones locales de audio, RGB, workspaces y
-dispositivos para que se confirmen por separado. El bundle `backup` exige un
-`backup.repository` local y no lo incluye en exports. `dotf host refresh`
+preferencias no deducibles: disposición física de pantallas, teclado, touchpad,
+bundles, ubicación/horario de Noctalia y formato del grabador. Conserva las
+secciones locales de audio, RGB, workspaces y dispositivos para que se confirmen
+por separado. La ubicación se guarda con permisos privados en `host.toml` y se
+renderiza en `$XDG_CONFIG_HOME/noctalia/zz-host-overrides.toml`; nunca forma
+parte de la configuración base ni de un export. El bundle `backup` exige un
+`backup.repository` local y tampoco lo incluye en exports. `dotf host refresh`
 compara un nuevo informe con las decisiones guardadas y no sobrescribe nada sin
 confirmación. `base` o `none` vacían los bundles de forma explícita. Si el
 asistente se ejecuta sin acceso a las pantallas de Hyprland, lo avisa y conserva
@@ -68,8 +73,10 @@ escala `1`, VRR desactivado, teclado US y workspaces genéricos.
 
 El mapa de teclado común no depende del hardware detectado. Kanata conserva
 Caps como Escape al pulsar y Hyper al mantener. La composición conserva también
-Alt+H/J/K/L, Alt+Q/W/E/R/U/I/O/P y todos los bindings Hyper. Los fragmentos de
-host solo añaden adaptadores confirmados, como brillo, audio o dictado.
+Alt+H/J/K/L, Alt+Q/W/E/R/U/I/O/P y todos los bindings Hyper. Zellij permanece
+transparente hasta `Ctrl+G`, que evita capturar `Alt+Z` y `Alt+X` de Hyprland.
+Los fragmentos de host solo añaden adaptadores confirmados, como brillo, audio
+o dictado.
 
 ## Bundles
 
@@ -90,7 +97,7 @@ o zona no se resuelve de forma única.
 ## Rollback
 
 Antes de reemplazar enlaces, el instalador registra el plan, los módulos legacy,
-los archivos generados y el estado de servicios bajo
+los archivos generados de Hyprland, audio y Noctalia, y el estado de servicios bajo
 `$XDG_STATE_HOME/dotfiles/migrations/`. Los conflictos ajenos se mueven a
 `$XDG_STATE_HOME/dotfiles/backups/`. Si falla Stow o una validación posterior,
 restaura todo desde el snapshot, incluso aunque el checkout ya no contenga los
@@ -108,3 +115,8 @@ aplicado A no debe saltar directamente a B. La secuencia exacta está en el
 
 CHWD sigue siendo responsable de los controladores. La composición no toca
 arranque, initramfs, Btrfs, ZRAM, firmware, PWM ni `/etc`.
+
+Los módulos de `system-etc` usan otra transacción: primero simulan el destino,
+después crean un journal con preimágenes y revierten las copias parciales en
+orden inverso. No participan en `just apply` y siempre requieren confirmación
+separada.

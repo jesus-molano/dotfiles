@@ -46,17 +46,20 @@ Uso directo:
 game-run -- juego argumentos
 game-run --hud -- juego argumentos
 game-run --gamescope -- juego argumentos
+game-run --gamescope --gamescope-mode 2560x1440@120 -- juego argumentos
 game-run --gamescope --hud -- juego argumentos
 game-run --dlss --hud -- juego argumentos
 game-run --bench cyberpunk --duration 120 -- juego argumentos
 game-run --dry-run --gamescope --hud -- juego argumentos
 ```
 
-`--gamescope` presenta una superficie virtual de 1920x1080 a 75 Hz. Cuando se
-combina con `--hud`, `game-run` usa `gamescope --mangoapp`; sin Gamescope usa
-`mangohud`. `--dlss` añade el wrapper oficial `dlss-swapper` de CachyOS para
-actualizar y seleccionar presets NGX. `--dry-run` imprime el comando escapado y
-no lanza nada.
+`--gamescope` presenta por defecto una superficie virtual de 1920x1080 a 75 Hz.
+`--gamescope-mode ANCHOxALTO@HZ` o `GAME_RUN_GAMESCOPE_MODE` permite cambiarla
+para un juego o una sesión sin modificar el preset actual. Cuando se combina
+con `--hud`, `game-run` usa `gamescope --mangoapp`; sin Gamescope usa `mangohud`.
+`--dlss` añade el wrapper oficial `dlss-swapper` de CachyOS para actualizar y
+seleccionar presets NGX. `--dry-run` imprime el comando escapado y no lanza
+nada.
 
 Integración recomendada:
 
@@ -67,11 +70,12 @@ Integración recomendada:
 - Faugus puede ejecutar el juego con UMU; añade el wrapper por título solo si
   su versión expone esa opción.
 
-Al iniciar un juego, `game-run` activa **No molestar** en Noctalia antes de
-ejecutar `game-performance`. Así ningún toast de notificación interfiere con el
-fullscreen o la captura del ratón. Al terminar, incluso si el juego devuelve un
-error, restaura exactamente el estado DND anterior. El modo `performance` lo
-mantiene CachyOS durante toda la vida del proceso del juego y no depende del
+Al iniciar un juego, `game-run` solicita **No molestar** en Noctalia antes de
+ejecutar `game-performance` y verifica el estado resultante. Si Noctalia no lo
+confirma, muestra un aviso y continúa con el juego: DND es una protección, no un
+bloqueo. Al terminar, incluso si el juego devuelve un error, intenta restaurar
+exactamente el estado DND anterior y vuelve a verificarlo. El modo `performance`
+lo mantiene CachyOS durante toda la vida del proceso del juego y no depende del
 foco de la ventana.
 
 Para **Project Zomboid**, usa la ruta estable sin Gamescope ni variables extra:

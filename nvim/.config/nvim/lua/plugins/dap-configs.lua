@@ -39,6 +39,11 @@ return {
       end
 
       -- Shared configurations for JS/TS filetypes
+      local brave = vim.fn.exepath("brave")
+      if brave == "" then
+        brave = vim.fn.exepath("brave-browser")
+      end
+
       for _, lang in ipairs({ "typescript", "javascript", "typescriptreact", "javascriptreact", "vue" }) do
         if not dap.configurations[lang] then
           dap.configurations[lang] = {}
@@ -63,12 +68,15 @@ return {
             skipFiles = { "<node_internals>/**", "**/node_modules/**" },
           },
           {
-            name = "Vite: dev server (Chrome)",
+            name = "Vite: dev server (Brave)",
             type = "pwa-chrome",
             request = "launch",
             url = "http://localhost:5173",
             webRoot = "${workspaceFolder}/src",
             sourceMaps = true,
+            -- CachyOS installs brave-bin. A missing executable remains visible
+            -- to js-debug instead of silently falling back to Chrome.
+            runtimeExecutable = brave ~= "" and brave or "/usr/bin/brave",
           },
           {
             name = "Node: attach to process",

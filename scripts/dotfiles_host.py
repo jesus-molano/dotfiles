@@ -32,6 +32,12 @@ PCI_GPU_VENDORS = {
     "8086": "intel",
 }
 
+# Algunos clientes de audio y OpenRGB crean caches o archivos de configuración
+# aunque se invoquen solo para consultar el hardware. La detección debe poder
+# hablar con la sesión actual (XDG_RUNTIME_DIR se conserva), pero nunca debe
+# dejar esos artefactos bajo el HOME/XDG del llamador.
+DETECTION_COMMAND_ENV: dict[str, str] | None = None
+
 
 def xdg_path(variable: str, fallback: str) -> Path:
     return Path(os.environ.get(variable, os.path.expanduser(fallback))).expanduser()
@@ -181,13 +187,36 @@ def command_output(*args: str, timeout: float = 3.0) -> str:
         return ""
     try:
         completed = subprocess.run((executable, *args[1:]), text=True, stdout=subprocess.PIPE,
-                                   stderr=subprocess.DEVNULL, check=False, timeout=timeout)
+                                   stderr=subprocess.DEVNULL, check=False, timeout=timeout,
+                                   env=DETECTION_COMMAND_ENV)
     except subprocess.TimeoutExpired:
         return ""
     return completed.stdout if completed.returncode == 0 else ""
 
 
 def detect() -> dict[str, Any]:
+    global DETECTION_COMMAND_ENV
+    previous_environment = DETECTION_COMMAND_ENV
+    with tempfile.TemporaryDirectory(prefix="dotfiles-detect-") as temporary:
+        root = Path(temporary)
+        isolated_environment = os.environ.copy()
+        for variable, directory in {
+            "HOME": root / "home",
+            "XDG_CONFIG_HOME": root / "config",
+            "XDG_CACHE_HOME": root / "cache",
+            "XDG_DATA_HOME": root / "data",
+            "XDG_STATE_HOME": root / "state",
+        }.items():
+            directory.mkdir(mode=0o700)
+            isolated_environment[variable] = str(directory)
+        DETECTION_COMMAND_ENV = isolated_environment
+        try:
+            return detect_hardware()
+        finally:
+            DETECTION_COMMAND_ENV = previous_environment
+
+
+def detect_hardware() -> dict[str, Any]:
     gpus: list[str] = []
     for line in command_output("lspci", "-nn").splitlines():
         if not PCI_DISPLAY_CLASS.search(line):
@@ -339,7 +368,10 @@ def toml_value(value: Any, label: str) -> str:
     if isinstance(value, float):
         if not value == value or value in (float("inf"), float("-inf")):
             raise ValueError(f"{label} no es un número finito")
-        return format(value, "g")
+        # repr() conserva el valor binario con la representación decimal mínima
+        # que hace round-trip. `g` usa seis cifras por defecto y desplazaba
+        # coordenadas o escalas precisas al reescribir host.toml.
+        return repr(value)
     if isinstance(value, str):
         if "\x00" in value:
             raise ValueError(f"{label} contiene NUL")
@@ -350,7 +382,7 @@ def toml_value(value: Any, label: str) -> str:
 
 
 def serialize_host(host: dict[str, Any]) -> str:
-    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "rgb", "backup"}, "host")
+    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "rgb", "backup", "noctalia"}, "host")
     lines = [f"schema = {SCHEMA}", "bundles = " + toml_value(string_list(host.get("bundles"), "bundles"), "bundles")]
 
     hardware = host.get("hardware", {})
@@ -439,7 +471,74 @@ def serialize_host(host: dict[str, Any]) -> str:
         for key in ordered_keys:
             if key in values:
                 lines.append(f"{key} = {toml_value(values[key], f'{section}.{key}')}")
+
+    noctalia = host.get("noctalia")
+    if noctalia is not None:
+        normalize_noctalia_preferences(noctalia)
+        lines.extend(["", "[noctalia]"])
+        for section, ordered_keys in (
+            ("location", ("auto_locate", "latitude", "longitude", "custom_schedule", "sunrise", "sunset")),
+            ("screen_recorder", ("resolution", "frame_rate")),
+        ):
+            values = noctalia.get(section)
+            if values is None:
+                continue
+            lines.extend(["", f"[noctalia.{section}]"])
+            for key in ordered_keys:
+                if key in values:
+                    lines.append(f"{key} = {toml_value(values[key], f'noctalia.{section}.{key}')}")
     return "\n".join(lines) + "\n"
+
+
+def normalize_noctalia_preferences(noctalia: Any) -> dict[str, dict[str, Any]]:
+    """Validate local Noctalia preferences and fill portable safe defaults."""
+    if not isinstance(noctalia, dict):
+        raise ValueError("noctalia debe ser una tabla")
+    reject_unknown(noctalia, {"location", "screen_recorder"}, "noctalia")
+    defaults: dict[str, dict[str, Any]] = {
+        "location": {
+            "auto_locate": False,
+            "latitude": 0.0,
+            "longitude": 0.0,
+            "custom_schedule": False,
+            "sunrise": "07:30",
+            "sunset": "20:30",
+        },
+        "screen_recorder": {"resolution": "1920x1080", "frame_rate": 60},
+    }
+    normalized = copy.deepcopy(defaults)
+    for section, allowed in (
+        ("location", set(defaults["location"])),
+        ("screen_recorder", set(defaults["screen_recorder"])),
+    ):
+        values = noctalia.get(section, {})
+        if not isinstance(values, dict):
+            raise ValueError(f"noctalia.{section} debe ser una tabla")
+        reject_unknown(values, allowed, f"noctalia.{section}")
+        normalized[section].update(values)
+    location = normalized["location"]
+    for key in ("auto_locate", "custom_schedule"):
+        if not isinstance(location[key], bool):
+            raise ValueError(f"noctalia.location.{key} debe ser booleano")
+    for key, minimum, maximum in (("latitude", -90, 90), ("longitude", -180, 180)):
+        value = location[key]
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not value == value or value in (float("inf"), float("-inf")) or not minimum <= value <= maximum:
+            raise ValueError(f"noctalia.location.{key} debe estar entre {minimum} y {maximum}")
+    for key in ("sunrise", "sunset"):
+        value = location[key]
+        if not isinstance(value, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", value):
+            raise ValueError(f"noctalia.location.{key} debe tener formato HH:MM")
+    recorder = normalized["screen_recorder"]
+    resolution = recorder["resolution"]
+    if not isinstance(resolution, str) or not re.fullmatch(r"[1-9][0-9]{2,4}x[1-9][0-9]{2,4}", resolution):
+        raise ValueError("noctalia.screen_recorder.resolution debe tener formato ANCHOxALTO")
+    width, height = (int(value) for value in resolution.split("x"))
+    if not 320 <= width <= 16384 or not 240 <= height <= 16384:
+        raise ValueError("noctalia.screen_recorder.resolution está fuera de rango")
+    frame_rate = recorder["frame_rate"]
+    if isinstance(frame_rate, bool) or not isinstance(frame_rate, int) or not 1 <= frame_rate <= 240:
+        raise ValueError("noctalia.screen_recorder.frame_rate debe estar entre 1 y 240")
+    return normalized
 
 
 def read_capabilities(path: Path | None = None) -> dict[str, Any]:
@@ -510,6 +609,8 @@ def resolve(repo: Path, host: dict[str, Any], capabilities: dict[str, Any], safe
         "audio": host.get("audio", {}) if host else {},
         "rgb": host.get("rgb", {}) if host else {},
         "backup": host.get("backup", {}) if host else {},
+        "noctalia": normalize_noctalia_preferences(host.get("noctalia", {})),
+        "noctalia_configured": bool(host and "noctalia" in host),
         "hardware_facts": {
             "has_internal_panel": capabilities.get("has_internal_panel") is True,
             "backlights": [item for item in capabilities.get("backlights", []) if isinstance(item, str) and SAFE_NAME.fullmatch(item)],
@@ -758,6 +859,31 @@ def rendered_backup_repository(plan: dict[str, Any]) -> str | None:
     return repository + "\n"
 
 
+def rendered_noctalia_overrides(plan: dict[str, Any]) -> str | None:
+    if plan.get("noctalia_configured") is not True:
+        return None
+    noctalia = normalize_noctalia_preferences(plan.get("noctalia", {}))
+    template = Path(plan["repo"]) / "templates" / "noctalia" / "host-overrides.toml"
+    if not template.is_file():
+        raise ValueError("Falta la plantilla de overrides de Noctalia")
+    rendered = template.read_text(encoding="utf-8")
+    replacements = {
+        "auto_locate": toml_value(noctalia["location"]["auto_locate"], "noctalia.location.auto_locate"),
+        "latitude": toml_value(noctalia["location"]["latitude"], "noctalia.location.latitude"),
+        "longitude": toml_value(noctalia["location"]["longitude"], "noctalia.location.longitude"),
+        "custom_schedule": toml_value(noctalia["location"]["custom_schedule"], "noctalia.location.custom_schedule"),
+        "sunrise": toml_value(noctalia["location"]["sunrise"], "noctalia.location.sunrise"),
+        "sunset": toml_value(noctalia["location"]["sunset"], "noctalia.location.sunset"),
+        "frame_rate": toml_value(noctalia["screen_recorder"]["frame_rate"], "noctalia.screen_recorder.frame_rate"),
+        "resolution": toml_value(noctalia["screen_recorder"]["resolution"], "noctalia.screen_recorder.resolution"),
+    }
+    for key, value in replacements.items():
+        rendered, replacements_count = re.subn(rf"(?m)^{re.escape(key)}\s*=\s*.*$", f"{key} = {value}", rendered)
+        if replacements_count != 1:
+            raise ValueError(f"La plantilla de Noctalia no contiene una única clave {key}")
+    return rendered
+
+
 def rendered_artifacts(plan: dict[str, Any]) -> dict[str, Any]:
     return {
         "hypr": generated_hypr(plan),
@@ -765,6 +891,7 @@ def rendered_artifacts(plan: dict[str, Any]) -> dict[str, Any]:
         "rgb": rendered_rgb(plan),
         "qmd": rendered_qmd(plan),
         "restic": rendered_backup_repository(plan),
+        "noctalia": rendered_noctalia_overrides(plan),
     }
 
 
@@ -779,6 +906,7 @@ def write_plan_and_hypr(plan: dict[str, Any]) -> None:
         ("rgb", state_root() / "staged" / "reactive-rgb" / "config.conf"),
         ("qmd", state_root() / "staged" / "qmd" / "index.yml"),
         ("restic", state_root() / "staged" / "restic" / "repository"),
+        ("noctalia", state_root() / "staged" / "noctalia" / "zz-host-overrides.toml"),
     ):
         contents = artifacts[key]
         if contents is None:
@@ -845,6 +973,51 @@ def cmd_configure(args: argparse.Namespace) -> int:
             if not keyboard_layouts or not all(re.fullmatch(r"[a-z]{2}", item) for item in keyboard_layouts):
                 raise ValueError("Layouts de teclado inválidos")
             input_config["keyboard_layouts"] = keyboard_layouts
+        noctalia_defaults = normalize_noctalia_preferences(host.get("noctalia", {}))
+        location = noctalia_defaults["location"]
+        recorder = noctalia_defaults["screen_recorder"]
+        automatic_answer = input(
+            "Localización automática de Noctalia "
+            f"[{'S/n' if location['auto_locate'] else 's/N'}]: "
+        ).strip().lower()
+        if automatic_answer not in ("", "s", "si", "sí", "n", "no"):
+            raise ValueError("Respuesta de localización automática inválida")
+        if automatic_answer:
+            location["auto_locate"] = automatic_answer in ("s", "si", "sí")
+        if location["auto_locate"]:
+            location["latitude"], location["longitude"] = 0.0, 0.0
+        else:
+            for key, label in (("latitude", "Latitud"), ("longitude", "Longitud")):
+                answer = input(f"{label} local [{location[key]}]: ").strip()
+                if answer:
+                    try:
+                        location[key] = float(answer)
+                    except ValueError as error:
+                        raise ValueError(f"{label} local inválida") from error
+        schedule_answer = input(
+            "Horario nocturno personalizado "
+            f"[{'S/n' if location['custom_schedule'] else 's/N'}]: "
+        ).strip().lower()
+        if schedule_answer not in ("", "s", "si", "sí", "n", "no"):
+            raise ValueError("Respuesta de horario nocturno inválida")
+        if schedule_answer:
+            location["custom_schedule"] = schedule_answer in ("s", "si", "sí")
+        if location["custom_schedule"]:
+            for key, label in (("sunrise", "Amanecer"), ("sunset", "Anochecer")):
+                answer = input(f"{label}, HH:MM [{location[key]}]: ").strip()
+                if answer:
+                    location[key] = answer
+        resolution_answer = input(f"Resolución de grabación [{recorder['resolution']}]: ").strip()
+        if resolution_answer:
+            recorder["resolution"] = resolution_answer
+        frame_rate_answer = input(f"FPS de grabación [{recorder['frame_rate']}]: ").strip()
+        if frame_rate_answer:
+            try:
+                recorder["frame_rate"] = int(frame_rate_answer)
+            except ValueError as error:
+                raise ValueError("FPS de grabación inválidos") from error
+        host["noctalia"] = {"location": location, "screen_recorder": recorder}
+        normalize_noctalia_preferences(host["noctalia"])
     touchpad = any(item.get("class") == "touchpad" for item in detected.get("inputs", []) if isinstance(item, dict))
     input_config = host.setdefault("input", {})
     if not isinstance(input_config, dict):
@@ -1372,6 +1545,7 @@ def generated_entries(target: Path) -> tuple[dict[str, tuple[Path, str]], dict[s
         "qmd": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "qmd" / "index.yml", "qmd"),
         "rgb": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "reactive-rgb" / "config.conf", "rgb"),
         "restic": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "restic" / "repository", "restic"),
+        "noctalia": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "noctalia" / "zz-host-overrides.toml", "noctalia"),
     }
     installed: dict[str, str] = {}
     installed_file = target / "generated-installed.tsv"
@@ -1779,7 +1953,7 @@ def cmd_retire(args: argparse.Namespace) -> int:
     generated, installed, _, _ = generated_entries(target)
     home = Path.home().resolve()
     preflight_remove_links(home, applied)
-    generated_actions = preflight_generated(generated, installed)
+    generated_actions = sorted(preflight_generated(generated, installed))
     manager_available = user_manager_available()
     managed_rgb_targets = managed_reactive_rgb_targets(home, applied)
     manage_rgb = bool(managed_rgb_targets)

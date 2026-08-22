@@ -1,6 +1,5 @@
 **/.cache
 **/.direnv
-**/.git/objects
 **/.mise
 **/.venv
 **/node_modules

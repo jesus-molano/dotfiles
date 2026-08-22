@@ -21,6 +21,11 @@ abre Ghostty en el directorio del proyecto. Ghostty se adjunta a una sesión de
 Zellij identificada por ese repositorio. Reabrir la sesión vuelve a adjuntarse;
 no crea otro proceso de Zellij ni otro servidor de preview.
 
+Zellij permanece en modo transparente para no capturar atajos de Codex, Neovim
+o Hyprland. Pulsa `Ctrl + G` para abrir su hub de comandos y `Esc` para volver al
+modo transparente. `Alt + Z` continúa reservado al scratchpad de logs y
+`Alt + X` al cierre de ventanas.
+
 Codex CLI no se inicia automáticamente. Ejecútalo en ese terminal cuando una
 tarea requiera un agente. Orca conserva el trabajo visual, los worktrees y sus
 terminales. Este reparto evita abrir Nvim, un agente y varios terminales para
@@ -228,6 +233,12 @@ La acción `demo_studio` de `/cmd` es el modo avanzado. Permite elegir audio del
 escritorio, micrófono, ambos o ninguno; webcam flotante; y monitor enfocado o
 portal. El modo predeterminado usa el monitor enfocado. Demo Studio solo detiene
 el proceso que inició y no interfiere con el replay de Noctalia.
+
+La captura mantiene `1920x1080` a 60 FPS por defecto. Para una grabación
+concreta, usa por ejemplo
+`demo-studio start --resolution 2560x1440 --frame-rate 60`. También acepta
+`DEMO_STUDIO_RESOLUTION` y `DEMO_STUDIO_FRAME_RATE`; no cambia el preset del
+host ni la configuración de Noctalia.
 
 No uses modo foco para juegos. `game-run` mantiene su propio comportamiento de
 pantalla completa y notificaciones. Si estaba activo, `game-run` lo restaura

@@ -67,6 +67,12 @@ dry_run=$(env "${base_env[@]}" DEMO_STUDIO_DRY_RUN=1 DEMO_STUDIO_AUDIO=both DEMO
 [[ "$dry_run" == *'DRY-RUN'* && "$dry_run" == *'-w portal'* && "$dry_run" == *'default_output\|default_input'* ]]
 [[ $(env "${base_env[@]}" "$helper" status) == idle ]]
 
+override=$(env "${base_env[@]}" DEMO_STUDIO_DRY_RUN=1 "$helper" start --resolution 2560x1440 --frame-rate 120)
+[[ "$override" == *'-s 2560x1440'* && "$override" == *'-f 120'* ]] || {
+  printf '%s\n' 'FAIL: Demo Studio no aplicó el override de resolución/frecuencia.' >&2
+  exit 1
+}
+
 bash -c 'exec -a gpu-screen-recorder sleep 30' >/dev/null 2>&1 &
 foreign=$!
 set +e

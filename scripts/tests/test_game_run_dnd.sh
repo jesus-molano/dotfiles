@@ -25,6 +25,9 @@ if [[ "${1:-}" == msg && "${2:-}" == notification-dnd-status ]]; then
 	exit 0
 fi
 if [[ "${1:-}" == msg && "${2:-}" == notification-dnd-set ]]; then
+	if [[ "${TEST_DND_SET_FAIL:-0}" == 1 ]]; then
+		exit 1
+	fi
 	printf '%s\n' "$3" >"$TEST_DND_STATE"
 	printf 'dnd:%s\n' "$3" >>"$TEST_LOG"
 	exit 0
@@ -102,6 +105,25 @@ run_case() {
 run_case off off $'dnd:on\nperformance:start\ngame:running\ndnd:off'
 run_case on off $'performance:start\ngame:running'
 run_case off on $'focus:off\ndnd:on\nperformance:start\ngame:running\ndnd:off'
+
+mode_output=$(PATH="$test_root/bin:$PATH" "$game_run" --gamescope --gamescope-mode 2560x1440@120 --dry-run -- test-game)
+[[ "$mode_output" == *'gamescope -W 2560 -H 1440 -r 120 -f'* ]] || {
+	printf '%s\n' 'FAIL: game-run no aplicó el modo Gamescope explícito.' >&2
+	exit 1
+}
+
+# DND must never block a game. A failed activation is visible to the caller.
+failure_runtime="$test_root/dnd-failure-runtime"
+failure_dnd="$test_root/dnd-failure-state"
+printf '%s\n' off >"$failure_dnd"
+set +e
+PATH="$test_root/bin:$PATH" XDG_RUNTIME_DIR="$failure_runtime" TEST_LOG="$test_root/dnd-failure.log" \
+	TEST_DND_STATE="$failure_dnd" TEST_FOCUS_INITIAL=off TEST_DND_SET_FAIL=1 \
+	"$game_run" -- test-game >"$test_root/dnd-failure.out" 2>"$test_root/dnd-failure.err"
+failure_status=$?
+set -e
+[[ $failure_status -eq 23 ]]
+grep -Fq 'No se pudo activar No molestar; el juego continúa.' "$test_root/dnd-failure.err"
 
 # Dos wrappers comparten la propiedad: A puede acabar primero sin quitar DND a B.
 concurrent_runtime="$test_root/concurrent-runtime"

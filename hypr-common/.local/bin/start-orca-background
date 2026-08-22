@@ -6,6 +6,11 @@ readonly safe_settings="${ORCA_SAFE_SETTINGS_BIN:-$script_dir/orca-safe-settings
 readonly pgrep_bin="${PGREP_BIN:-pgrep}"
 readonly orca_cli="${ORCA_CLI_BIN:-orca-ide}"
 
+if ! command -v "$orca_cli" >/dev/null 2>&1; then
+	printf '%s\n' 'start-orca-background: Orca no está instalado; se omite el arranque en segundo plano.' >&2
+	exit 0
+fi
+
 # Apply the generated terminal palette before Orca reads its settings.
 "$safe_settings"
 

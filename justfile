@@ -44,6 +44,10 @@ doctor:
 lint:
     "{{ dotfiles_dir }}/scripts/doctor.sh" --config-only
 
+# Suite portable ejecutable en Arch CI sin hardware, sesión gráfica ni secretos.
+ci:
+    "{{ dotfiles_dir }}/scripts/ci-check.sh"
+
 # Simula el despliegue contra HOME sin escribir.
 plan:
     @just --justfile "{{ justfile() }}" status
@@ -96,6 +100,10 @@ toolchain-check:
 toolchain-migrate:
     "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --apply
 
+# Comprueba el SDK Android local sin descargar herramientas ni aceptar licencias.
+android-check:
+    "{{ dotfiles_dir }}/android/.local/bin/android-sdk-check"
+
 # Revisa los timers de usuario de backup sin activarlos.
 check-user-timers:
     @systemctl --user is-enabled restic-backup.timer restic-maintenance.timer || true
@@ -139,37 +147,7 @@ apply-maintenance:
 check-system module:
     #!/usr/bin/env bash
     set -euo pipefail
-    module={{ quote(module) }}
-    read -r -a allowed <<< "{{ system_packages }}"
-    [[ " ${allowed[*]} " == *" $module "* ]] || {
-        printf 'Módulo de sistema no permitido: %s\n' "$module" >&2
-        exit 2
-    }
-
-    source_root="{{ dotfiles_dir }}/system-etc/$module"
-    target_root="/etc/$module"
-    [[ -d "$source_root" ]] || {
-        printf 'No existe el módulo: %s\n' "$source_root" >&2
-        exit 2
-    }
-
-    while IFS= read -r -d '' source; do
-        relative="${source#"$source_root/"}"
-        if [[ "$module" == sddm && "$relative" == conf.d/* ]]; then
-            target="/etc/sddm.conf.d/${relative#conf.d/}"
-        else
-            target="$target_root/$relative"
-        fi
-        if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
-            printf '= %s\n' "$target"
-        elif [[ -e "$target" ]]; then
-            printf '~ %s\n' "$target"
-            diff -u --label "$target (actual)" --label "$source (propuesto)" \
-                "$target" "$source" || true
-        else
-            printf '+ %s\n' "$target"
-        fi
-    done < <(find "$source_root" -type f -print0 | sort -z)
+    "{{ dotfiles_dir }}/scripts/system-etc-transaction.sh" --check {{ quote(module) }}
 
 # Instala copias en /etc con confirmación y backup; no crea enlaces a HOME.
 apply-system module:
@@ -201,31 +179,7 @@ apply-system module:
         exit 1
     }
 
-    state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
-    backup_root="$state_root/system-backups/$(date +%Y%m%d-%H%M%S)"
-    mkdir -p "$backup_root"
-
-    while IFS= read -r -d '' source; do
-        relative="${source#"$source_root/"}"
-        if [[ "$module" == sddm && "$relative" == conf.d/* ]]; then
-            target="/etc/sddm.conf.d/${relative#conf.d/}"
-        else
-            target="$target_root/$relative"
-        fi
-        if [[ -e "$target" ]] && cmp -s "$source" "$target"; then
-            printf '= %s (sin cambios)\n' "$target"
-            continue
-        fi
-        if [[ -e "$target" || -L "$target" ]]; then
-            pkexec /usr/bin/cp --archive --parents "$target" "$backup_root"
-        fi
-        mode="$(stat -c '%a' "$source")"
-        pkexec /usr/bin/install -D -m "$mode" "$source" "$target"
-        printf '✓ %s\n' "$target"
-    done < <(find "$source_root" -type f -print0 | sort -z)
-
-    printf '%s\n' "$backup_root" > "$state_root/last-system-backup"
-    printf 'Backup: %s\n' "$backup_root"
+    "{{ dotfiles_dir }}/scripts/system-etc-transaction.sh" --apply "$module"
 
 # Ejecuta el instalador de la composición local.
 install:

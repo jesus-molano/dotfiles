@@ -1,11 +1,12 @@
 // Zellij is reserved for standalone terminals and SSH. It stays transparent to
-// Codex and Neovim until the explicit Alt+Z prefix is pressed.
+// Codex and Neovim until the explicit Ctrl+G prefix is pressed. Alt+Z remains
+// available to Hyprland for the logs scratchpad, even when Zellij has focus.
 keybinds clear-defaults=true {
     locked {
-        bind "Alt z" { SwitchToMode "normal"; }
+        bind "Ctrl g" { SwitchToMode "normal"; }
     }
 
-    // Command hub: Alt+Z followed by one of these keys.
+    // Command hub: Ctrl+G followed by one of these keys.
     normal {
         bind "p" { SwitchToMode "pane"; }
         bind "t" { SwitchToMode "tab"; }
@@ -90,7 +91,7 @@ keybinds clear-defaults=true {
     }
 
     shared_except "locked" {
-        bind "Alt z" "esc" "enter" { SwitchToMode "locked"; }
+        bind "Ctrl g" "esc" "enter" { SwitchToMode "locked"; }
     }
 }
 

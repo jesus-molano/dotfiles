@@ -60,6 +60,13 @@ TEST_LOG="$test_root/starter-running.log" TEST_PGREP_STATUS=0 \
 	"$starter"
 [[ $(<"$test_root/starter-running.log") == $'safe-settings\npgrep:-f [/]orca-ide$' ]]
 
+TEST_LOG="$test_root/starter-missing.log" TEST_PGREP_STATUS=1 \
+	ORCA_SAFE_SETTINGS_BIN="$test_root/bin/orca-safe-settings" \
+	PGREP_BIN="$test_root/bin/pgrep" ORCA_CLI_BIN="missing-orca-ide" \
+	PATH="$test_root/bin:$PATH" "$starter" 2>"$test_root/starter-missing.err"
+[[ ! -s "$test_root/starter-missing.log" ]]
+grep -Fq 'Orca no está instalado' "$test_root/starter-missing.err"
+
 printf '%s\n' '[{"class":"orca","initialClass":"orca","workspace":{"name":"special:orca"}}]' \
 	>"$test_root/clients.json"
 TEST_LOG="$test_root/launcher-special.log" TEST_CLIENTS="$test_root/clients.json" \

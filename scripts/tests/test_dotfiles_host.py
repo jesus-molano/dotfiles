@@ -283,6 +283,48 @@ ensure_on_start = true
         self.assertNotIn("SECRET-123", json.dumps(detected))
         self.assertIn("Built-in Audio", detected["audio"]["sinks"])
 
+    def test_detection_isolates_clients_that_write_xdg_state(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            writer = fake_bin / "openrgb"
+            writer.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "mkdir -p \"$HOME/.config/OpenRGB\" \"$XDG_CACHE_HOME/openrgb\"\n"
+                "printf 'cache\\n' >\"$HOME/.config/OpenRGB/detected\"\n"
+                "printf '0: Test RGB Device\\n'\n",
+                encoding="utf-8",
+            )
+            writer.chmod(0o755)
+            pactl = fake_bin / "pactl"
+            pactl.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "mkdir -p \"$HOME/.config/pulse\"\n"
+                "printf 'cookie\\n' >\"$HOME/.config/pulse/cookie\"\n"
+                "printf '[]\\n'\n",
+                encoding="utf-8",
+            )
+            pactl.chmod(0o755)
+            caller_home = root / "caller-home"
+            caller_config = caller_home / ".config"
+            result = self.run_tool(
+                "detect",
+                env={
+                    "HOME": str(caller_home),
+                    "XDG_CONFIG_HOME": str(caller_config),
+                    "XDG_CACHE_HOME": str(caller_home / ".cache"),
+                    "XDG_DATA_HOME": str(caller_home / ".local/share"),
+                    "XDG_STATE_HOME": str(caller_home / ".local/state"),
+                    "PATH": f"{fake_bin}:{os.environ['PATH']}",
+                },
+            )
+            detected = json.loads(result.stdout)
+            self.assertIn("Test RGB Device", detected["openrgb_devices"])
+            self.assertFalse(caller_home.exists(), "detect no debe crear HOME/XDG del llamador")
+
     def test_detection_identifies_intel_without_matching_compatible_as_ati(self) -> None:
         outputs = {
             ("lspci", "-nn"): "00:02.0 VGA compatible controller [0300]: Intel Corporation UHD Graphics 620 [8086:5917] (rev 07)\n",
@@ -445,8 +487,9 @@ keybord_layouts = ["es"]
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             caps = root / "caps.json"
-            caps.write_text('{"schema": 1, "gpu_vendors": [], "has_internal_panel": true, "backlights": ["intel_backlight"]}', encoding="utf-8")
-            self.run_tool("resolve", "--host-config", str(ROOT / "scripts/tests/fixtures/laptop-host.toml"), "--capabilities", str(caps), "--write", env={"XDG_STATE_HOME": str(root / "state"), "XDG_CONFIG_HOME": str(root / "config")})
+            caps.write_text('{"schema": 1, "gpu_vendors": ["intel", "nvidia"], "has_internal_panel": true, "backlights": ["intel_backlight"]}', encoding="utf-8")
+            plan = json.loads(self.run_tool("resolve", "--host-config", str(ROOT / "scripts/tests/fixtures/laptop-host.toml"), "--capabilities", str(caps), "--write", env={"XDG_STATE_HOME": str(root / "state"), "XDG_CONFIG_HOME": str(root / "config")}).stdout)
+            self.assertIn("gpu-nvidia", plan["modules"])
             inputs = (root / "state/dotfiles/generated/hypr/config/inputs.lua").read_text(encoding="utf-8")
             monitors = (root / "state/dotfiles/generated/hypr/config/monitors.lua").read_text(encoding="utf-8")
             self.assertIn("tap_to_click = true", inputs)
@@ -456,6 +499,57 @@ keybord_layouts = ["es"]
             binds = (root / "state/dotfiles/generated/hypr/config/hardware-binds.lua").read_text(encoding="utf-8")
             self.assertIn("XF86MonBrightnessUp", binds)
             self.assertIn("XF86MonBrightnessDown", binds)
+
+    def test_noctalia_overrides_are_local_validated_and_staged(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host = root / "host.toml"
+            host.write_text(
+                """schema = 1
+bundles = []
+
+[noctalia.location]
+auto_locate = false
+latitude = 12.345678912345
+longitude = -34.5
+custom_schedule = true
+sunrise = "06:15"
+sunset = "21:45"
+
+[noctalia.screen_recorder]
+resolution = "2560x1440"
+frame_rate = 75
+""",
+                encoding="utf-8",
+            )
+            caps = root / "caps.json"
+            caps.write_text('{"schema": 1}', encoding="utf-8")
+            state, config = root / "state", root / "config"
+            plan = json.loads(self.run_tool(
+                "resolve", "--host-config", str(host), "--capabilities", str(caps), "--write",
+                env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config)},
+            ).stdout)
+            self.assertTrue(plan["noctalia_configured"])
+            staged = (state / "dotfiles/staged/noctalia/zz-host-overrides.toml").read_text(encoding="utf-8")
+            self.assertIn("auto_locate = false", staged)
+            self.assertIn("resolution = \"2560x1440\"", staged)
+            self.assertEqual(tomllib.loads(staged)["location"]["latitude"], 12.345678912345)
+            invalid = host.read_text(encoding="utf-8").replace('sunrise = "06:15"', 'sunrise = "25:00"')
+            host.write_text(invalid, encoding="utf-8")
+            runtime = os.environ.copy()
+            runtime.update({"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config), "PYTHONDONTWRITEBYTECODE": "1"})
+            result = subprocess.run(
+                ["python3", str(TOOL), "--repo", str(ROOT), "resolve", "--host-config", str(host), "--capabilities", str(caps)],
+                text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=runtime, check=False,
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("noctalia.location.sunrise", result.stderr)
+
+    def test_noctalia_safe_defaults_are_valid_without_host_coordinates(self) -> None:
+        plan = HOST_MODULE.resolve(ROOT, {}, {"schema": 1}, safe_defaults=True)
+        self.assertFalse(plan["noctalia_configured"])
+        self.assertFalse(plan["noctalia"]["location"]["auto_locate"])
+        self.assertIsNone(HOST_MODULE.rendered_artifacts(plan)["noctalia"])
 
     def test_configure_round_trips_existing_host_without_erasing_preferences(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -512,13 +606,32 @@ keybord_layouts = ["es"]
             stderr = io.StringIO()
             with mock.patch.object(HOST_MODULE, "detect", return_value=detected), \
                     mock.patch.object(HOST_MODULE.sys.stdin, "isatty", return_value=True), \
-                    mock.patch("builtins.input", side_effect=["base", ""]), \
+                    mock.patch("builtins.input", side_effect=["base", "", "", "", "", "", "", ""]), \
                     mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(root / "config"), "XDG_STATE_HOME": str(root / "state")}), \
                     contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(HOST_MODULE.cmd_configure(args), 0)
             configured = tomllib.loads(host.read_text(encoding="utf-8"))
             self.assertEqual(configured["bundles"], [])
+            self.assertFalse(configured["noctalia"]["location"]["auto_locate"])
             self.assertIn("Hyprland no ha devuelto pantallas", stderr.getvalue())
+
+    def test_interactive_configure_records_noctalia_preferences_outside_git(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host = root / "host.toml"
+            host.write_text('schema = 1\nbundles = []\n\n[input]\nkeyboard_layouts = ["us"]\n', encoding="utf-8")
+            args = argparse.Namespace(repo=str(ROOT), host_config=str(host), bundle=None, interactive=False)
+            detected = {"schema": 1, "gpu_vendors": [], "inputs": [], "monitors": []}
+            answers = ["", "", "n", "12.345678912345", "-45.678912345678", "s", "06:10", "21:50", "2560x1440", "120"]
+            with mock.patch.object(HOST_MODULE, "detect", return_value=detected), \
+                    mock.patch.object(HOST_MODULE.sys.stdin, "isatty", return_value=True), \
+                    mock.patch("builtins.input", side_effect=answers), \
+                    mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(root / "config"), "XDG_STATE_HOME": str(root / "state")}), \
+                    contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(HOST_MODULE.cmd_configure(args), 0)
+            configured = tomllib.loads(host.read_text(encoding="utf-8"))
+            self.assertEqual(configured["noctalia"]["location"]["latitude"], 12.345678912345)
+            self.assertEqual(configured["noctalia"]["screen_recorder"], {"resolution": "2560x1440", "frame_rate": 120})
 
     def test_noninteractive_configure_refuses_backup_without_repository(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -795,17 +908,21 @@ keybord_layouts = ["es"]
             (migration / "applied-links.tsv").write_text(f".config/host.lua\t{source}\n", encoding="utf-8")
             generated = config / "qmd/index.yml"; generated.parent.mkdir(parents=True); generated.write_text("generated", encoding="utf-8")
             digest = hashlib.sha256(generated.read_bytes()).hexdigest()
-            (migration / "generated-installed.tsv").write_text(f"qmd\t{digest}\n", encoding="utf-8")
-            (migration / "generated-targets.tsv").write_text("qmd\tabsent\n", encoding="utf-8")
+            noctalia = config / "noctalia/zz-host-overrides.toml"; noctalia.parent.mkdir(parents=True); noctalia.write_text("generated-noctalia", encoding="utf-8")
+            noctalia_digest = hashlib.sha256(noctalia.read_bytes()).hexdigest()
+            (migration / "generated-installed.tsv").write_text(f"qmd\t{digest}\nnoctalia\t{noctalia_digest}\n", encoding="utf-8")
+            (migration / "generated-targets.tsv").write_text("qmd\tabsent\nnoctalia\tabsent\n", encoding="utf-8")
             (migration / "status").write_text("applied\n", encoding="utf-8")
             checksummed = [path for path in migration.rglob("*") if path.is_file() and path.name != "status"]
             (migration / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed), encoding="utf-8")
             (state / "dotfiles/last-migration").write_text(str(migration), encoding="utf-8")
             preview = json.loads(self.run_tool("retire", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config), "HOME": str(home)}).stdout)
             self.assertEqual(preview["remove_links"], [".config/host.lua"])
+            self.assertEqual(preview["remove_generated"], ["noctalia", "qmd"])
             self.run_tool("retire", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config), "HOME": str(home)})
             self.assertFalse(linked.exists())
             self.assertFalse(generated.exists())
+            self.assertFalse(noctalia.exists())
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "retired\n")
 
     def test_retire_does_not_claim_success_when_user_manager_reload_fails(self) -> None:
@@ -936,6 +1053,33 @@ keybord_layouts = ["es"]
             (migration / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed), encoding="utf-8")
             self.run_tool("rollback", "deployment-removed", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config), "HOME": str(root / "home")})
             self.assertEqual((config / "qmd/index.yml").read_text(encoding="utf-8"), "old-qmd")
+
+    def test_manual_rollback_restores_noctalia_generated_preimage(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state, config, home = root / "state", root / "config", root / "home"
+            migration = state / "dotfiles/migrations/deployment-noctalia"
+            migration.mkdir(parents=True)
+            for name in ("legacy-modules", "applied-links.tsv", "legacy-links.tsv", "previous-applied-links.tsv"):
+                (migration / name).write_text("", encoding="utf-8")
+            (migration / "plan.json").write_text(json.dumps({"repo": str(root / "gone"), "modules": []}), encoding="utf-8")
+            destination = config / "noctalia/zz-host-overrides.toml"
+            destination.parent.mkdir(parents=True)
+            destination.write_text("new-override", encoding="utf-8")
+            snapshot = migration / "generated-backups/noctalia"
+            snapshot.parent.mkdir(parents=True)
+            snapshot.write_text("old-override", encoding="utf-8")
+            digest = hashlib.sha256(destination.read_bytes()).hexdigest()
+            (migration / "generated-targets.tsv").write_text("noctalia\tcopy\n", encoding="utf-8")
+            (migration / "generated-installed.tsv").write_text(f"noctalia\t{digest}\n", encoding="utf-8")
+            (migration / "status").write_text("applied\n", encoding="utf-8")
+            checksummed = [path for path in migration.rglob("*") if path.is_file() and path.name != "status"]
+            (migration / "SHA256SUMS").write_text(
+                "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed),
+                encoding="utf-8",
+            )
+            self.run_tool("rollback", "deployment-noctalia", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(config), "HOME": str(home)})
+            self.assertEqual(destination.read_text(encoding="utf-8"), "old-override")
 
     def test_manual_rollback_restores_prior_profileless_snapshot_not_checkout(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

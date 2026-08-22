@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Comprueba el SDK gestionado por el usuario. No descarga componentes ni acepta
+# licencias de Google; esas decisiones permanecen explícitas.
+set -euo pipefail
+
+sdk_root=${ANDROID_SDK_ROOT:-${ANDROID_HOME:-$HOME/.local/share/android-sdk}}
+missing=0
+
+check_tool() {
+	local label=$1 target="$sdk_root/$2"
+	if [[ -x "$target" ]]; then
+		printf '✓ %s: %s\n' "$label" "$target"
+	else
+		printf '✗ Falta %s: %s\n' "$label" "$target" >&2
+		missing=1
+	fi
+}
+
+check_tool sdkmanager cmdline-tools/latest/bin/sdkmanager
+check_tool avdmanager cmdline-tools/latest/bin/avdmanager
+check_tool adb platform-tools/adb
+check_tool emulator emulator/emulator
+
+if ! find "$sdk_root/platforms" -mindepth 1 -maxdepth 1 -type d -name 'android-*' -print -quit 2>/dev/null | grep -q .; then
+	printf '✗ Falta una plataforma Android bajo %s/platforms.\n' "$sdk_root" >&2
+	missing=1
+fi
+
+if ((missing)); then
+	printf '%s\n' 'Instala primero las Command-line Tools oficiales y usa sdkmanager para añadir plataforma, platform-tools y emulator.' >&2
+	exit 1
+fi
+
+printf '%s\n' 'SDK Android completo para CLI y emulador.'

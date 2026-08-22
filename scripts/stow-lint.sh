@@ -13,8 +13,10 @@ workspace="$(mktemp -d --tmpdir="$runtime_root" dotfiles-stow-lint.XXXXXX)"
 target="$workspace/home"
 config_root="$workspace/config"
 state_root="$workspace/state"
+cache_root="$workspace/cache"
+data_root="$workspace/data"
 test_runtime="$workspace/runtime"
-mkdir -p "$target" "$config_root" "$state_root" "$test_runtime"
+mkdir -p "$target" "$config_root" "$state_root" "$cache_root" "$data_root" "$test_runtime"
 chmod 700 "$test_runtime"
 cleanup() {
 	[[ "$workspace" == "$runtime_root"/dotfiles-stow-lint.* ]] || return 1
@@ -82,7 +84,7 @@ validate_or_defer() {
 	fi
 }
 
-validator_env=(env HOME="$target" XDG_CONFIG_HOME="$config_root" XDG_STATE_HOME="$state_root" XDG_RUNTIME_DIR="$test_runtime")
+validator_env=(env HOME="$target" XDG_CONFIG_HOME="$config_root" XDG_STATE_HOME="$state_root" XDG_CACHE_HOME="$cache_root" XDG_DATA_HOME="$data_root" XDG_RUNTIME_DIR="$test_runtime")
 validate_or_defer Hyprland Hyprland \
 	"${validator_env[@]}" DOTFILES_DEPLOYED_HYPR_DIR="$target/.config/hypr" \
 	DOTFILES_GENERATED_HYPR_DIR="$state_root/dotfiles/generated/hypr" \

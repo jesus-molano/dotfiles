@@ -3,7 +3,7 @@ set -euo pipefail
 
 usage() {
 	printf '%s\n' \
-		'Uso: game-run [--hud] [--gamescope] [--dlss] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
+		'Uso: game-run [--hud] [--gamescope] [--gamescope-mode ANCHOxALTO@HZ] [--dlss] [--bench NOMBRE] [--duration SEGUNDOS] [--dry-run] [--] COMANDO [ARGUMENTOS...]'
 }
 
 hud=false
@@ -12,6 +12,9 @@ use_dlss=false
 dry_run=false
 benchmark_name=''
 benchmark_duration=120
+# Preset del desktop actual. GAME_RUN_GAMESCOPE_MODE permite un override por
+# host sin alterar las máquinas ya configuradas.
+gamescope_mode="${GAME_RUN_GAMESCOPE_MODE:-1920x1080@75}"
 
 while (($#)); do
 	case "$1" in
@@ -20,6 +23,11 @@ while (($#)); do
 		;;
 	--gamescope)
 		use_gamescope=true
+		;;
+	--gamescope-mode)
+		(($# >= 2)) || { printf '%s\n' 'Falta el modo de Gamescope.' >&2; exit 2; }
+		gamescope_mode=$2
+		shift
 		;;
 	--dlss)
 		use_dlss=true
@@ -63,6 +71,14 @@ while (($#)); do
 	shift
 done
 
+if [[ ! "$gamescope_mode" =~ ^([1-9][0-9]*)x([1-9][0-9]*)@([1-9][0-9]*(\.[0-9]+)?)$ ]]; then
+	printf '%s\n' 'El modo de Gamescope debe usar ANCHOxALTO@HZ, por ejemplo 1920x1080@75.' >&2
+	exit 2
+fi
+gamescope_width=${BASH_REMATCH[1]}
+gamescope_height=${BASH_REMATCH[2]}
+gamescope_rate=${BASH_REMATCH[3]}
+
 if (($# == 0)); then
 	printf '%s\n' 'Falta el comando del juego.' >&2
 	usage >&2
@@ -92,7 +108,7 @@ if [[ "$use_dlss" == true ]]; then
 fi
 
 if [[ "$use_gamescope" == true ]]; then
-	launch_command+=(gamescope -W 1920 -H 1080 -r 75 -f)
+	launch_command+=(gamescope -W "$gamescope_width" -H "$gamescope_height" -r "$gamescope_rate" -f)
 	if [[ "$hud" == true ]]; then
 		launch_command+=(--mangoapp)
 	fi
@@ -166,6 +182,14 @@ mkdir -p -- "$gaming_sessions"
 chmod 700 "$gaming_sessions"
 require_command flock
 
+warn_dnd() {
+	local message=$1
+	printf 'game-run: %s\n' "$message" >&2
+	if command -v noctalia >/dev/null 2>&1; then
+		noctalia msg notification-show 'Gaming' -- "$message" >/dev/null 2>&1 || true
+	fi
+}
+
 marker_is_live() {
 	local marker=$1 pid expected extra current
 	read -r pid expected extra <"$marker" || return 1
@@ -231,7 +255,11 @@ acquire_gaming_session() {
 	if "$first_session" && command -v noctalia >/dev/null 2>&1; then
 		current_dnd="$(noctalia msg notification-dnd-status 2>/dev/null || true)"
 		if [[ "$current_dnd" == off ]]; then
-			noctalia msg notification-dnd-set on >/dev/null 2>&1 || true
+			if ! noctalia msg notification-dnd-set on >/dev/null 2>&1; then
+				warn_dnd 'No se pudo activar No molestar; el juego continúa.'
+			elif [[ "$(noctalia msg notification-dnd-status 2>/dev/null || true)" != on ]]; then
+				warn_dnd 'No molestar no quedó activo; el juego continúa.'
+			fi
 		fi
 	fi
 
@@ -258,7 +286,11 @@ restore_gaming_session() {
 			if [[ "$restore_dnd" == on || "$restore_dnd" == off ]]; then
 				current_dnd="$(noctalia msg notification-dnd-status 2>/dev/null || true)"
 				if [[ "$current_dnd" != "$restore_dnd" ]]; then
-					noctalia msg notification-dnd-set "$restore_dnd" >/dev/null 2>&1 || true
+					if ! noctalia msg notification-dnd-set "$restore_dnd" >/dev/null 2>&1; then
+						warn_dnd 'No se pudo restaurar No molestar al terminar el juego.'
+					elif [[ "$(noctalia msg notification-dnd-status 2>/dev/null || true)" != "$restore_dnd" ]]; then
+						warn_dnd 'No molestar no recuperó su estado al terminar el juego.'
+					fi
 				fi
 			fi
 			rm -f -- "$dnd_state_file"

@@ -114,6 +114,13 @@ check_backup() {
   check_command 'rclone disponible para backup' rclone
   systemctl --user is-enabled --quiet restic-backup.timer restic-maintenance.timer 2>/dev/null && ok 'Timers Restic habilitados' || info 'Timers Restic no habilitados'
 }
+check_android() {
+  if "$repo_root/android/.local/bin/android-sdk-check" >/dev/null 2>&1; then
+    ok 'SDK Android CLI y emulador disponibles'
+  else
+    warn 'SDK Android externo incompleto; ejecuta just android-check'
+  fi
+}
 check_base_workflows() {
 	check 'Contrato de teclado Alt/Hyper y Kanata' "$repo_root/scripts/tests/test_keyboard_contract.sh"
 	check 'Fallback portable de Hyprland' "$repo_root/scripts/tests/test_hypr_host_fallback.sh"
@@ -343,6 +350,16 @@ if [[ "$mode" != config ]]; then
   printf '\nHost vivo\n'
   check_snapshot
 	check 'Base CachyOS' "$repo_root/hypr-common/.local/bin/hypr-check-cachyos-base"
+	if command -v noctalia >/dev/null 2>&1; then
+		noctalia_config="${XDG_CONFIG_HOME:-$HOME/.config}/noctalia"
+		if [[ -d "$noctalia_config" ]]; then
+			check 'Noctalia desplegado válido, incluidos overrides de host' noctalia config validate "$noctalia_config"
+		else
+			fail 'Falta el directorio Noctalia desplegado'
+		fi
+	else
+		fail 'Noctalia no está disponible en el host vivo'
+	fi
 	system_failed="$(systemctl --failed --no-legend --plain 2>/dev/null || true)"
 	[[ -z "$system_failed" ]] && ok 'Sin unidades del sistema fallidas' || fail 'Hay unidades del sistema fallidas'
 	user_failed="$(systemctl --user --failed --no-legend --plain 2>/dev/null || true)"
@@ -358,6 +375,7 @@ if [[ "$mode" != config ]]; then
   check_backup
   check_desktop_runtime
   check_backup_runtime
+  check_android
   check_gaming_packages
   check_nvidia_stack
   check_gaming_scheduler
