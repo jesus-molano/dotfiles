@@ -23,7 +23,6 @@ gpu_red_threshold=83
 interval=5
 debounce=2
 hysteresis=2
-reapply_interval=300
 mode=thermal
 write_state=1
 resolved_openrgb_device_cache=''
@@ -87,9 +86,6 @@ read_config() {
 			;;
 		REACTIVE_RGB_HYSTERESIS)
 			[[ "$value" =~ ^[0-9]+$ ]] && ((value <= 15)) && hysteresis=$value
-			;;
-		REACTIVE_RGB_REAPPLY_INTERVAL)
-			[[ "$value" =~ ^[0-9]+$ ]] && ((value >= 30 && value <= 3600)) && reapply_interval=$value
 			;;
 		esac
 	done <"$config_file"
@@ -419,7 +415,7 @@ run_once() {
 		return 4
 	}
 	install -d -m 700 -- "$state_dir"
-	local colors desired_cpu_color desired_gpu_color current_cpu_color='' current_gpu_color='' cpu_color gpu_color cpu_stable=0 gpu_stable=0 last_applied_at=0 now
+	local colors desired_cpu_color desired_gpu_color current_cpu_color='' current_gpu_color='' cpu_color gpu_color cpu_stable=0 gpu_stable=0 now
 	colors=$(colors_for_mode) || {
 		printf '%s\n' 'No hay temperatura CPU/GPU disponible.' >&2
 		return 1
@@ -427,10 +423,7 @@ run_once() {
 	IFS=$'\t' read -r desired_cpu_color desired_gpu_color <<<"$colors"
 	current_cpu_color=$(cat -- "$state_dir/cpu-color" 2>/dev/null || true)
 	current_gpu_color=$(cat -- "$state_dir/gpu-color" 2>/dev/null || true)
-	last_applied_at=$(cat -- "$state_dir/last-applied-at" 2>/dev/null || printf 0)
-	[[ "$last_applied_at" =~ ^[0-9]+$ ]] || last_applied_at=0
-	now=$(date +%s)
-	if [[ "$current_cpu_color" == "$desired_cpu_color" && "$current_gpu_color" == "$desired_gpu_color" ]] && ((now - last_applied_at < reapply_interval)); then
+	if [[ "$current_cpu_color" == "$desired_cpu_color" && "$current_gpu_color" == "$desired_gpu_color" ]]; then
 		printf 'Sin cambio: CPU=%s GPU=%s\n' "$desired_cpu_color" "$desired_gpu_color"
 		return 0
 	fi
@@ -444,6 +437,7 @@ run_once() {
 		printf '%s\n' 'No hay destinos RGB seguros disponibles.' >&2
 		return 1
 	}
+	now=$(date +%s)
 	printf '%s\n' "$cpu_color" >"$state_dir/cpu-color"
 	printf '%s\n' "$gpu_color" >"$state_dir/gpu-color"
 	printf '%s\n' "$now" >"$state_dir/last-applied-at"
@@ -470,7 +464,7 @@ write_health() {
 	temporary=$(mktemp "$state_dir/.health.XXXXXX") || return 1
 	{
 		printf 'status=%s\n' "$status"
-		printf '%s\n' 'scope=liveness-with-periodic-hardware-reapply'
+		printf '%s\n' 'scope=liveness-with-hardware-on-change'
 		printf 'updated_at=%s\n' "$(date +%s)"
 		printf 'last_applied_at=%s\n' "$last_applied_at"
 		printf 'consecutive_failures=%s\n' "$failures"
@@ -495,7 +489,7 @@ print_health() {
 		esac
 	done <"$state_dir/health"
 	[[ "$status" == starting || "$status" == ok || "$status" == error ]] || return 1
-	[[ "$scope" == liveness-with-periodic-hardware-reapply ]] || return 1
+	[[ "$scope" == liveness-with-hardware-on-change ]] || return 1
 	[[ "$updated_at" =~ ^[0-9]+$ && "$last_applied_at" =~ ^[0-9]+$ && "$failures" =~ ^[0-9]+$ && "$pid" =~ ^[0-9]+$ && "$starttime" =~ ^[0-9]+$ ]] || return 1
 	now=$(date +%s)
 	age=$((now - updated_at))

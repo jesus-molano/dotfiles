@@ -802,7 +802,7 @@ def rendered_rgb(plan: dict[str, Any]) -> str | None:
     if "rgb-openrgb" not in plan.get("bundles", []) or rgb.get("enabled") is not True:
         return None
     required_strings = ("mode", "ambient_color", "openrgb_device", "nzxt_device", "static_color")
-    required_numbers = ("openrgb_zone", "openrgb_zone_size", "cpu_led_count", "cpu_green_threshold", "cpu_orange_threshold", "cpu_red_threshold", "gpu_green_threshold", "gpu_orange_threshold", "gpu_red_threshold", "interval", "debounce", "hysteresis", "reapply_interval")
+    required_numbers = ("openrgb_zone", "openrgb_zone_size", "cpu_led_count", "cpu_green_threshold", "cpu_orange_threshold", "cpu_red_threshold", "gpu_green_threshold", "gpu_orange_threshold", "gpu_red_threshold", "interval", "debounce", "hysteresis")
     if any(not isinstance(rgb.get(name), str) or not rgb[name] or len(rgb[name]) > 160 or any(char in rgb[name] for char in "\r\n\x00") for name in required_strings):
         raise ValueError("rgb requiere todos los targets y umbrales válidos")
     if rgb["mode"] not in ("ambient", "thermal", "gaming", "recording", "build-pass", "build-fail"):
@@ -814,7 +814,7 @@ def rendered_rgb(plan: dict[str, Any]) -> str | None:
         "openrgb_zone": (0, 99), "openrgb_zone_size": (1, 999), "cpu_led_count": (1, 998),
         "cpu_green_threshold": (1, 150), "cpu_orange_threshold": (1, 150), "cpu_red_threshold": (1, 150),
         "gpu_green_threshold": (1, 150), "gpu_orange_threshold": (1, 150), "gpu_red_threshold": (1, 150),
-        "interval": (1, 3600), "debounce": (1, 20), "hysteresis": (0, 15), "reapply_interval": (30, 3600),
+        "interval": (1, 3600), "debounce": (1, 20), "hysteresis": (0, 15),
     }
     for name in required_numbers:
         value = rgb.get(name)

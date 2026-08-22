@@ -250,6 +250,7 @@ ensure_on_start = true
             repository = (state / "dotfiles/staged/restic/repository").read_text(encoding="utf-8")
             self.assertIn("DOTFILES_AUDIO_BASE_PROFILE=output:hdmi-stereo", audio)
             self.assertIn("REACTIVE_RGB_NZXT_DEVICE=NZXT Smart Device V2", rgb)
+            self.assertNotIn("REACTIVE_RGB_REAPPLY_INTERVAL", rgb)
             self.assertEqual(repository, "/mnt/backups/restic-desktop\n")
             self.assertFalse((config / "reactive-rgb/config.conf").exists())
             monitors = (state / "dotfiles/generated/hypr/config/monitors.lua").read_text(encoding="utf-8")

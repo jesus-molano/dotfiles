@@ -99,11 +99,11 @@ check_rgb() {
     local rgb_health
     if rgb_health="$("$HOME/.local/bin/reactive-rgb" health 2>/dev/null)" &&
       grep -Fxq 'health_status=ok' <<<"$rgb_health" &&
-      grep -Fxq 'health_scope=liveness-with-periodic-hardware-reapply' <<<"$rgb_health" &&
+      grep -Fxq 'health_scope=liveness-with-hardware-on-change' <<<"$rgb_health" &&
       grep -Fxq 'health_fresh=1' <<<"$rgb_health"; then
-      ok 'Reactive RGB activo y con aplicación reciente'
+      ok 'Reactive RGB activo y saludable'
     else
-      warn 'Reactive RGB no tiene una aplicación saludable reciente'
+      warn 'Reactive RGB no informa salud reciente'
     fi
   else info 'Servicio RGB no habilitado'
   fi

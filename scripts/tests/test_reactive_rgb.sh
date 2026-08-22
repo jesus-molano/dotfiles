@@ -33,6 +33,7 @@ printf '%s\n' \
 	'REACTIVE_RGB_GPU_RED_THRESHOLD=83' \
 	'REACTIVE_RGB_DEBOUNCE=1' \
 	'REACTIVE_RGB_INTERVAL=1' \
+	'REACTIVE_RGB_REAPPLY_INTERVAL=300' \
 	>"$test_root/config/reactive-rgb/config.conf"
 : >"$test_root/log"
 : >"$test_root/list-log"
@@ -97,6 +98,16 @@ assert_direct_write 20D070 FF4000
 [[ $(<"$test_root/runtime/cpu-band") == normal ]]
 [[ $(<"$test_root/runtime/gpu-band") == warm ]]
 
+# Una marca antigua no debe reaplicar el mismo color. La clave heredada del
+# intervalo se acepta, pero ya no provoca accesos periódicos a OpenRGB.
+applies_before=$(wc -l <"$test_root/log")
+printf '%s\n' 0 >"$test_root/runtime/last-applied-at"
+env "${env_base[@]}" TEST_GPU_TEMP=69 "$helper" run-once --mode thermal >/dev/null
+[[ $(wc -l <"$test_root/log") -eq $applies_before ]] || {
+	printf '%s\n' 'FAIL: reaplicó colores sin cambio térmico.' >&2
+	exit 1
+}
+
 # Límites exactos, sin estado previo para no mezclar la histéresis.
 assert_thermal_colors 49 49 2080FF 2080FF
 assert_thermal_colors 50 50 20D070 20D070
@@ -130,7 +141,7 @@ if [[ $invalid_thresholds_code -ne 2 ]] || ! grep -q 'Umbrales RGB inválidos' <
 fi
 mv "$test_root/config/reactive-rgb/config.valid" "$test_root/config/reactive-rgb/config.conf"
 
-# `run` conserva lock, salud y reaplicación; el modo ambiente da el mismo color
+# `run` conserva lock y salud; el modo ambiente da el mismo color
 # a los 60 LEDs, pero sigue sin seleccionar otro dispositivo o controlador.
 : >"$test_root/log"
 : >"$test_root/list-log"
@@ -139,6 +150,7 @@ sleep 0.2
 assert_direct_write 123ABC 123ABC
 health=$(env "${env_base[@]}" "$helper" health)
 grep -Fxq 'health_status=ok' <<<"$health"
+grep -Fxq 'health_scope=liveness-with-hardware-on-change' <<<"$health"
 grep -Fxq 'health_fresh=1' <<<"$health"
 set +e
 env "${env_base[@]}" "$helper" run-once --mode ambient >/dev/null 2>&1
