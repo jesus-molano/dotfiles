@@ -24,5 +24,7 @@ grep -Fq 'check_backup_runtime' "$doctor"
 grep -Fq 'check_desktop_runtime' "$doctor"
 grep -Fq 'check_minimum_versions' "$doctor"
 grep -Fq 'Bundle gaming-core no seleccionado' "$doctor"
+grep -Fq 'chwd --list-installed' "$doctor"
+if grep -Fq 'chwd --check' "$doctor"; then exit 1; fi
 
 printf '%s\n' 'PASS: doctor clasifica base, bundles, capacidades y hardware sin perfiles'

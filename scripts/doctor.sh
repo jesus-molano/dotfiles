@@ -182,7 +182,12 @@ check_gaming_packages() {
 check_nvidia_stack() {
   has capabilities gpu-nvidia || { info 'Stack NVIDIA no seleccionado'; return; }
   if command -v chwd >/dev/null 2>&1; then
-    chwd --check 2>/dev/null && ok 'CHWD reconoce un driver NVIDIA' || warn 'CHWD no confirmó el driver NVIDIA activo'
+    local chwd_profiles
+    if chwd_profiles="$(LC_ALL=C chwd --list-installed 2>/dev/null)" && grep -Eqi 'nvidia[-_[:alnum:].+]*' <<<"$chwd_profiles"; then
+      ok 'CHWD reconoce un perfil NVIDIA instalado'
+    else
+      warn 'CHWD no confirmó un perfil NVIDIA instalado'
+    fi
   else
     info 'CHWD no está disponible para revisar NVIDIA'
   fi
