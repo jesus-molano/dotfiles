@@ -5,15 +5,62 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly helper=${1:-"$repo_root/hypr-common/.local/bin/local-dictation"}
 test_root=$(mktemp -d)
+zombie_holder_pid=''
 cleanup() {
 	if [[ -f "$test_root/state/recorder.pid" ]]; then
 		read -r recorder_pid _ <"$test_root/state/recorder.pid"
 		kill "$recorder_pid" 2>/dev/null || true
 	fi
 	[[ -z "${unrelated_pid:-}" ]] || kill "$unrelated_pid" 2>/dev/null || true
+	[[ -z "$zombie_holder_pid" ]] || kill "$zombie_holder_pid" 2>/dev/null || true
+	[[ -z "$zombie_holder_pid" ]] || wait "$zombie_holder_pid" 2>/dev/null || true
 	rm -rf -- "$test_root"
 }
 trap cleanup EXIT
+
+spawn_zombie() {
+	local ready_file=$1
+	python3 - "$ready_file" <<'PY' &
+import os
+import pathlib
+import signal
+import sys
+import time
+
+child = os.fork()
+if child == 0:
+    os._exit(0)
+
+def clean_up(_signum, _frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, clean_up)
+
+deadline = time.monotonic() + 2
+while time.monotonic() < deadline:
+    try:
+        state = pathlib.Path(f"/proc/{child}/stat").read_text().rsplit(") ", 1)[1].split()[0]
+    except (FileNotFoundError, IndexError):
+        state = ""
+    if state == "Z":
+        pathlib.Path(sys.argv[1]).write_text(f"{child}\n")
+        break
+    time.sleep(0.005)
+else:
+    raise SystemExit("no se pudo crear un proceso zombi")
+
+signal.pause()
+PY
+	zombie_holder_pid=$!
+	for _ in {1..200}; do
+		[[ -s "$ready_file" ]] && return 0
+		kill -0 "$zombie_holder_pid" 2>/dev/null || break
+		sleep 0.01
+	done
+	printf '%s\n' 'FAIL: no se pudo preparar un proceso zombi' >&2
+	return 1
+}
 
 mkdir -p "$test_root/bin" "$test_root/state" "$test_root/data"
 printf 'model\n' >"$test_root/data/model.bin"
@@ -117,5 +164,22 @@ set -e
 	printf '%s\n' 'FAIL: una PID obsoleta afectó a otro proceso' >&2
 	exit 1
 }
+
+# Un zombi conserva PID y starttime hasta que su padre lo recoge, pero no es
+# una grabación viva y nunca debe llegar al envío de señales.
+zombie_ready="$test_root/zombie.pid"
+spawn_zombie "$zombie_ready"
+zombie_pid=$(<"$zombie_ready")
+zombie_starttime=$(awk '{ print $22 }' "/proc/$zombie_pid/stat")
+printf '%s %s\n' "$zombie_pid" "$zombie_starttime" >"$test_root/state/recorder.pid"
+set +e
+env "${common_env[@]}" "$helper" stop >"$test_root/zombie.out" 2>"$test_root/zombie.err"
+zombie_status=$?
+set -e
+if ! [[ $zombie_status -eq 2 ]] ||
+	! grep -Fq 'No hay una grabación activa o su PID quedó obsoleta.' "$test_root/zombie.err"; then
+	printf '%s\n' 'FAIL: un zombi se trató como una grabación activa' >&2
+	exit 1
+fi
 
 printf '%s\n' 'PASS: local-dictation valida PID y modelo, graba, transcribe, copia y pega bajo demanda'

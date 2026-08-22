@@ -171,6 +171,7 @@ process_starttime() {
 	remainder=${stat_line##*) }
 	read -r -a fields <<<"$remainder"
 	((${#fields[@]} >= 20)) && [[ "${fields[19]}" =~ ^[0-9]+$ ]] || return 1
+	[[ "${fields[0]}" != Z ]] || return 1
 	printf '%s\n' "${fields[19]}"
 }
 

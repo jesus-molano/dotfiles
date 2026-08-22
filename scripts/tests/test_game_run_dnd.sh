@@ -7,13 +7,60 @@ readonly game_run=${1:-"$repo_root/gaming-core/.local/bin/game-run"}
 test_root=$(mktemp -d)
 a_pid=''
 b_pid=''
+zombie_holder_pid=''
 cleanup() {
 	[[ -z "$a_pid" ]] || kill "$a_pid" 2>/dev/null || true
 	[[ -z "$b_pid" ]] || kill "$b_pid" 2>/dev/null || true
+	[[ -z "$zombie_holder_pid" ]] || kill "$zombie_holder_pid" 2>/dev/null || true
 	wait "$a_pid" "$b_pid" 2>/dev/null || true
+	[[ -z "$zombie_holder_pid" ]] || wait "$zombie_holder_pid" 2>/dev/null || true
 	rm -rf -- "$test_root"
 }
 trap cleanup EXIT
+
+spawn_zombie() {
+	local ready_file=$1
+	python3 - "$ready_file" <<'PY' &
+import os
+import pathlib
+import signal
+import sys
+import time
+
+child = os.fork()
+if child == 0:
+    os._exit(0)
+
+def clean_up(_signum, _frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, clean_up)
+
+deadline = time.monotonic() + 2
+while time.monotonic() < deadline:
+    try:
+        state = pathlib.Path(f"/proc/{child}/stat").read_text().rsplit(") ", 1)[1].split()[0]
+    except (FileNotFoundError, IndexError):
+        state = ""
+    if state == "Z":
+        pathlib.Path(sys.argv[1]).write_text(f"{child}\n")
+        break
+    time.sleep(0.005)
+else:
+    raise SystemExit("no se pudo crear un proceso zombi")
+
+signal.pause()
+PY
+	zombie_holder_pid=$!
+	for _ in {1..200}; do
+		[[ -s "$ready_file" ]] && return 0
+		kill -0 "$zombie_holder_pid" 2>/dev/null || break
+		sleep 0.01
+	done
+	printf '%s\n' 'FAIL: no se pudo preparar un proceso zombi' >&2
+	return 1
+}
 
 mkdir -p "$test_root/bin"
 
@@ -124,6 +171,27 @@ failure_status=$?
 set -e
 [[ $failure_status -eq 23 ]]
 grep -Fq 'No se pudo activar No molestar; el juego continúa.' "$test_root/dnd-failure.err"
+
+# Un zombi conserva PID+starttime mientras su padre no lo recoja. Debe
+# podarse antes de decidir si esta sesión es la primera propietaria de DND.
+zombie_runtime="$test_root/zombie-runtime"
+zombie_log="$test_root/zombie.log"
+zombie_dnd="$test_root/zombie-dnd"
+mkdir -p "$zombie_runtime/dotfiles-gaming-sessions"
+spawn_zombie "$test_root/zombie.pid"
+zombie_pid=$(<"$test_root/zombie.pid")
+zombie_starttime=$(awk '{ print $22 }' "/proc/$zombie_pid/stat")
+printf '%s %s\n' "$zombie_pid" "$zombie_starttime" >"$zombie_runtime/dotfiles-gaming-sessions/$zombie_pid"
+printf '%s\n' off >"$zombie_dnd"
+PATH="$test_root/bin:$PATH" XDG_RUNTIME_DIR="$zombie_runtime" TEST_LOG="$zombie_log" \
+	TEST_DND_STATE="$zombie_dnd" TEST_FOCUS_INITIAL=off \
+	"$game_run" -- test-game >/dev/null 2>&1 || zombie_status=$?
+if ! [[ "${zombie_status:-0}" -eq 23 ]] ||
+	[[ $(<"$zombie_log") != $'dnd:on\nperformance:start\ngame:running\ndnd:off' ]] ||
+	[[ -e "$zombie_runtime/dotfiles-gaming-sessions/$zombie_pid" ]]; then
+	printf '%s\n' 'FAIL: un marcador zombi retuvo la propiedad de DND' >&2
+	exit 1
+fi
 
 # Dos wrappers comparten la propiedad: A puede acabar primero sin quitar DND a B.
 concurrent_runtime="$test_root/concurrent-runtime"

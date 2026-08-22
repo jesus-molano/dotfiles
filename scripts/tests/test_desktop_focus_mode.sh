@@ -4,6 +4,7 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly helper=${1:-"$repo_root/hypr-common/.local/bin/desktop-focus-mode"}
 test_root=$(mktemp -d)
+zombie_holder_pid=''
 cleanup() {
 	local file pid
 	while IFS= read -r file; do
@@ -11,9 +12,55 @@ cleanup() {
 		pid=$(<"$file")
 		[[ "$pid" =~ ^[0-9]+$ ]] && kill "$pid" 2>/dev/null || true
 	done < <(find "$test_root" -maxdepth 1 -type f -name '*-recording' 2>/dev/null)
+	[[ -z "$zombie_holder_pid" ]] || kill "$zombie_holder_pid" 2>/dev/null || true
+	[[ -z "$zombie_holder_pid" ]] || wait "$zombie_holder_pid" 2>/dev/null || true
 	rm -rf -- "$test_root"
 }
 trap cleanup EXIT
+
+spawn_zombie() {
+	local ready_file=$1
+	python3 - "$ready_file" <<'PY' &
+import os
+import pathlib
+import signal
+import sys
+import time
+
+child = os.fork()
+if child == 0:
+    os._exit(0)
+
+def clean_up(_signum, _frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, clean_up)
+
+deadline = time.monotonic() + 2
+while time.monotonic() < deadline:
+    try:
+        state = pathlib.Path(f"/proc/{child}/stat").read_text().rsplit(") ", 1)[1].split()[0]
+    except (FileNotFoundError, IndexError):
+        state = ""
+    if state == "Z":
+        pathlib.Path(sys.argv[1]).write_text(f"{child}\n")
+        break
+    time.sleep(0.005)
+else:
+    raise SystemExit("no se pudo crear un proceso zombi")
+
+signal.pause()
+PY
+	zombie_holder_pid=$!
+	for _ in {1..200}; do
+		[[ -s "$ready_file" ]] && return 0
+		kill -0 "$zombie_holder_pid" 2>/dev/null || break
+		sleep 0.01
+	done
+	printf '%s\n' 'FAIL: no se pudo preparar un proceso zombi' >&2
+	return 1
+}
 
 mkdir -p "$test_root/bin"
 
@@ -189,5 +236,32 @@ set -e
 	printf '%s\n' 'FAIL: modo foco se activó durante una sesión gaming' >&2
 	exit 1
 }
+
+# Un marcador de un proceso zombi debe podarse: conserva PID+starttime, pero
+# no representa una sesión gaming activa.
+zombie_runtime="$test_root/zombie-runtime"
+zombie_log="$test_root/zombie.log"
+mkdir -p "$zombie_runtime/dotfiles-gaming-sessions"
+spawn_zombie "$test_root/zombie.pid"
+zombie_pid=$(<"$test_root/zombie.pid")
+zombie_starttime=$(awk '{ print $22 }' "/proc/$zombie_pid/stat")
+printf '%s %s\n' "$zombie_pid" "$zombie_starttime" >"$zombie_runtime/dotfiles-gaming-sessions/$zombie_pid"
+printf '%s\n' off >"$test_root/zombie-caffeine"
+printf '%s\n' balanced >"$test_root/zombie-power"
+: >"$test_root/zombie-recording"
+: >"$zombie_log"
+PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/zombie-state" XDG_RUNTIME_DIR="$zombie_runtime" \
+	TEST_CAFFEINE_FILE="$test_root/zombie-caffeine" TEST_POWER_FILE="$test_root/zombie-power" \
+	TEST_LOG="$zombie_log" TEST_DND=off TEST_BAR_VISIBLE=true TEST_RECORDING_FILE="$test_root/zombie-recording" \
+	"$helper" on
+PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/zombie-state" XDG_RUNTIME_DIR="$zombie_runtime" \
+	TEST_CAFFEINE_FILE="$test_root/zombie-caffeine" TEST_POWER_FILE="$test_root/zombie-power" \
+	TEST_LOG="$zombie_log" TEST_DND=off TEST_BAR_VISIBLE=true TEST_RECORDING_FILE="$test_root/zombie-recording" \
+	"$helper" off
+if [[ $(<"$zombie_log") != $'caffeine:on\npower:performance\ndnd:on\nbar:hide\nbar:show\ndnd:off\npower:balanced\ncaffeine:off' ]] ||
+	[[ -e "$zombie_runtime/dotfiles-gaming-sessions/$zombie_pid" ]]; then
+	printf '%s\n' 'FAIL: un marcador zombi bloqueó el modo foco' >&2
+	exit 1
+fi
 
 printf '%s\n' 'PASS: el modo foco restaura DND, barra, cafeína, potencia y grabación propia'
