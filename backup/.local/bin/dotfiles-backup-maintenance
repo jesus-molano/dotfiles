@@ -2,6 +2,8 @@
 # shellcheck source-path=SCRIPTDIR
 set -Eeuo pipefail
 
+readonly MAX_SNAPSHOT_AGE_SECONDS=259200
+
 notify() {
 	"$HOME/.local/bin/desktop-notify" "Backup" "$1" || true
 }
@@ -14,6 +16,100 @@ cleanup() {
 		return 1
 		;;
 	esac
+}
+
+select_latest_snapshot() {
+	local snapshot_json snapshot_info
+	if ! snapshot_json="$(restic snapshots --json --host "$RESTIC_HOST" --tag desktop)"; then
+		printf '%s\n' 'No se pudo consultar el snapshot Restic de este host.' >&2
+		return 1
+	fi
+	if ! snapshot_info="$(python3 -c '
+import datetime as dt
+import json
+import re
+import sys
+
+host = sys.argv[1]
+try:
+    snapshots = json.load(sys.stdin)
+except (json.JSONDecodeError, TypeError) as error:
+    raise SystemExit(f"JSON de snapshots inválido: {error}")
+if not isinstance(snapshots, list):
+    raise SystemExit("JSON de snapshots inválido")
+
+eligible = []
+for snapshot in snapshots:
+    if not isinstance(snapshot, dict):
+        continue
+    snapshot_id = snapshot.get("id")
+    timestamp = snapshot.get("time")
+    tags = snapshot.get("tags")
+    if (not isinstance(snapshot_id, str) or not re.fullmatch(r"[0-9a-f]{8,64}", snapshot_id)
+            or snapshot.get("hostname") != host or not isinstance(timestamp, str)
+            or not isinstance(tags, list) or "desktop" not in tags):
+        continue
+    try:
+        instant = dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if instant.tzinfo is None:
+            raise ValueError("sin zona horaria")
+        epoch = int(instant.timestamp())
+    except ValueError:
+        continue
+    eligible.append((epoch, snapshot_id))
+
+if not eligible:
+    raise SystemExit("No hay snapshot desktop válido para este host")
+epoch, snapshot_id = max(eligible)
+print(f"{snapshot_id}\t{epoch}")
+' "$RESTIC_HOST" <<<"$snapshot_json")"; then
+		printf '%s\n' 'No hay snapshot desktop válido para este host.' >&2
+		return 1
+	fi
+	IFS=$'\t' read -r SNAPSHOT_ID SNAPSHOT_EPOCH <<<"$snapshot_info"
+	[[ "$SNAPSHOT_ID" =~ ^[0-9a-f]{8,64}$ && "$SNAPSHOT_EPOCH" =~ ^[0-9]+$ ]] || {
+		printf '%s\n' 'La selección del snapshot Restic no es válida.' >&2
+		return 1
+	}
+}
+
+validate_snapshot_freshness() {
+	local now age
+	now=$(date +%s)
+	age=$((now - SNAPSHOT_EPOCH))
+	if ((age < -300 || age > MAX_SNAPSHOT_AGE_SECONDS)); then
+		printf '%s\n' 'El último backup Restic de este host supera el umbral de 72 horas.' >&2
+		return 1
+	fi
+}
+
+validate_canary() {
+	local mode token created_at
+	[[ -f "$canary" && ! -L "$canary" ]] || {
+		printf '%s\n' 'No existe el canario Restic privado; ejecuta primero dotfiles-backup.' >&2
+		return 1
+	}
+	mode=$(stat -c '%a' "$canary")
+	[[ "$mode" == 600 ]] || {
+		printf '%s\n' 'El canario Restic no tiene permisos privados.' >&2
+		return 1
+	}
+	mapfile -t canary_lines <"$canary"
+	((${#canary_lines[@]} == 3)) || {
+		printf '%s\n' 'El canario Restic no tiene el formato actual.' >&2
+		return 1
+	}
+	[[ "${canary_lines[0]}" == dotfiles-restic-canary-v2 ]] || {
+		printf '%s\n' 'El canario Restic no tiene el formato actual.' >&2
+		return 1
+	}
+	token=${canary_lines[1]#token=}
+	created_at=${canary_lines[2]#created_at=}
+	[[ "${canary_lines[1]}" == token=* && "$token" =~ ^[0-9a-f]{64}$ &&
+		"${canary_lines[2]}" == created_at=* && "$created_at" =~ ^[0-9]+$ ]] || {
+		printf '%s\n' 'El canario Restic no tiene el formato actual.' >&2
+		return 1
+	}
 }
 status=0
 trap 'status=$?; cleanup; notify "Falló la comprobación Restic (código $status)"; exit "$status"' ERR
@@ -31,16 +127,16 @@ command -v restic >/dev/null 2>&1 || exit 127
 [[ -n ${RESTIC_PASSWORD:-}${RESTIC_PASSWORD_FILE:-}${RESTIC_PASSWORD_COMMAND:-} ]] || exit 2
 export RESTIC_HOST="${RESTIC_HOST:-$(hostname)}"
 
-restic check --read-data-subset=5%
-restic prune
-
 canary="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-backup/canary.txt"
-[[ -r "$canary" ]] || {
-	printf 'No existe el canario local: %s\n' "$canary" >&2
-	exit 2
-}
+validate_canary
+select_latest_snapshot
+validate_snapshot_freshness
+
+# Primero verificamos el snapshot exacto que se va a restaurar. Así un fallo de
+# frescura o de restore no ejecuta prune sobre el repositorio.
+restic check --read-data-subset=5%
 restore_root="$(mktemp -d --tmpdir="${XDG_RUNTIME_DIR:-/tmp}" desktop-restic-restore.XXXXXX)"
-restic restore latest --tag desktop --target "$restore_root" \
+restic restore --verify "$SNAPSHOT_ID" --target "$restore_root" \
 	--include '**/dotfiles-backup/canary.txt'
 mapfile -t restored_files < <(find "$restore_root" -type f -print)
 if ((${#restored_files[@]} != 1)); then
@@ -52,5 +148,6 @@ cmp -- "$canary" "${restored_files[0]}"
 
 cleanup
 restore_root=''
+restic prune
 trap - ERR
 notify 'Check, prune y restauración canario correctos'

@@ -19,6 +19,7 @@ base,browser,python-adblock,native
 base,terminal,ghostty,native
 base,terminal,fish,native
 base,terminal,cachyos-fish-config,native
+base,terminal,bat,native
 base,terminal,starship,native
 base,terminal,zellij,native
 base,terminal,zoxide,native
@@ -59,6 +60,7 @@ base,development,git-delta,native
 base,development,difftastic,native
 base,development,direnv,native
 base,development,mise,native
+base,development,npm,native
 base,development,pnpm,native
 base,development,openai-codex,native
 base,development,shellcheck,native

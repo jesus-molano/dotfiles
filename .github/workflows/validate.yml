@@ -19,13 +19,16 @@ jobs:
     container: archlinux:base-devel
     timeout-minutes: 20
     steps:
+      - name: Install Git for checkout
+        run: pacman -Syu --noconfirm --needed git
+
       - name: Checkout
         uses: actions/checkout@v6
 
       - name: Install test dependencies
         run: >-
-          pacman -Syu --noconfirm --needed
-          git python stow just shellcheck fish zellij
+          pacman -S --noconfirm --needed
+          python stow just shellcheck fish zellij bat starship
 
       - name: Run as an unprivileged CachyOS-style user
         shell: bash

@@ -75,6 +75,58 @@ grep -Fqx $'absent\t'"$rollback_root/etc/udev/rules.d/20-second.rules" \
 	"$rollback_failure_backup/rollback-incomplete.tsv"
 grep -Fq 'Rollback incompleto' "$rollback_root/output"
 
+# TERM e INT pueden llegar entre dos copias. La segunda llamada simulada avisa
+# al proceso real antes de escribir, de modo que el journal debe restaurar la
+# primera copia una sola vez y conservar el código de señal.
+assert_signal_rollback() {
+	local signal=$1 expected_status=$2 signal_root
+	signal_root="$test_root/signal-$signal"
+	mkdir -p "$signal_root/bin" "$signal_root/source/udev/rules.d" \
+		"$signal_root/etc/udev/rules.d" "$signal_root/config" "$signal_root/state"
+	printf '%s\n' new-first >"$signal_root/source/udev/rules.d/10-first.rules"
+	printf '%s\n' new-second >"$signal_root/source/udev/rules.d/20-second.rules"
+	printf '%s\n' old-first >"$signal_root/etc/udev/rules.d/10-first.rules"
+	cat >"$signal_root/bin/pkexec" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ "$1" == /usr/bin/install && "${*: -1}" == *20-second.rules ]]; then
+	case "${TEST_INTERRUPT_SIGNAL:?}" in
+		INT | TERM) ;;
+		*) exit 2 ;;
+	esac
+	printf 'interrumpir %s\n' "$TEST_INTERRUPT_SIGNAL" >>"${TEST_PKEXEC_LOG:?}"
+	kill "-$TEST_INTERRUPT_SIGNAL" "$PPID"
+	exit 0
+fi
+printf '%s\n' "$*" >>"${TEST_PKEXEC_LOG:?}"
+exec "$@"
+EOF
+	chmod +x "$signal_root/bin/pkexec"
+
+	local status
+	if PATH="$signal_root/bin:$PATH" \
+		DOTFILES_SYSTEM_ETC_SOURCE_ROOT="$signal_root/source" \
+		DOTFILES_SYSTEM_ETC_TARGET_ROOT="$signal_root/etc" \
+		DOTFILES_SYSTEM_ETC_PKEXEC=pkexec \
+		TEST_INTERRUPT_SIGNAL="$signal" TEST_PKEXEC_LOG="$signal_root/pkexec.log" \
+		XDG_STATE_HOME="$signal_root/state" XDG_CONFIG_HOME="$signal_root/config" \
+		bash "$helper" --apply udev >"$signal_root/output" 2>&1; then
+		status=0
+	else
+		status=$?
+	fi
+	[[ "$status" -eq "$expected_status" ]]
+	[[ $(<"$signal_root/etc/udev/rules.d/10-first.rules") == old-first ]]
+	[[ ! -e "$signal_root/etc/udev/rules.d/20-second.rules" ]]
+	grep -Fq 'Fallo durante apply-system; se revierte el módulo ya copiado.' "$signal_root/output"
+	[[ $(grep -Fc '/usr/bin/rm -f -- ' "$signal_root/pkexec.log") -eq 1 ]]
+	[[ $(grep -Fc '/usr/bin/cp --archive -- ' "$signal_root/pkexec.log") -eq 1 ]]
+}
+
+assert_signal_rollback TERM 143
+assert_signal_rollback INT 130
+
 cat >"$test_root/bin/pkexec" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -105,5 +157,12 @@ sed -e 's/@MNT_BACKUPS_UUID@/ABCD-1234/g' -e 's/@MNT_BACKUPS_UID@/1001/g' -e 's/
 cp -- "$repo_root/system-etc/systemd/system/mnt-backups.automount" "$test_root/etc/systemd/system/mnt-backups.automount"
 DOTFILES_SYSTEM_ETC_TARGET_ROOT="$test_root/etc" XDG_CONFIG_HOME="$test_root/config" \
 	bash "$helper" --check systemd | grep -Fqx "= $test_root/etc/systemd/system/mnt-backups.mount"
+
+grep -Fqx 'apply-backup-automount:' "$repo_root/justfile"
+grep -Fqx '    mount_unit=/etc/systemd/system/mnt-backups.mount' "$repo_root/justfile"
+grep -Fqx '    automount_unit=/etc/systemd/system/mnt-backups.automount' "$repo_root/justfile"
+grep -Fqx '    pkexec /usr/bin/systemctl daemon-reload' "$repo_root/justfile"
+grep -Fqx '    pkexec /usr/bin/systemctl enable --now mnt-backups.automount' "$repo_root/justfile"
+grep -Fq 'Rollback exacto: pkexec systemctl disable --now mnt-backups.automount; pkexec systemctl daemon-reload' "$repo_root/justfile"
 
 printf '%s\n' 'PASS: system-etc revierte, registra preimágenes y protege systemd por host'

@@ -15,10 +15,12 @@ run() {
 
 run 'Sintaxis y contratos Shell' shellcheck -x \
 	install.sh \
+	scripts/lib/install_package_ops.sh \
 	scripts/ci-check.sh \
 	scripts/stow-lint.sh \
 	scripts/system-etc-transaction.sh \
 	backup/.local/bin/dotfiles-backup \
+	backup/.local/bin/dotfiles-backup-maintenance \
 	gaming-core/.local/bin/game-run \
 	hypr-common/.local/bin/demo-studio \
 	hypr-common/.local/bin/start-orca-background \
@@ -27,10 +29,14 @@ run 'Sintaxis y contratos Shell' shellcheck -x \
 run 'Sintaxis Python' python3 -c \
 	'import ast,pathlib; [ast.parse(path.read_text(encoding="utf-8"), filename=str(path)) for path in pathlib.Path("scripts").rglob("*.py")]'
 run 'Sintaxis Fish Android' fish -n android/.config/fish/conf.d/android.fish
-run 'Configuración Zellij' env ZELLIJ_CONFIG_FILE="$repo_root/zellij/.config/zellij/config.kdl" \
+run 'Configuración Zellij' env -u ZELLIJ_CONFIG_FILE ZELLIJ_CONFIG_DIR="$repo_root/zellij/.config/zellij" \
 	zellij setup --check
 run 'Pruebas Python' env PYTHONDONTWRITEBYTECODE=1 \
 	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+run 'Contrato qutebrowser' env PYTHONDONTWRITEBYTECODE=1 \
+	python3 scripts/tests/test_qutebrowser_config.py
+run 'Generación de temas terminales y Micro' env PYTHONDONTWRITEBYTECODE=1 \
+	python3 scripts/tests/test_terminal_theme_generation.py
 
 for test in \
 	test_dotf_function.sh \
@@ -49,4 +55,5 @@ for test in \
 done
 
 run 'Whitespace Git' git diff --check
+run 'Whitespace del commit Git' git show --check --format= HEAD
 printf '%s\n' 'CI reproducible completado.'

@@ -47,18 +47,27 @@ else
 fi
 
 canary="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles-backup/canary.txt"
-canary_value='dotfiles-restic-restore-canary-v1'
-mkdir -p -- "$(dirname -- "$canary")"
-if [[ ! -e "$canary" ]]; then
-	printf '%s\n' "$canary_value" >"$canary"
-elif [[ ! -f "$canary" || -L "$canary" || "$(<"$canary")" != "$canary_value" ]]; then
-	printf 'Canario local inesperado; no se sobrescribirá: %s\n' "$canary" >&2
+canary_dir=$(dirname -- "$canary")
+install -d -m 700 -- "$canary_dir"
+canary_token="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
+[[ "$canary_token" =~ ^[0-9a-f]{64}$ ]] || {
+	printf '%s\n' 'No se pudo generar el token privado del canario Restic.' >&2
 	exit 1
-fi
+}
+canary_temporary=$(mktemp "$canary_dir/.canary.XXXXXX")
+chmod 600 "$canary_temporary"
+printf '%s\n' \
+	'dotfiles-restic-canary-v2' \
+	"token=$canary_token" \
+	"created_at=$(date +%s)" >"$canary_temporary"
+mv -fT -- "$canary_temporary" "$canary"
 
 runtime_root=${XDG_RUNTIME_DIR:-/tmp}
 paths_file="$(mktemp --tmpdir="$runtime_root" desktop-restic-paths.XXXXXX)"
-trap 'rm -f -- "$paths_file"' EXIT
+cleanup() {
+	rm -f -- "${paths_file:-}" "${canary_temporary:-}"
+}
+trap cleanup EXIT
 
 while IFS= read -r configured || [[ -n "$configured" ]]; do
 	[[ -n "$configured" && "$configured" != \#* ]] || continue

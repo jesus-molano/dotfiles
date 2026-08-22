@@ -120,12 +120,19 @@ journal="$backup_root/journal.tsv"
 mkdir -p -- "$backup_root/preimages"
 : >"$journal"
 applied=0
+rollback_started=0
 
 rollback() {
-	local status=$? line kind target backup rollback_failed=0
+	local status=${1:-$?} line kind target backup rollback_failed=0
 	local rollback_failures="$backup_root/rollback-incomplete.tsv"
+	# ERR, INT y TERM pueden llegar muy cerca. Desarma los traps antes de tocar
+	# los destinos para que el mismo journal nunca se ejecute dos veces.
+	if ((rollback_started)); then
+		exit "$status"
+	fi
+	rollback_started=1
+	trap - ERR INT TERM
 	((applied)) || exit "$status"
-	trap - ERR
 	set +e
 	printf '%s\n' 'Fallo durante apply-system; se revierte el módulo ya copiado.' >&2
 	mapfile -t journal_lines <"$journal"
@@ -151,7 +158,9 @@ rollback() {
 	fi
 	exit "$status"
 }
-trap rollback ERR
+trap 'rollback "$?"' ERR
+trap 'rollback 130' INT
+trap 'rollback 143' TERM
 
 for index in "${!sources[@]}"; do
 	source=${sources[$index]}
@@ -174,6 +183,6 @@ for index in "${!sources[@]}"; do
 	printf '✓ %s\n' "$target"
 done
 
-trap - ERR
+trap - ERR INT TERM
 printf '%s\n' "$backup_root" >"$state_root/last-system-backup"
 printf 'Backup: %s\n' "$backup_root"

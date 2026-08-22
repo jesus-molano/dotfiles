@@ -181,6 +181,35 @@ apply-system module:
 
     "{{ dotfiles_dir }}/scripts/system-etc-transaction.sh" --apply "$module"
 
+# No instala ni recarga otros módulos de /etc.
+# Activa únicamente el automount de backups después de aplicar system-etc.
+apply-backup-automount:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mount_unit=/etc/systemd/system/mnt-backups.mount
+    automount_unit=/etc/systemd/system/mnt-backups.automount
+    for unit in "$mount_unit" "$automount_unit"; do
+        [[ -f "$unit" && ! -L "$unit" ]] || {
+            printf 'Falta la unidad aplicada por system-etc: %s\n' "$unit" >&2
+            printf '%s\n' 'Ejecuta primero: just apply-system systemd'
+            exit 2
+        }
+    done
+    printf 'Unidades exactas: %s y %s\n' "$mount_unit" "$automount_unit"
+    printf '%s\n' 'Acciones: daemon-reload y enable --now de mnt-backups.automount.'
+    printf '%s\n' 'Rollback exacto: pkexec systemctl disable --now mnt-backups.automount; pkexec systemctl daemon-reload'
+    printf '%s\n' 'No se modificará ningún otro módulo ni unidad.'
+    printf 'Escribe ACTIVAR: '
+    read -r confirmation
+    [[ "$confirmation" == ACTIVAR ]] || {
+        printf 'Cancelado sin cambios.\n'
+        exit 1
+    }
+    pkexec /usr/bin/systemctl daemon-reload
+    pkexec /usr/bin/systemctl enable --now mnt-backups.automount
+    /usr/bin/systemctl is-enabled --quiet mnt-backups.automount
+    /usr/bin/systemctl is-active --quiet mnt-backups.automount
+
 # Ejecuta el instalador de la composición local.
 install:
     "{{ dotfiles_dir }}/install.sh"

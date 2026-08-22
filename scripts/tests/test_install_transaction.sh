@@ -12,8 +12,11 @@ fixture_repo="$test_root/repo"
 fixture_home="$test_root/home"
 fixture_state="$test_root/state"
 fixture_config="$test_root/config"
-mkdir -p "$fixture_repo/scripts/tests/fixtures" "$fixture_home" "$fixture_state" "$fixture_config" "$test_root/bin"
+mkdir -p "$fixture_repo/scripts/lib" "$fixture_repo/scripts/tests/fixtures" \
+	"$fixture_home" "$fixture_state" "$fixture_config" "$test_root/bin"
 cp -- "$repo_root/install.sh" "$fixture_repo/install.sh"
+cp -- "$repo_root/scripts/lib/checkout_link_guard.py" "$fixture_repo/scripts/lib/checkout_link_guard.py"
+cp -- "$repo_root/scripts/lib/install_package_ops.sh" "$fixture_repo/scripts/lib/install_package_ops.sh"
 cp -- "$repo_root/scripts/tests/fixtures/current-host.toml" "$fixture_repo/scripts/tests/fixtures/current-host.toml"
 cp -- "$repo_root/scripts/tests/fixtures/laptop-host.toml" "$fixture_repo/scripts/tests/fixtures/laptop-host.toml"
 
