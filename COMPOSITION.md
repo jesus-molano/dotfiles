@@ -102,6 +102,10 @@ los archivos generados de Hyprland, audio y Noctalia, y el estado de servicios b
 `$XDG_STATE_HOME/dotfiles/backups/`. Si falla Stow o una validación posterior,
 restaura todo desde el snapshot, incluso aunque el checkout ya no contenga los
 módulos legacy. No desinstala paquetes, Flatpaks, juegos, bibliotecas ni datos.
+Stow puede provocar una recarga automática de Hyprland durante el breve intervalo
+en que sustituye enlaces. Una instalación aplicada recarga y comprueba la sesión
+solo después de persistir el estado final; un rollback hace lo mismo después de
+persistir `rolled-back`.
 
 `dotf host rollback` previsualiza la última transacción. Solo
 `dotf host rollback --apply` modifica el sistema y se niega a sobrescribir un

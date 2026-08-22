@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Las pruebas nunca deben alcanzar la sesión Hyprland del proceso que las lanza.
+unset HYPRLAND_INSTANCE_SIGNATURE
+
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
@@ -212,6 +215,94 @@ EOF
 chmod +x "$test_root/bin/systemctl"
 # Ningún caso posterior puede tocar el gestor systemd de la sesión real.
 export PATH="$test_root/bin:$PATH"
+
+# Stow puede provocar una recarga automática mientras el árbol de Hyprland
+# está temporalmente incompleto. La recarga final debe recuperar la sesión y
+# detectar el modo de emergencia, que solo registra sus atajos de rescate.
+hypr_bin="$test_root/hypr-bin"
+mkdir -p "$hypr_bin"
+cat >"$hypr_bin/hyprctl" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$TEST_HYPRCTL_LOG"
+case "$*" in
+reload) ;;
+configerrors) ;;
+'binds -j')
+    if [[ ${TEST_HYPRCTL_MODE:-valid} == emergency ]]; then
+        printf '%s\n' '[{"description":"Emergency terminal"},{"description":"Emergency exit"},{"description":"Emergency reload"}]'
+    else
+        printf '%s\n' '[{"description":"Open Ghostty"},{"description":"Open Noctalia launcher"}]'
+    fi
+    ;;
+*) exit 2 ;;
+esac
+EOF
+chmod +x "$hypr_bin/hyprctl"
+hypr_reload_runner="$test_root/reload-hyprland.sh"
+cat >"$hypr_reload_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+reload_live_hyprland prueba 'Open Ghostty'
+EOF
+chmod +x "$hypr_reload_runner"
+hyprctl_log="$test_root/hyprctl.log"
+HYPRLAND_INSTANCE_SIGNATURE=fixture TEST_HYPRCTL_LOG="$hyprctl_log" \
+	PATH="$hypr_bin:$PATH" FIXTURE_REPO="$fixture_repo" "$hypr_reload_runner"
+[[ $(grep -Fxc reload "$hyprctl_log") -eq 1 ]]
+[[ $(grep -Fxc configerrors "$hyprctl_log") -eq 1 ]]
+[[ $(grep -Fxc 'binds -j' "$hyprctl_log") -eq 1 ]]
+
+: >"$hyprctl_log"
+if HYPRLAND_INSTANCE_SIGNATURE=fixture TEST_HYPRCTL_MODE=emergency TEST_HYPRCTL_LOG="$hyprctl_log" \
+	PATH="$hypr_bin:$PATH" FIXTURE_REPO="$fixture_repo" "$hypr_reload_runner"; then
+	printf '%s\n' 'FAIL: la recarga aceptó los tres atajos del modo de emergencia.' >&2
+	exit 1
+fi
+grep -Fxq 'binds -j' "$hyprctl_log"
+
+: >"$hyprctl_log"
+TEST_HYPRCTL_LOG="$hyprctl_log" PATH="$hypr_bin:$PATH" \
+	FIXTURE_REPO="$fixture_repo" "$hypr_reload_runner"
+[[ ! -s "$hyprctl_log" ]]
+
+# La activación viva ocurre después de persistir la transacción. Un fallo de
+# IPC no debe provocar otro restow ni revertir archivos ya validados.
+hypr_order_runner="$test_root/hyprland-activation-order.sh"
+cat >"$hypr_order_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+begin_migration() {
+    MIGRATION_DIR="$STATE_DIR/migrations/order"
+    mkdir -p "$MIGRATION_DIR"
+}
+preflight_migration_checkout_links() { return 0; }
+generate_derived_state() { return 0; }
+backup_targets() { return 0; }
+deploy_dotfiles() { return 0; }
+install_staged_configs() { return 0; }
+validate_deployed_config() { return 0; }
+reload_user_manager() { return 0; }
+record_user_services_mutation_intent() { return 0; }
+configure_user_services() { return 0; }
+persist_migration_checkpoint() { return 0; }
+reload_live_hyprland() {
+    printf '%s\n' "$(<"$MIGRATION_DIR/status")" >>"$TEST_HYPR_RELOAD_STATES"
+	return 1
+}
+mkdir -p "$STATE_DIR"
+apply_dotfiles_transaction
+EOF
+chmod +x "$hypr_order_runner"
+hypr_order_state="$test_root/hypr-order-state"
+hypr_reload_states="$test_root/hypr-reload-states.log"
+XDG_STATE_HOME="$hypr_order_state" FIXTURE_REPO="$fixture_repo" \
+	TEST_HYPR_RELOAD_STATES="$hypr_reload_states" "$hypr_order_runner"
+[[ $(<"$hypr_reload_states") == applied ]]
 
 # Un despliegue sin un gestor systemd de usuario accesible no debe fallar. Las
 # unidades se cargarán en la próxima sesión, y no se intenta daemon-reload.
@@ -430,15 +521,21 @@ generate_derived_state() {
 }
 validate_deployed_config() { return 0; }
 configure_user_services() { return 1; }
+reload_live_hyprland() {
+    printf '%s\n' "$(<"$MIGRATION_DIR/status")" >>"$TEST_HYPR_RELOAD_STATES"
+	return 1
+}
 apply_dotfiles_transaction
 EOF
 chmod +x "$runner"
 
 set +e
 transaction_systemctl_log="$test_root/systemctl-transaction.log"
+transaction_hypr_reload_states="$test_root/hypr-rollback-states.log"
 PATH="$test_root/bin:$PATH" \
 	HOME="$fixture_home" XDG_CONFIG_HOME="$fixture_config" XDG_STATE_HOME="$fixture_state" \
 	FIXTURE_REPO="$fixture_repo" TEST_PLAN="$plan" TEST_SYSTEMCTL_LOG="$transaction_systemctl_log" \
+	TEST_HYPR_RELOAD_STATES="$transaction_hypr_reload_states" \
 	"$runner" >"$test_root/run.log" 2>&1
 code=$?
 set -e
@@ -447,6 +544,7 @@ set -e
 	exit 1
 }
 [[ $(grep -Fxc -- '--user daemon-reload' "$transaction_systemctl_log") -eq 2 ]]
+[[ $(<"$transaction_hypr_reload_states") == rolled-back ]]
 
 migration=$(<"$fixture_state/dotfiles/last-migration")
 [[ "$migration" == "$fixture_state/dotfiles/migrations/"* ]]

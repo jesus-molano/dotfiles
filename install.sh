@@ -2417,6 +2417,9 @@ rollback_migration() {
 	write_restored_active_generated
 	printf '%s\n' rolled-back >"$MIGRATION_DIR/status"
 	persist_migration_checkpoint
+	if ! reload_live_hyprland 'después del rollback'; then
+		warn 'Los archivos anteriores se restauraron, pero la sesión Hyprland no pudo recargarlos.'
+	fi
 	ok "Transacción restaurada: $MIGRATION_DIR"
 }
 
@@ -2545,6 +2548,52 @@ reload_user_manager() {
 		warn "No se pudo recargar systemd de usuario $context."
 		return 1
 	fi
+}
+
+reload_live_hyprland() {
+	local context=${1:-'después del despliegue'}
+	local expected_description=${2:-}
+	local config_errors binds_json
+	if ! command -v hyprctl >/dev/null 2>&1; then
+		return 0
+	fi
+	if [[ -z ${HYPRLAND_INSTANCE_SIGNATURE:-} ]]; then
+		info 'No hay una sesión Hyprland accesible; la configuración se cargará en el próximo inicio de sesión.'
+		return 0
+	fi
+	if ! hyprctl reload >/dev/null 2>&1; then
+		warn "No se pudo recargar Hyprland $context."
+		return 1
+	fi
+	if ! config_errors="$(hyprctl configerrors 2>/dev/null)"; then
+		warn "No se pudo consultar el estado de Hyprland $context."
+		return 1
+	fi
+	if [[ -n ${config_errors//[[:space:]]/} ]]; then
+		warn "Hyprland informa de errores de configuración $context."
+		return 1
+	fi
+	if [[ -n "$expected_description" ]]; then
+		if ! binds_json="$(hyprctl binds -j 2>/dev/null)"; then
+			warn "No se pudieron comprobar los atajos de Hyprland $context."
+			return 1
+		fi
+		if ! python3 -c '
+import json
+import sys
+
+binds = json.load(sys.stdin)
+expected = sys.argv[1]
+valid = isinstance(binds, list) and any(
+    isinstance(bind, dict) and bind.get("description") == expected for bind in binds
+)
+raise SystemExit(0 if valid else 1)
+' "$expected_description" <<<"$binds_json"; then
+			warn "Hyprland no registró el atajo gestionado esperado $context."
+			return 1
+		fi
+	fi
+	ok "Sesión Hyprland recargada $context."
 }
 
 disable_reactive_rgb_autostart() {
@@ -2749,6 +2798,9 @@ apply_dotfiles_transaction() {
 	sync -f -- "$STATE_DIR/last-migration" || die 'No se pudo sincronizar la referencia de la migración aplicada.'
 	sync -f -- "$STATE_DIR" || die 'No se pudo sincronizar el estado de migración aplicado.'
 	sync -f -- "$(dirname "$STATE_DIR")" || die 'No se pudo sincronizar el índice del estado aplicado.'
+	if ! reload_live_hyprland 'después del despliegue' 'Open Ghostty'; then
+		warn 'Los archivos se aplicaron y validaron, pero la sesión Hyprland no aceptó la recarga final.'
+	fi
 	ok "Transacción aplicada: $MIGRATION_DIR"
 }
 
