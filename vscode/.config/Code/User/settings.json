@@ -4,5 +4,6 @@
   "terminal.integrated.fontFamily": "JetBrainsMono Nerd Font",
   "terminal.integrated.minimumContrastRatio": 1,
   "gitlens.ai.model": "vscode",
-  "gitlens.ai.vscode.model": "copilotcli:"
+  "gitlens.ai.vscode.model": "copilotcli:",
+  "git.autofetch": true
 }
