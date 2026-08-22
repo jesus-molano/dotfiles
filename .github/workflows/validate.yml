@@ -16,9 +16,7 @@ concurrency:
 jobs:
   reproducible:
     runs-on: ubuntu-latest
-    # packages.csv incluye paquetes nativos del repositorio CachyOS. La imagen
-    # oficial evita falsos negativos; latest valida el catálogo rolling actual.
-    container: cachyos/cachyos:latest
+    container: archlinux:base-devel
     timeout-minutes: 20
     steps:
       - name: Install Git for checkout
@@ -32,9 +30,33 @@ jobs:
           pacman -S --noconfirm --needed
           python stow just shellcheck fish zellij bat starship
 
-      - name: Run as an unprivileged CachyOS user
+      - name: Run as an unprivileged user
         shell: bash
         run: |
           useradd --create-home --shell /bin/bash dotfiles-ci
           chown -R dotfiles-ci:dotfiles-ci "$GITHUB_WORKSPACE"
           runuser -u dotfiles-ci -- just --justfile "$GITHUB_WORKSPACE/justfile" ci
+
+  cachyos_packages:
+    name: CachyOS package catalog
+    runs-on: ubuntu-latest
+    # latest es intencional: este job comprueba el catálogo rolling actual.
+    container: cachyos/cachyos:latest
+    timeout-minutes: 10
+    steps:
+      - name: Install Git for checkout
+        run: pacman -Syu --noconfirm --needed git
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate native package availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t native_packages < <(
+            awk -F, '$4 == "native" { print $3 }' packages.csv | LC_ALL=C sort -u
+          )
+          ((${#native_packages[@]} > 0))
+          pacman -Si "${native_packages[@]}" >/dev/null
+          printf 'Validated %d native packages in CachyOS repositories.\n' "${#native_packages[@]}"

@@ -1496,16 +1496,40 @@ cat >"$e2e_bin/shelly" <<'EOF'
 printf '%s\n' 'FAIL: --check no debe ejecutar Shelly.' >&2
 exit 97
 EOF
-chmod +x "$e2e_bin/shelly"
+cat >"$e2e_bin/pacman" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$TEST_PACMAN_LOG"
+case "${1:-}" in
+-Si) exit 0 ;;
+-Q) exit 1 ;;
+-Sp)
+	case "${!#}" in
+	cachyos-hypr-noctalia) printf '%s\n' '1.2.5-1' ;;
+	hyprland) printf '%s\n' '0.56.2-1' ;;
+	noctalia) printf '%s\n' '5.0.0_beta.9-1' ;;
+	*) exit 98 ;;
+	esac
+	;;
+*) exit 98 ;;
+esac
+EOF
+chmod +x "$e2e_bin/shelly" "$e2e_bin/pacman"
+e2e_pacman_log="$test_root/e2e-pacman.log"
+: >"$e2e_pacman_log"
 e2e_env=(
 	HOME="$e2e_home"
 	XDG_CONFIG_HOME="$e2e_home/.config"
 	XDG_STATE_HOME="$e2e_state"
 	XDG_CACHE_HOME="$e2e_cache"
 	XDG_DATA_HOME="$e2e_data"
+	TEST_PACMAN_LOG="$e2e_pacman_log"
 	PATH="$e2e_bin:$PATH"
 )
 env "${e2e_env[@]}" "$repo_root/install.sh" --safe-defaults --check >"$test_root/e2e-safe-defaults.out"
+grep -Fq -- '-Si ' "$e2e_pacman_log"
+grep -Fq -- 'cachyos-hypr-noctalia' "$e2e_pacman_log"
+grep -Fq -- '-Sp --print-format %v noctalia' "$e2e_pacman_log"
 [[ -z "$(find "$e2e_home" -mindepth 1 -print -quit)" ]]
 if env "${e2e_env[@]}" "$repo_root/install.sh" </dev/null >"$test_root/e2e-missing-host.out" 2>&1; then
 	printf '%s\n' 'FAIL: main() aceptó una instalación no interactiva sin host.toml.' >&2
