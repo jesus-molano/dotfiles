@@ -31,6 +31,26 @@ tarea requiera un agente. Orca conserva el trabajo visual, los worktrees y sus
 terminales. Este reparto evita abrir Nvim, un agente y varios terminales para
 cada proyecto aunque solo quieras hablar con Codex.
 
+## Ventanas, espacios y teclado
+
+Kanata convierte Caps Lock en Escape al pulsar y en Hyper al mantener. La salida
+de emergencia es `Ctrl + Space + Esc`.
+
+| Atajo | Acción |
+|---|---|
+| `Alt + H/J/K/L` | Mover el foco. |
+| `Alt + Shift + H/J/K/L` | Mover la ventana. |
+| `Alt + Ctrl + H/J/K/L` | Redimensionar. |
+| `Alt + Q/W/E/R/U/I/O/P` | Ir a los espacios 1–8. |
+| `Alt + Shift + Q/W/E/R/U/I/O/P` | Enviar la ventana a un espacio. |
+| `Alt + Tab` | Abrir el selector de ventanas. |
+| `Alt + X` | Cerrar la ventana. |
+| `Alt + M` | Maximizar. |
+| `Alt + F` | Alternar flotante. |
+| `Hyper + D` | Alternar la dirección de división. |
+| `Hyper + F` | Alternar pantalla completa. |
+| `Ctrl + G` en Zellij | Abrir el hub; `Esc` vuelve al modo transparente. |
+
 ## Proyectos y acciones avanzadas
 
 `/proj` descubre repositorios dentro de `~/projects`, `~/work`, `~/.dotfiles` y
@@ -284,6 +304,8 @@ demás plantillas activas. Starship se genera fuera del checkout. Neovim y
 qutebrowser leen la paleta al abrir una instancia nueva. Orca la aplica antes
 de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
 abierta.
+Los ajustes antiguos de Kitty y Kvantum que no tienen paridad se conservan
+como [referencias legacy](reference/README.md); no son módulos desplegables.
 SDDM mantiene Project Atlas: se ejecuta antes de la sesión y no participa en
 este cambio de apariencia.
 

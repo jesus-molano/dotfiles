@@ -114,8 +114,8 @@ archivo generado que haya cambiado después del despliegue.
 La retirada de los módulos legacy requiere dos fases. El commit A conserva sus
 fuentes, se aplica desde el checkout canónico y se valida en vivo. El commit B
 puede borrarlas únicamente después de demostrar esa paridad; un host que no haya
-aplicado A no debe saltar directamente a B. La secuencia exacta está en el
-[README](README.md#migración-desde-los-módulos-legacy-dos-commits-obligatorios).
+aplicado A no debe saltar directamente a B. La secuencia exacta está en
+[docs/RECOVERY.md](docs/RECOVERY.md#migración-desde-módulos-legacy).
 
 CHWD sigue siendo responsable de los controladores. La composición no toca
 arranque, initramfs, Btrfs, ZRAM, firmware, PWM ni `/etc`.
@@ -124,3 +124,8 @@ Los módulos de `system-etc` usan otra transacción: primero simulan el destino,
 después crean un journal con preimágenes y revierten las copias parciales en
 orden inverso. No participan en `just apply` y siempre requieren confirmación
 separada.
+
+Los ajustes antiguos de Kitty y Kvantum no son módulos de la composición.
+Noctalia solo cubre la paleta de Kitty y los colores de qt5ct/qt6ct, por lo que
+sus preferencias se conservan como [referencias legacy](docs/reference/README.md)
+hasta que exista una migración con paridad comprobada.
