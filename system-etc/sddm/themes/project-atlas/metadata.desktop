@@ -1,10 +1,10 @@
 [SddmGreeterTheme]
-Name=Project Atlas
-Description=Project Atlas login theme for Hyprland
+Name=Neutral Login
+Description=Neutral login theme for Hyprland
 Type=sddm-theme
 Author=jesus-molano
 License=MIT
-Version=1.0
+Version=1.1
 MainScript=Main.qml
 ConfigFile=theme.conf
 Theme-Id=project-atlas

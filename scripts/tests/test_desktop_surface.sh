@@ -9,10 +9,16 @@ common_binds="$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 timer_service="$repo_root/noctalia/.local/share/noctalia/plugins/timer/service.luau"
 timer_manifest="$repo_root/noctalia/.local/share/noctalia/plugins/timer/plugin.toml"
 dap_configs="$repo_root/nvim/.config/nvim/lua/plugins/dap-configs.lua"
+sddm_theme="$repo_root/system-etc/sddm/themes/project-atlas/theme.conf"
+sddm_qml="$repo_root/system-etc/sddm/themes/project-atlas/Main.qml"
+sddm_metadata="$repo_root/system-etc/sddm/themes/project-atlas/metadata.desktop"
 
-python3 - "$noctalia" <<'PY'
+python3 - "$noctalia" "$sddm_theme" "$sddm_qml" "$sddm_metadata" <<'PY'
+import configparser
+import re
 import sys
 import tomllib
+from pathlib import Path
 
 with open(sys.argv[1], "rb") as source:
     config = tomllib.load(source)
@@ -40,6 +46,70 @@ assert notes["extension"] == "md"
 assert "salemsayed/codexbar-meter" not in config["plugin_settings"]
 assert config["plugins"]["auto_update"] == "none"
 assert config["shell"]["avatar_path"].endswith("/avatar.svg")
+assert config["widget"]["session"]["color"] == "primary"
+
+session_actions = {
+    action["action"]: action for action in config["shell"]["session"]["actions"]
+}
+assert session_actions["shutdown"]["variant"] == "destructive"
+assert all(
+    action["variant"] == "primary"
+    for name, action in session_actions.items()
+    if name != "shutdown"
+)
+
+sddm_theme = configparser.ConfigParser(interpolation=None)
+sddm_theme.optionxform = str
+assert sddm_theme.read(sys.argv[2]) == [sys.argv[2]]
+theme = sddm_theme["General"]
+assert theme["accent"].lower() != "#ff5b4d"
+assert theme["accent"].lower() != theme["danger"].lower()
+assert "background" not in theme
+
+def relative_luminance(value):
+    assert re.fullmatch(r"#[0-9a-fA-F]{6}", value)
+    channels = [int(value[index:index + 2], 16) / 255 for index in (1, 3, 5)]
+    linear = [
+        channel / 12.92
+        if channel <= 0.04045
+        else ((channel + 0.055) / 1.055) ** 2.4
+        for channel in channels
+    ]
+    return 0.2126 * linear[0] + 0.7152 * linear[1] + 0.0722 * linear[2]
+
+def contrast_ratio(first, second):
+    lighter, darker = sorted(
+        (relative_luminance(first), relative_luminance(second)), reverse=True
+    )
+    return (lighter + 0.05) / (darker + 0.05)
+
+assert contrast_ratio(theme["danger"], theme["dangerText"]) >= 4.5
+
+qml = Path(sys.argv[3]).read_text(encoding="utf-8")
+config_tokens = set(re.findall(r'config\.stringValue\("([^"]+)"\)', qml))
+assert config_tokens <= set(theme)
+assert {
+    "backgroundTop",
+    "backgroundMiddle",
+    "backgroundBottom",
+    "accent",
+    "warning",
+    "danger",
+    "dangerText",
+} <= config_tokens
+assert "PROJECT ATLAS" not in qml
+assert "AtlasButton" not in qml
+assert 'config.stringValue("background")' not in qml
+assert "control.danger ? root.danger" in qml
+assert "#ff5b4d" not in qml
+assert "#b94f70" not in qml
+assert "#d86f91" not in qml
+
+sddm_metadata = configparser.ConfigParser(interpolation=None)
+assert sddm_metadata.read(sys.argv[4]) == [sys.argv[4]]
+metadata = sddm_metadata["SddmGreeterTheme"]
+assert metadata["Name"] == "Neutral Login"
+assert metadata["Theme-Id"] == "project-atlas"
 PY
 
 if command -v noctalia >/dev/null 2>&1; then
@@ -78,6 +148,7 @@ grep -Fq 'bind(hyper .. " + bracketleft", hl.dsp.exec_cmd(noctalia .. "wallpaper
 grep -Fq 'bind(hyper .. " + bracketright", hl.dsp.exec_cmd(noctalia .. "wallpaper-next")' "$common_binds"
 grep -Fq 'bind(hyper .. " + T", hl.dsp.exec_cmd(noctalia .. "panel-open launcher /appearance")' "$common_binds"
 grep -Fq 'bind(hyper .. " + A", hl.dsp.exec_cmd("desktop-launcher open timer")' "$common_binds"
+grep -Fq 'bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session")' "$common_binds"
 grep -Fq 'panel-toggle control-center' "$common_binds"
 
 python3 - "$repo_root" <<'PY'
@@ -118,4 +189,4 @@ grep -Fq 'runtimeExecutable = brave ~= "" and brave or "/usr/bin/brave"' "$dap_c
 [[ ! -e "$repo_root/hypr-common/.local/bin/dev-pulse-status" ]]
 [[ ! -e "$repo_root/noctalia/.local/share/noctalia/plugins/dev-pulse/plugin.toml" ]]
 
-printf '%s\n' 'PASS: barra útil, Notes, Timer visible y paneles T/A/[ ]/R estables'
+printf '%s\n' 'PASS: barra útil, sesión coherente, login neutral y paneles T/A/[ ]/R estables'

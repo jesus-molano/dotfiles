@@ -304,10 +304,18 @@ demás plantillas activas. Starship se genera fuera del checkout. Neovim y
 qutebrowser leen la paleta al abrir una instancia nueva. Orca la aplica antes
 de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
 abierta.
+El widget de sesión y las acciones normales de `Hyper + Q` usan el color
+primario de la apariencia activa. El fondo del panel usa la superficie de esa
+misma paleta. Solo la acción final de apagado conserva la variante destructiva.
+Los diálogos GTK, incluido el cierre de Ghostty, siguen la paleta generada; una
+aplicación abierta antes del cambio puede requerir reinicio.
 Los ajustes antiguos de Kitty y Kvantum que no tienen paridad se conservan
 como [referencias legacy](reference/README.md); no son módulos desplegables.
-SDDM mantiene Project Atlas: se ejecuta antes de la sesión y no participa en
-este cambio de apariencia.
+El SDDM personalizado usa un tema neutral y no consume el estado de apariencia
+de Noctalia. El identificador interno `project-atlas` se conserva para mantener
+compatible el despliegue existente. La sincronización de Noctalia Greeter no se
+aplica a este SDDM y sus ejecutables auxiliares no están instalados. Solo el
+botón final de apagado usa el color de peligro.
 
 Cuando el bundle `rgb-openrgb` está seleccionado para el hardware actual,
 `reactive-rgb.service` usa dos indicadores independientes dentro

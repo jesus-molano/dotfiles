@@ -7,8 +7,11 @@ Rectangle {
 
     width: 1920
     height: 1080
-    color: "#090a0d"
+    color: backgroundBottom
 
+    readonly property color backgroundTop: config.stringValue("backgroundTop")
+    readonly property color backgroundMiddle: config.stringValue("backgroundMiddle")
+    readonly property color backgroundBottom: config.stringValue("backgroundBottom")
     readonly property color accent: config.stringValue("accent")
     readonly property color accentText: config.stringValue("accentText")
     readonly property color surface: config.stringValue("surface")
@@ -16,6 +19,9 @@ Rectangle {
     readonly property color textColor: config.stringValue("text")
     readonly property color mutedColor: config.stringValue("muted")
     readonly property color outlineColor: config.stringValue("outline")
+    readonly property color warning: config.stringValue("warning")
+    readonly property color danger: config.stringValue("danger")
+    readonly property color dangerText: config.stringValue("dangerText")
     property date now: new Date()
     property bool authenticating: false
 
@@ -46,23 +52,13 @@ Rectangle {
         onTriggered: root.now = new Date()
     }
 
-    Image {
-        id: wallpaper
-        anchors.fill: parent
-        source: Qt.resolvedUrl(config.stringValue("background"))
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        cache: true
-    }
-
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.0; color: "#ed090a0d" }
-            GradientStop { position: 0.36; color: "#99090a0d" }
-            GradientStop { position: 0.68; color: "#21090a0d" }
-            GradientStop { position: 1.0; color: "#73090a0d" }
+            orientation: Gradient.Vertical
+            GradientStop { position: 0.0; color: root.backgroundTop }
+            GradientStop { position: 0.52; color: root.backgroundMiddle }
+            GradientStop { position: 1.0; color: root.backgroundBottom }
         }
     }
 
@@ -112,7 +108,7 @@ Rectangle {
                 spacing: 5
 
                 Text {
-                    text: "PROJECT ATLAS"
+                    text: "INICIO DE SESIÓN"
                     color: root.accent
                     font.family: "Inter"
                     font.pixelSize: 13
@@ -238,7 +234,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 18
                 text: ""
-                color: text.indexOf("Comprobando") === 0 ? root.mutedColor : "#d86f91"
+                color: text.indexOf("Comprobando") === 0 ? root.mutedColor : root.warning
                 font.family: "Inter"
                 font.pixelSize: 12
                 wrapMode: Text.WordWrap
@@ -285,26 +281,26 @@ Rectangle {
 
         property bool expanded: false
 
-        AtlasButton {
+        SessionButton {
             text: "Suspender"
             visible: powerActions.expanded && sddm.canSuspend
             onClicked: sddm.suspend()
         }
 
-        AtlasButton {
+        SessionButton {
             text: "Reiniciar"
             visible: powerActions.expanded && sddm.canReboot
             onClicked: sddm.reboot()
         }
 
-        AtlasButton {
+        SessionButton {
             text: "Apagar"
             visible: powerActions.expanded && sddm.canPowerOff
             danger: true
             onClicked: sddm.powerOff()
         }
 
-        AtlasButton {
+        SessionButton {
             text: powerActions.expanded ? "Cerrar" : "Energía"
             emphasized: !powerActions.expanded
             onClicked: powerActions.expanded = !powerActions.expanded
@@ -318,7 +314,7 @@ Rectangle {
             username.forceActiveFocus()
     }
 
-    component AtlasButton: Button {
+    component SessionButton: Button {
         id: control
         property bool emphasized: false
         property bool danger: false
@@ -329,7 +325,7 @@ Rectangle {
 
         contentItem: Text {
             text: control.text
-            color: control.danger ? "#f1f3f5" : (control.emphasized ? root.accentText : root.textColor)
+            color: control.danger ? root.dangerText : (control.emphasized ? root.accentText : root.textColor)
             font.family: "Inter"
             font.pixelSize: 13
             font.weight: Font.Medium
@@ -339,7 +335,7 @@ Rectangle {
 
         background: Rectangle {
             radius: 13
-            color: control.danger ? "#b94f70" : (control.emphasized ? root.accent : root.surfaceStrong)
+            color: control.danger ? root.danger : (control.emphasized ? root.accent : root.surfaceStrong)
             border.width: control.activeFocus ? 2 : 1
             border.color: control.activeFocus ? root.textColor : root.outlineColor
             opacity: control.down ? 0.8 : 1.0
