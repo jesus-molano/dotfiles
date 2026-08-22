@@ -283,6 +283,59 @@ ensure_on_start = true
         self.assertNotIn("SECRET-123", json.dumps(detected))
         self.assertIn("Built-in Audio", detected["audio"]["sinks"])
 
+    def test_detection_identifies_intel_without_matching_compatible_as_ati(self) -> None:
+        outputs = {
+            ("lspci", "-nn"): "00:02.0 VGA compatible controller [0300]: Intel Corporation UHD Graphics 620 [8086:5917] (rev 07)\n",
+        }
+
+        def fake_output(*args: str, timeout: float = 3.0) -> str:
+            del timeout
+            return outputs.get(tuple(args), "")
+
+        with mock.patch.object(HOST_MODULE, "command_output", side_effect=fake_output):
+            detected = HOST_MODULE.detect()
+        self.assertEqual(detected["gpu_vendors"], ["intel"])
+
+    def test_detection_identifies_mixed_gpu_vendors(self) -> None:
+        cases = {
+            "intel-nvidia": (
+                "00:02.0 VGA compatible controller [0300]: Intel Corporation Iris Xe Graphics [8086:9a49] (rev 01)\n"
+                "01:00.0 3D controller [0302]: NVIDIA Corporation GA107M [GeForce RTX 3050 Mobile] [10de:25a2] (rev a1)\n",
+                ["intel", "nvidia"],
+            ),
+            "amd-nvidia": (
+                "03:00.0 VGA compatible controller [0300]: Advanced Micro Devices, Inc. [AMD/ATI] Rembrandt [Radeon 680M] [1002:1681] (rev c9)\n"
+                "04:00.0 3D controller [0302]: NVIDIA Corporation AD107M [GeForce RTX 4060 Max-Q / Mobile] [10de:28a0] (rev a1)\n",
+                ["amd", "nvidia"],
+            ),
+            "intel-amd": (
+                "00:02.0 VGA compatible controller [0300]: Intel Corporation UHD Graphics 630 [8086:3e92] (rev 02)\n"
+                "01:00.0 Display controller [0380]: Advanced Micro Devices, Inc. [AMD/ATI] Navi 23 [Radeon RX 6600M] [1002:73ff] (rev c1)\n",
+                ["amd", "intel"],
+            ),
+            "numeric-ids-ignore-localized-names": (
+                "00:02.0 Controlador gráfico localizado [0301]: Fabricante desconocido [8086:46a6] (rev 0c)\n",
+                ["intel"],
+            ),
+            "unknown": (
+                "02:00.0 Display controller [0380]: Example Vendor Example GPU [1234:5678] (rev 01)\n",
+                ["unknown"],
+            ),
+        }
+
+        for name, (lspci, vendors) in cases.items():
+            with self.subTest(name=name), mock.patch.object(
+                HOST_MODULE,
+                "command_output",
+                side_effect=lambda *args, timeout=3.0: lspci if args == ("lspci", "-nn") else "",
+            ):
+                detected = HOST_MODULE.detect()
+                self.assertEqual(detected["gpu_vendors"], vendors)
+                plan = HOST_MODULE.resolve(ROOT, {"schema": 1, "bundles": []}, detected, True)
+                expected_capabilities = ["gpu-nvidia"] if "nvidia" in vendors else []
+                self.assertEqual(plan["capabilities"], expected_capabilities)
+                self.assertEqual(plan["modules"].count("gpu-nvidia"), len(expected_capabilities))
+
     def test_invalid_rgb_limits_are_rejected_before_staging(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

@@ -77,8 +77,10 @@ Los bundles son independientes. Si no se seleccionan, el doctor los informa sin
 fallar. Si se seleccionan y faltan paquetes, configuración o un target exigido,
 el doctor falla para que no haya una instalación parcialmente funcional.
 
-La capacidad `gpu-nvidia` solo se resuelve cuando la detección encuentra
-NVIDIA. CHWD conserva siempre la propiedad de drivers; esta configuración no
+La detección conserva todos los fabricantes gráficos presentes mediante sus
+identificadores PCI, también en equipos híbridos Intel+NVIDIA, AMD+NVIDIA o
+Intel+AMD. La capacidad `gpu-nvidia` se resuelve cuando NVIDIA forma parte del
+conjunto; CHWD conserva siempre la propiedad de drivers y esta configuración no
 modifica CHWD, initramfs, arranque, Btrfs, ZRAM, firmware, PWM ni `/etc`.
 
 ## Apariencias y Project Atlas

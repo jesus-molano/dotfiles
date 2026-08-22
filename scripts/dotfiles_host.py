@@ -24,6 +24,13 @@ from typing import Any
 SCHEMA = 1
 SAFE_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 SAFE_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+_:-]*$")
+PCI_DISPLAY_CLASS = re.compile(r"\[03[0-9a-fA-F]{2}\]:")
+PCI_DEVICE_ID = re.compile(r"\[([0-9a-fA-F]{4}):[0-9a-fA-F]{4}\]")
+PCI_GPU_VENDORS = {
+    "1002": "amd",
+    "10de": "nvidia",
+    "8086": "intel",
+}
 
 
 def xdg_path(variable: str, fallback: str) -> Path:
@@ -183,16 +190,11 @@ def command_output(*args: str, timeout: float = 3.0) -> str:
 def detect() -> dict[str, Any]:
     gpus: list[str] = []
     for line in command_output("lspci", "-nn").splitlines():
-        lower = line.lower()
-        if "vga compatible controller" in lower or "3d controller" in lower or "display controller" in lower:
-            if "nvidia" in lower:
-                gpus.append("nvidia")
-            elif "amd" in lower or "ati" in lower:
-                gpus.append("amd")
-            elif "intel" in lower:
-                gpus.append("intel")
-            else:
-                gpus.append("unknown")
+        if not PCI_DISPLAY_CLASS.search(line):
+            continue
+        device = PCI_DEVICE_ID.search(line)
+        vendor_id = device.group(1).lower() if device else ""
+        gpus.append(PCI_GPU_VENDORS.get(vendor_id, "unknown"))
     monitors: list[dict[str, str]] = []
     hypr = command_output("hyprctl", "monitors", "-j")
     if hypr:
