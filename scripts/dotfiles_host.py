@@ -38,6 +38,103 @@ def state_root() -> Path:
     return xdg_path("XDG_STATE_HOME", "~/.local/state") / "dotfiles"
 
 
+def user_manager_available() -> bool:
+    if not shutil.which("systemctl"):
+        return False
+    return subprocess.run(
+        ["systemctl", "--user", "show-environment"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+
+
+def user_services_reconciliation_required(target: Path) -> bool:
+    format_path = target / "user-services-format"
+    if os.path.lexists(format_path):
+        if format_path.is_symlink() or not format_path.is_file() or format_path.read_text(encoding="utf-8").strip() != "v1":
+            raise ValueError("El formato de estado de servicios de usuario no es válido")
+        intent = target / "user-services-mutation-intent"
+        if os.path.lexists(intent) and (intent.is_symlink() or not intent.is_file()):
+            raise ValueError("La intención de servicios de usuario no es válida")
+        return intent.is_file()
+    return (target / "rgb-state").is_file()
+
+
+def managed_reactive_rgb_targets(home: Path, links: list[tuple[str, str]]) -> set[Path]:
+    relative_unit = ".config/systemd/user/reactive-rgb.service"
+    targets: set[Path] = set()
+    for relative, destination in links:
+        if relative != relative_unit:
+            continue
+        value = Path(destination)
+        if not value.is_absolute():
+            value = home / Path(relative).parent / value
+        targets.add(value.resolve(strict=False))
+    return targets
+
+
+def checkpoint_reactive_rgb_service_links(target: Path) -> list[tuple[str, str]]:
+    """Return checkpoint manifests used only to prove service ownership.
+
+    A pre-existing exact common Stow link is deliberately excluded from the
+    filesystem-removal plan.  It can nevertheless be the service unit behind
+    an enablement this transaction owns, as recorded by the immutable Stow
+    intent and resulting applied manifest.
+    """
+    links: list[tuple[str, str]] = []
+    for name in ("stow-intent.tsv", "applied-links.tsv"):
+        manifest = target / name
+        if manifest.is_file():
+            links.extend(read_link_manifest(manifest, name))
+    return links
+
+
+ReactiveRgbEnablement = tuple[Path, str, Path]
+
+
+def validate_reactive_rgb_enablement(home: Path, managed_targets: set[Path]) -> ReactiveRgbEnablement | None:
+    wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
+    if wants.is_symlink():
+        lexical_target = os.readlink(wants)
+        resolved = wants.resolve(strict=False)
+        if resolved not in managed_targets:
+            raise ValueError(f"No se retira un enablement de Reactive RGB con destino ajeno: {wants}")
+        return wants, lexical_target, resolved
+    if wants.exists():
+        raise ValueError(f"No se retira un enablement de Reactive RGB modificado: {wants}")
+    return None
+
+
+def clear_reactive_rgb_service(enablement: ReactiveRgbEnablement | None) -> None:
+    active = subprocess.run(
+        ["systemctl", "--user", "is-active", "reactive-rgb.service"],
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    ).returncode == 0
+    stopped = False
+    if active:
+        subprocess.run(["systemctl", "--user", "stop", "reactive-rgb.service"], check=True)
+        stopped = True
+    if enablement is None:
+        return
+    try:
+        wants, lexical_target, resolved_target = enablement
+        if (not wants.is_symlink()
+                or os.readlink(wants) != lexical_target
+                or wants.resolve(strict=False) != resolved_target):
+            raise ValueError(f"El enablement de Reactive RGB cambió durante la operación: {wants}")
+        wants.unlink()
+    except Exception:
+        if stopped:
+            # Preserve the prior runtime state if a concurrent change makes
+            # removal unsafe.  This is deliberately best-effort: the original
+            # validation/unlink error remains the transaction failure.
+            subprocess.run(["systemctl", "--user", "start", "reactive-rgb.service"], check=False)
+        raise
+
+
 def host_path(value: str | None = None) -> Path:
     return Path(value).expanduser() if value else config_root() / "host.toml"
 
@@ -1611,19 +1708,33 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     if not args.apply:
         print(json.dumps(preview, indent=2))
         return 0
+    reconcile_services = user_services_reconciliation_required(target)
+    manager_available = user_manager_available()
+    service_ownership_links = [*stow_removals, *previous, *legacy_live]
+    if checkpoint is not None:
+        # These manifests expand only the service ownership proof.  They never
+        # enter ``stow_removals``, so an exact common pre-Stow link survives.
+        service_ownership_links.extend(checkpoint_reactive_rgb_service_links(target))
+    managed_rgb_targets = managed_reactive_rgb_targets(home, service_ownership_links)
+    reconcile_rgb = reconcile_services and bool(managed_rgb_targets)
+    rgb_wants = validate_reactive_rgb_enablement(home, managed_rgb_targets) if reconcile_rgb and manager_available else None
     remove_links(home, stow_removals, allow_absent=allow_absent)
+    rgb_state = target / "rgb-state"
+    desired_rgb = set(rgb_state.read_text(encoding="utf-8").splitlines()) if reconcile_rgb and rgb_state.is_file() else set()
+    if reconcile_rgb and manager_available:
+        clear_reactive_rgb_service(rgb_wants)
     restore_generated_actions(target, generated, generated_remove_actions, generated_restore_actions)
     restore_backup_moves(backup_moves)
     restore_links(home, stow_restorations)
     restore_links(home, previous_restore_actions)
     restore_links(home, legacy_restore_actions)
     restore_derived_state(target)
-    rgb_state = target / "rgb-state"
-    if rgb_state.is_file() and shutil.which("systemctl"):
-        desired = set(rgb_state.read_text(encoding="utf-8").splitlines())
-        subprocess.run(["systemctl", "--user", "disable", "--now", "reactive-rgb.service"], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if "enabled" in desired: subprocess.run(["systemctl", "--user", "enable", "reactive-rgb.service"], check=True)
-        if "active" in desired: subprocess.run(["systemctl", "--user", "start", "reactive-rgb.service"], check=True)
+    if manager_available:
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if reconcile_rgb and manager_available:
+        if "enabled" in desired_rgb: subprocess.run(["systemctl", "--user", "enable", "reactive-rgb.service"], check=True)
+        if "active" in desired_rgb: subprocess.run(["systemctl", "--user", "start", "reactive-rgb.service"], check=True)
     checkpoint_active, checkpoint_snapshots = checkpoint_restored_entries(target, home)
     if previous_removal_started:
         previous_active, previous_snapshots = removal_active_entries(
@@ -1667,6 +1778,10 @@ def cmd_retire(args: argparse.Namespace) -> int:
     home = Path.home().resolve()
     preflight_remove_links(home, applied)
     generated_actions = preflight_generated(generated, installed)
+    manager_available = user_manager_available()
+    managed_rgb_targets = managed_reactive_rgb_targets(home, applied)
+    manage_rgb = bool(managed_rgb_targets)
+    rgb_wants = validate_reactive_rgb_enablement(home, managed_rgb_targets) if manager_available and manage_rgb else None
     preview = {
         "migration": target.name,
         "remove_links": [relative for relative, _ in applied],
@@ -1683,16 +1798,16 @@ def cmd_retire(args: argparse.Namespace) -> int:
     write_private(target / "status", "retiring\n")
     persist_migration_checkpoint(target)
     remove_links(home, applied)
+    if manager_available and manage_rgb:
+        clear_reactive_rgb_service(rgb_wants)
     for key in generated_actions:
         destination = generated[key][0]
         if (not destination.is_file() or destination.is_symlink()
                 or hashlib.sha256(destination.read_bytes()).hexdigest() != installed[key]):
             raise ValueError(f"El archivo generado cambió durante la retirada: {destination}")
         destination.unlink()
-    if shutil.which("systemctl"):
-        subprocess.run(["systemctl", "--user", "disable", "--now", "reactive-rgb.service"], check=False,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        subprocess.run(["systemctl", "--user", "daemon-reload"], check=False,
+    if manager_available:
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     write_private(target / "status", "retired\n")
     persist_migration_checkpoint(target)

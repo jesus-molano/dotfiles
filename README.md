@@ -159,6 +159,8 @@ Stow. Antes de sustituir conflictos crea backups recuperables. Si falla Stow,
 la generación de configuración, Hyprland o un servicio gestionado, restaura
 enlaces, archivos generados y el estado previo del servicio. Los paquetes,
 Flatpaks, juegos y bibliotecas no se desinstalan durante el rollback.
+Reactive RGB es accesorio: si su hardware, helper o activación no coinciden con
+el host, muestra un aviso y la instalación principal continúa sin configurarlo.
 
 Cierra sesión y vuelve a entrar si se añadieron variables de entorno o servicios
 de usuario. Después valida:

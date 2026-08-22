@@ -27,6 +27,35 @@ SPEC.loader.exec_module(HOST_MODULE)
 
 
 class DotfilesHostTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._original_path = os.environ.get("PATH", "")
+        cls._fake_bin = tempfile.TemporaryDirectory()
+        systemctl = Path(cls._fake_bin.name) / "systemctl"
+        systemctl.write_text(
+            """#!/usr/bin/env bash
+set -euo pipefail
+if [[ -n ${DOTFILES_TEST_SYSTEMCTL_LOG:-} ]]; then
+    printf '%s\\n' "$*" >>"$DOTFILES_TEST_SYSTEMCTL_LOG"
+fi
+if [[ "$*" == '--user daemon-reload' && ${DOTFILES_TEST_SYSTEMCTL_FAIL_RELOAD:-0} == 1 ]]; then
+    exit 1
+fi
+if [[ "$*" == '--user stop reactive-rgb.service' && -n ${DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP:-} ]]; then
+    rm -f -- "$DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP"
+    ln -s -- "$DOTFILES_TEST_SYSTEMCTL_REPLACEMENT_TARGET" "$DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP"
+fi
+""",
+            encoding="utf-8",
+        )
+        systemctl.chmod(0o755)
+        os.environ["PATH"] = f"{cls._fake_bin.name}:{cls._original_path}"
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        os.environ["PATH"] = cls._original_path
+        cls._fake_bin.cleanup()
+
     def run_tool(self, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
         runtime = os.environ.copy()
         runtime["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -34,6 +63,64 @@ class DotfilesHostTests(unittest.TestCase):
             runtime.update(env)
         return subprocess.run(["python3", str(TOOL), "--repo", str(ROOT), *args], text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=runtime)
+
+    def test_user_service_journal_and_foreign_enablement_are_guarded(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            migration = root / "migration"
+            migration.mkdir()
+            (migration / "user-services-format").write_text("v1\n", encoding="utf-8")
+            self.assertFalse(HOST_MODULE.user_services_reconciliation_required(migration))
+            (migration / "user-services-mutation-intent").write_text("", encoding="utf-8")
+            self.assertTrue(HOST_MODULE.user_services_reconciliation_required(migration))
+            (migration / "user-services-format").write_text("future\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "formato de estado"):
+                HOST_MODULE.user_services_reconciliation_required(migration)
+
+            legacy = root / "legacy"
+            legacy.mkdir()
+            (legacy / "rgb-state").write_text("active\n", encoding="utf-8")
+            self.assertTrue(HOST_MODULE.user_services_reconciliation_required(legacy))
+
+            home = root / "home"
+            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
+            wants.parent.mkdir(parents=True)
+            foreign = root / "foreign.service"
+            foreign.write_text("foreign\n", encoding="utf-8")
+            os.symlink(foreign, wants)
+            with self.assertRaisesRegex(ValueError, "destino ajeno"):
+                HOST_MODULE.validate_reactive_rgb_enablement(home, {root / "managed.service"})
+            self.assertTrue(wants.is_symlink())
+            self.assertEqual(wants.resolve(), foreign)
+
+    def test_clear_reactive_rgb_revalidates_wants_after_stop_and_restarts_on_race(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
+            wants.parent.mkdir(parents=True)
+            managed = root / "managed.service"
+            foreign = root / "foreign.service"
+            managed.write_text("managed\n", encoding="utf-8")
+            foreign.write_text("foreign\n", encoding="utf-8")
+            os.symlink(managed, wants)
+            enablement = HOST_MODULE.validate_reactive_rgb_enablement(home, {managed.resolve()})
+            assert enablement is not None
+            log = root / "systemctl.log"
+            with mock.patch.dict(os.environ, {
+                "DOTFILES_TEST_SYSTEMCTL_LOG": str(log),
+                "DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP": str(wants),
+                "DOTFILES_TEST_SYSTEMCTL_REPLACEMENT_TARGET": str(foreign),
+            }):
+                with self.assertRaisesRegex(ValueError, "cambió durante la operación"):
+                    HOST_MODULE.clear_reactive_rgb_service(enablement)
+            self.assertTrue(wants.is_symlink())
+            self.assertEqual(wants.resolve(), foreign.resolve())
+            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), [
+                "--user is-active reactive-rgb.service",
+                "--user stop reactive-rgb.service",
+                "--user start reactive-rgb.service",
+            ])
 
     def test_current_host_fixture_resolves_all_bundles_and_nvidia(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -424,25 +511,59 @@ keybord_layouts = ["es"]
             legacy_source = migration / "modules/legacy/.config/legacy.conf"
             legacy_source.parent.mkdir(parents=True)
             legacy_source.write_text("old", encoding="utf-8")
+            legacy_unit = migration / "modules/legacy/.config/systemd/user/reactive-rgb.service"
+            legacy_unit.parent.mkdir(parents=True)
+            legacy_unit.write_text("[Service]\nExecStart=/old\n", encoding="utf-8")
             plan = migration / "plan.json"
             plan.write_text(json.dumps({"repo": str(root / "checkout-gone"), "modules": ["hypr-host"]}), encoding="utf-8")
             (migration / "legacy-modules").write_text("legacy\n", encoding="utf-8")
-            (migration / "applied-links.tsv").write_text(".config/current.conf\t/current/checkouts/new.conf\n", encoding="utf-8")
+            (migration / "applied-links.tsv").write_text(
+                ".config/current.conf\t/current/checkouts/new.conf\n"
+                ".config/systemd/user/reactive-rgb.service\t/current/checkouts/reactive-rgb.service\n",
+                encoding="utf-8",
+            )
             (migration / "previous-applied-links.tsv").write_text("", encoding="utf-8")
-            (migration / "legacy-links.tsv").write_text(f".config/legacy.conf\t{legacy_source}\n", encoding="utf-8")
+            (migration / "legacy-links.tsv").write_text(
+                f".config/legacy.conf\t{legacy_source}\n"
+                f".config/systemd/user/reactive-rgb.service\t{legacy_unit}\n",
+                encoding="utf-8",
+            )
             (migration / "legacy-links-removed").write_text("yes\n", encoding="utf-8")
+            (migration / "rgb-state").write_text("enabled\nactive\n", encoding="utf-8")
             (migration / "generated-targets.tsv").write_text("qmd\tlegacy\n", encoding="utf-8")
             digest = hashlib.sha256(destination.read_bytes()).hexdigest()
             (migration / "generated-installed.tsv").write_text(f"qmd\t{digest}\n", encoding="utf-8")
             current = home / ".config/current.conf"
             current.parent.mkdir(parents=True)
             os.symlink("/current/checkouts/new.conf", current)
-            checksummed = [plan, migration / "legacy-modules", migration / "applied-links.tsv", migration / "previous-applied-links.tsv", migration / "legacy-links.tsv", migration / "legacy-links-removed", migration / "generated-targets.tsv", migration / "generated-installed.tsv", legacy_source]
+            current_unit = home / ".config/systemd/user/reactive-rgb.service"
+            current_unit.parent.mkdir(parents=True)
+            os.symlink("/current/checkouts/reactive-rgb.service", current_unit)
+            current_wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
+            current_wants.parent.mkdir(parents=True)
+            os.symlink("/current/checkouts/reactive-rgb.service", current_wants)
+            checksummed = [plan, migration / "legacy-modules", migration / "applied-links.tsv", migration / "previous-applied-links.tsv", migration / "legacy-links.tsv", migration / "legacy-links-removed", migration / "generated-targets.tsv", migration / "generated-installed.tsv", migration / "rgb-state", legacy_source, legacy_unit]
             (migration / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed), encoding="utf-8")
-            self.run_tool("rollback", "deployment-order", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(root / "config"), "HOME": str(home)})
+            systemctl_log = root / "systemctl.log"
+            self.run_tool("rollback", "deployment-order", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(root / "config"), "HOME": str(home), "DOTFILES_TEST_SYSTEMCTL_LOG": str(systemctl_log)})
             self.assertFalse(destination.exists())
             self.assertFalse(current.exists())
             self.assertTrue((home / ".config/legacy.conf").is_symlink())
+            self.assertTrue(current_unit.is_symlink())
+            self.assertEqual(current_unit.resolve(), legacy_unit)
+            self.assertFalse(current_wants.exists())
+            self.assertFalse(current_wants.is_symlink())
+            self.assertEqual(
+                systemctl_log.read_text(encoding="utf-8").splitlines(),
+                [
+                    "--user show-environment",
+                    "--user is-active reactive-rgb.service",
+                    "--user stop reactive-rgb.service",
+                    "--user daemon-reload",
+                    "--user enable reactive-rgb.service",
+                    "--user start reactive-rgb.service",
+                ],
+            )
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "rolled-back\n")
             repeated = self.run_tool("rollback", "deployment-order", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(root / "config"), "HOME": str(home)})
             self.assertEqual(repeated.stdout.strip(), str(migration))
@@ -477,6 +598,60 @@ keybord_layouts = ["es"]
             self.assertFalse(current.exists())
             self.assertFalse(current.is_symlink())
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "rolled-back\n")
+
+    def test_manual_rollback_reconciles_rgb_for_common_prestow_unit_without_removing_it(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state, home = root / "state", root / "home"
+            migration = state / "dotfiles/migrations/deployment-common-rgb"
+            migration.mkdir(parents=True)
+            unit = ".config/systemd/user/reactive-rgb.service"
+            expected = str(root / "checkout/rgb-openrgb/.config/systemd/user/reactive-rgb.service")
+            snapshot = migration / "pre-stow/rgb.service"
+            snapshot.parent.mkdir(parents=True)
+            snapshot.write_text("[Service]\nExecStart=/previous\n", encoding="utf-8")
+            (migration / "plan.json").write_text(json.dumps({"repo": str(root / "checkout"), "modules": ["rgb-openrgb"]}), encoding="utf-8")
+            for name in (
+                "legacy-modules", "legacy-links.tsv", "previous-applied-links.tsv",
+                "generated-installed.tsv", "generated-removed.tsv", "generated-targets.tsv",
+            ):
+                (migration / name).write_text("", encoding="utf-8")
+            (migration / "stow-checkpoint").write_text("", encoding="utf-8")
+            (migration / "stow-intent.tsv").write_text(f"{unit}\t{expected}\n", encoding="utf-8")
+            (migration / "stow-before.tsv").write_text(f"{unit}\tlink\t{expected}\n", encoding="utf-8")
+            (migration / "pre-stow-restore-links.tsv").write_text(f"{unit}\t{snapshot}\n", encoding="utf-8")
+            (migration / "applied-links.tsv").write_text(f"{unit}\t{expected}\n", encoding="utf-8")
+            (migration / "user-services-format").write_text("v1\n", encoding="utf-8")
+            (migration / "user-services-mutation-intent").write_text("rgb\n", encoding="utf-8")
+            (migration / "rgb-state").write_text("active\n", encoding="utf-8")
+            (migration / "status").write_text("stow-ready\n", encoding="utf-8")
+            current_unit = home / unit
+            current_unit.parent.mkdir(parents=True)
+            os.symlink(expected, current_unit)
+            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
+            wants.parent.mkdir(parents=True)
+            os.symlink("../reactive-rgb.service", wants)
+            checksummed = [path for path in migration.rglob("*") if path.is_file() and path.name != "status"]
+            (migration / "SHA256SUMS").write_text(
+                "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed),
+                encoding="utf-8",
+            )
+            log = root / "systemctl.log"
+            self.run_tool(
+                "rollback", "deployment-common-rgb", "--apply",
+                env={"XDG_STATE_HOME": str(state), "HOME": str(home), "DOTFILES_TEST_SYSTEMCTL_LOG": str(log)},
+            )
+            self.assertTrue(current_unit.is_symlink())
+            self.assertEqual(os.readlink(current_unit), expected)
+            self.assertFalse(wants.exists())
+            self.assertFalse(wants.is_symlink())
+            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), [
+                "--user show-environment",
+                "--user is-active reactive-rgb.service",
+                "--user stop reactive-rgb.service",
+                "--user daemon-reload",
+                "--user start reactive-rgb.service",
+            ])
 
     def test_manual_rollback_ignores_partial_new_format_stow_manifest_before_checkpoint(self) -> None:
         """A failed checkpoint preparation has not invoked Stow yet.
@@ -579,6 +754,38 @@ keybord_layouts = ["es"]
             self.assertFalse(linked.exists())
             self.assertFalse(generated.exists())
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "retired\n")
+
+    def test_retire_does_not_claim_success_when_user_manager_reload_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            state, home, config = root / "state", root / "home", root / "config"
+            migration = state / "dotfiles/migrations/deployment-reload-failure"
+            migration.mkdir(parents=True)
+            (migration / "plan.json").write_text(json.dumps({"repo": str(ROOT), "modules": ["hypr-host"]}), encoding="utf-8")
+            (migration / "legacy-modules").write_text("", encoding="utf-8")
+            (migration / "applied-links.tsv").write_text("", encoding="utf-8")
+            (migration / "generated-installed.tsv").write_text("", encoding="utf-8")
+            (migration / "generated-targets.tsv").write_text("", encoding="utf-8")
+            (migration / "status").write_text("applied\n", encoding="utf-8")
+            checksummed = [path for path in migration.iterdir() if path.is_file() and path.name != "status"]
+            (migration / "SHA256SUMS").write_text(
+                "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in checksummed),
+                encoding="utf-8",
+            )
+            (state / "dotfiles/last-migration").write_text(str(migration), encoding="utf-8")
+            with self.assertRaises(subprocess.CalledProcessError) as failure:
+                self.run_tool(
+                    "retire",
+                    "--apply",
+                    env={
+                        "XDG_STATE_HOME": str(state),
+                        "XDG_CONFIG_HOME": str(config),
+                        "HOME": str(home),
+                        "DOTFILES_TEST_SYSTEMCTL_FAIL_RELOAD": "1",
+                    },
+                )
+            self.assertIn("daemon-reload", failure.exception.stderr)
+            self.assertEqual((migration / "status").read_text(encoding="utf-8"), "retiring\n")
 
     def test_manual_rollback_recovers_interrupted_retire_without_partial_removal(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

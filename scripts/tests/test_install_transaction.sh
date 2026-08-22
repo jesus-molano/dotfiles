@@ -24,6 +24,7 @@ mkdir -p \
 	"$fixture_repo/hypr-host/.config/hypr/config" \
 	"$fixture_repo/split-new/.config/hypr/config" \
 	"$fixture_repo/unit-test/.config/systemd/user" \
+	"$fixture_repo/rgb-openrgb/.config/systemd/user" \
 	"$fixture_repo/mise-test/.config/mise" \
 	"$fixture_repo/codex/.agents/skills/example-skill" \
 	"$fixture_repo/qutebrowser/.config/qutebrowser/__pycache__" \
@@ -43,6 +44,7 @@ printf '%s\n' new-host-legacy >"$fixture_repo/hypr-host/.config/hypr/config/lega
 printf '%s\n' new-managed >"$fixture_repo/hypr-host/.config/personal.conf"
 printf '%s\n' split-monitors >"$fixture_repo/split-new/.config/hypr/config/monitors.lua"
 printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-test.service"
+printf '%s\n' '[Install]' 'WantedBy=default.target' >"$fixture_repo/rgb-openrgb/.config/systemd/user/reactive-rgb.service"
 printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
 printf '%s\n' '# fixture skill' >"$fixture_repo/codex/.agents/skills/example-skill/SKILL.md"
 printf '%s\n' retired >"$fixture_repo/codex/.agents/retired-skills.txt"
@@ -201,11 +203,14 @@ if [[ -n ${TEST_SYSTEMCTL_LOG:-} ]]; then
 fi
 case "$*" in
 '--user show-environment') [[ ${TEST_NO_USER_MANAGER:-0} != 1 ]] ;;
-'--user is-enabled reactive-rgb.service' | '--user is-active reactive-rgb.service') exit 1 ;;
+'--user is-enabled reactive-rgb.service') [[ ${TEST_RGB_ENABLED:-0} == 1 ]] ;;
+'--user is-active reactive-rgb.service') [[ ${TEST_RGB_ACTIVE:-0} == 1 ]] ;;
 *) exit 0 ;;
 esac
 EOF
 chmod +x "$test_root/bin/systemctl"
+# Ningún caso posterior puede tocar el gestor systemd de la sesión real.
+export PATH="$test_root/bin:$PATH"
 
 # Un despliegue sin un gestor systemd de usuario accesible no debe fallar. Las
 # unidades se cargarán en la próxima sesión, y no se intenta daemon-reload.
@@ -223,6 +228,177 @@ PATH="$test_root/bin:$PATH" TEST_NO_USER_MANAGER=1 TEST_SYSTEMCTL_LOG="$unavaila
 	FIXTURE_REPO="$fixture_repo" "$reload_runner"
 grep -Fxq -- '--user show-environment' "$unavailable_systemctl_log"
 if grep -Fxq -- '--user daemon-reload' "$unavailable_systemctl_log"; then exit 9; fi
+
+# RGB seleccionado también debe conservar un despliegue válido si el manager
+# no está accesible. No intenta activar, desactivar ni restaurar estado vivo.
+cat >"$test_root/bin/reactive-rgb" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+detect)
+	printf '%s\n' 'opt_in=1' 'openrgb_target=0:fixture' 'openrgb_static_nzxt=1:fixture'
+	;;
+dry-run) ;;
+*) exit 2 ;;
+esac
+EOF
+chmod +x "$test_root/bin/reactive-rgb"
+rgb_plan="$test_root/rgb-plan.json"
+printf '%s\n' '{"schema":1,"repo":"fixture","modules":["rgb-openrgb"],"bundles":["rgb-openrgb"],"package_scopes":["base","bundle:rgb-openrgb"],"rgb":{"enabled":true}}' >"$rgb_plan"
+rgb_unavailable_runner="$test_root/rgb-user-manager-unavailable.sh"
+cat >"$rgb_unavailable_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_RGB_PLAN
+MIGRATION_DIR=$TEST_RGB_MIGRATION
+mkdir -p "$MIGRATION_DIR"
+printf '%s\n' v1 >"$MIGRATION_DIR/user-services-format"
+: >"$MIGRATION_DIR/user-services-mutation-intent"
+printf '%s\n' enabled active >"$MIGRATION_DIR/rgb-state"
+configure_user_services
+reset_user_services_after_restore
+reload_user_manager prueba
+restore_rgb_service_state
+EOF
+chmod +x "$rgb_unavailable_runner"
+rgb_unavailable_log="$test_root/systemctl-rgb-unavailable.log"
+mkdir -p "$test_root/rgb-config/reactive-rgb"
+printf '%s\n' fixture >"$test_root/rgb-config/reactive-rgb/config.conf"
+TEST_NO_USER_MANAGER=1 TEST_SYSTEMCTL_LOG="$rgb_unavailable_log" \
+	HOME="$test_root/rgb-home" XDG_CONFIG_HOME="$test_root/rgb-config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_PLAN="$rgb_plan" TEST_RGB_MIGRATION="$test_root/rgb-migration" \
+	"$rgb_unavailable_runner"
+grep -Fxq -- '--user show-environment' "$rgb_unavailable_log"
+if grep -Evq '^--user show-environment$' "$rgb_unavailable_log"; then exit 9; fi
+
+# Desactivar el opt-in retira solo el enlace de autostart. El enlace principal
+# gestionado por Stow debe permanecer para que el siguiente --check sea exacto.
+rgb_disabled_plan="$test_root/rgb-disabled-plan.json"
+printf '%s\n' '{"schema":1,"repo":"fixture","modules":["rgb-openrgb"],"bundles":["rgb-openrgb"],"package_scopes":["base","bundle:rgb-openrgb"],"rgb":{"enabled":false}}' >"$rgb_disabled_plan"
+rgb_disabled_home="$test_root/rgb-disabled-home"
+rgb_disabled_config="$rgb_disabled_home/.config"
+rgb_unit_source="$fixture_repo/rgb-openrgb/.config/systemd/user/reactive-rgb.service"
+rgb_unit="$rgb_disabled_config/systemd/user/reactive-rgb.service"
+rgb_wants="$rgb_disabled_config/systemd/user/default.target.wants/reactive-rgb.service"
+mkdir -p "$(dirname "$rgb_wants")"
+ln -s "$rgb_unit_source" "$rgb_unit"
+ln -s "$rgb_unit_source" "$rgb_wants"
+rgb_disabled_runner="$test_root/rgb-disabled.sh"
+cat >"$rgb_disabled_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_RGB_PLAN
+configure_user_services
+EOF
+chmod +x "$rgb_disabled_runner"
+rgb_disabled_log="$test_root/systemctl-rgb-disabled.log"
+TEST_RGB_ENABLED=1 TEST_SYSTEMCTL_LOG="$rgb_disabled_log" \
+	HOME="$rgb_disabled_home" XDG_CONFIG_HOME="$rgb_disabled_config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_PLAN="$rgb_disabled_plan" \
+	"$rgb_disabled_runner"
+[[ -L "$rgb_unit" && $(readlink -- "$rgb_unit") == "$rgb_unit_source" ]]
+[[ ! -e "$rgb_wants" && ! -L "$rgb_wants" ]]
+grep -Fxq -- '--user daemon-reload' "$rgb_disabled_log"
+if grep -Fxq -- '--user disable --now reactive-rgb.service' "$rgb_disabled_log"; then exit 9; fi
+
+# Un wants ajeno se conserva y omite solo RGB. La instalación principal no
+# falla y el enlace principal tampoco cambia.
+foreign_rgb_source="$test_root/foreign-reactive-rgb.service"
+printf '%s\n' foreign >"$foreign_rgb_source"
+ln -s "$foreign_rgb_source" "$rgb_wants"
+TEST_RGB_ENABLED=1 TEST_RGB_ACTIVE=1 TEST_SYSTEMCTL_LOG="$test_root/systemctl-rgb-foreign.log" \
+	HOME="$rgb_disabled_home" XDG_CONFIG_HOME="$rgb_disabled_config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_PLAN="$rgb_disabled_plan" \
+	"$rgb_disabled_runner" >"$test_root/rgb-foreign.log" 2>&1
+[[ -L "$rgb_wants" && $(readlink -- "$rgb_wants") == "$foreign_rgb_source" ]]
+[[ -L "$rgb_unit" && $(readlink -- "$rgb_unit") == "$rgb_unit_source" ]]
+if grep -Fxq -- '--user stop reactive-rgb.service' "$test_root/systemctl-rgb-foreign.log"; then exit 9; fi
+rm -- "$rgb_wants"
+
+# Sin wants, una unidad homónima ajena tampoco autoriza parar el servicio.
+# La propiedad debe probarse con el enlace directo o con el journal exacto.
+rm -- "$rgb_unit"
+ln -s "$foreign_rgb_source" "$rgb_unit"
+TEST_RGB_ACTIVE=1 TEST_SYSTEMCTL_LOG="$test_root/systemctl-rgb-foreign-unit.log" \
+	HOME="$rgb_disabled_home" XDG_CONFIG_HOME="$rgb_disabled_config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_PLAN="$rgb_disabled_plan" \
+	"$rgb_disabled_runner" >"$test_root/rgb-foreign-unit.log" 2>&1
+[[ -L "$rgb_unit" && $(readlink -- "$rgb_unit") == "$foreign_rgb_source" ]]
+if grep -Fxq -- '--user stop reactive-rgb.service' "$test_root/systemctl-rgb-foreign-unit.log"; then exit 9; fi
+rm -- "$rgb_unit"
+ln -s "$rgb_unit_source" "$rgb_unit"
+
+# Con el filesystem ya restaurado, el orden vivo es stop/limpieza exacta,
+# daemon-reload y, solo después, enable/start del estado anterior.
+rgb_restore_home="$test_root/rgb-restore-home"
+rgb_restore_config="$rgb_restore_home/.config"
+rgb_restore_unit="$rgb_restore_config/systemd/user/reactive-rgb.service"
+rgb_restore_wants="$rgb_restore_config/systemd/user/default.target.wants/reactive-rgb.service"
+mkdir -p "$(dirname "$rgb_restore_wants")"
+ln -s "$rgb_unit_source" "$rgb_restore_unit"
+ln -s "$rgb_unit_source" "$rgb_restore_wants"
+rgb_restore_runner="$test_root/rgb-restore-order.sh"
+cat >"$rgb_restore_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+MIGRATION_DIR=$TEST_RGB_MIGRATION
+mkdir -p "$MIGRATION_DIR"
+printf '%s\n' v1 >"$MIGRATION_DIR/user-services-format"
+: >"$MIGRATION_DIR/user-services-mutation-intent"
+printf '%s\n' enabled active >"$MIGRATION_DIR/rgb-state"
+reset_user_services_after_restore
+reload_user_manager prueba
+restore_rgb_service_state
+EOF
+chmod +x "$rgb_restore_runner"
+rgb_restore_log="$test_root/systemctl-rgb-restore.log"
+TEST_RGB_ACTIVE=1 TEST_SYSTEMCTL_LOG="$rgb_restore_log" \
+	HOME="$rgb_restore_home" XDG_CONFIG_HOME="$rgb_restore_config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_MIGRATION="$test_root/rgb-restore-migration" \
+	"$rgb_restore_runner"
+[[ -L "$rgb_restore_unit" && $(readlink -- "$rgb_restore_unit") == "$rgb_unit_source" ]]
+[[ ! -e "$rgb_restore_wants" && ! -L "$rgb_restore_wants" ]]
+printf '%s\n' \
+	'--user show-environment' \
+	'--user is-active reactive-rgb.service' \
+	'--user stop reactive-rgb.service' \
+	'--user show-environment' \
+	'--user daemon-reload' \
+	'--user show-environment' \
+	'--user enable reactive-rgb.service' \
+	'--user start reactive-rgb.service' >"$test_root/systemctl-rgb-restore.expected"
+cmp -s "$test_root/systemctl-rgb-restore.expected" "$rgb_restore_log"
+
+# Formato nuevo sin intención: se recargan las unidades restauradas, pero no
+# se cambia RGB porque la fase de servicios nunca empezó.
+rgb_no_intent_runner="$test_root/rgb-no-intent.sh"
+cat >"$rgb_no_intent_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+MIGRATION_DIR=$TEST_RGB_MIGRATION
+mkdir -p "$MIGRATION_DIR"
+printf '%s\n' v1 >"$MIGRATION_DIR/user-services-format"
+printf '%s\n' enabled active >"$MIGRATION_DIR/rgb-state"
+reset_user_services_after_restore
+reload_user_manager prueba
+restore_rgb_service_state
+EOF
+chmod +x "$rgb_no_intent_runner"
+rgb_no_intent_log="$test_root/systemctl-rgb-no-intent.log"
+TEST_RGB_ACTIVE=1 TEST_SYSTEMCTL_LOG="$rgb_no_intent_log" \
+	HOME="$rgb_restore_home" XDG_CONFIG_HOME="$rgb_restore_config" \
+	FIXTURE_REPO="$fixture_repo" TEST_RGB_MIGRATION="$test_root/rgb-no-intent-migration" \
+	"$rgb_no_intent_runner"
+grep -Fxq -- '--user daemon-reload' "$rgb_no_intent_log"
+if grep -Eq -- '--user (stop|enable|start) reactive-rgb.service' "$rgb_no_intent_log"; then exit 9; fi
 
 plan="$test_root/plan.json"
 printf '%s\n' \
