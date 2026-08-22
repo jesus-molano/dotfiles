@@ -14,7 +14,8 @@ backup_and_replace() {
 	chmod 700 "$state_root"
 
 	if [[ -f "$target" ]]; then
-		local backup="$state_root/${label}.$(date +%Y%m%d-%H%M%S).bak"
+		local backup
+		backup="$state_root/${label}.$(date +%Y%m%d-%H%M%S).bak"
 		install -m 600 "$target" "$backup"
 		printf 'Project Atlas: backup de %s en %s\n' "$label" "$backup"
 	fi

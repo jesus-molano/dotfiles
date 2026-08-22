@@ -86,6 +86,11 @@ restore)
 *) printf 'restic fake inesperado: %s\n' "$command" >&2; exit 2 ;;
 esac
 EOF
+cat >"$test_root/bin/ludusavi" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" >>"$TEST_LUDUSAVI_LOG"
+EOF
 cat >"$test_root/home/.local/bin/desktop-notify" <<'EOF'
 #!/usr/bin/env bash
 exit 0
@@ -97,6 +102,8 @@ printf '%s\n' "$*" >>"$TEST_WITH_SECRETS_LOG"
 RESTIC_PASSWORD=fixture exec "$@"
 EOF
 chmod +x "$test_root/bin/"* "$test_root/home/.local/bin/"*
+: >"$test_root/ludusavi.log"
+export TEST_LUDUSAVI_LOG="$test_root/ludusavi.log"
 
 	PATH="$test_root/bin:$PATH" HOME="$test_root/home" XDG_CONFIG_HOME="$test_root/config" \
 	XDG_STATE_HOME="$test_root/state" XDG_RUNTIME_DIR="$test_root/runtime" \
@@ -126,6 +133,8 @@ if grep -Fq "$first_token" "$test_root/output"; then
 	exit 1
 fi
 grep -Fq $'backup\t--tag desktop --files-from ' "$test_root/restic.log"
+grep -Fxq "backup --force --no-cloud-sync --path $test_root/state/gaming/ludusavi" \
+	"$test_root/ludusavi.log"
 
 # Cada backup debe generar un token distinto. El fake conserva ambos
 # snapshots para comprobar que maintenance elige el más nuevo del host local.

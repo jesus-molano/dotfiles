@@ -13,19 +13,19 @@ run() {
 	"$@"
 }
 
-run 'Sintaxis y contratos Shell' shellcheck -x \
-	install.sh \
-	scripts/lib/install_package_ops.sh \
-	scripts/ci-check.sh \
-	scripts/stow-lint.sh \
-	scripts/system-etc-transaction.sh \
-	backup/.local/bin/dotfiles-backup \
-	backup/.local/bin/dotfiles-backup-maintenance \
-	gaming-core/.local/bin/game-run \
-	hypr-common/.local/bin/demo-studio \
-	hypr-common/.local/bin/start-orca-background \
-	android/.local/bin/android-sdk-check \
-	scripts/tests/test_android_environment.sh
+mapfile -t shell_files < <(
+	git grep -Il \
+		-e '^#!/usr/bin/env bash' \
+		-e '^#!/usr/bin/bash' \
+		-e '^#!/bin/bash' \
+		-e '^#!/bin/sh' --
+)
+((${#shell_files[@]})) || {
+	printf '%s\n' 'No se encontraron scripts Shell versionados.' >&2
+	exit 1
+}
+run 'Sintaxis y contratos de todos los scripts Shell versionados' \
+	shellcheck -x "${shell_files[@]}"
 run 'Sintaxis Python' python3 -c \
 	'import ast,pathlib; [ast.parse(path.read_text(encoding="utf-8"), filename=str(path)) for path in pathlib.Path("scripts").rglob("*.py")]'
 run 'Sintaxis Fish Android' fish -n android/.config/fish/conf.d/android.fish

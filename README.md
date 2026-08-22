@@ -98,12 +98,13 @@ proporciona un `host.toml` o usa `--safe-defaults`.
 
 ~~~bash
 just packages
-./install.sh --check
 just check
+just plan
 ~~~
 
-Revisa paquetes, Flatpaks, módulos y retiradas. `just check` usa un HOME
-temporal. No sigas si algo es inesperado.
+`just check` valida la composición en un HOME temporal. `just plan` revisa el
+preflight exacto del HOME actual, incluidos paquetes, Flatpaks, módulos y
+retiradas. No sigas si algo es inesperado.
 
 Si falta un paquete, el apply actualiza CachyOS por completo con Shelly antes de
 instalarlo. Nunca hace una actualización parcial de Arch.
@@ -176,6 +177,7 @@ dotf host refresh
 dotf host show
 just packages
 just check
+just plan
 just apply
 just doctor
 ~~~
