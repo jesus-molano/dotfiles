@@ -16,7 +16,9 @@ concurrency:
 jobs:
   reproducible:
     runs-on: ubuntu-latest
-    container: archlinux:base-devel
+    # packages.csv incluye paquetes nativos del repositorio CachyOS. La imagen
+    # oficial evita falsos negativos; latest valida el catálogo rolling actual.
+    container: cachyos/cachyos:latest
     timeout-minutes: 20
     steps:
       - name: Install Git for checkout
@@ -30,7 +32,7 @@ jobs:
           pacman -S --noconfirm --needed
           python stow just shellcheck fish zellij bat starship
 
-      - name: Run as an unprivileged CachyOS-style user
+      - name: Run as an unprivileged CachyOS user
         shell: bash
         run: |
           useradd --create-home --shell /bin/bash dotfiles-ci
