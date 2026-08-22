@@ -44,6 +44,16 @@ esac'
 
 base_env=(PATH="$test_root/bin:$PATH" HOME="$test_root/home" XDG_RUNTIME_DIR="$test_root/runtime" DEMO_STUDIO_RECORDINGS_DIR="$test_root/out" TEST_LOG="$test_root/notify.log" TEST_MPV_LOG="$test_root/mpv.log" TEST_GSR_LOG="$test_root/gsr.log")
 
+process_is_live() {
+	local pid=$1 stat_line remainder
+	local -a fields
+	[[ -r "/proc/$pid/stat" ]] || return 1
+	stat_line=$(<"/proc/$pid/stat")
+	remainder=${stat_line##*) }
+	read -r -a fields <<<"$remainder"
+	[[ "${fields[0]:-Z}" != Z ]]
+}
+
 [[ $(env "${base_env[@]}" "$helper" status) == idle ]]
 output=$(env "${base_env[@]}" DEMO_STUDIO_AUDIO=both DEMO_STUDIO_CAPTURE=portal DEMO_STUDIO_WEBCAM=true DEMO_STUDIO_WEBCAM_DEVICE=/dev/null "$helper" start)
 [[ $(env "${base_env[@]}" "$helper" status) == recording ]]
@@ -105,8 +115,62 @@ starts_after=$(wc -l <"$test_root/gsr.log")
 recording_pid=$(awk -F= '$1 == "pid" { print $2; exit }' "$test_root/runtime/demo-studio/state")
 env "${base_env[@]}" "$helper" stop >/dev/null
 for _ in {1..40}; do
-  kill -0 "$recording_pid" 2>/dev/null || break
+	process_is_live "$recording_pid" || break
   sleep 0.05
 done
-! kill -0 "$recording_pid" 2>/dev/null || { printf '%s\n' 'FAIL: dejó un grabador huérfano' >&2; exit 1; }
+! process_is_live "$recording_pid" || { printf '%s\n' 'FAIL: dejó un grabador activo huérfano' >&2; exit 1; }
+
+zombie_pid_file="$test_root/zombie.pid"
+python3 -c '
+import os
+from pathlib import Path
+import signal
+import sys
+import time
+
+child = os.fork()
+if child == 0:
+    os._exit(0)
+
+def stop(_signal, _frame):
+    os.waitpid(child, 0)
+    raise SystemExit(0)
+
+signal.signal(signal.SIGTERM, stop)
+Path(sys.argv[1]).write_text(f"{child}\n", encoding="utf-8")
+while True:
+    time.sleep(1)
+' "$zombie_pid_file" &
+zombie_parent=$!
+zombie_pid=
+zombie_starttime=
+zombie_state=
+for _ in {1..100}; do
+	if [[ -s "$zombie_pid_file" ]]; then
+		zombie_pid=$(<"$zombie_pid_file")
+		if [[ -r "/proc/$zombie_pid/stat" ]]; then
+			stat_line=$(<"/proc/$zombie_pid/stat")
+			remainder=${stat_line##*) }
+			read -r -a fields <<<"$remainder"
+			zombie_state=${fields[0]:-}
+			zombie_starttime=${fields[19]:-}
+			[[ "$zombie_state" == Z && "$zombie_starttime" =~ ^[0-9]+$ ]] && break
+		fi
+	fi
+	sleep 0.02
+done
+[[ "$zombie_state" == Z && "$zombie_starttime" =~ ^[0-9]+$ ]] || {
+	printf '%s\n' 'FAIL: no se pudo preparar el proceso zombi de regresión' >&2
+	exit 1
+}
+printf 'pid=%s\nstarttime=%s\noutput=%s\nwebcam=false\nwebcam_pid=0\nwebcam_starttime=0\n' \
+	"$zombie_pid" "$zombie_starttime" "$test_root/out/zombie.mp4" >"$test_root/runtime/demo-studio/state"
+[[ $(env "${base_env[@]}" "$helper" status) == idle ]] || {
+	printf '%s\n' 'FAIL: trató un proceso zombi como una grabación activa' >&2
+	exit 1
+}
+[[ ! -e "$test_root/runtime/demo-studio/state" ]]
+kill -TERM "$zombie_parent"
+wait "$zombie_parent"
+
 printf '%s\n' 'PASS: demo-studio guarda estado propio, serializa inicios y no deja grabadores huérfanos'
