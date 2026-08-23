@@ -28,7 +28,7 @@ jobs:
       - name: Install test dependencies
         run: >-
           pacman -S --noconfirm --needed
-          python stow just shellcheck fish zellij bat starship jq
+          python stow just shellcheck fish zellij bat starship jq nodejs
 
       - name: Run as an unprivileged user
         shell: bash
