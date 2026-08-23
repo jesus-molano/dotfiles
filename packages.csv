@@ -16,6 +16,7 @@ base,core,tesseract-data-spa,native
 base,core,brave-bin,native
 base,browser,qutebrowser,native
 base,browser,python-adblock,native
+base,mail,thunderbird,native
 base,terminal,ghostty,native
 base,terminal,fish,native
 base,terminal,cachyos-fish-config,native

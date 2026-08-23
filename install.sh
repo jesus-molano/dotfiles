@@ -2306,6 +2306,24 @@ apply_dotfiles_transaction() {
 	ok "Transacción aplicada: $MIGRATION_DIR"
 }
 
+configure_thunderbird_dynamic_theme() {
+	local setup="$HOME/.local/bin/setup-thunderbird-project-atlas-theme"
+	local generated_policy="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/thunderbird/policies.json"
+	local installed_policy=/etc/thunderbird/policies/policies.json
+
+	command -v thunderbird >/dev/null 2>&1 || return 0
+	[[ -x $setup ]] || { warn 'Thunderbird está instalado, pero falta el generador de su tema dinámico.'; return 0; }
+	if ! "$setup" >/dev/null; then
+		warn 'No se pudo generar la extensión de tema dinámico de Thunderbird.'
+		return 0
+	fi
+	if cmp -s -- "$generated_policy" "$installed_policy"; then
+		ok 'Tema dinámico de Thunderbird preparado.'
+	else
+		warn "La extensión está preparada, pero falta aplicar su política: pkexec install -D -m 644 '$generated_policy' '$installed_policy'"
+	fi
+}
+
 main() {
 	# Stow modela .config dentro de HOME. Rechaza un layout dividido antes de
 	# detectar, configurar, instalar paquetes o crear estado local.
@@ -2352,6 +2370,7 @@ main() {
 	install_flatpaks
 	mkdir -p "$STATE_DIR"
 	apply_dotfiles_transaction
+	configure_thunderbird_dynamic_theme
 	if plan_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply
 		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --apply

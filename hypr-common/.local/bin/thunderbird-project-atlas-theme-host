@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Expone la paleta activa de Noctalia a Thunderbird por native messaging."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import struct
+import sys
+import time
+
+
+REQUIRED_COLORS = (
+    "mPrimary",
+    "mOnPrimary",
+    "mSecondary",
+    "mOnSecondary",
+    "mTertiary",
+    "mOnTertiary",
+    "mError",
+    "mOnError",
+    "mSurface",
+    "mOnSurface",
+    "mSurfaceVariant",
+    "mOnSurfaceVariant",
+    "mOutline",
+    "mHover",
+)
+
+
+def palette_path() -> Path:
+    config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return config_home / "noctalia/generated/active-palette.json"
+
+
+def load_palette(raw: bytes) -> dict[str, str]:
+    data = json.loads(raw.decode("utf-8"))
+    dark = data.get("dark")
+    if not isinstance(dark, dict):
+        raise ValueError("la paleta no contiene el objeto dark")
+    palette: dict[str, str] = {}
+    for key in REQUIRED_COLORS:
+        value = dark.get(key)
+        if not isinstance(value, str) or len(value) != 7 or value[0] != "#":
+            raise ValueError(f"color inválido: {key}")
+        int(value[1:], 16)
+        palette[key] = value.lower()
+    return palette
+
+
+def send(message: dict[str, object]) -> None:
+    payload = json.dumps(message, separators=(",", ":")).encode("utf-8")
+    sys.stdout.buffer.write(struct.pack("<I", len(payload)))
+    sys.stdout.buffer.write(payload)
+    sys.stdout.buffer.flush()
+
+
+def main() -> int:
+    path = palette_path()
+    once = "--once" in sys.argv[1:]
+    previous: tuple[str, object] | None = None
+    while True:
+        try:
+            raw = path.read_bytes()
+            observation: tuple[str, object] = ("data", raw)
+            if observation != previous:
+                previous = observation
+                try:
+                    send({"ok": True, "palette": load_palette(raw)})
+                except (UnicodeDecodeError, ValueError, json.JSONDecodeError) as error:
+                    send({"ok": False, "error": str(error)})
+        except OSError as error:
+            observation = ("error", str(error))
+            if observation != previous:
+                previous = observation
+                send({"ok": False, "error": str(error)})
+        if once:
+            return 0
+        time.sleep(0.5)
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except BrokenPipeError:
+        raise SystemExit(0)

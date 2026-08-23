@@ -136,6 +136,7 @@ check_base_workflows() {
   check 'Launcher multimedia' "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
   check 'Práctica de mecanografía' "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
   check 'Apariencias coordinadas' "$repo_root/scripts/tests/test_appearance_switch.sh"
+  check 'Tema dinámico de Thunderbird' "$repo_root/scripts/tests/test_thunderbird_theme.sh"
   check 'Temas terminales generados' env PYTHONDONTWRITEBYTECODE=1 python "$repo_root/scripts/tests/test_terminal_theme_generation.py"
   check 'Colección de fondos al iniciar' "$repo_root/scripts/tests/test_start_noctalia_ready.sh"
   check 'Arranque único de 1Password' "$repo_root/scripts/tests/test_ensure_1password_tray.sh"

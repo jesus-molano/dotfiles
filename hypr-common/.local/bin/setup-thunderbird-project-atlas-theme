@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly host_name=com.project_atlas.thunderbird_theme
+readonly extension_id=project-atlas-theme@local
+script_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+readonly script_path
+bin_dir=$(dirname -- "$script_path")
+readonly bin_dir
+readonly share_dir=${THUNDERBIRD_THEME_EXTENSION_DIR:-"$(cd -- "$bin_dir/../share/thunderbird-project-atlas-theme" && pwd)"}
+readonly host_path=${THUNDERBIRD_THEME_HOST_PATH:-"$bin_dir/thunderbird-project-atlas-theme-host"}
+readonly state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+readonly xpi_path=${THUNDERBIRD_THEME_XPI:-"$state_home/dotfiles/thunderbird/project-atlas-theme.xpi"}
+readonly policy_path=${THUNDERBIRD_THEME_POLICY:-"$state_home/dotfiles/thunderbird/policies.json"}
+readonly manifest_dir=${THUNDERBIRD_NATIVE_MANIFEST_DIR:-"$HOME/.mozilla/native-messaging-hosts"}
+readonly manifest_path="$manifest_dir/$host_name.json"
+
+[[ -x $host_path ]] || { printf 'Host no ejecutable: %s\n' "$host_path" >&2; exit 1; }
+[[ -f $share_dir/manifest.json && -f $share_dir/background.js ]] || {
+	printf 'Extensión incompleta: %s\n' "$share_dir" >&2
+	exit 1
+}
+
+install -d -m 700 -- "$manifest_dir" "$(dirname -- "$xpi_path")" "$(dirname -- "$policy_path")"
+tmp_manifest=$(mktemp "$manifest_dir/.${host_name}.XXXXXX")
+tmp_xpi=$(mktemp "$(dirname -- "$xpi_path")/.project-atlas-theme.XXXXXX")
+trap 'rm -f -- "$tmp_manifest" "$tmp_xpi"' EXIT
+
+python3 - "$host_name" "$host_path" "$extension_id" >"$tmp_manifest" <<'PY'
+import json
+import sys
+
+name, path, extension_id = sys.argv[1:]
+json.dump(
+    {
+        "name": name,
+        "description": "Paleta dinámica de Noctalia para Thunderbird",
+        "path": path,
+        "type": "stdio",
+        "allowed_extensions": [extension_id],
+    },
+    sys.stdout,
+    indent=2,
+)
+sys.stdout.write("\n")
+PY
+chmod 600 "$tmp_manifest"
+mv -f -- "$tmp_manifest" "$manifest_path"
+
+bsdtar --format zip -cf "$tmp_xpi" -C "$share_dir" manifest.json background.js
+chmod 600 "$tmp_xpi"
+mv -f -- "$tmp_xpi" "$xpi_path"
+trap - EXIT
+
+python3 - "$xpi_path" "$extension_id" "$policy_path" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+xpi_path = Path(sys.argv[1]).resolve()
+extension_id = sys.argv[2]
+policy_path = Path(sys.argv[3])
+policy = {
+    "policies": {
+        "ExtensionSettings": {
+            extension_id: {
+                "installation_mode": "normal_installed",
+                "install_url": xpi_path.as_uri(),
+                "updates_disabled": True,
+            }
+        }
+    }
+}
+temporary = policy_path.with_name(f".{policy_path.name}.tmp")
+temporary.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+temporary.chmod(0o600)
+temporary.replace(policy_path)
+PY
+
+printf '%s\n' "$xpi_path"

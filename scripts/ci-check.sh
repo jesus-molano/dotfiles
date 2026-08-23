@@ -43,6 +43,7 @@ for test in \
 	test_runtime_compatibility.sh \
 	test_keyboard_contract.sh \
 	test_desktop_surface.sh \
+	test_thunderbird_theme.sh \
 	test_stow_lint.sh \
 	test_install_transaction.sh \
 	test_backup_portable.sh \

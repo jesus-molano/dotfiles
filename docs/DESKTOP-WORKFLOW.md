@@ -304,6 +304,18 @@ demás plantillas activas. Starship se genera fuera del checkout. Neovim y
 qutebrowser leen la paleta al abrir una instancia nueva. Orca la aplica antes
 de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
 abierta.
+Thunderbird recibe los colores de la paleta activa en tiempo real mediante una
+extensión local. `just apply` vuelve a generar la extensión y su manifiesto. En
+una instalación nueva, aplica una vez la política que prepara el instalador:
+
+```bash
+pkexec install -D -m 644 \
+  "$HOME/.local/state/dotfiles/thunderbird/policies.json" \
+  /etc/thunderbird/policies/policies.json
+```
+
+Reinicia Thunderbird después de instalar esa política. Los cambios posteriores
+de `/appearance` no requieren reiniciar la aplicación.
 El widget de sesión y las acciones normales de `Hyper + Q` usan el color
 primario de la apariencia activa. El fondo del panel usa la superficie de esa
 misma paleta. Solo la acción final de apagado conserva la variante destructiva.

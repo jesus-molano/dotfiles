@@ -169,8 +169,8 @@ fi
         by_scope: dict[str, set[str]] = {}
         for scope, _category, package, _source in rows:
             by_scope.setdefault(scope, set()).add(package)
-        self.assertEqual(len(by_scope["base"]), 119)
-        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 142)
+        self.assertEqual(len(by_scope["base"]), 120)
+        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 143)
         self.assertIn("bat", by_scope["base"])
         self.assertIn("npm", by_scope["base"])
         self.assertEqual(len(by_scope["bundle:gaming-core"]), 6)
