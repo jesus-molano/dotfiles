@@ -16,7 +16,16 @@ description: Implement a scoped feature, bug fix, refactor, or ready ticket from
    confirmed failure to `$systematic-debugging`, or `$debug-web-flow` for a
    Next, Nuxt, or Vue path spanning browser and server.
 4. Run focused checks, required repository checks, and `$verification-before-completion`.
-   Inspect the diff and report only evidence actually obtained.
-5. Commit a coherent verified change when the governing instructions allow it.
+   Inspect the complete task delta and report only evidence actually obtained.
+5. Apply independent review in proportion to the completed delta:
+   - small/low: skip an agent reviewer unless the change crosses a public,
+     security, data, accessibility-critical, or deployment boundary;
+   - medium: use one independent read-only correctness/architecture reviewer;
+   - large/high: use at least one independent read-only reviewer and add only
+     the narrow specialists justified by the changed domains.
+   Require file/line evidence. Verify findings before changing code. Fix
+   blockers, rerun affected checks, and request one fresh review. Stop after two
+   review passes; report blocked or partial if a blocker remains.
+6. Commit a coherent verified change when the governing instructions allow it.
    Keep the configured Git identity; never add `Co-authored-by`. Tracker writes,
    deployment, and push need their own explicit authority and safety gates.
