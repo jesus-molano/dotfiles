@@ -32,10 +32,10 @@ PCI_GPU_VENDORS = {
     "8086": "intel",
 }
 
-# Algunos clientes de audio y OpenRGB crean caches o archivos de configuración
-# aunque se invoquen solo para consultar el hardware. La detección debe poder
-# hablar con la sesión actual (XDG_RUNTIME_DIR se conserva), pero nunca debe
-# dejar esos artefactos bajo el HOME/XDG del llamador.
+# Algunos clientes de audio crean caches o archivos de configuración aunque se
+# invoquen solo para consultar el hardware. La detección debe poder hablar con
+# la sesión actual (XDG_RUNTIME_DIR se conserva), pero nunca debe dejar esos
+# artefactos bajo el HOME/XDG del llamador.
 DETECTION_COMMAND_ENV: dict[str, str] | None = None
 
 
@@ -60,92 +60,6 @@ def user_manager_available() -> bool:
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     ).returncode == 0
-
-
-def user_services_reconciliation_required(target: Path) -> bool:
-    format_path = target / "user-services-format"
-    if os.path.lexists(format_path):
-        if format_path.is_symlink() or not format_path.is_file() or format_path.read_text(encoding="utf-8").strip() != "v1":
-            raise ValueError("El formato de estado de servicios de usuario no es válido")
-        intent = target / "user-services-mutation-intent"
-        if os.path.lexists(intent) and (intent.is_symlink() or not intent.is_file()):
-            raise ValueError("La intención de servicios de usuario no es válida")
-        return intent.is_file()
-    return (target / "rgb-state").is_file()
-
-
-def managed_reactive_rgb_targets(home: Path, links: list[tuple[str, str]]) -> set[Path]:
-    relative_unit = ".config/systemd/user/reactive-rgb.service"
-    targets: set[Path] = set()
-    for relative, destination in links:
-        if relative != relative_unit:
-            continue
-        value = Path(destination)
-        if not value.is_absolute():
-            value = home / Path(relative).parent / value
-        targets.add(value.resolve(strict=False))
-    return targets
-
-
-def checkpoint_reactive_rgb_service_links(target: Path) -> list[tuple[str, str]]:
-    """Return checkpoint manifests used only to prove service ownership.
-
-    A pre-existing exact common Stow link is deliberately excluded from the
-    filesystem-removal plan.  It can nevertheless be the service unit behind
-    an enablement this transaction owns, as recorded by the immutable Stow
-    intent and resulting applied manifest.
-    """
-    links: list[tuple[str, str]] = []
-    for name in ("stow-intent.tsv", "applied-links.tsv"):
-        manifest = target / name
-        if manifest.is_file():
-            links.extend(read_link_manifest(manifest, name))
-    return links
-
-
-ReactiveRgbEnablement = tuple[Path, str, Path]
-
-
-def validate_reactive_rgb_enablement(home: Path, managed_targets: set[Path]) -> ReactiveRgbEnablement | None:
-    wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
-    if wants.is_symlink():
-        lexical_target = os.readlink(wants)
-        resolved = wants.resolve(strict=False)
-        if resolved not in managed_targets:
-            raise ValueError(f"No se retira un enablement de Reactive RGB con destino ajeno: {wants}")
-        return wants, lexical_target, resolved
-    if wants.exists():
-        raise ValueError(f"No se retira un enablement de Reactive RGB modificado: {wants}")
-    return None
-
-
-def clear_reactive_rgb_service(enablement: ReactiveRgbEnablement | None) -> None:
-    active = subprocess.run(
-        ["systemctl", "--user", "is-active", "reactive-rgb.service"],
-        check=False,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    ).returncode == 0
-    stopped = False
-    if active:
-        subprocess.run(["systemctl", "--user", "stop", "reactive-rgb.service"], check=True)
-        stopped = True
-    if enablement is None:
-        return
-    try:
-        wants, lexical_target, resolved_target = enablement
-        if (not wants.is_symlink()
-                or os.readlink(wants) != lexical_target
-                or wants.resolve(strict=False) != resolved_target):
-            raise ValueError(f"El enablement de Reactive RGB cambió durante la operación: {wants}")
-        wants.unlink()
-    except Exception:
-        if stopped:
-            # Preserve the prior runtime state if a concurrent change makes
-            # removal unsafe.  This is deliberately best-effort: the original
-            # validation/unlink error remains the transaction failure.
-            subprocess.run(["systemctl", "--user", "start", "reactive-rgb.service"], check=False)
-        raise
 
 
 def host_path(value: str | None = None) -> Path:
@@ -274,13 +188,6 @@ def detect_hardware() -> dict[str, Any]:
             (audio_sinks if audio_section == "sinks" else audio_cards).append(value)
     audio_sinks = sorted(set(audio_sinks))
     audio_cards = sorted(set(audio_cards))
-    rgb_devices: list[str] = []
-    for line in command_output("openrgb", "--noautoconnect", "--list-devices", timeout=10).splitlines():
-        # OpenRGB may print serials and USB metadata below each device. Persist
-        # only numbered display names, which are sufficient for exact matching.
-        match = re.fullmatch(r"\s*[0-9]+:\s*(.+?)\s*", line)
-        if match and not any(character in match.group(1) for character in "\r\n\x00"):
-            rgb_devices.append(match.group(1)[:160])
     detected = {
         "schema": SCHEMA,
         "gpu_vendors": sorted(set(gpus)),
@@ -291,8 +198,6 @@ def detect_hardware() -> dict[str, Any]:
         "inputs": sorted(inputs, key=lambda item: (item["class"], item["name"])),
         "pipewire": bool(shutil.which("wpctl")),
         "audio": {"sinks": audio_sinks, "cards": audio_cards},
-        "openrgb": bool(shutil.which("openrgb")),
-        "openrgb_devices": rgb_devices,
     }
     detected["detected_at"] = int(time.time())
     fingerprint_input = {key: value for key, value in detected.items() if key != "detected_at"}
@@ -382,7 +287,7 @@ def toml_value(value: Any, label: str) -> str:
 
 
 def serialize_host(host: dict[str, Any]) -> str:
-    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "rgb", "backup", "noctalia"}, "host")
+    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "backup", "noctalia"}, "host")
     lines = [f"schema = {SCHEMA}", "bundles = " + toml_value(string_list(host.get("bundles"), "bundles"), "bundles")]
 
     hardware = host.get("hardware", {})
@@ -458,7 +363,6 @@ def serialize_host(host: dict[str, Any]) -> str:
 
     for section, ordered_keys in (
         ("audio", ("cycle", "ensure_on_start", "card", "base_profile", "secondary_profile", "sink_prefix", "base_sink", "secondary_sink", "default_profile", "default_sink")),
-        ("rgb", ("enabled", "mode", "ambient_color", "openrgb_device", "nzxt_device", "static_color", "openrgb_zone", "openrgb_zone_size", "cpu_led_count", "cpu_green_threshold", "cpu_orange_threshold", "cpu_red_threshold", "gpu_green_threshold", "gpu_orange_threshold", "gpu_red_threshold", "interval", "debounce", "hysteresis", "reapply_interval")),
         ("backup", ("repository",)),
     ):
         values = host.get(section)
@@ -488,6 +392,16 @@ def serialize_host(host: dict[str, Any]) -> str:
                 if key in values:
                     lines.append(f"{key} = {toml_value(values[key], f'noctalia.{section}.{key}')}")
     return "\n".join(lines) + "\n"
+
+
+def without_retired_rgb(host: dict[str, Any]) -> dict[str, Any]:
+    """Accept the former RGB preferences long enough to migrate old hosts."""
+    normalized = copy.deepcopy(host)
+    normalized.pop("rgb", None)
+    bundles = normalized.get("bundles")
+    if isinstance(bundles, list):
+        normalized["bundles"] = [item for item in bundles if item != "rgb-openrgb"]
+    return normalized
 
 
 def normalize_noctalia_preferences(noctalia: Any) -> dict[str, dict[str, Any]]:
@@ -556,6 +470,7 @@ def resolve(repo: Path, host: dict[str, Any], capabilities: dict[str, Any], safe
     contract = load_contract(repo)
     if host and host.get("schema", SCHEMA) != SCHEMA:
         raise ValueError("host.toml tiene un esquema no compatible")
+    host = without_retired_rgb(host)
     if host:
         serialize_host(host)
     bundles = string_list(host.get("bundles") if host else [], "bundles")
@@ -607,7 +522,6 @@ def resolve(repo: Path, host: dict[str, Any], capabilities: dict[str, Any], safe
         "input": host.get("input", {}) if host else {},
         "workspaces": host.get("workspaces", {}) if host else {},
         "audio": host.get("audio", {}) if host else {},
-        "rgb": host.get("rgb", {}) if host else {},
         "backup": host.get("backup", {}) if host else {},
         "noctalia": normalize_noctalia_preferences(host.get("noctalia", {})),
         "noctalia_configured": bool(host and "noctalia" in host),
@@ -793,46 +707,6 @@ def rendered_audio(plan: dict[str, Any]) -> str | None:
     return "\n".join(lines) + "\n"
 
 
-def rendered_rgb(plan: dict[str, Any]) -> str | None:
-    rgb = plan.get("rgb", {})
-    if not isinstance(rgb, dict):
-        raise ValueError("rgb debe ser una tabla")
-    if "rgb-openrgb" in plan.get("bundles", []) and "enabled" in rgb and not isinstance(rgb["enabled"], bool):
-        raise ValueError("rgb.enabled debe ser booleano")
-    if "rgb-openrgb" not in plan.get("bundles", []) or rgb.get("enabled") is not True:
-        return None
-    required_strings = ("mode", "ambient_color", "openrgb_device", "nzxt_device", "static_color")
-    required_numbers = ("openrgb_zone", "openrgb_zone_size", "cpu_led_count", "cpu_green_threshold", "cpu_orange_threshold", "cpu_red_threshold", "gpu_green_threshold", "gpu_orange_threshold", "gpu_red_threshold", "interval", "debounce", "hysteresis")
-    if any(not isinstance(rgb.get(name), str) or not rgb[name] or len(rgb[name]) > 160 or any(char in rgb[name] for char in "\r\n\x00") for name in required_strings):
-        raise ValueError("rgb requiere todos los targets y umbrales válidos")
-    if rgb["mode"] not in ("ambient", "thermal", "gaming", "recording", "build-pass", "build-fail"):
-        raise ValueError("rgb.mode inválido")
-    for color in ("ambient_color", "static_color"):
-        if not re.fullmatch(r"[0-9A-Fa-f]{6}", rgb[color]):
-            raise ValueError(f"rgb.{color} debe ser un color hexadecimal de seis dígitos")
-    limits = {
-        "openrgb_zone": (0, 99), "openrgb_zone_size": (1, 999), "cpu_led_count": (1, 998),
-        "cpu_green_threshold": (1, 150), "cpu_orange_threshold": (1, 150), "cpu_red_threshold": (1, 150),
-        "gpu_green_threshold": (1, 150), "gpu_orange_threshold": (1, 150), "gpu_red_threshold": (1, 150),
-        "interval": (1, 3600), "debounce": (1, 20), "hysteresis": (0, 15),
-    }
-    for name in required_numbers:
-        value = rgb.get(name)
-        minimum, maximum = limits[name]
-        if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
-            raise ValueError(f"rgb.{name} debe estar entre {minimum} y {maximum}")
-    if rgb["cpu_led_count"] >= rgb["openrgb_zone_size"]:
-        raise ValueError("rgb.cpu_led_count debe ser menor que rgb.openrgb_zone_size")
-    if not (rgb["cpu_green_threshold"] < rgb["cpu_orange_threshold"] < rgb["cpu_red_threshold"]):
-        raise ValueError("Los umbrales CPU de RGB deben estar ordenados")
-    if not (rgb["gpu_green_threshold"] < rgb["gpu_orange_threshold"] < rgb["gpu_red_threshold"]):
-        raise ValueError("Los umbrales GPU de RGB deben estar ordenados")
-    lines = ["REACTIVE_RGB_ENABLED=1"]
-    for name in required_strings + required_numbers:
-        lines.append("REACTIVE_RGB_" + name.upper() + "=" + str(rgb[name]))
-    return "\n".join(lines) + "\n"
-
-
 def rendered_qmd(plan: dict[str, Any]) -> str | None:
     if "productivity-extra" not in plan.get("bundles", []):
         return None
@@ -888,7 +762,6 @@ def rendered_artifacts(plan: dict[str, Any]) -> dict[str, Any]:
     return {
         "hypr": generated_hypr(plan),
         "audio": rendered_audio(plan),
-        "rgb": rendered_rgb(plan),
         "qmd": rendered_qmd(plan),
         "restic": rendered_backup_repository(plan),
         "noctalia": rendered_noctalia_overrides(plan),
@@ -903,7 +776,6 @@ def write_plan_and_hypr(plan: dict[str, Any]) -> None:
         write_private(directory / name, contents)
     for key, path in (
         ("audio", state_root() / "generated" / "audio.conf"),
-        ("rgb", state_root() / "staged" / "reactive-rgb" / "config.conf"),
         ("qmd", state_root() / "staged" / "qmd" / "index.yml"),
         ("restic", state_root() / "staged" / "restic" / "repository"),
         ("noctalia", state_root() / "staged" / "noctalia" / "zz-host-overrides.toml"),
@@ -939,7 +811,7 @@ def cmd_configure(args: argparse.Namespace) -> int:
     existing = load_toml(path)
     if existing and existing.get("schema", SCHEMA) != SCHEMA:
         raise ValueError("host.toml tiene un esquema no compatible")
-    host: dict[str, Any] = copy.deepcopy(existing) or {"schema": SCHEMA, "bundles": [], "hardware": {}, "input": {"keyboard_layouts": ["us"]}}
+    host: dict[str, Any] = without_retired_rgb(existing) if existing else {"schema": SCHEMA, "bundles": [], "hardware": {}, "input": {"keyboard_layouts": ["us"]}}
     if not isinstance(host, dict):
         raise ValueError("host.toml inválido")
     host["schema"] = SCHEMA
@@ -1121,7 +993,7 @@ def cmd_refresh(args: argparse.Namespace) -> int:
     detected = detect()
     previous = read_capabilities()
     if previous and previous.get("fingerprint") != detected.get("fingerprint"):
-        keys = ("gpu_vendors", "monitors", "has_internal_panel", "backlights", "batteries", "inputs", "audio", "openrgb", "openrgb_devices")
+        keys = ("gpu_vendors", "monitors", "has_internal_panel", "backlights", "batteries", "inputs", "audio")
         changes = {key: {"before": previous.get(key), "after": detected.get(key)} for key in keys if previous.get(key) != detected.get(key)}
         print("Cambios detectados (host.toml no se modifica):\n" + json.dumps(changes, indent=2, ensure_ascii=False), file=sys.stderr)
         if not args.yes:
@@ -1140,7 +1012,7 @@ def cmd_export(args: argparse.Namespace) -> int:
     # Las elecciones son exportables; nunca incluimos datos detectados de hardware.
     if not SAFE_NAME.fullmatch(args.name):
         raise ValueError("Nombre de exportación inválido")
-    lines = ["# Export saneado: sin pantallas, dispositivos, audio ni RGB", "schema = 1", "bundles = " + json.dumps(string_list(host.get("bundles"), "bundles"))]
+    lines = ["# Export saneado: sin pantallas, dispositivos ni audio", "schema = 1", "bundles = " + json.dumps(string_list(host.get("bundles"), "bundles"))]
     input_config = host.get("input", {})
     if not isinstance(input_config, dict):
         raise ValueError("input debe ser una tabla")
@@ -1532,6 +1404,8 @@ def write_restored_active_generated(target: Path, generated: dict[str, tuple[Pat
     entries: list[str] = []
     for line in previous.read_text(encoding="utf-8").splitlines():
         key, digest = line.split("\t", 1)
+        if key == "rgb" and re.fullmatch(r"[0-9a-f]{64}", digest):
+            continue
         if key not in generated or not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise ValueError("previous-generated-installed.tsv inválido")
         destination = generated[key][0]
@@ -1543,7 +1417,6 @@ def write_restored_active_generated(target: Path, generated: dict[str, tuple[Pat
 def generated_entries(target: Path) -> tuple[dict[str, tuple[Path, str]], dict[str, str], dict[str, str], dict[str, str]]:
     generated: dict[str, tuple[Path, str]] = {
         "qmd": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "qmd" / "index.yml", "qmd"),
-        "rgb": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "reactive-rgb" / "config.conf", "rgb"),
         "restic": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "restic" / "repository", "restic"),
         "noctalia": (xdg_path("XDG_CONFIG_HOME", "~/.config") / "noctalia" / "zz-host-overrides.toml", "noctalia"),
     }
@@ -1552,6 +1425,8 @@ def generated_entries(target: Path) -> tuple[dict[str, tuple[Path, str]], dict[s
     if installed_file.is_file():
         for line in installed_file.read_text(encoding="utf-8").splitlines():
             key, digest = line.split("\t", 1)
+            if key == "rgb" and re.fullmatch(r"[0-9a-f]{64}", digest):
+                continue
             if key not in generated or not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise ValueError("generated-installed.tsv inválido")
             installed[key] = digest
@@ -1560,6 +1435,8 @@ def generated_entries(target: Path) -> tuple[dict[str, tuple[Path, str]], dict[s
     if targets_file.is_file():
         for line in targets_file.read_text(encoding="utf-8").splitlines():
             key, status = line.split("\t", 1)
+            if key == "rgb" and status in ("absent", "legacy", "copy"):
+                continue
             if key not in generated or status not in ("absent", "legacy", "copy"):
                 raise ValueError("generated-targets.tsv inválido")
             previous[key] = status
@@ -1568,6 +1445,8 @@ def generated_entries(target: Path) -> tuple[dict[str, tuple[Path, str]], dict[s
     if removed_file.is_file():
         for line in removed_file.read_text(encoding="utf-8").splitlines():
             key, digest = line.split("\t", 1)
+            if key == "rgb" and re.fullmatch(r"[0-9a-f]{64}", digest):
+                continue
             if key not in generated or not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise ValueError("generated-removed.tsv inválido")
             removed[key] = digest
@@ -1884,21 +1763,8 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     if not args.apply:
         print(json.dumps(preview, indent=2))
         return 0
-    reconcile_services = user_services_reconciliation_required(target)
     manager_available = user_manager_available()
-    service_ownership_links = [*stow_removals, *previous, *legacy_live]
-    if checkpoint is not None:
-        # These manifests expand only the service ownership proof.  They never
-        # enter ``stow_removals``, so an exact common pre-Stow link survives.
-        service_ownership_links.extend(checkpoint_reactive_rgb_service_links(target))
-    managed_rgb_targets = managed_reactive_rgb_targets(home, service_ownership_links)
-    reconcile_rgb = reconcile_services and bool(managed_rgb_targets)
-    rgb_wants = validate_reactive_rgb_enablement(home, managed_rgb_targets) if reconcile_rgb and manager_available else None
     remove_links(home, stow_removals, allow_absent=allow_absent)
-    rgb_state = target / "rgb-state"
-    desired_rgb = set(rgb_state.read_text(encoding="utf-8").splitlines()) if reconcile_rgb and rgb_state.is_file() else set()
-    if reconcile_rgb and manager_available:
-        clear_reactive_rgb_service(rgb_wants)
     restore_generated_actions(target, generated, generated_remove_actions, generated_restore_actions)
     restore_backup_moves(backup_moves)
     restore_links(home, stow_restorations)
@@ -1908,9 +1774,6 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     if manager_available:
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if reconcile_rgb and manager_available:
-        if "enabled" in desired_rgb: subprocess.run(["systemctl", "--user", "enable", "reactive-rgb.service"], check=True)
-        if "active" in desired_rgb: subprocess.run(["systemctl", "--user", "start", "reactive-rgb.service"], check=True)
     checkpoint_active, checkpoint_snapshots = checkpoint_restored_entries(target, home)
     if previous_removal_started:
         previous_active, previous_snapshots = removal_active_entries(
@@ -1955,9 +1818,6 @@ def cmd_retire(args: argparse.Namespace) -> int:
     preflight_remove_links(home, applied)
     generated_actions = sorted(preflight_generated(generated, installed))
     manager_available = user_manager_available()
-    managed_rgb_targets = managed_reactive_rgb_targets(home, applied)
-    manage_rgb = bool(managed_rgb_targets)
-    rgb_wants = validate_reactive_rgb_enablement(home, managed_rgb_targets) if manager_available and manage_rgb else None
     preview = {
         "migration": target.name,
         "remove_links": [relative for relative, _ in applied],
@@ -1974,8 +1834,6 @@ def cmd_retire(args: argparse.Namespace) -> int:
     write_private(target / "status", "retiring\n")
     persist_migration_checkpoint(target)
     remove_links(home, applied)
-    if manager_available and manage_rgb:
-        clear_reactive_rgb_service(rgb_wants)
     for key in generated_actions:
         destination = generated[key][0]
         if (not destination.is_file() or destination.is_symlink()

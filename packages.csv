@@ -129,8 +129,6 @@ base,media,mpv,native
 base,media,yt-dlp,native
 base,media,libdvdcss,native
 base,media,gpu-screen-recorder,native
-bundle:rgb-openrgb,hardware,openrgb,native
-bundle:rgb-openrgb,hardware,liquidctl,native
 bundle:local-ai,development,whisper-cpp,native
 bundle:local-ai,development,ggml-cpu,native
 bundle:local-ai,development,ggml-vulkan,native

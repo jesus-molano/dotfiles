@@ -80,32 +80,11 @@ check_snapshot() {
 import json, sys
 old = json.load(open(sys.argv[1], encoding="utf-8"))
 new = json.loads(sys.argv[2])
-keys = ("gpu_vendors", "monitors", "has_internal_panel", "backlights", "batteries", "pipewire", "openrgb")
+keys = ("gpu_vendors", "monitors", "has_internal_panel", "backlights", "batteries", "pipewire")
 raise SystemExit(0 if all(old.get(key) == new.get(key) for key in keys) else 1)
 PY
   then ok 'Hardware coincide con el último snapshot'
   else warn 'El hardware cambió desde el snapshot; ejecuta dotf host refresh antes de aplicar preferencias'
-  fi
-}
-check_rgb() {
-  if ! has bundles rgb-openrgb; then info 'Bundle rgb-openrgb no seleccionado'; return; fi
-  check_command 'OpenRGB disponible para rgb-openrgb' openrgb
-  local config="${XDG_CONFIG_HOME:-$HOME/.config}/reactive-rgb/config.conf"
-  if [[ -r "$config" ]]; then ok 'Targets RGB locales presentes'
-  else warn 'rgb-openrgb sin targets locales: el servicio debe permanecer desactivado'
-  fi
-  if systemctl --user is-enabled --quiet reactive-rgb.service 2>/dev/null; then
-    [[ -r "$config" ]] && ok 'Servicio RGB habilitado con targets' || fail 'Servicio RGB habilitado sin targets exactos'
-    local rgb_health
-    if rgb_health="$("$HOME/.local/bin/reactive-rgb" health 2>/dev/null)" &&
-      grep -Fxq 'health_status=ok' <<<"$rgb_health" &&
-      grep -Fxq 'health_scope=liveness-with-hardware-on-change' <<<"$rgb_health" &&
-      grep -Fxq 'health_fresh=1' <<<"$rgb_health"; then
-      ok 'Reactive RGB activo y saludable'
-    else
-      warn 'Reactive RGB no informa salud reciente'
-    fi
-  else info 'Servicio RGB no habilitado'
   fi
 }
 check_backup() {
@@ -168,11 +147,6 @@ check_optional_config() {
     check 'Unidades Restic' "$repo_root/scripts/verify-restic-units.sh"
     check 'Backup portable' "$repo_root/scripts/tests/test_backup_portable.sh"
   else info 'Checks backup no seleccionados'; fi
-  if has bundles rgb-openrgb; then
-    check 'RGB térmico sin targets versionados' "$repo_root/scripts/tests/test_reactive_rgb.sh"
-    check 'Unidad Reactive RGB' env HOME="$repo_root/rgb-openrgb" \
-      systemd-analyze --user verify "$repo_root/rgb-openrgb/.config/systemd/user/reactive-rgb.service"
-  else info 'Checks rgb-openrgb no seleccionados'; fi
   check 'Acciones audio genéricas' "$repo_root/scripts/tests/test_cycle_desktop_audio_output.sh"
   check 'Selector HDMI configurable' "$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
   check 'Audio configurado al iniciar' "$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
@@ -337,7 +311,7 @@ if [[ "$mode" != live ]]; then
 		Hyprland --verify-config -c "$repo_root/hypr-common/.config/hypr/hyprland.lua"
 	check_base_workflows
 	check_optional_config
-  for bundle in gaming-core gaming-launchers gaming-tools backup rgb-openrgb local-ai productivity-extra; do check_bundle_packages "$bundle"; done
+  for bundle in gaming-core gaming-launchers gaming-tools backup local-ai productivity-extra; do check_bundle_packages "$bundle"; done
   if has capabilities gpu-nvidia; then
     command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi --query-gpu=name --format=csv,noheader >/dev/null 2>&1 && ok 'Capacidad gpu-nvidia operativa' || fail 'Capacidad gpu-nvidia seleccionada pero no operativa'
   else info 'Capacidad gpu-nvidia no seleccionada'

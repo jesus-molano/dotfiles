@@ -56,7 +56,7 @@ provoca una actualización del sistema.
 `dotf host detect` no modifica el sistema. `dotf host configure` confirma solo
 preferencias no deducibles: disposición física de pantallas, teclado, touchpad,
 bundles, ubicación/horario de Noctalia y formato del grabador. Conserva las
-secciones locales de audio, RGB, workspaces y dispositivos para que se confirmen
+secciones locales de audio, workspaces y dispositivos para que se confirmen
 por separado. La ubicación se guarda con permisos privados en `host.toml` y se
 renderiza en `$XDG_CONFIG_HOME/noctalia/zz-host-overrides.toml`; nunca forma
 parte de la configuración base ni de un export. El bundle `backup` exige un
@@ -86,13 +86,11 @@ o dictado.
 | `gaming-launchers` | Heroic, Lutris, Faugus y ProtonPlus |
 | `gaming-tools` | Ludusavi, benchmark y wrappers |
 | `backup` | Restic, rclone y operaciones de copia voluntarias |
-| `rgb-openrgb` | OpenRGB/liquidctl; control solo con destino exacto confirmado |
 | `local-ai` | Herramientas locales opcionales |
 | `productivity-extra` | Utilidades de productividad opcionales |
 
 La ausencia de un bundle es informativa. Si se selecciona y no funciona, el
-doctor lo trata como fallo. No se habilita un servicio de RGB si su dispositivo
-o zona no se resuelve de forma única.
+doctor lo trata como fallo.
 
 ## Rollback
 

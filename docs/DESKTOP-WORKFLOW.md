@@ -281,7 +281,7 @@ La cápsula de recursos muestra CPU, temperatura de CPU, uso y temperatura de GP
 y porcentaje de RAM. Ya no muestra VRAM. La barra tampoco incluye espejo de
 pantalla ni estado periódico del repositorio.
 
-## Apariencias y RGB
+## Apariencias
 
 `/appearance` ofrece ocho escenas: Atlas, Obsidian Amber, Catppuccin Mocha,
 Rosé Pine Moon, Nord Night, Dracula Violet, Tokyo Night City y Vice Afterglow. Cada escena
@@ -328,27 +328,6 @@ de Noctalia. El identificador interno `project-atlas` se conserva para mantener
 compatible el despliegue existente. La sincronización de Noctalia Greeter no se
 aplica a este SDDM y sus ejecutables auxiliares no están instalados. Solo el
 botón final de apagado usa el color de peligro.
-
-Cuando el bundle `rgb-openrgb` está seleccionado para el hardware actual,
-`reactive-rgb.service` usa dos indicadores independientes dentro
-de `Aura Addressable 1`. Los LED 1–12 de la CPU siguen exclusivamente la
-temperatura de CPU. Los LED 13–60 de los ventiladores internos siguen
-exclusivamente la temperatura de la GPU. La CPU usa azul por debajo de 50 °C,
-verde entre 50 y 69 °C, naranja entre 70 y 84 °C y rojo desde 85 °C. La GPU
-usa azul por debajo de 50 °C, verde entre 50 y 69 °C, naranja entre 70 y 82 °C
-y rojo desde 83 °C. Las líneas frontal y superior permanecen blancas mediante
-la zona fija de la placa y los
-dos canales NZXT. OpenRGB nunca selecciona la iluminación de la GPU o la RAM y
-no modifica PWM. El estado vivo se guarda en `XDG_RUNTIME_DIR`, no en el NVMe,
-y los destinos se reaplican cada cinco minutos aunque la banda térmica no
-cambie. Comandos útiles:
-
-```bash
-reactive-rgb status
-reactive-rgb dry-run --mode thermal
-systemctl --user enable --now reactive-rgb.service
-systemctl --user status reactive-rgb.service
-```
 
 ## qutebrowser
 

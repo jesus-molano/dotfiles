@@ -41,10 +41,6 @@ fi
 if [[ "$*" == '--user daemon-reload' && ${DOTFILES_TEST_SYSTEMCTL_FAIL_RELOAD:-0} == 1 ]]; then
     exit 1
 fi
-if [[ "$*" == '--user stop reactive-rgb.service' && -n ${DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP:-} ]]; then
-    rm -f -- "$DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP"
-    ln -s -- "$DOTFILES_TEST_SYSTEMCTL_REPLACEMENT_TARGET" "$DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP"
-fi
 """,
             encoding="utf-8",
         )
@@ -64,83 +60,37 @@ fi
         return subprocess.run(["python3", str(TOOL), "--repo", str(ROOT), *args], text=True,
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, env=runtime)
 
-    def test_user_service_journal_and_foreign_enablement_are_guarded(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            migration = root / "migration"
-            migration.mkdir()
-            (migration / "user-services-format").write_text("v1\n", encoding="utf-8")
-            self.assertFalse(HOST_MODULE.user_services_reconciliation_required(migration))
-            (migration / "user-services-mutation-intent").write_text("", encoding="utf-8")
-            self.assertTrue(HOST_MODULE.user_services_reconciliation_required(migration))
-            (migration / "user-services-format").write_text("future\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "formato de estado"):
-                HOST_MODULE.user_services_reconciliation_required(migration)
-
-            legacy = root / "legacy"
-            legacy.mkdir()
-            (legacy / "rgb-state").write_text("active\n", encoding="utf-8")
-            self.assertTrue(HOST_MODULE.user_services_reconciliation_required(legacy))
-
-            home = root / "home"
-            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
-            wants.parent.mkdir(parents=True)
-            foreign = root / "foreign.service"
-            foreign.write_text("foreign\n", encoding="utf-8")
-            os.symlink(foreign, wants)
-            with self.assertRaisesRegex(ValueError, "destino ajeno"):
-                HOST_MODULE.validate_reactive_rgb_enablement(home, {root / "managed.service"})
-            self.assertTrue(wants.is_symlink())
-            self.assertEqual(wants.resolve(), foreign)
-
-    def test_clear_reactive_rgb_revalidates_wants_after_stop_and_restarts_on_race(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            home = root / "home"
-            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
-            wants.parent.mkdir(parents=True)
-            managed = root / "managed.service"
-            foreign = root / "foreign.service"
-            managed.write_text("managed\n", encoding="utf-8")
-            foreign.write_text("foreign\n", encoding="utf-8")
-            os.symlink(managed, wants)
-            enablement = HOST_MODULE.validate_reactive_rgb_enablement(home, {managed.resolve()})
-            assert enablement is not None
-            log = root / "systemctl.log"
-            with mock.patch.dict(os.environ, {
-                "DOTFILES_TEST_SYSTEMCTL_LOG": str(log),
-                "DOTFILES_TEST_SYSTEMCTL_REPLACE_WANTS_ON_STOP": str(wants),
-                "DOTFILES_TEST_SYSTEMCTL_REPLACEMENT_TARGET": str(foreign),
-            }):
-                with self.assertRaisesRegex(ValueError, "cambió durante la operación"):
-                    HOST_MODULE.clear_reactive_rgb_service(enablement)
-            self.assertTrue(wants.is_symlink())
-            self.assertEqual(wants.resolve(), foreign.resolve())
-            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), [
-                "--user is-active reactive-rgb.service",
-                "--user stop reactive-rgb.service",
-                "--user start reactive-rgb.service",
-            ])
-
     def test_current_host_fixture_resolves_all_bundles_and_nvidia(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             host = root / "host.toml"
             host.write_text(
-                'schema = 1\nbundles = ["gaming-core", "gaming-launchers", "gaming-tools", "backup", "rgb-openrgb", "local-ai", "productivity-extra"]\n\n[backup]\nrepository = "/tmp/restic-test"\n',
+                'schema = 1\nbundles = ["gaming-core", "gaming-launchers", "gaming-tools", "backup", "local-ai", "productivity-extra"]\n\n[backup]\nrepository = "/tmp/restic-test"\n',
                 encoding="utf-8",
             )
             caps = root / "caps.json"
-            caps.write_text(json.dumps({"schema": 1, "gpu_vendors": ["nvidia"], "openrgb": True}), encoding="utf-8")
+            caps.write_text(json.dumps({"schema": 1, "gpu_vendors": ["nvidia"]}), encoding="utf-8")
             plan = json.loads(self.run_tool("resolve", "--host-config", str(host), "--capabilities", str(caps)).stdout)
-        self.assertEqual(plan["bundles"], ["gaming-core", "gaming-launchers", "gaming-tools", "backup", "rgb-openrgb", "local-ai", "productivity-extra"])
+        self.assertEqual(plan["bundles"], ["gaming-core", "gaming-launchers", "gaming-tools", "backup", "local-ai", "productivity-extra"])
         self.assertIn("gpu-nvidia", plan["capabilities"])
         self.assertIn("productivity-extra", plan["modules"])
-        self.assertEqual(set(plan["package_scopes"]), {"base", "bundle:gaming-core", "bundle:gaming-launchers", "bundle:gaming-tools", "bundle:backup", "bundle:rgb-openrgb", "bundle:local-ai", "bundle:productivity-extra"})
+        self.assertEqual(set(plan["package_scopes"]), {"base", "bundle:gaming-core", "bundle:gaming-launchers", "bundle:gaming-tools", "bundle:backup", "bundle:local-ai", "bundle:productivity-extra"})
         self.assertEqual(plan["compatibility"]["packages"]["noctalia"]["minimum"], "5.0.0_beta.9")
         self.assertEqual(plan["compatibility"]["packages"]["noctalia"]["stable_minimum"], "5.0.0")
         self.assertEqual(plan["compatibility"]["packages"]["hyprland"]["minimum"], "0.56.2")
         self.assertEqual(plan["compatibility"]["packages"]["kanata-bin"]["minimum"], "1.12.0")
+
+    def test_retired_rgb_host_preferences_are_ignored_during_migration(self) -> None:
+        host = {
+            "schema": 1,
+            "bundles": ["backup", "rgb-openrgb"],
+            "backup": {"repository": "/tmp/restic-test"},
+            "rgb": {"enabled": True},
+        }
+        plan = HOST_MODULE.resolve(ROOT, host, {"schema": 1, "gpu_vendors": []}, True)
+        self.assertEqual(plan["bundles"], ["backup"])
+        self.assertNotIn("rgb-openrgb", plan["modules"])
+        self.assertNotIn("bundle:rgb-openrgb", plan["package_scopes"])
 
     def test_compatibility_rejects_malformed_or_unknown_stable_transition(self) -> None:
         valid = {
@@ -170,14 +120,13 @@ fi
         for scope, _category, package, _source in rows:
             by_scope.setdefault(scope, set()).add(package)
         self.assertEqual(len(by_scope["base"]), 120)
-        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 143)
+        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 141)
         self.assertIn("bat", by_scope["base"])
         self.assertIn("npm", by_scope["base"])
         self.assertEqual(len(by_scope["bundle:gaming-core"]), 6)
         self.assertEqual(len(by_scope["bundle:gaming-launchers"]), 4)
         self.assertEqual(len(by_scope["bundle:gaming-tools"]), 2)
         self.assertEqual(len(by_scope["bundle:backup"]), 2)
-        self.assertEqual(len(by_scope["bundle:rgb-openrgb"]), 2)
         self.assertEqual(len(by_scope["bundle:local-ai"]), 4)
         self.assertIn("wtype", by_scope["bundle:local-ai"])
         self.assertEqual(len(by_scope["bundle:productivity-extra"]), 3)
@@ -238,21 +187,17 @@ ensure_on_start = true
             )
             self.assertEqual((generated / "inputs.lua").stat().st_mode & 0o777, 0o600)
 
-    def test_current_fixture_stages_audio_and_rgb_without_overwriting_xdg(self) -> None:
+    def test_current_fixture_stages_audio_and_backup_without_overwriting_xdg(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             config, state = root / "config", root / "state"
             caps = root / "caps.json"
-            caps.write_text(json.dumps({"schema": 1, "gpu_vendors": ["nvidia"], "openrgb": True}), encoding="utf-8")
+            caps.write_text(json.dumps({"schema": 1, "gpu_vendors": ["nvidia"]}), encoding="utf-8")
             self.run_tool("resolve", "--host-config", str(ROOT / "scripts/tests/fixtures/current-host.toml"), "--capabilities", str(caps), "--write", env={"XDG_CONFIG_HOME": str(config), "XDG_STATE_HOME": str(state)})
             audio = (state / "dotfiles/generated/audio.conf").read_text(encoding="utf-8")
-            rgb = (state / "dotfiles/staged/reactive-rgb/config.conf").read_text(encoding="utf-8")
             repository = (state / "dotfiles/staged/restic/repository").read_text(encoding="utf-8")
             self.assertIn("DOTFILES_AUDIO_BASE_PROFILE=output:hdmi-stereo", audio)
-            self.assertIn("REACTIVE_RGB_NZXT_DEVICE=NZXT Smart Device V2", rgb)
-            self.assertNotIn("REACTIVE_RGB_REAPPLY_INTERVAL", rgb)
             self.assertEqual(repository, "/mnt/backups/restic-desktop\n")
-            self.assertFalse((config / "reactive-rgb/config.conf").exists())
             monitors = (state / "dotfiles/generated/hypr/config/monitors.lua").read_text(encoding="utf-8")
             inputs = (state / "dotfiles/generated/hypr/config/inputs.lua").read_text(encoding="utf-8")
             user_inputs = (state / "dotfiles/generated/hypr/config/user-inputs.lua").read_text(encoding="utf-8")
@@ -266,41 +211,11 @@ ensure_on_start = true
             self.assertIn("SCROLLING_WORKSPACE = 6", user_inputs)
             self.assertIn('[1] = ""', user_inputs)
 
-    def test_detection_keeps_openrgb_names_but_not_serial_metadata(self) -> None:
-        outputs = {
-            ("lspci", "-nn"): "",
-            ("hyprctl", "monitors", "-j"): "[]",
-            ("pactl", "-f", "json", "list", "sinks"): "[]",
-            ("pactl", "-f", "json", "list", "cards"): "[]",
-            ("wpctl", "status", "-n"): "Audio\n ├─ Sinks:\n │  * 42. Built-in Audio [vol: 0.50]\n",
-            ("openrgb", "--noautoconnect", "--list-devices"): "0: Mainboard RGB\n  Serial: SECRET-123\n  Type: Motherboard\n1: NZXT Smart Device V2\n",
-        }
-
-        def fake_output(*args: str, timeout: float = 3.0) -> str:
-            del timeout
-            return outputs.get(tuple(args), "")
-
-        with mock.patch.object(HOST_MODULE, "command_output", side_effect=fake_output):
-            detected = HOST_MODULE.detect()
-        self.assertEqual(detected["openrgb_devices"], ["Mainboard RGB", "NZXT Smart Device V2"])
-        self.assertNotIn("SECRET-123", json.dumps(detected))
-        self.assertIn("Built-in Audio", detected["audio"]["sinks"])
-
     def test_detection_isolates_clients_that_write_xdg_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             fake_bin = root / "bin"
             fake_bin.mkdir()
-            writer = fake_bin / "openrgb"
-            writer.write_text(
-                "#!/usr/bin/env bash\n"
-                "set -euo pipefail\n"
-                "mkdir -p \"$HOME/.config/OpenRGB\" \"$XDG_CACHE_HOME/openrgb\"\n"
-                "printf 'cache\\n' >\"$HOME/.config/OpenRGB/detected\"\n"
-                "printf '0: Test RGB Device\\n'\n",
-                encoding="utf-8",
-            )
-            writer.chmod(0o755)
             pactl = fake_bin / "pactl"
             pactl.write_text(
                 "#!/usr/bin/env bash\n"
@@ -325,7 +240,6 @@ ensure_on_start = true
                 },
             )
             detected = json.loads(result.stdout)
-            self.assertIn("Test RGB Device", detected["openrgb_devices"])
             self.assertFalse(caller_home.exists(), "detect no debe crear HOME/XDG del llamador")
 
     def test_detection_identifies_intel_without_matching_compatible_as_ati(self) -> None:
@@ -381,32 +295,6 @@ ensure_on_start = true
                 self.assertEqual(plan["capabilities"], expected_capabilities)
                 self.assertEqual(plan["modules"].count("gpu-nvidia"), len(expected_capabilities))
 
-    def test_invalid_rgb_limits_are_rejected_before_staging(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            host = root / "host.toml"
-            host.write_text(
-                (ROOT / "scripts/tests/fixtures/current-host.toml").read_text(encoding="utf-8").replace(
-                    "cpu_led_count = 12", "cpu_led_count = 60"
-                ),
-                encoding="utf-8",
-            )
-            caps = root / "caps.json"
-            caps.write_text('{"schema": 1, "gpu_vendors": ["nvidia"]}', encoding="utf-8")
-            runtime = os.environ.copy()
-            runtime.update({"XDG_STATE_HOME": str(root / "state"), "XDG_CONFIG_HOME": str(root / "config")})
-            result = subprocess.run(
-                ["python3", str(TOOL), "--repo", str(ROOT), "resolve", "--host-config", str(host), "--capabilities", str(caps), "--write"],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=runtime,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 2)
-            self.assertIn("cpu_led_count", result.stderr)
-            self.assertFalse((root / "state/dotfiles/staged/reactive-rgb/config.conf").exists())
-
     def test_read_only_resolve_rejects_invalid_rendered_preferences(self) -> None:
         invalid_hosts = {
             "monitor": '''schema = 1
@@ -425,11 +313,6 @@ keyboard_layouts = ["english"]
 bundles = []
 [audio]
 cycle = "yes"
-''',
-            "rgb": '''schema = 1
-bundles = ["rgb-openrgb"]
-[rgb]
-enabled = true
 ''',
             "backup": '''schema = 1
 bundles = ["backup"]
@@ -575,7 +458,6 @@ frame_rate = 75
             restored = tomllib.loads(host.read_text(encoding="utf-8"))
             self.assertEqual(restored, original)
             self.assertEqual(restored["audio"]["default_sink"], "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1")
-            self.assertEqual(restored["rgb"]["nzxt_device"], "NZXT Smart Device V2")
             self.assertEqual(restored["workspaces"]["split_after"], 4)
 
     def test_configure_enables_only_portable_defaults_implied_by_choices(self) -> None:
@@ -680,57 +562,37 @@ frame_rate = 75
             legacy_source = migration / "modules/legacy/.config/legacy.conf"
             legacy_source.parent.mkdir(parents=True)
             legacy_source.write_text("old", encoding="utf-8")
-            legacy_unit = migration / "modules/legacy/.config/systemd/user/reactive-rgb.service"
-            legacy_unit.parent.mkdir(parents=True)
-            legacy_unit.write_text("[Service]\nExecStart=/old\n", encoding="utf-8")
             plan = migration / "plan.json"
             plan.write_text(json.dumps({"repo": str(root / "checkout-gone"), "modules": ["hypr-host"]}), encoding="utf-8")
             (migration / "legacy-modules").write_text("legacy\n", encoding="utf-8")
             (migration / "applied-links.tsv").write_text(
-                ".config/current.conf\t/current/checkouts/new.conf\n"
-                ".config/systemd/user/reactive-rgb.service\t/current/checkouts/reactive-rgb.service\n",
+                ".config/current.conf\t/current/checkouts/new.conf\n",
                 encoding="utf-8",
             )
             (migration / "previous-applied-links.tsv").write_text("", encoding="utf-8")
             (migration / "legacy-links.tsv").write_text(
-                f".config/legacy.conf\t{legacy_source}\n"
-                f".config/systemd/user/reactive-rgb.service\t{legacy_unit}\n",
+                f".config/legacy.conf\t{legacy_source}\n",
                 encoding="utf-8",
             )
             (migration / "legacy-links-removed").write_text("yes\n", encoding="utf-8")
-            (migration / "rgb-state").write_text("enabled\nactive\n", encoding="utf-8")
             (migration / "generated-targets.tsv").write_text("qmd\tlegacy\n", encoding="utf-8")
             digest = hashlib.sha256(destination.read_bytes()).hexdigest()
             (migration / "generated-installed.tsv").write_text(f"qmd\t{digest}\n", encoding="utf-8")
             current = home / ".config/current.conf"
             current.parent.mkdir(parents=True)
             os.symlink("/current/checkouts/new.conf", current)
-            current_unit = home / ".config/systemd/user/reactive-rgb.service"
-            current_unit.parent.mkdir(parents=True)
-            os.symlink("/current/checkouts/reactive-rgb.service", current_unit)
-            current_wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
-            current_wants.parent.mkdir(parents=True)
-            os.symlink("/current/checkouts/reactive-rgb.service", current_wants)
-            checksummed = [plan, migration / "legacy-modules", migration / "applied-links.tsv", migration / "previous-applied-links.tsv", migration / "legacy-links.tsv", migration / "legacy-links-removed", migration / "generated-targets.tsv", migration / "generated-installed.tsv", migration / "rgb-state", legacy_source, legacy_unit]
+            checksummed = [plan, migration / "legacy-modules", migration / "applied-links.tsv", migration / "previous-applied-links.tsv", migration / "legacy-links.tsv", migration / "legacy-links-removed", migration / "generated-targets.tsv", migration / "generated-installed.tsv", legacy_source]
             (migration / "SHA256SUMS").write_text("".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed), encoding="utf-8")
             systemctl_log = root / "systemctl.log"
             self.run_tool("rollback", "deployment-order", "--apply", env={"XDG_STATE_HOME": str(state), "XDG_CONFIG_HOME": str(root / "config"), "HOME": str(home), "DOTFILES_TEST_SYSTEMCTL_LOG": str(systemctl_log)})
             self.assertFalse(destination.exists())
             self.assertFalse(current.exists())
             self.assertTrue((home / ".config/legacy.conf").is_symlink())
-            self.assertTrue(current_unit.is_symlink())
-            self.assertEqual(current_unit.resolve(), legacy_unit)
-            self.assertFalse(current_wants.exists())
-            self.assertFalse(current_wants.is_symlink())
             self.assertEqual(
                 systemctl_log.read_text(encoding="utf-8").splitlines(),
                 [
                     "--user show-environment",
-                    "--user is-active reactive-rgb.service",
-                    "--user stop reactive-rgb.service",
                     "--user daemon-reload",
-                    "--user enable reactive-rgb.service",
-                    "--user start reactive-rgb.service",
                 ],
             )
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "rolled-back\n")
@@ -767,60 +629,6 @@ frame_rate = 75
             self.assertFalse(current.exists())
             self.assertFalse(current.is_symlink())
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "rolled-back\n")
-
-    def test_manual_rollback_reconciles_rgb_for_common_prestow_unit_without_removing_it(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            state, home = root / "state", root / "home"
-            migration = state / "dotfiles/migrations/deployment-common-rgb"
-            migration.mkdir(parents=True)
-            unit = ".config/systemd/user/reactive-rgb.service"
-            expected = str(root / "checkout/rgb-openrgb/.config/systemd/user/reactive-rgb.service")
-            snapshot = migration / "pre-stow/rgb.service"
-            snapshot.parent.mkdir(parents=True)
-            snapshot.write_text("[Service]\nExecStart=/previous\n", encoding="utf-8")
-            (migration / "plan.json").write_text(json.dumps({"repo": str(root / "checkout"), "modules": ["rgb-openrgb"]}), encoding="utf-8")
-            for name in (
-                "legacy-modules", "legacy-links.tsv", "previous-applied-links.tsv",
-                "generated-installed.tsv", "generated-removed.tsv", "generated-targets.tsv",
-            ):
-                (migration / name).write_text("", encoding="utf-8")
-            (migration / "stow-checkpoint").write_text("", encoding="utf-8")
-            (migration / "stow-intent.tsv").write_text(f"{unit}\t{expected}\n", encoding="utf-8")
-            (migration / "stow-before.tsv").write_text(f"{unit}\tlink\t{expected}\n", encoding="utf-8")
-            (migration / "pre-stow-restore-links.tsv").write_text(f"{unit}\t{snapshot}\n", encoding="utf-8")
-            (migration / "applied-links.tsv").write_text(f"{unit}\t{expected}\n", encoding="utf-8")
-            (migration / "user-services-format").write_text("v1\n", encoding="utf-8")
-            (migration / "user-services-mutation-intent").write_text("rgb\n", encoding="utf-8")
-            (migration / "rgb-state").write_text("active\n", encoding="utf-8")
-            (migration / "status").write_text("stow-ready\n", encoding="utf-8")
-            current_unit = home / unit
-            current_unit.parent.mkdir(parents=True)
-            os.symlink(expected, current_unit)
-            wants = home / ".config/systemd/user/default.target.wants/reactive-rgb.service"
-            wants.parent.mkdir(parents=True)
-            os.symlink("../reactive-rgb.service", wants)
-            checksummed = [path for path in migration.rglob("*") if path.is_file() and path.name != "status"]
-            (migration / "SHA256SUMS").write_text(
-                "".join(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.relative_to(migration)}\n" for path in checksummed),
-                encoding="utf-8",
-            )
-            log = root / "systemctl.log"
-            self.run_tool(
-                "rollback", "deployment-common-rgb", "--apply",
-                env={"XDG_STATE_HOME": str(state), "HOME": str(home), "DOTFILES_TEST_SYSTEMCTL_LOG": str(log)},
-            )
-            self.assertTrue(current_unit.is_symlink())
-            self.assertEqual(os.readlink(current_unit), expected)
-            self.assertFalse(wants.exists())
-            self.assertFalse(wants.is_symlink())
-            self.assertEqual(log.read_text(encoding="utf-8").splitlines(), [
-                "--user show-environment",
-                "--user is-active reactive-rgb.service",
-                "--user stop reactive-rgb.service",
-                "--user daemon-reload",
-                "--user start reactive-rgb.service",
-            ])
 
     def test_manual_rollback_ignores_partial_new_format_stow_manifest_before_checkpoint(self) -> None:
         """A failed checkpoint preparation has not invoked Stow yet.

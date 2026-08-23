@@ -75,14 +75,14 @@ if grep -Fq 'bind(hyper .. " + W"' "$user_binds" ||
 fi
 
 # Fallbacks must stay usable before host detection. They cannot force a device,
-# output, audio helper, RGB controller or brightness path.
+# output, audio helper or brightness path.
 require_text "$host_inputs" 'follow_mouse = 0'
 require_text "$host_user_inputs" 'kb_layout = "us"'
 require_text "$host_monitors" 'mode = "preferred"'
 require_text "$host_monitors" 'position = "auto"'
 require_text "$host_monitors" 'scale = "1"'
 require_text "$host_monitors" 'vrr = false'
-if grep -Eq 'HYPR_BIND|cycle-desktop-audio-output|Brightness|reactive-rgb' "$host_binds"; then
+if grep -Eq 'HYPR_BIND|cycle-desktop-audio-output|Brightness' "$host_binds"; then
     printf '%s\n' 'FAIL: el fallback de hardware presupone un adaptador opcional.' >&2
     exit 1
 fi

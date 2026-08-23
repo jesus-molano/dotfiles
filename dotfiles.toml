@@ -21,9 +21,6 @@ modules = ["gaming-tools"]
 [bundles.backup]
 modules = ["backup"]
 
-[bundles.rgb-openrgb]
-modules = ["rgb-openrgb"]
-
 [bundles.local-ai]
 modules = []
 requires = []

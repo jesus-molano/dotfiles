@@ -100,6 +100,8 @@ def main() -> None:
 
     for fragment in (
         "config.load_autoconfig()",
+        'c.qt.args = [',
+        '"enable-features=AcceleratedVideoDecoder,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs"',
         'c.url.default_page = "https://www.google.com/"',
         'c.url.start_pages = ["https://www.google.com/"]',
         '"DEFAULT": "https://www.google.com/search?q={}"',

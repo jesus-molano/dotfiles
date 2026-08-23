@@ -76,6 +76,13 @@ def _load_palette(active_path=None, fallback_path=None):
 # file remains the canonical source for the shared profile defaults.
 config.load_autoconfig()
 
+# QtWebEngine 6.11/Chromium 140 incluye VA-API. Estas funciones habilitan la
+# decodificación de vídeo por GPU en Linux y permiten probar el backend VA-API
+# de NVIDIA. QtWebEngine fuerza por sí mismo la ruta Vulkan en este hardware.
+c.qt.args = [
+    "enable-features=AcceleratedVideoDecoder,VaapiIgnoreDriverChecks,VaapiOnNvidiaGPUs",
+]
+
 
 # Blocking: Brave's ABP engine handles cosmetic/network rules and the hosts
 # backend provides a small second layer. Fanboy Annoyances already includes

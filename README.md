@@ -29,7 +29,7 @@ composición y `just packages` muestra los paquetes efectivos.
 ## Límites
 
 La base cubre Hyprland, Noctalia, Kanata, terminal, navegador, editor y
-toolchain. Los bundles opcionales cubren gaming, backup, RGB, IA local y
+toolchain. Los bundles opcionales cubren gaming, backup, IA local y
 productividad.
 
 La instalación normal no cambia CHWD, drivers NVIDIA, kernel, initramfs,
@@ -87,7 +87,7 @@ Para HTTPS, usa `https://github.com/jesus-molano/dotfiles.git`. El checkout
 ~~~
 
 `configure` pregunta por pantallas, teclado, touchpad, bundles, ubicación de
-Noctalia y grabación. Conserva las decisiones locales existentes de audio, RGB,
+Noctalia y grabación. Conserva las decisiones locales existentes de audio,
 workspaces y dispositivos.
 
 `host.toml` vive en `$XDG_CONFIG_HOME/dotfiles/`. El hardware y los generados
@@ -182,7 +182,7 @@ just apply
 just doctor
 ~~~
 
-En hardware nuevo revisa pantallas, teclado, audio, RGB y bundles.
+En hardware nuevo revisa pantallas, teclado, audio y bundles.
 
 ## Opcionales
 

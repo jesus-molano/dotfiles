@@ -4,7 +4,7 @@
 # Contratos de manifiestos, resolución e instalación de paquetes.
 # install.sh define las rutas, el plan y las funciones de salida que usa esta biblioteca.
 scope_is_valid() {
-	[[ "${1:-}" =~ ^base$|^bundle:(gaming-core|gaming-launchers|gaming-tools|backup|rgb-openrgb|local-ai|productivity-extra)$ ]]
+	[[ "${1:-}" =~ ^base$|^bundle:(gaming-core|gaming-launchers|gaming-tools|backup|local-ai|productivity-extra)$ ]]
 }
 
 validate_package_manifest() {

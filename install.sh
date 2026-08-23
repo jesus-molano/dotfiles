@@ -70,7 +70,6 @@ legacy_fixture_for_host() {
 	local fixture=''
 	if legacy_link_matches hypr-desktop .config/hypr/config/monitors.lua &&
 		legacy_link_matches hypr-desktop .config/hypr/config/user-inputs.lua &&
-		legacy_link_matches hypr-desktop .config/reactive-rgb/config.conf &&
 		legacy_link_matches gaming .local/bin/game-run &&
 		legacy_link_matches backup .local/bin/desktop-backup &&
 		legacy_link_matches qmd .config/qmd/index.yml; then
@@ -354,10 +353,6 @@ plan_has_bundle() {
 		[[ "$bundle" == "$requested" ]] && return 0
 	done < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["bundles"], sep="\n")' "$PLAN_JSON")
 	return 1
-}
-
-plan_rgb_enabled() {
-	python3 -c 'import json,sys; raise SystemExit(json.load(open(sys.argv[1])).get("rgb", {}).get("enabled") is not True)' "$PLAN_JSON"
 }
 
 is_private_env_path() {
@@ -719,7 +714,6 @@ target_points_to_legacy_module() {
 generated_target_path() {
 	case "$1" in
 	qmd) printf '%s/qmd/index.yml\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
-	rgb) printf '%s/reactive-rgb/config.conf\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	restic) printf '%s/restic/repository\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	noctalia) printf '%s/noctalia/zz-host-overrides.toml\n' "${XDG_CONFIG_HOME:-$HOME/.config}" ;;
 	*) return 2 ;;
@@ -1563,16 +1557,11 @@ begin_migration() {
 	# It distinguishes an interrupted checkpoint *preparation* (where Stow did
 	# not run) from a legacy transaction that genuinely predates checkpoints.
 	printf '%s\n' v1 >"$MIGRATION_DIR/stow-checkpoint-format"
-	# Service intent is separate from filesystem intent. A new transaction that
-	# fails before service configuration must not alter live service state.
-	printf '%s\n' v1 >"$MIGRATION_DIR/user-services-format"
 	rm -f -- "$MIGRATION_DIR/previous-links-removed"
 	rm -f -- "$MIGRATION_DIR/legacy-links-removed"
 	rm -f -- "$MIGRATION_DIR/previous-links-removal-intent"
 	rm -f -- "$MIGRATION_DIR/legacy-links-removal-intent"
 	rm -f -- "$MIGRATION_DIR/stow-checkpoint"
-	rm -f -- "$MIGRATION_DIR/user-services-mutation-intent"
-	: >"$MIGRATION_DIR/rgb-state"
 	((${#LEGACY_MODULES[@]})) && printf '%s\n' "${LEGACY_MODULES[@]}" >"$MIGRATION_DIR/legacy-modules"
 	record_legacy_links
 	# Follow source links while taking the private legacy snapshot.  Restoring a
@@ -1582,16 +1571,9 @@ begin_migration() {
 	copy_previous_applied_links
 	copy_previous_generated_targets
 	snapshot_generated_target qmd
-	snapshot_generated_target rgb
 	snapshot_generated_target restic
 	snapshot_generated_target noctalia
 	snapshot_derived_state
-	if user_manager_available; then
-		local enabled_state
-		enabled_state="$(systemctl --user is-enabled reactive-rgb.service 2>/dev/null || :)"
-		[[ "$enabled_state" == enabled || "$enabled_state" == enabled-runtime ]] && printf 'enabled\n' >>"$MIGRATION_DIR/rgb-state" || :
-		systemctl --user is-active reactive-rgb.service >/dev/null 2>&1 && printf 'active\n' >>"$MIGRATION_DIR/rgb-state" || :
-	fi
 	printf '%s\n' prepared >"$MIGRATION_DIR/status"
 	persist_migration_checkpoint
 	printf '%s\n' "$MIGRATION_DIR" >"$STATE_DIR/last-migration"
@@ -1637,7 +1619,10 @@ restore_generated_targets() {
 	declare -A statuses=() installed=() removed=() remove_after=()
 	while IFS=$'\t' read -r key status; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$status" =~ ^(absent|legacy|copy)$ && -z "${statuses[$key]+x}" ]] || {
+		if [[ "$key" == rgb && "$status" =~ ^(absent|legacy|copy)$ ]]; then
+			continue
+		fi
+		[[ "$key" =~ ^(qmd|restic|noctalia)$ && "$status" =~ ^(absent|legacy|copy)$ && -z "${statuses[$key]+x}" ]] || {
 			warn "Estado generado no reconocido: $key/$status"
 			return 1
 		}
@@ -1645,7 +1630,10 @@ restore_generated_targets() {
 	done <"$MIGRATION_DIR/generated-targets.tsv"
 	while IFS=$'\t' read -r key expected; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${installed[$key]+x}" ]] || {
+		if [[ "$key" == rgb && "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+			continue
+		fi
+		[[ "$key" =~ ^(qmd|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${installed[$key]+x}" ]] || {
 			warn "Journal de instalación generado inválido: $key"
 			return 1
 		}
@@ -1653,7 +1641,10 @@ restore_generated_targets() {
 	done <"$MIGRATION_DIR/generated-installed.tsv"
 	while IFS=$'\t' read -r key expected; do
 		[[ -n "$key" ]] || continue
-		[[ "$key" =~ ^(qmd|rgb|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${removed[$key]+x}" && -z "${installed[$key]+x}" ]] || {
+		if [[ "$key" == rgb && "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+			continue
+		fi
+		[[ "$key" =~ ^(qmd|restic|noctalia)$ && "$expected" =~ ^[0-9a-f]{64}$ && -n "${statuses[$key]+x}" && -z "${removed[$key]+x}" && -z "${installed[$key]+x}" ]] || {
 			warn "Journal de retirada generado inválido: $key"
 			return 1
 		}
@@ -1751,7 +1742,6 @@ restore_generated_targets() {
 generated_key_selected() {
 	case "$1" in
 	qmd) plan_has_bundle productivity-extra ;;
-	rgb) plan_has_bundle rgb-openrgb && plan_rgb_enabled ;;
 	restic) plan_has_bundle backup ;;
 	noctalia) python3 -c 'import json,sys; raise SystemExit(json.load(open(sys.argv[1])).get("noctalia_configured") is not True)' "$PLAN_JSON" ;;
 	*) return 1 ;;
@@ -1790,69 +1780,6 @@ remove_deselected_generated_targets() {
 	return "$failed"
 }
 
-restore_rgb_service_state() {
-	local reconcile_status
-	if user_services_reconciliation_required; then
-		:
-	else
-		reconcile_status=$?
-		((reconcile_status == 1)) && return 0
-		return 1
-	fi
-	user_manager_available || return 0
-	local failed=0
-	if grep -Fxq enabled "$MIGRATION_DIR/rgb-state"; then
-		systemctl --user enable reactive-rgb.service >/dev/null 2>&1 || failed=1
-	fi
-	if grep -Fxq active "$MIGRATION_DIR/rgb-state"; then
-		systemctl --user start reactive-rgb.service >/dev/null 2>&1 || failed=1
-	fi
-	return "$failed"
-}
-
-reset_user_services_after_restore() {
-	local reconcile_status
-	if user_services_reconciliation_required; then
-		:
-	else
-		reconcile_status=$?
-		((reconcile_status == 1)) && return 0
-		return 1
-	fi
-	# El journal es genérico para unidades de usuario. Solo toca RGB cuando la
-	# transacción registró estado previo o gestionó su unidad exacta.
-	[[ -s "$MIGRATION_DIR/rgb-state" ]] || reactive_rgb_manifest_records_unit || return 0
-	user_manager_available || return 0
-	disable_reactive_rgb_autostart
-}
-
-user_services_reconciliation_required() {
-	local format="$MIGRATION_DIR/user-services-format"
-	if [[ -e "$format" || -L "$format" ]]; then
-		if [[ -L "$format" || ! -f "$format" || $(<"$format") != v1 ]]; then
-			warn 'El formato de estado de servicios de usuario no es válido.'
-			return 2
-		fi
-		local intent="$MIGRATION_DIR/user-services-mutation-intent"
-		if [[ -e "$intent" || -L "$intent" ]]; then
-			if [[ -L "$intent" || ! -f "$intent" ]]; then
-				warn 'La intención de servicios de usuario no es válida.'
-				return 2
-			fi
-			return 0
-		fi
-		return 1
-	fi
-	# Compatibilidad con migraciones creadas antes del journal de servicios.
-	[[ -f "$MIGRATION_DIR/rgb-state" ]]
-}
-
-record_user_services_mutation_intent() {
-	[[ -f "$MIGRATION_DIR/user-services-format" && $(<"$MIGRATION_DIR/user-services-format") == v1 ]] || return 1
-	: >"$MIGRATION_DIR/user-services-mutation-intent"
-	persist_migration_checkpoint
-}
-
 rollback_migration() {
 	[[ -n "$MIGRATION_DIR" && -f "$MIGRATION_DIR/plan.json" && -f "$MIGRATION_DIR/legacy-modules" ]] || return 0
 	if [[ -f "$MIGRATION_DIR/status" && $(<"$MIGRATION_DIR/status") == rolled-back ]]; then
@@ -1860,7 +1787,7 @@ rollback_migration() {
 		return 0
 	fi
 	warn "Restaurando transacción: $MIGRATION_DIR"
-	local failed=0 services_ready=1
+	local failed=0
 	local -a restore_manifests=(
 		"$MIGRATION_DIR/previous-restore-links.tsv"
 		"$MIGRATION_DIR/legacy-links.tsv"
@@ -1892,16 +1819,8 @@ rollback_migration() {
 			"$MIGRATION_DIR/symlinks.tsv" \
 			"$MIGRATION_DIR/legacy-links-removed" || failed=1
 	fi
-	if ! reset_user_services_after_restore; then
-		failed=1
-		services_ready=0
-	fi
 	if ! reload_user_manager 'durante el rollback'; then
 		failed=1
-		services_ready=0
-	fi
-	if ((services_ready)); then
-		restore_rgb_service_state || failed=1
 	fi
 	if ((failed)); then
 		printf '%s\n' rollback-incomplete >"$MIGRATION_DIR/status"
@@ -1990,9 +1909,6 @@ install_staged_configs() {
 	remove_deselected_generated_targets
 	if plan_has_bundle productivity-extra; then
 		install_staged_file qmd "$STATE_DIR/staged/qmd/index.yml"
-	fi
-	if plan_has_bundle rgb-openrgb && plan_rgb_enabled; then
-		install_staged_file rgb "$STATE_DIR/staged/reactive-rgb/config.conf"
 	fi
 	if plan_has_bundle backup; then
 		install_staged_file restic "$STATE_DIR/staged/restic/repository"
@@ -2098,180 +2014,6 @@ raise SystemExit(0 if valid else 1)
 	ok "Sesión Hyprland recargada $context."
 }
 
-disable_reactive_rgb_autostart() {
-	local config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-	local wants="$config_home/systemd/user/default.target.wants/reactive-rgb.service"
-	local direct="$config_home/systemd/user/reactive-rgb.service"
-	local source="$DOTFILES_DIR/rgb-openrgb/.config/systemd/user/reactive-rgb.service"
-	local wants_target current_target direct_link was_active=0 had_wants=0 direct_was_link=0
-	if [[ -L "$wants" ]]; then
-		had_wants=1
-		wants_target="$(readlink -f -- "$wants" 2>/dev/null || :)"
-		if [[ -z "$wants_target" ]] || ! reactive_rgb_target_is_managed "$wants_target" "$direct" "$source"; then
-			warn "No se retira un enablement de Reactive RGB con destino ajeno: $wants"
-			return 1
-		fi
-	elif [[ -e "$wants" ]]; then
-		warn "No se retira un enablement de Reactive RGB modificado: $wants"
-		return 1
-	fi
-	if [[ -L "$direct" ]]; then
-		direct_was_link=1
-		direct_link="$(readlink -- "$direct")"
-		current_target="$(readlink -f -- "$direct" 2>/dev/null || :)"
-		if [[ -z "$current_target" ]] || ! reactive_rgb_target_is_managed "$current_target" "$direct" "$source"; then
-			warn "No se modifica una unidad Reactive RGB con destino ajeno: $direct"
-			return 1
-		fi
-	elif [[ -e "$direct" ]]; then
-		warn "No se modifica una unidad Reactive RGB no gestionada: $direct"
-		return 1
-	elif ((had_wants == 0)) && ! reactive_rgb_manifest_records_unit; then
-		warn 'No se modifica reactive-rgb.service sin evidencia de que pertenezca a esta transacción.'
-		return 1
-	fi
-	if systemctl --user is-active reactive-rgb.service >/dev/null 2>&1; then
-		was_active=1
-		systemctl --user stop reactive-rgb.service || return 1
-	fi
-	if ((direct_was_link)); then
-		if [[ ! -L "$direct" || $(readlink -- "$direct") != "$direct_link" ]]; then
-			if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-			warn "La unidad Reactive RGB cambió durante la operación: $direct"
-			return 1
-		fi
-	elif [[ -e "$direct" || -L "$direct" ]]; then
-		if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-		warn "La unidad Reactive RGB cambió durante la operación: $direct"
-		return 1
-	fi
-	if ((had_wants)); then
-		if [[ ! -L "$wants" ]]; then
-			if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-			warn "El enablement de Reactive RGB cambió durante la operación: $wants"
-			return 1
-		fi
-		current_target="$(readlink -f -- "$wants" 2>/dev/null || :)"
-		if [[ "$current_target" != "$wants_target" ]]; then
-			if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-			warn "El enablement de Reactive RGB cambió durante la operación: $wants"
-			return 1
-		fi
-		if ! rm -- "$wants"; then
-			if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-			return 1
-		fi
-	elif [[ -e "$wants" || -L "$wants" ]]; then
-		if ((was_active)); then systemctl --user start reactive-rgb.service >/dev/null 2>&1 || :; fi
-		warn "El enablement de Reactive RGB cambió durante la operación: $wants"
-		return 1
-	fi
-}
-
-reactive_rgb_manifest_records_unit() {
-	local manifest relative destination
-	[[ -n "$MIGRATION_DIR" ]] || return 1
-	for manifest in \
-		"$MIGRATION_DIR/stow-intent.tsv" \
-		"$MIGRATION_DIR/applied-links.tsv" \
-		"$MIGRATION_DIR/previous-applied-links.tsv" \
-		"$MIGRATION_DIR/previous-restore-links.tsv" \
-		"$MIGRATION_DIR/symlinks.tsv" \
-		"$MIGRATION_DIR/legacy-links.tsv" \
-		"$MIGRATION_DIR/pre-stow-restore-links.tsv"; do
-		[[ -f "$manifest" ]] || continue
-		while IFS=$'\t' read -r relative destination; do
-			[[ "$relative" == .config/systemd/user/reactive-rgb.service && -n "$destination" ]] && return 0
-		done <"$manifest"
-	done
-	return 1
-}
-
-reactive_rgb_target_is_managed() {
-	local requested=$1 direct=$2 source=$3 manifest relative destination resolved
-	resolved="$(readlink -f -- "$source" 2>/dev/null || :)"
-	[[ -n "$resolved" && "$requested" == "$resolved" ]] && return 0
-	[[ -n "$MIGRATION_DIR" ]] || return 1
-	for manifest in \
-		"$MIGRATION_DIR/applied-links.tsv" \
-		"$MIGRATION_DIR/previous-restore-links.tsv" \
-		"$MIGRATION_DIR/legacy-links.tsv" \
-		"$MIGRATION_DIR/pre-stow-restore-links.tsv"; do
-		[[ -f "$manifest" ]] || continue
-		while IFS=$'\t' read -r relative destination; do
-			[[ "$relative" == .config/systemd/user/reactive-rgb.service ]] || continue
-			if [[ "$destination" == /* ]]; then
-				resolved="$(readlink -m -- "$destination")"
-			else
-				resolved="$(readlink -m -- "$(dirname "$direct")/$destination")"
-			fi
-			[[ "$requested" == "$resolved" ]] && return 0
-		done <"$manifest"
-	done
-	return 1
-}
-
-configure_user_services() {
-	if ! plan_has_bundle rgb-openrgb || ! plan_rgb_enabled; then
-		local wants="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user/default.target.wants/reactive-rgb.service"
-		user_manager_available || return 0
-		if [[ -e "$wants" || -L "$wants" ]] || {
-			systemctl --user is-enabled reactive-rgb.service >/dev/null 2>&1 ||
-				systemctl --user is-active reactive-rgb.service >/dev/null 2>&1
-		}; then
-			info 'Reactive RGB no está seleccionado o no tiene opt-in; se desactiva su unidad de usuario.'
-			if ! disable_reactive_rgb_autostart; then
-				warn 'Reactive RGB se conserva sin cambios porque su unidad no se pudo atribuir con seguridad.'
-				return 0
-			fi
-			systemctl --user daemon-reload || warn 'No se pudo recargar systemd de usuario tras omitir Reactive RGB.'
-		fi
-		return 0
-	fi
-	local rgb_config="${XDG_CONFIG_HOME:-$HOME/.config}/reactive-rgb/config.conf"
-	local rgb_helper detection
-	if [[ ! -s "$rgb_config" ]]; then
-		warn 'Reactive RGB se omite porque no tiene configuración local generada.'
-		return 0
-	fi
-	if command -v reactive-rgb >/dev/null 2>&1; then
-		rgb_helper="$(command -v reactive-rgb)"
-	elif [[ -x "$HOME/.local/bin/reactive-rgb" ]]; then
-		rgb_helper="$HOME/.local/bin/reactive-rgb"
-	else
-		warn 'Reactive RGB se omite porque el helper no está disponible.'
-		return 0
-	fi
-	if ! detection="$($rgb_helper detect)"; then
-		warn 'Reactive RGB se omite porque no se pudieron enumerar sus dispositivos.'
-		return 0
-	fi
-	if ! grep -Fxq 'opt_in=1' <<<"$detection" ||
-		! grep -Eq '^openrgb_target=[0-9]+:.+' <<<"$detection" ||
-		! grep -Eq '^openrgb_static_nzxt=[0-9]+:.+' <<<"$detection"; then
-		warn 'Reactive RGB se omite porque los dispositivos configurados no coinciden con este host.'
-		return 0
-	fi
-	if ! "$rgb_helper" dry-run >/dev/null; then
-		warn 'Reactive RGB se omite porque el modo configurado no es válido en este host.'
-		return 0
-	fi
-	if ! user_manager_available; then
-		warn 'Reactive RGB quedó desplegado pero no se activó porque no hay una sesión systemd de usuario accesible.'
-		return 0
-	fi
-	if ! systemctl --user restart reactive-rgb.service ||
-		! systemctl --user is-active reactive-rgb.service >/dev/null 2>&1; then
-		warn 'Reactive RGB no pudo iniciarse; el resto de la instalación continúa sin activarlo.'
-		return 0
-	fi
-	if ! systemctl --user enable reactive-rgb.service; then
-		warn 'Reactive RGB funciona en esta sesión, pero no se pudo habilitar para el próximo inicio.'
-		return 0
-	fi
-	ok 'Reactive RGB habilitado para el bundle rgb-openrgb.'
-}
-
 apply_dotfiles_transaction() {
 	begin_migration
 	if ! (
@@ -2286,8 +2028,6 @@ apply_dotfiles_transaction() {
 		install_staged_configs || exit 1
 		validate_deployed_config || exit 1
 		reload_user_manager 'después del despliegue' || exit 1
-		record_user_services_mutation_intent || exit 1
-		configure_user_services || exit 1
 	); then
 		if rollback_migration; then
 			die 'El despliegue falló y se restauró el estado anterior.'
@@ -2354,11 +2094,6 @@ main() {
 
 	printf '\nComposición: %s\nDestino dotfiles: %s\n' "$(tr '\n' ' ' < <(python3 -c 'import json,sys; print(*json.load(open(sys.argv[1]))["bundles"], sep="\n")' "$PLAN_JSON"))" "$HOME"
 	printf '%s\n' 'Si falta algún paquete, Shelly actualizará CachyOS por completo antes de instalarlo; Flatpak gestionará aplicaciones del usuario. Esos cambios no forman parte del backup de HOME.'
-	if plan_has_bundle rgb-openrgb && plan_rgb_enabled; then
-		printf '%s\n' 'El bundle rgb-openrgb tiene opt-in activo y habilitará reactive-rgb.service como unidad de usuario.'
-	elif plan_has_bundle rgb-openrgb; then
-		printf '%s\n' 'El bundle rgb-openrgb está disponible, pero Reactive RGB seguirá desactivado hasta activar rgb.enabled en host.toml.'
-	fi
 	printf 'No se desplegará system-etc ni se cambiarán explícitamente GPU, arranque, Btrfs o zram. ¿Continuar? [s/N] '
 	read -r answer
 	[[ "$answer" =~ ^[sS]$ ]] || exit 0

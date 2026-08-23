@@ -6,7 +6,6 @@ bundles = [
   "gaming-launchers",
   "gaming-tools",
   "backup",
-  "rgb-openrgb",
   "local-ai",
   "productivity-extra",
 ]
@@ -68,24 +67,3 @@ default_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1"
 
 [backup]
 repository = "/mnt/backups/restic-desktop"
-
-[rgb]
-enabled = true
-mode = "thermal"
-ambient_color = "FF5B4D"
-openrgb_device = "ASUS TUF GAMING B550-PLUS (WI-FI)"
-nzxt_device = "NZXT Smart Device V2"
-static_color = "FFFFFF"
-openrgb_zone = 1
-openrgb_zone_size = 60
-cpu_led_count = 12
-cpu_green_threshold = 50
-cpu_orange_threshold = 70
-cpu_red_threshold = 85
-gpu_green_threshold = 50
-gpu_orange_threshold = 70
-gpu_red_threshold = 83
-interval = 5
-debounce = 2
-hysteresis = 2
-reapply_interval = 300
