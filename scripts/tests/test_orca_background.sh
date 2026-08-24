@@ -25,6 +25,37 @@ EOF
 cat >"$test_root/bin/orca-ide" <<'EOF'
 #!/usr/bin/env bash
 printf 'orca:%s\n' "$*" >>"$TEST_LOG"
+case "$*" in
+"open")
+	: >"$TEST_OPEN_READY_FILE"
+	;;
+"status --json")
+	while [[ ! -e $TEST_OPEN_READY_FILE ]]; do sleep 0.01; done
+	printf '%s\n' '{"ok":true,"result":{"runtime":{"state":"ready"},"graph":{"state":"ready"}}}'
+	;;
+"repo list --json")
+	if [[ ${TEST_REPO_DELAY_ONCE:-0} == 1 && ! -e ${TEST_REPO_READY_FILE:-} ]]; then
+		: >"$TEST_REPO_READY_FILE"
+		printf '%s\n' '{"ok":true,"result":{"repos":[]}}'
+	else
+		printf '%s\n' '{"ok":true,"result":{"repos":[{"id":"repo-id"}]}}'
+	fi
+	;;
+"automations list --json")
+	printf '%s\n' '{"ok":true,"result":{"automations":[{"id":"automation-id","enabled":true,"lastRunAt":9999999999999,"runContext":{"repoId":"repo-id"}}]}}'
+	;;
+"automations runs --id automation-id --json")
+	if [[ -n ${TEST_AUTOMATION_RUNS_JSON:-} ]]; then
+		printf '%s\n' "$TEST_AUTOMATION_RUNS_JSON"
+	else
+		printf '%s\n' '{"ok":true,"result":{"runs":[{"status":"skipped_unavailable","trigger":"scheduled","startedAt":9999999999999,"error":"The target project is no longer available."}]}}'
+	fi
+	;;
+"automations run automation-id --json")
+	printf '%s\n' '{"ok":true}'
+	;;
+*) exit 2 ;;
+esac
 EOF
 
 cat >"$test_root/bin/hyprctl" <<'EOF'
@@ -49,10 +80,23 @@ EOF
 chmod +x "$test_root/bin/"*
 
 TEST_LOG="$test_root/starter-new.log" TEST_PGREP_STATUS=1 \
+	TEST_OPEN_READY_FILE="$test_root/open-ready" \
+	TEST_REPO_DELAY_ONCE=1 TEST_REPO_READY_FILE="$test_root/repo-ready" \
+	ORCA_AUTOMATION_READY_DELAY_SECONDS=0 \
 	ORCA_SAFE_SETTINGS_BIN="$test_root/bin/orca-safe-settings" \
 	PGREP_BIN="$test_root/bin/pgrep" ORCA_CLI_BIN="$test_root/bin/orca-ide" \
 	"$starter"
-[[ $(<"$test_root/starter-new.log") == $'safe-settings\npgrep:-f [/]orca-ide$\norca:open' ]]
+[[ $(<"$test_root/starter-new.log") == $'safe-settings\npgrep:-f [/]orca-ide$\norca:open\norca:status --json\norca:automations list --json\norca:repo list --json\norca:repo list --json\norca:automations runs --id automation-id --json\norca:automations run automation-id --json' ]]
+
+TEST_LOG="$test_root/starter-no-retry.log" TEST_PGREP_STATUS=1 \
+	TEST_OPEN_READY_FILE="$test_root/open-ready-no-retry" \
+	TEST_AUTOMATION_RUNS_JSON='{"ok":true,"result":{"runs":[{"status":"completed","trigger":"scheduled","startedAt":9999999999999,"error":null}]}}' \
+	ORCA_SAFE_SETTINGS_BIN="$test_root/bin/orca-safe-settings" \
+	PGREP_BIN="$test_root/bin/pgrep" ORCA_CLI_BIN="$test_root/bin/orca-ide" \
+	"$starter"
+if grep -Fq 'orca:automations run automation-id --json' "$test_root/starter-no-retry.log"; then
+	exit 1
+fi
 
 TEST_LOG="$test_root/starter-running.log" TEST_PGREP_STATUS=0 \
 	ORCA_SAFE_SETTINGS_BIN="$test_root/bin/orca-safe-settings" \

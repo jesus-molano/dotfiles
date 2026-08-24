@@ -5,6 +5,120 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly safe_settings="${ORCA_SAFE_SETTINGS_BIN:-$script_dir/orca-safe-settings}"
 readonly pgrep_bin="${PGREP_BIN:-pgrep}"
 readonly orca_cli="${ORCA_CLI_BIN:-orca-ide}"
+readonly jq_bin="${JQ_BIN:-jq}"
+readonly runtime_ready_attempts="${ORCA_RUNTIME_READY_ATTEMPTS:-30}"
+readonly retry_attempts="${ORCA_AUTOMATION_READY_ATTEMPTS:-10}"
+readonly retry_delay_seconds="${ORCA_AUTOMATION_READY_DELAY_SECONDS:-1}"
+readonly retry_window_seconds="${ORCA_AUTOMATION_RETRY_WINDOW_SECONDS:-300}"
+
+wait_for_orca_runtime() {
+	command -v "$jq_bin" >/dev/null 2>&1 || return 1
+
+	local status_json=''
+	local attempt
+	for ((attempt = 1; attempt <= runtime_ready_attempts; attempt++)); do
+		if status_json=$("$orca_cli" status --json 2>/dev/null) \
+			&& "$jq_bin" -e '
+				.ok == true
+				and .result.runtime.state == "ready"
+				and .result.graph.state == "ready"
+			' <<<"$status_json" >/dev/null; then
+			return 0
+		fi
+		((attempt < runtime_ready_attempts)) && sleep "$retry_delay_seconds"
+	done
+	return 1
+}
+
+retry_recent_unavailable_automations() {
+	command -v "$jq_bin" >/dev/null 2>&1 || return 0
+
+	local automations_json
+	automations_json=$("$orca_cli" automations list --json 2>/dev/null) || return 0
+	"$jq_bin" -e '
+		.ok == true
+		and any(.result.automations[]?; .enabled == true and (.runContext.repoId // "") != "")
+	' <<<"$automations_json" >/dev/null || return 0
+
+	local repos_json=''
+	local attempt
+	for ((attempt = 1; attempt <= retry_attempts; attempt++)); do
+		# shellcheck disable=SC2016 # $automations, $repos and $repo_id belong to jq.
+		if repos_json=$("$orca_cli" repo list --json 2>/dev/null) \
+			&& "$jq_bin" -e --argjson automations "$automations_json" '
+				. as $repos
+				| .ok == true
+				and all(
+					$automations.result.automations[]?
+					| select(.enabled == true)
+					| .runContext.repoId
+					| select(. != null and . != "");
+					. as $repo_id | any($repos.result.repos[]?; .id == $repo_id)
+				)
+			' <<<"$repos_json" >/dev/null; then
+			break
+		fi
+		((attempt < retry_attempts)) && sleep "$retry_delay_seconds"
+	done
+
+	# shellcheck disable=SC2016 # $repo_id is a jq variable.
+	"$jq_bin" -e --argjson automations "$automations_json" '
+		. as $repos
+		| .ok == true
+		and all(
+			$automations.result.automations[]?
+			| select(.enabled == true)
+			| .runContext.repoId
+			| select(. != null and . != "");
+			. as $repo_id | any($repos.result.repos[]?; .id == $repo_id)
+		)
+	' <<<"$repos_json" >/dev/null 2>&1 || return 0
+
+	local now_seconds cutoff_ms
+	now_seconds=$(date +%s)
+	cutoff_ms=$(((now_seconds - retry_window_seconds) * 1000))
+	local automation_id repo_id runs_json run_attempt
+	while IFS=$'\t' read -r automation_id repo_id; do
+		[[ -n $automation_id && -n $repo_id ]] || continue
+		# shellcheck disable=SC2016 # $repo_id is a jq variable.
+		"$jq_bin" -e --arg repo_id "$repo_id" \
+			'any(.result.repos[]?; .id == $repo_id)' <<<"$repos_json" >/dev/null || continue
+
+		runs_json=''
+		for ((run_attempt = 1; run_attempt <= retry_attempts; run_attempt++)); do
+			if runs_json=$("$orca_cli" automations runs --id "$automation_id" --json 2>/dev/null) \
+				&& "$jq_bin" -e '.ok == true and ((.result.runs // []) | length > 0)' \
+					<<<"$runs_json" >/dev/null; then
+				break
+			fi
+			((run_attempt < retry_attempts)) && sleep "$retry_delay_seconds"
+		done
+		# shellcheck disable=SC2016 # $run is a jq variable.
+		"$jq_bin" -e --argjson cutoff_ms "$cutoff_ms" '
+			(.result.runs // [])[0] as $run
+			| $run != null
+			and $run.status == "skipped_unavailable"
+			and $run.trigger == "scheduled"
+			and $run.startedAt >= $cutoff_ms
+			and $run.error == "The target project is no longer available."
+		' <<<"$runs_json" >/dev/null || continue
+
+		if "$orca_cli" automations run "$automation_id" --json >/dev/null; then
+			printf 'start-orca-background: reintentada automation %s tras cargar los proyectos.\n' \
+				"$automation_id" >&2
+		else
+			printf 'start-orca-background: no se pudo reintentar la automation %s.\n' \
+				"$automation_id" >&2
+		fi
+	done < <(
+		"$jq_bin" -r '
+			.result.automations[]?
+			| select(.enabled == true and .lastRunAt != null)
+			| [.id, (.runContext.repoId // "")]
+			| @tsv
+		' <<<"$automations_json"
+	)
+}
 
 if ! command -v "$orca_cli" >/dev/null 2>&1; then
 	printf '%s\n' 'start-orca-background: Orca no está instalado; se omite el arranque en segundo plano.' >&2
@@ -19,4 +133,9 @@ if "$pgrep_bin" -f '[/]orca-ide$' >/dev/null; then
 	exit 0
 fi
 
-exec "$orca_cli" open
+"$orca_cli" open &
+readonly orca_process_pid=$!
+if wait_for_orca_runtime; then
+	retry_recent_unavailable_automations
+fi
+wait "$orca_process_pid"

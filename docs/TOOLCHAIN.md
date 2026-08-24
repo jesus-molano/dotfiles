@@ -64,7 +64,9 @@ just android-check
 
 Orca debe instalarse fuera de Pacman y proporcionar `orca-ide` en `PATH`.
 Si no existe, `start-orca-background` avisa y deja operativo el resto del
-escritorio.
+escritorio. Durante el arranque, el helper espera a que Orca registre los
+proyectos y reintenta solo las automations programadas en los últimos cinco
+minutos que hayan fallado por no encontrar todavía el proyecto local.
 
 Comprobaciones disponibles:
 
