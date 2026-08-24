@@ -346,7 +346,6 @@ if [[ "$mode" != config ]]; then
     if hyprctl configerrors 2>/dev/null | grep -q .; then fail 'Hyprland tiene errores activos'; else ok 'Hyprland sin errores activos'; fi
   else info 'Hyprland no está disponible en esta sesión'
   fi
-  check_rgb
   check_backup
   check_desktop_runtime
   check_backup_runtime
