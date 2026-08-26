@@ -340,15 +340,28 @@ Chromium impide que las extensiones actúen en `brave://`, Chrome Web Store y
 otras superficies protegidas. En esas páginas usa los atajos nativos de Brave:
 `Ctrl + L`, `Ctrl + Tab`, `Ctrl + W` y `Ctrl + Shift + T`.
 
-El tema local **Project Atlas - Obsidian Amber** mantiene negro como superficie
-dominante y usa ámbar y naranja como acentos. Se instala una sola vez desde
-`brave://extensions`: activa el modo de desarrollador, selecciona **Load
-unpacked** y abre `~/.local/share/brave-project-atlas-theme/`. Brave conserva el
-tema después de reiniciar. El directorio es un enlace Stow a la fuente canónica.
-Después de modificar el tema, aplica los cambios con su botón **Reload** en
-`brave://extensions`.
+Brave sigue automáticamente el color primario de `/appearance` mediante la
+política dinámica `BrowserThemeColor`. La activación administrativa se realiza
+una sola vez, después de `appearance-switch prepare`:
 
-Para que Vimium C use la misma paleta, abre sus opciones y copia el contenido de
+```bash
+setup-brave-project-atlas-policy --check
+setup-brave-project-atlas-policy --install
+```
+
+El segundo comando usa Polkit. Instala un observador `systemd` de sistema y un
+helper propiedad de root. El helper acepta solo `BrowserThemeColor` y copia la
+política validada a `/etc/brave/policies/managed/project-atlas-theme.json`. No
+sustituye archivos ajenos. Brave muestra que está administrado y desactiva su
+selector manual de tema mientras la política está instalada. Cada cambio
+posterior de `/appearance` se aplica sin reiniciar el navegador. Rollback:
+`setup-brave-project-atlas-policy --remove`.
+
+El tema desempaquetado **Project Atlas - Obsidian Amber** se conserva como
+fallback manual en `~/.local/share/brave-project-atlas-theme/`.
+
+Vimium C conserva una interfaz oscura de alto contraste. Abre sus opciones y
+copia el contenido de
 `~/.local/share/brave-project-atlas-theme/vimium-c.css` en **Custom CSS for
 Vimium C UI**. Esta personalización afecta a hints, HUD, Vomnibar y FindBar; no
 inyecta estilos generales en las páginas web.

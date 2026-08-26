@@ -41,6 +41,8 @@ for test in \
 	test_runtime_compatibility.sh \
 	test_keyboard_contract.sh \
 	test_brave_browser_contract.sh \
+	test_appearance_switch.sh \
+	test_setup_brave_theme_policy.sh \
 	test_desktop_surface.sh \
 	test_thunderbird_theme.sh \
 	test_stow_lint.sh \

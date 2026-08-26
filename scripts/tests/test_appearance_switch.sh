@@ -7,6 +7,7 @@ test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 
 mkdir -p "$test_root/bin" "$test_root/state" "$test_root/asset-store" \
+	"$test_root/config/noctalia/generated" \
 	"$test_root/wallpapers/atlas" "$test_root/wallpapers/dracula" \
 	"$test_root/wallpapers/catppuccin" "$test_root/wallpapers/nord"
 touch "$test_root/asset-store/atlas-default.png"
@@ -83,13 +84,23 @@ case "$1 $2" in
 'msg templates-apply')
 	printf 'templates:visible=%s\n' "$visible" >>"$TEST_LOG"
 	[[ ${TEST_FAIL:-} != templates ]] || exit 1
-	case "$(cat "$TEST_SCHEME_FILE")" in
-	'custom ProjectAtlas') rendered_id=atlas ;;
-	'builtin Dracula') rendered_id=dracula ;;
-	'builtin Catppuccin') rendered_id=catppuccin ;;
-	'builtin Nord') rendered_id=nord ;;
+	if [[ -r $TEST_SCHEME_FILE ]]; then
+		scheme=$(cat "$TEST_SCHEME_FILE")
+	else
+		scheme='custom ProjectAtlas'
+	fi
+	case "$scheme" in
+	'custom ProjectAtlas') rendered_id=atlas; primary='#ff5b4d' ;;
+	'builtin Dracula') rendered_id=dracula; primary='#bd93f9' ;;
+	'builtin Catppuccin') rendered_id=catppuccin; primary='#cba6f7' ;;
+	'builtin Nord') rendered_id=nord; primary='#88c0d0' ;;
 	*) exit 3 ;;
 	esac
+	if [[ ${TEST_BAD_PALETTE:-0} == 1 ]]; then
+		printf '{"dark":{"mPrimary":"invalid"}}\n' >"$TEST_ACTIVE_PALETTE"
+	else
+		printf '{"dark":{"mPrimary":"%s"}}\n' "$primary" >"$TEST_ACTIVE_PALETTE"
+	fi
 	printf '%s\n' "$rendered_id" >"$TEST_RENDERED_ID_FILE"
 	;;
 *) printf 'Noctalia inesperado: %s\n' "$*" >&2; exit 2 ;;
@@ -101,10 +112,13 @@ readonly visible="$test_root/state/dotfiles/appearance-switch/visible"
 run() {
 	PATH="$test_root/bin:$PATH" HOME="$test_root" APPEARANCE_CATALOG="$test_root/catalog.tsv" \
 		APPEARANCE_WALLPAPER_ROOT="$test_root/wallpapers" XDG_STATE_HOME="$test_root/state" \
+		APPEARANCE_ACTIVE_PALETTE="$test_root/config/noctalia/generated/active-palette.json" \
+		BRAVE_POLICY_DIR="$test_root/state/dotfiles/appearance-switch/brave-policies/managed" \
 		APPEARANCE_LOCK_TIMEOUT="${TEST_LOCK_TIMEOUT:-0.1}" APPEARANCE_APPLY_TIMEOUT=2 \
 		TEST_VISIBLE="$visible" TEST_LOG="$test_root/log" \
 		TEST_ROOT="$test_root" TEST_SCHEME_FILE="$test_root/scheme" \
 		TEST_WALLPAPER_FILE="$test_root/wallpaper" \
+		TEST_ACTIVE_PALETTE="$test_root/config/noctalia/generated/active-palette.json" \
 		TEST_RENDERED_ID_FILE="$test_root/state/dotfiles/appearance-switch/rendered" \
 		"$helper" "$@"
 }
@@ -113,16 +127,30 @@ run() {
 [[ $(run current) == atlas ]]
 [[ $(run prepare) == atlas ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
+: >"$test_root/log"
 
 [[ $(run apply atlas) == atlas ]]
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
 [[ $(<"$test_root/log") == \
 	$'palette:custom:ProjectAtlas:visible='"$test_root"$'/wallpapers/atlas\nwallpaper:'"$test_root"$'/wallpapers/atlas/default.png:visible='"$test_root"$'/wallpapers/atlas\ntemplates:visible='"$test_root"$'/wallpapers/atlas' ]]
 
 [[ $(run next) == dracula ]]
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == dracula ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#bd93f9' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/dracula" ]]
 [[ $(run previous) == atlas ]]
+[[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
+
+# Un color inválido también revierte Noctalia y conserva la política anterior.
+if TEST_BAD_PALETTE=1 run apply dracula >/dev/null 2>&1; then
+	printf '%s\n' 'FAIL: ignoró una paleta inválida para Brave.' >&2
+	exit 1
+fi
+[[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
+[[ $(<"$test_root/scheme") == 'custom ProjectAtlas' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
 
 # Recuerda el último fondo elegido con `/wall` y lo restaura al volver al tema.
@@ -154,6 +182,7 @@ if TEST_FAIL=wallpaper run apply dracula >/dev/null 2>&1; then
 	exit 1
 fi
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
 
 # La simulación muestra el conjunto que usaría sin tocar el enlace ni el estado.
@@ -161,6 +190,7 @@ dry_run=$(run --dry-run apply dracula)
 [[ $dry_run == *"visible $visible -> $test_root/wallpapers/dracula"* ]]
 [[ $dry_run == *'color-scheme-set builtin Dracula'* ]]
 [[ $dry_run == *'wallpaper-set'* ]]
+[[ $dry_run == *'BrowserThemeColor'* ]]
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
 

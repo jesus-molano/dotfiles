@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+[[ $# -eq 2 ]] || {
+	printf 'Uso: %s ORIGEN DESTINO\n' "${0##*/}" >&2
+	exit 2
+}
+
+readonly source_file=$1
+readonly target_file=$2
+readonly target_dir=${target_file%/*}
+
+[[ $source_file == /* && $target_file == /* && $target_dir != "$target_file" ]] || {
+	printf '%s\n' 'Las rutas de origen y destino deben ser absolutas.' >&2
+	exit 2
+}
+[[ ! -L $target_dir && ! -L $target_file ]] || {
+	printf '%s\n' 'El destino no puede atravesar enlaces simbólicos.' >&2
+	exit 1
+}
+
+color=$(/usr/bin/jq -er '
+	select(
+		type == "object" and
+		(keys == ["BrowserThemeColor"]) and
+		(.BrowserThemeColor | type == "string" and test("^#[0-9a-f]{6}$"))
+	) | .BrowserThemeColor
+' "$source_file") || {
+	printf 'Política de origen ausente o inválida: %s\n' "$source_file" >&2
+	exit 1
+}
+readonly color
+
+/usr/bin/install -d -o root -g root -m 755 -- "$target_dir"
+tmp=$(/usr/bin/mktemp "$target_dir/.project-atlas-theme.XXXXXX")
+trap '/usr/bin/rm -f -- "$tmp"' EXIT
+/usr/bin/jq -n --arg color "$color" '{BrowserThemeColor: $color}' >"$tmp"
+/usr/bin/chown root:root -- "$tmp"
+/usr/bin/chmod 644 -- "$tmp"
+/usr/bin/mv -fT -- "$tmp" "$target_file"
+trap - EXIT

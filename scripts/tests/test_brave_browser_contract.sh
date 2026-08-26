@@ -51,6 +51,12 @@ grep -Fqx 'match,' "$vimium_css"
 grep -Fqx '.label,' "$vimium_css"
 grep -Fqx '.time,' "$vimium_css"
 grep -Fq 'brave-project-atlas-theme' "$repo_root/docs/DESKTOP-WORKFLOW.md"
-grep -Fq 'botón **Reload**' "$repo_root/docs/DESKTOP-WORKFLOW.md"
+grep -Fq 'BrowserThemeColor' "$repo_root/hypr-common/.local/bin/appearance-switch"
+grep -Fq 'sin reiniciar el' "$repo_root/docs/DESKTOP-WORKFLOW.md"
+grep -Fq 'setup-brave-project-atlas-policy' "$repo_root/docs/DESKTOP-WORKFLOW.md"
+grep -Fq 'project-atlas-brave-policy-sync' \
+	"$repo_root/hypr-common/.local/bin/setup-brave-project-atlas-policy"
+grep -Fq 'keys == ["BrowserThemeColor"]' \
+	"$repo_root/hypr-common/.local/libexec/project-atlas-brave-policy-sync"
 
 printf '%s\n' 'PASS: Brave es el navegador único y su tema Atlas es válido'

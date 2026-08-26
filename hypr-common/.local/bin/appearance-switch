@@ -19,6 +19,9 @@ readonly state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
 readonly state_dir="$state_home/dotfiles/appearance-switch"
 readonly state_file="$state_dir/current"
 readonly rendered_id_file="$state_dir/rendered"
+readonly active_palette_path=${APPEARANCE_ACTIVE_PALETTE:-"${XDG_CONFIG_HOME:-$HOME/.config}/noctalia/generated/active-palette.json"}
+readonly brave_policy_dir=${BRAVE_POLICY_DIR:-"$state_dir/brave-policies/managed"}
+readonly brave_policy_file="$brave_policy_dir/project-atlas-theme.json"
 readonly visible_link=${APPEARANCE_VISIBLE_LINK:-"$state_dir/visible"}
 # Apunta a la fuente canónica para que añadir o retirar fondos en el checkout
 # sea visible de inmediato y no exija regenerar enlaces Stow por archivo.
@@ -137,6 +140,28 @@ write_rendered_id() {
 	tmp=$(mktemp "$state_dir/rendered.XXXXXX")
 	(umask 077; printf '%s\n' "$id" >"$tmp")
 	mv -f -- "$tmp" "$rendered_id_file"
+}
+
+write_brave_theme_policy() {
+	local color tmp
+	color=$(jq -er '
+		.dark.mPrimary
+		| strings
+		| ascii_downcase
+		| select(test("^#[0-9a-f]{6}$"))
+	' "$active_palette_path") || {
+		printf 'appearance-switch: la paleta activa no contiene un color primario válido: %s\n' \
+			"$active_palette_path" >&2
+		return 1
+	}
+	install -d -m 700 -- "$brave_policy_dir"
+	tmp=$(mktemp "$brave_policy_dir/project-atlas-theme.XXXXXX")
+	if ! (umask 077; jq -n --arg color "$color" '{BrowserThemeColor: $color}' >"$tmp"); then
+		rm -f -- "$tmp"
+		printf '%s\n' 'appearance-switch: no se pudo generar la política de tema de Brave' >&2
+		return 1
+	fi
+	mv -f -- "$tmp" "$brave_policy_file"
 }
 
 valid_raster_name() {
@@ -301,6 +326,7 @@ apply_appearance() {
 			"${appearance_sources[$id]}" "${appearance_palettes[$id]}"
 		printf 'noctalia msg wallpaper-set %q\n' "$resolved_wallpaper"
 		printf '%s\n' 'noctalia msg templates-apply'
+		printf 'BrowserThemeColor <- %q\n' "$active_palette_path"
 		printf 'state %q\n' "$id"
 		return
 	fi
@@ -345,6 +371,19 @@ apply_appearance() {
 		fi
 		noctalia msg templates-apply >/dev/null 2>&1 || true
 		fail "Noctalia no pudo aplicar la apariencia $id"
+	fi
+	if ! write_brave_theme_policy; then
+		if [[ -n $previous_target ]]; then
+			replace_visible_link "$previous_target"
+		else
+			rm -f -- "$visible_link"
+		fi
+		noctalia msg color-scheme-set "$previous_source" "$previous_palette" >/dev/null 2>&1 || true
+		if [[ -f $previous_wallpaper ]]; then
+			noctalia msg wallpaper-set "$previous_wallpaper" >/dev/null 2>&1 || true
+		fi
+		noctalia msg templates-apply >/dev/null 2>&1 || true
+		fail "no se pudo sincronizar la apariencia $id con Brave"
 	fi
 	write_current_id "$id"
 	printf '%s\n' "$id"
@@ -399,6 +438,14 @@ prepare)
 		acquire_lock
 		active=$(current_id)
 		prepare_visible "$active"
+		if [[ ! -r $active_palette_path ]]; then
+			require_noctalia
+			rm -f -- "$rendered_id_file"
+			if ! noctalia msg templates-apply >/dev/null || ! wait_for_templates "$active"; then
+				fail 'Noctalia no pudo generar la paleta activa'
+			fi
+		fi
+		write_brave_theme_policy || fail 'no se pudo preparar la política de tema de Brave'
 	fi
 	printf '%s\n' "$active"
 	;;

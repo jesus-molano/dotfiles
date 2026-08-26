@@ -14,6 +14,32 @@ simulan y aplican por módulo, con Polkit, confirmación y copia previa.
 
 No uses Stow contra `/etc`.
 
+## Política dinámica de Brave
+
+La integración de Brave no copia una política mutable dentro del repositorio.
+`appearance-switch` genera un objeto que contiene solo `BrowserThemeColor`
+bajo `$XDG_STATE_HOME/dotfiles/appearance-switch/brave-policies/managed/`.
+La instalación crea un helper y dos unidades root. El `.path` observa ese
+archivo. El servicio valida la clave y copia el resultado a
+`/etc/brave/policies/managed/project-atlas-theme.json`:
+
+~~~bash
+appearance-switch prepare
+setup-brave-project-atlas-policy --check
+setup-brave-project-atlas-policy --install
+~~~
+
+El navegador mostrará el estado administrado mientras la política exista. El
+helper instalado es propiedad de root y no ejecuta código desde HOME. El
+marcador root `/var/lib/project-atlas-brave-policy/installation` distingue los
+archivos propios de políticas ajenas. El instalador puede actualizar o retirar
+una instalación propia incompleta aunque el archivo de usuario ya no exista.
+Rollback:
+
+~~~bash
+setup-brave-project-atlas-policy --remove
+~~~
+
 ## Flujo por módulo
 
 Simula primero:

@@ -114,6 +114,7 @@ check_base_workflows() {
   check 'Compartir con LocalSend' "$repo_root/scripts/tests/test_local_share.sh"
   check 'Launcher multimedia' "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
   check 'Navegador Brave' "$repo_root/scripts/tests/test_brave_browser_contract.sh"
+  check 'Política dinámica de Brave' "$repo_root/scripts/tests/test_setup_brave_theme_policy.sh"
   check 'Práctica de mecanografía' "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
   check 'Apariencias coordinadas' "$repo_root/scripts/tests/test_appearance_switch.sh"
   check 'Tema dinámico de Thunderbird' "$repo_root/scripts/tests/test_thunderbird_theme.sh"

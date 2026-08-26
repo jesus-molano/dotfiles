@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+	printf 'Uso: %s {--check|--install|--remove}\n' "${0##*/}" >&2
+	exit 2
+}
+
+[[ $# -eq 1 ]] || usage
+readonly action=$1
+case "$action" in
+--check | --install | --remove) ;;
+*) usage ;;
+esac
+
+script_path=$(readlink -f -- "${BASH_SOURCE[0]}")
+readonly script_path
+repo_root=$(cd -- "$(dirname -- "$script_path")/../../.." && pwd)
+readonly repo_root
+readonly state_home=${XDG_STATE_HOME:-"$HOME/.local/state"}
+readonly policy_root=/etc/brave/policies
+readonly systemd_dir=/etc/systemd/system
+readonly libexec_dir=/usr/local/libexec
+readonly install_state_dir=/var/lib/project-atlas-brave-policy
+readonly pkexec_cmd=/usr/bin/pkexec
+readonly systemctl_cmd=/usr/bin/systemctl
+readonly policy_source="$state_home/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json"
+readonly policy_target="$policy_root/managed/project-atlas-theme.json"
+readonly helper_source="$repo_root/hypr-common/.local/libexec/project-atlas-brave-policy-sync"
+readonly helper_target="$libexec_dir/project-atlas-brave-policy-sync"
+readonly service_target="$systemd_dir/project-atlas-brave-policy.service"
+readonly path_target="$systemd_dir/project-atlas-brave-policy.path"
+readonly ownership_marker="$install_state_dir/installation"
+
+[[ $policy_source =~ ^/[A-Za-z0-9._/-]+$ && $policy_target =~ ^/[A-Za-z0-9._/-]+$ ]] || {
+	printf '%s\n' 'Las rutas de política contienen caracteres no admitidos por la unidad systemd.' >&2
+	exit 1
+}
+[[ -x $helper_source ]] || {
+	printf 'Helper ausente o no ejecutable: %s\n' "$helper_source" >&2
+	exit 1
+}
+
+tmp_dir=$(mktemp -d)
+trap 'rm -rf -- "$tmp_dir"' EXIT
+service_source="$tmp_dir/project-atlas-brave-policy.service"
+path_source="$tmp_dir/project-atlas-brave-policy.path"
+marker_source="$tmp_dir/installation"
+printf '%s\n' 'project-atlas-brave-policy:v1' >"$marker_source"
+
+cat >"$service_source" <<EOF
+[Unit]
+Description=Synchronize the Project Atlas color with Brave
+
+[Service]
+Type=oneshot
+ExecStart=$helper_target $policy_source $policy_target
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=$policy_root/managed
+EOF
+
+cat >"$path_source" <<EOF
+[Unit]
+Description=Watch the Project Atlas Brave color policy
+
+[Path]
+PathChanged=$policy_source
+Unit=project-atlas-brave-policy.service
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+valid_policy() {
+	jq -e '
+		type == "object" and
+		(keys == ["BrowserThemeColor"]) and
+		(.BrowserThemeColor | type == "string" and test("^#[0-9a-f]{6}$"))
+	' "$policy_source" >/dev/null 2>&1
+}
+
+same_file() {
+	local expected=$1 actual=$2
+	[[ -f $actual && ! -L $actual ]] && cmp -s -- "$expected" "$actual"
+}
+
+managed_files_match() {
+	same_file "$helper_source" "$helper_target" &&
+		same_file "$service_source" "$service_target" &&
+		same_file "$path_source" "$path_target"
+}
+
+installation_owned() {
+	same_file "$marker_source" "$ownership_marker"
+}
+
+any_installation_file_exists() {
+	[[ -e $helper_target || -L $helper_target || -e $service_target || -L $service_target ||
+		-e $path_target || -L $path_target || -e $policy_target || -L $policy_target ||
+		-e $ownership_marker || -L $ownership_marker ]]
+}
+
+target_policy_matches() {
+	local source_color target_color
+	[[ -f $policy_target && ! -L $policy_target ]] || return 1
+	source_color=$(jq -er '
+		select(type == "object" and keys == ["BrowserThemeColor"]) | .BrowserThemeColor
+	' "$policy_source" 2>/dev/null) || return 1
+	target_color=$(jq -er '
+		select(type == "object" and keys == ["BrowserThemeColor"]) | .BrowserThemeColor
+	' "$policy_target" 2>/dev/null) || return 1
+	[[ $source_color == "$target_color" ]]
+}
+
+path_ready() {
+	"$systemctl_cmd" is-enabled --quiet project-atlas-brave-policy.path >/dev/null 2>&1 &&
+		"$systemctl_cmd" is-active --quiet project-atlas-brave-policy.path >/dev/null 2>&1
+}
+
+case "$action" in
+--check)
+	valid_policy || {
+		printf 'Política de usuario ausente o inválida: %s\n' "$policy_source" >&2
+		exit 1
+	}
+	if installation_owned && managed_files_match && target_policy_matches && path_ready; then
+		printf '= sincronización automática instalada para %s\n' "$policy_source"
+	elif any_installation_file_exists && ! installation_owned; then
+		printf '%s\n' '! existen archivos sin el marcador de Project Atlas; no se sustituirán' >&2
+		exit 1
+	else
+		printf '+ sincronización automática pendiente, desactualizada o incompleta para %s\n' "$policy_source"
+	fi
+	;;
+--install)
+	valid_policy || {
+		printf 'Política de usuario ausente o inválida: %s\n' "$policy_source" >&2
+		exit 1
+	}
+	if any_installation_file_exists && ! installation_owned; then
+		printf '%s\n' 'No se sustituye una instalación sin el marcador de Project Atlas.' >&2
+		exit 1
+	fi
+	# El marcador se instala primero. Una interrupción posterior se puede reparar
+	# o retirar sin adoptar archivos administrativos ajenos.
+	"$pkexec_cmd" /usr/bin/install -D -o root -g root -m 644 -- "$marker_source" "$ownership_marker"
+	"$pkexec_cmd" /usr/bin/install -D -o root -g root -m 755 -- "$helper_source" "$helper_target"
+	"$pkexec_cmd" /usr/bin/install -D -o root -g root -m 644 -- "$service_source" "$service_target"
+	"$pkexec_cmd" /usr/bin/install -D -o root -g root -m 644 -- "$path_source" "$path_target"
+	"$pkexec_cmd" /usr/bin/install -d -o root -g root -m 755 -- "$policy_root/managed"
+	"$pkexec_cmd" "$systemctl_cmd" daemon-reload
+	"$pkexec_cmd" "$systemctl_cmd" start project-atlas-brave-policy.service
+	"$pkexec_cmd" "$systemctl_cmd" enable --now project-atlas-brave-policy.path
+	if ! target_policy_matches || ! path_ready; then
+		printf '%s\n' 'La instalación quedó marcada pero no está operativa; repite --install o usa --remove.' >&2
+		exit 1
+	fi
+	printf '%s\n' '✓ sincronización automática de Brave instalada'
+	;;
+--remove)
+	if any_installation_file_exists && ! installation_owned; then
+		printf '%s\n' 'No se retira una instalación sin el marcador de Project Atlas.' >&2
+		exit 1
+	fi
+	"$pkexec_cmd" "$systemctl_cmd" disable --now project-atlas-brave-policy.path >/dev/null 2>&1 || true
+	if installation_owned; then
+		"$pkexec_cmd" /usr/bin/rm -f -- "$path_target" "$service_target" "$helper_target" \
+			"$policy_target" "$ownership_marker"
+		"$pkexec_cmd" /usr/bin/rmdir --ignore-fail-on-non-empty -- "$install_state_dir"
+	fi
+	"$pkexec_cmd" "$systemctl_cmd" daemon-reload
+	printf '%s\n' '✓ sincronización automática de Brave retirada'
+	;;
+esac
