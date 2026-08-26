@@ -340,6 +340,19 @@ Chromium impide que las extensiones actúen en `brave://`, Chrome Web Store y
 otras superficies protegidas. En esas páginas usa los atajos nativos de Brave:
 `Ctrl + L`, `Ctrl + Tab`, `Ctrl + W` y `Ctrl + Shift + T`.
 
+El tema local **Project Atlas - Obsidian Amber** mantiene negro como superficie
+dominante y usa ámbar y naranja como acentos. Se instala una sola vez desde
+`brave://extensions`: activa el modo de desarrollador, selecciona **Load
+unpacked** y abre `~/.local/share/brave-project-atlas-theme/`. Brave conserva el
+tema después de reiniciar. El directorio es un enlace Stow a la fuente canónica.
+Después de modificar el tema, aplica los cambios con su botón **Reload** en
+`brave://extensions`.
+
+Para que Vimium C use la misma paleta, abre sus opciones y copia el contenido de
+`~/.local/share/brave-project-atlas-theme/vimium-c.css` en **Custom CSS for
+Vimium C UI**. Esta personalización afecta a hints, HUD, Vomnibar y FindBar; no
+inyecta estilos generales en las páginas web.
+
 ## Flujos cortos
 
 ### Implementar una tarea

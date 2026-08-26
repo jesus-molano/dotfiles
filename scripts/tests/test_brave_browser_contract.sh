@@ -3,6 +3,7 @@
 set -euo pipefail
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+readonly theme_dir="$repo_root/hypr-common/.local/share/brave-project-atlas-theme"
 
 grep -Fqx 'base,core,brave-bin,native' "$repo_root/packages.csv"
 if grep -Eq '(^|,)(qutebrowser|python-adblock)(,|$)' "$repo_root/packages.csv"; then
@@ -22,4 +23,34 @@ for mime in \
 	grep -Fqx "$mime=brave-browser.desktop" "$repo_root/mimeapps/.config/mimeapps.list"
 done
 
-printf '%s\n' 'PASS: Brave es el navegador único de los contratos del escritorio'
+python3 - "$theme_dir/manifest.json" <<'PY'
+import json
+from pathlib import Path
+import sys
+
+manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+assert manifest["manifest_version"] == 3
+assert manifest["name"] == "Project Atlas - Obsidian Amber"
+colors = manifest["theme"]["colors"]
+assert colors["frame"] == [10, 9, 7]
+assert colors["toolbar"] == [21, 19, 14]
+assert colors["toolbar_text"] == [245, 241, 232]
+assert colors["ntp_background"] == [7, 6, 4]
+assert colors["ntp_link"] == [255, 200, 87]
+PY
+
+vimium_css="$theme_dir/vimium-c.css"
+grep -Fq '/* #ui */' "$vimium_css"
+grep -Fq '/* #omni */' "$vimium_css"
+grep -Fq '/* #find */' "$vimium_css"
+grep -Fq '#ffc857' "$vimium_css"
+grep -Fq '#ff9f1c' "$vimium_css"
+grep -Fq '#0a0907' "$vimium_css"
+grep -Fqx 'a,' "$vimium_css"
+grep -Fqx 'match,' "$vimium_css"
+grep -Fqx '.label,' "$vimium_css"
+grep -Fqx '.time,' "$vimium_css"
+grep -Fq 'brave-project-atlas-theme' "$repo_root/docs/DESKTOP-WORKFLOW.md"
+grep -Fq 'botón **Reload**' "$repo_root/docs/DESKTOP-WORKFLOW.md"
+
+printf '%s\n' 'PASS: Brave es el navegador único y su tema Atlas es válido'

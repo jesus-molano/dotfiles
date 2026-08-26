@@ -1,0 +1,129 @@
+/* Project Atlas - Obsidian Amber */
+
+/* #ui */
+.LH,
+.D > .LH {
+  background: linear-gradient(145deg, #ffc857, #ff9f1c) !important;
+  border: 1px solid #fff0bd !important;
+  border-radius: 4px !important;
+  box-shadow: 0 4px 12px #00000080 !important;
+  color: #241600 !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+}
+
+.BH {
+  color: #7a2f00 !important;
+}
+
+.MC,
+.MH {
+  color: #241600 !important;
+}
+
+.HUD,
+.HUD.D {
+  color: #f5f1e8 !important;
+}
+
+.HUD::after,
+.HUD.D::after {
+  background: #0a0907 !important;
+  border: 1px solid #59513f !important;
+  box-shadow: 0 8px 24px #00000099 !important;
+}
+
+.Flash,
+.Sel {
+  box-shadow: 0 0 0 2px #ffc857, 0 0 18px #ff9f1c99 !important;
+}
+
+/* #omni */
+html,
+body,
+#bar {
+  background: #0a0907 !important;
+  color: #f5f1e8 !important;
+}
+
+#bar {
+  border: 1px solid #59513f !important;
+  border-radius: 10px !important;
+  box-shadow: 0 18px 60px #000000b3 !important;
+  overflow: hidden !important;
+}
+
+#input {
+  background: #15130e !important;
+  border-bottom: 1px solid #59513f !important;
+  color: #fffaf0 !important;
+  caret-color: #ffc857 !important;
+}
+
+#input::selection,
+::selection {
+  background: #59451d !important;
+  color: #fff5d6 !important;
+}
+
+.item {
+  background: #0a0907 !important;
+  border-bottom-color: #211d13 !important;
+  color: #f5f1e8 !important;
+}
+
+.item.s,
+.item:hover {
+  background: #211d13 !important;
+  box-shadow: inset 3px 0 #ffc857 !important;
+}
+
+.title,
+.item .title {
+  color: #f5f1e8 !important;
+}
+
+a,
+.url,
+.item .url {
+  color: #8dc6b0 !important;
+}
+
+match,
+.match,
+.item .match {
+  color: #ffc857 !important;
+  font-weight: 700 !important;
+}
+
+.label,
+.time,
+.source,
+.item .source {
+  color: #ff9f1c !important;
+}
+
+/* #find */
+.r,
+.r.D {
+  background: #0a0907 !important;
+  border: 1px solid #59513f !important;
+  box-shadow: 0 8px 24px #00000099 !important;
+  color: #f5f1e8 !important;
+}
+
+#i {
+  color: #fffaf0 !important;
+  caret-color: #ffc857 !important;
+}
+
+#s,
+#c {
+  color: #ffc857 !important;
+}
+
+/* #find:selection */
+::selection {
+  background: #ffc857 !important;
+  color: #241600 !important;
+}
