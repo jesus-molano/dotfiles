@@ -78,7 +78,7 @@ grep -Fq "PathChanged=$test_root/state/" \
 	"$test_root/etc/systemd/system/project-atlas-brave-policy.path"
 grep -Fq 'enable --now project-atlas-brave-policy.path' "$test_root/systemctl.log"
 if command -v systemd-analyze >/dev/null 2>&1; then
-	systemd-analyze verify \
+	systemd-analyze --generators=no verify \
 		"$test_root/etc/systemd/system/project-atlas-brave-policy.service" \
 		"$test_root/etc/systemd/system/project-atlas-brave-policy.path"
 fi
