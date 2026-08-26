@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+readonly recipe_dir="$repo_root/packages/codexbar-cli"
+readonly github_api="${CODEXBAR_GITHUB_API:-https://api.github.com/repos/steipete/CodexBar/releases/latest}"
+readonly release_base="${CODEXBAR_RELEASE_BASE:-https://github.com/steipete/CodexBar/releases/download}"
+readonly curl_bin="${CURL_BIN:-curl}"
+readonly jq_bin="${JQ_BIN:-jq}"
+readonly pacman_bin="${PACMAN_BIN:-pacman}"
+readonly shelly_bin="${SHELLY_BIN:-shelly}"
+readonly vercmp_bin="${VERCMP_BIN:-vercmp}"
+readonly output_dir="${CODEXBAR_PACKAGE_OUTPUT_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/packages/codexbar-cli}"
+
+usage() {
+	printf '%s\n' 'Uso: codexbar-official {check|test|build}'
+}
+
+require_command() {
+	command -v "$1" >/dev/null 2>&1 || {
+		printf 'codexbar-official: falta el comando requerido: %s\n' "$1" >&2
+		exit 1
+	}
+}
+
+recipe_version() {
+	awk -F= '$1 == "pkgver" { gsub(/[[:space:]]/, "", $2); print $2; exit }' \
+		"$recipe_dir/PKGBUILD"
+}
+
+latest_version() {
+	"$curl_bin" -fsSL "$github_api" | "$jq_bin" -er '
+		.tag_name
+		| select(type == "string" and test("^v[0-9]+\\.[0-9]+\\.[0-9]+$"))
+		| ltrimstr("v")
+	'
+}
+
+installed_version() {
+	"$pacman_bin" -Q codexbar-cli 2>/dev/null | awk 'NR == 1 { print $2 }'
+}
+
+ensure_current_recipe() {
+	local pinned latest
+	pinned=$(recipe_version)
+	latest=$(latest_version)
+	if [[ $pinned != "$latest" ]]; then
+		printf 'codexbar-official: la receta fija %s, pero upstream publica %s.\n' \
+			"$pinned" "$latest" >&2
+		printf '%s\n' 'Revisa la release y actualiza PKGBUILD antes de continuar.' >&2
+		exit 1
+	fi
+	printf '%s\n' "$pinned"
+}
+
+check_versions() {
+	local pinned latest installed='no instalado'
+	pinned=$(recipe_version)
+	latest=$(latest_version)
+	installed=$(installed_version || printf '%s' "$installed")
+
+	printf 'Instalado: %s\nReceta:    %s\nUpstream:  %s\n' "$installed" "$pinned" "$latest"
+	if [[ $installed != 'no instalado' ]] && (( $("$vercmp_bin" "$installed" "$latest") >= 0 )); then
+		printf '%s\n' 'Estado: CodexBar está actualizado.'
+	else
+		printf '%s\n' 'Estado: hay una actualización disponible.'
+	fi
+	if [[ $pinned != "$latest" ]]; then
+		printf '%s\n' 'Acción: revisar la release y actualizar la receta fijada.'
+	fi
+}
+
+test_release() (
+	local version=${1:-$(ensure_current_recipe)}
+	local architecture asset probe_dir status
+	architecture=$(uname -m)
+	case "$architecture" in
+		x86_64 | aarch64) ;;
+		*)
+			printf 'codexbar-official: arquitectura no soportada: %s\n' "$architecture" >&2
+			exit 1
+			;;
+	esac
+	asset="CodexBarCLI-v${version}-linux-${architecture}.tar.gz"
+	probe_dir=$(mktemp -d "${TMPDIR:-/tmp}/codexbar-${version}-test.XXXXXX")
+	trap 'find "$probe_dir" -depth -delete' EXIT
+
+	"$curl_bin" -fsSL -o "$probe_dir/$asset" "$release_base/v${version}/$asset"
+	"$curl_bin" -fsSL -o "$probe_dir/$asset.sha256" "$release_base/v${version}/$asset.sha256"
+	(
+		cd "$probe_dir"
+		sha256sum --check "$asset.sha256"
+		tar -xzf "$asset"
+	)
+	[[ $("$probe_dir/codexbar" --version) == "CodexBar ${version}" ]]
+
+	set +e
+	timeout 30s "$probe_dir/codexbar" usage --format json --json-only \
+		>"$probe_dir/usage.json" 2>"$probe_dir/usage.err"
+	status=$?
+	set -e
+	if ((status != 0)) || ! "$jq_bin" -e '
+		type == "array"
+		and any(.[]?; .provider == "codex" and (.error // null) == null and (.usage | type) == "object")
+	' "$probe_dir/usage.json" >/dev/null; then
+		printf 'codexbar-official: la prueba de uso falló con código %d.\n' "$status" >&2
+		sed -n '1,8p' "$probe_dir/usage.err" >&2
+		exit 1
+	fi
+	printf 'PASS: CodexBar %s verificó el checksum y devolvió uso válido.\n' "$version"
+)
+
+build_package() (
+	local version build_dir package_path destination
+	version=$(ensure_current_recipe)
+	test_release "$version"
+	require_command "$shelly_bin"
+	build_dir=$(mktemp -d "${TMPDIR:-/tmp}/dotfiles-codexbar-build.XXXXXX")
+	trap 'find "$build_dir" -depth -delete' EXIT
+	cp "$recipe_dir/PKGBUILD" "$recipe_dir/codexbar-wrapper" "$build_dir/"
+	(
+		cd "$build_dir"
+		"$shelly_bin" build PKGBUILD --reviewed --check
+	)
+	package_path=$(find "$build_dir" -maxdepth 1 -type f \
+		-name "codexbar-cli-${version}-*.pkg.tar.*" ! -name '*.sig' -print -quit)
+	[[ -n $package_path ]] || {
+		printf '%s\n' 'codexbar-official: Shelly no produjo el paquete esperado.' >&2
+		exit 1
+	}
+	destination="$output_dir/$(basename -- "$package_path")"
+	install -Dm644 "$package_path" "$destination"
+	printf 'Paquete verificado: %s\n' "$destination"
+)
+
+for command in "$curl_bin" "$jq_bin" "$pacman_bin" "$vercmp_bin" awk sha256sum tar timeout; do
+	require_command "$command"
+done
+
+case "${1:-}" in
+	check) check_versions ;;
+	test) test_release ;;
+	build) build_package ;;
+	*) usage >&2; exit 2 ;;
+esac

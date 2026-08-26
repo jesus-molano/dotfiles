@@ -68,6 +68,23 @@ escritorio. Durante el arranque, el helper espera a que Orca registre los
 proyectos y reintenta solo las automations programadas en los últimos cinco
 minutos que hayan fallado por no encontrar todavía el proyecto local.
 
+CodexBar CLI mantiene una receta local revisada en
+`packages/codexbar-cli/PKGBUILD`. `just codexbar-check` compara la instalación,
+la receta fijada y la última release oficial. `just codexbar-test` descarga el
+archivo oficial, verifica el checksum publicado y prueba el proveedor Codex sin
+instalar. `just codexbar-build` repite esa prueba, construye el paquete con
+Shelly y lo copia a `~/.cache/dotfiles/packages/codexbar-cli`.
+
+Shelly construye la receta, pero no descubre releases de GitHub. Cuando
+`codexbar-check` indique una versión nueva, hay que revisar sus notas y actualizar
+la versión y los checksums del `PKGBUILD`. La instalación permanece bajo Pacman
+y se hace de forma explícita con `pkexec pacman -U <paquete>`.
+
+Antes de sustituir una versión, conserva el paquete anterior en el mismo
+directorio de caché. El rollback usa esa ruta exacta con
+`pkexec pacman -U <paquete-anterior>` y vuelve a ejecutar
+`just codexbar-test` después de la transacción.
+
 Comprobaciones disponibles:
 
 ~~~bash

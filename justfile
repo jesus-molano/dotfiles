@@ -100,6 +100,18 @@ toolchain-check:
 toolchain-migrate:
     "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --apply
 
+# Compara la instalación y la receta fijada con la última release oficial.
+codexbar-check:
+    "{{ dotfiles_dir }}/scripts/codexbar-official" check
+
+# Verifica el checksum oficial y prueba CodexBar sin instalarlo.
+codexbar-test:
+    "{{ dotfiles_dir }}/scripts/codexbar-official" test
+
+# Prueba y construye mediante Shelly la receta oficial revisada.
+codexbar-build:
+    "{{ dotfiles_dir }}/scripts/codexbar-official" build
+
 # Comprueba el SDK Android local sin descargar herramientas ni aceptar licencias.
 android-check:
     "{{ dotfiles_dir }}/android/.local/bin/android-sdk-check"
