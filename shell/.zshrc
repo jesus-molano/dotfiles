@@ -7,11 +7,6 @@ export STARSHIP_CONFIG="$HOME/.config/noctalia/generated/starship.toml"
 export BAT_THEME="project-atlas"
 [[ -r $STARSHIP_CONFIG ]] || export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
-# mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
-if command -v mise >/dev/null 2>&1; then
-  eval "$(mise activate zsh)"
-fi
-
 # pnpm
 export PNPM_HOME="$HOME/.local/share/pnpm"
 if [[ ":$PATH:" != *":$PNPM_HOME:"* ]]; then
@@ -21,6 +16,12 @@ fi
 # Local binaries
 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
   export PATH="$HOME/.local/bin:$PATH"
+fi
+
+# Activa mise después de todos los cambios explícitos de PATH para que la
+# versión seleccionada por proyecto conserve precedencia.
+if command -v mise >/dev/null 2>&1; then
+  eval "$(mise activate zsh)"
 fi
 
 if [[ -S "$HOME/.1password/agent.sock" ]]; then

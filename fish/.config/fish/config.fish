@@ -16,11 +16,6 @@ if not test -r "$STARSHIP_CONFIG"
     set -gx STARSHIP_CONFIG "$HOME/.config/starship.toml"
 end
 
-# mise conserva .node-version/.nvmrc y centraliza runtimes por proyecto.
-if status is-interactive; and command -q mise
-    mise activate fish | source
-end
-
 # Binarios globales explícitos de pnpm. La versión de Node la decide mise.
 set -gx PNPM_HOME "$HOME/.local/share/pnpm"
 fish_add_path -g "$PNPM_HOME"
@@ -53,6 +48,12 @@ if status is-interactive; and command -q atuin
     atuin init fish --disable-ai | source
 end
 fish_add_path -g "$HOME/.local/bin"
+
+# Activa mise después de todos los cambios explícitos de PATH para que la
+# versión seleccionada por proyecto conserve precedencia.
+if status is-interactive; and command -q mise
+    mise activate fish | source
+end
 
 # Abreviaturas sin reemplazar comandos comunes como test, build o lint.
 abbr -a p pnpm

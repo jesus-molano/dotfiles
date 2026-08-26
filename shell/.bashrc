@@ -17,10 +17,6 @@ export STARSHIP_CONFIG="$HOME/.config/noctalia/generated/starship.toml"
 export BAT_THEME="project-atlas"
 [[ -r $STARSHIP_CONFIG ]] || export STARSHIP_CONFIG="$HOME/.config/starship.toml"
 
-if command -v mise >/dev/null 2>&1; then
-	eval "$(mise activate bash)"
-fi
-
 export PNPM_HOME="$HOME/.local/share/pnpm"
 case ":$PATH:" in
 *":$PNPM_HOME:"*) ;;
@@ -31,6 +27,12 @@ case ":$PATH:" in
 *":$HOME/.local/bin:"*) ;;
 *) export PATH="$HOME/.local/bin:$PATH" ;;
 esac
+
+# Activa mise después de todos los cambios explícitos de PATH para que la
+# versión seleccionada por proyecto conserve precedencia.
+if command -v mise >/dev/null 2>&1; then
+	eval "$(mise activate bash)"
+fi
 
 if [[ -S "$HOME/.1password/agent.sock" ]]; then
 	export SSH_AUTH_SOCK="$HOME/.1password/agent.sock"
