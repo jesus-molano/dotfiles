@@ -90,16 +90,17 @@ case "$1 $2" in
 		scheme='custom ProjectAtlas'
 	fi
 	case "$scheme" in
-	'custom ProjectAtlas') rendered_id=atlas; primary='#ff5b4d' ;;
-	'builtin Dracula') rendered_id=dracula; primary='#bd93f9' ;;
-	'builtin Catppuccin') rendered_id=catppuccin; primary='#cba6f7' ;;
-	'builtin Nord') rendered_id=nord; primary='#88c0d0' ;;
+	'custom ProjectAtlas') rendered_id=atlas; primary='#ff5b4d'; surface='#14171c' ;;
+	'builtin Dracula') rendered_id=dracula; primary='#bd93f9'; surface='#282a36' ;;
+	'builtin Catppuccin') rendered_id=catppuccin; primary='#cba6f7'; surface='#1e1e2e' ;;
+	'builtin Nord') rendered_id=nord; primary='#88c0d0'; surface='#2e3440' ;;
 	*) exit 3 ;;
 	esac
 	if [[ ${TEST_BAD_PALETTE:-0} == 1 ]]; then
-		printf '{"dark":{"mPrimary":"invalid"}}\n' >"$TEST_ACTIVE_PALETTE"
+		printf '{"dark":{"mPrimary":"%s","mSurface":"invalid"}}\n' "$primary" >"$TEST_ACTIVE_PALETTE"
 	else
-		printf '{"dark":{"mPrimary":"%s"}}\n' "$primary" >"$TEST_ACTIVE_PALETTE"
+		printf '{"dark":{"mPrimary":"%s","mSurface":"%s"}}\n' \
+			"$primary" "$surface" >"$TEST_ACTIVE_PALETTE"
 	fi
 	printf '%s\n' "$rendered_id" >"$TEST_RENDERED_ID_FILE"
 	;;
@@ -127,18 +128,18 @@ run() {
 [[ $(run current) == atlas ]]
 [[ $(run prepare) == atlas ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
-[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#14171c' ]]
 : >"$test_root/log"
 
 [[ $(run apply atlas) == atlas ]]
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
-[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#14171c' ]]
 [[ $(<"$test_root/log") == \
 	$'palette:custom:ProjectAtlas:visible='"$test_root"$'/wallpapers/atlas\nwallpaper:'"$test_root"$'/wallpapers/atlas/default.png:visible='"$test_root"$'/wallpapers/atlas\ntemplates:visible='"$test_root"$'/wallpapers/atlas' ]]
 
 [[ $(run next) == dracula ]]
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == dracula ]]
-[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#bd93f9' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#282a36' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/dracula" ]]
 [[ $(run previous) == atlas ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
@@ -150,7 +151,7 @@ if TEST_BAD_PALETTE=1 run apply dracula >/dev/null 2>&1; then
 fi
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
 [[ $(<"$test_root/scheme") == 'custom ProjectAtlas' ]]
-[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#14171c' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
 
 # Recuerda el último fondo elegido con `/wall` y lo restaura al volver al tema.
@@ -182,7 +183,7 @@ if TEST_FAIL=wallpaper run apply dracula >/dev/null 2>&1; then
 	exit 1
 fi
 [[ $(<"$test_root/state/dotfiles/appearance-switch/current") == atlas ]]
-[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#ff5b4d' ]]
+[[ $(jq -r '.BrowserThemeColor' "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json") == '#14171c' ]]
 [[ $(readlink -f -- "$visible") == "$test_root/wallpapers/atlas" ]]
 
 # La simulación muestra el conjunto que usaría sin tocar el enlace ni el estado.

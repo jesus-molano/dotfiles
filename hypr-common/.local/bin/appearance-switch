@@ -145,12 +145,12 @@ write_rendered_id() {
 write_brave_theme_policy() {
 	local color tmp
 	color=$(jq -er '
-		.dark.mPrimary
+		.dark.mSurface
 		| strings
 		| ascii_downcase
 		| select(test("^#[0-9a-f]{6}$"))
 	' "$active_palette_path") || {
-		printf 'appearance-switch: la paleta activa no contiene un color primario válido: %s\n' \
+		printf 'appearance-switch: la paleta activa no contiene un color de superficie válido: %s\n' \
 			"$active_palette_path" >&2
 		return 1
 	}
