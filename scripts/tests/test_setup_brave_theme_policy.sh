@@ -78,24 +78,9 @@ grep -Fq "PathChanged=$test_root/state/" \
 	"$test_root/etc/systemd/system/project-atlas-brave-policy.path"
 grep -Fq 'enable --now project-atlas-brave-policy.path' "$test_root/systemctl.log"
 if command -v systemd-analyze >/dev/null 2>&1; then
-	verify_root="$test_root/systemd-root"
-	mkdir -p "$verify_root/etc/systemd/system" "$verify_root/usr/lib/systemd" \
-		"$verify_root/usr/local/libexec" "$verify_root/state/dotfiles/appearance-switch/brave-policies/managed" \
-		"$verify_root/etc/brave/policies/managed"
-	cp -a /usr/lib/systemd/system "$verify_root/usr/lib/systemd/"
-	sed "s|$test_root||g" \
+	systemd-analyze --generators=no verify \
 		"$test_root/etc/systemd/system/project-atlas-brave-policy.service" \
-		>"$verify_root/etc/systemd/system/project-atlas-brave-policy.service"
-	sed "s|$test_root||g" \
-		"$test_root/etc/systemd/system/project-atlas-brave-policy.path" \
-		>"$verify_root/etc/systemd/system/project-atlas-brave-policy.path"
-	cp -- "$repo_root/hypr-common/.local/libexec/project-atlas-brave-policy-sync" \
-		"$verify_root/usr/local/libexec/project-atlas-brave-policy-sync"
-	cp -- "$test_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json" \
-		"$verify_root/state/dotfiles/appearance-switch/brave-policies/managed/project-atlas-theme.json"
-	systemd-analyze --root="$verify_root" --generators=no verify \
-		"$verify_root/etc/systemd/system/project-atlas-brave-policy.service" \
-		"$verify_root/etc/systemd/system/project-atlas-brave-policy.path"
+		"$test_root/etc/systemd/system/project-atlas-brave-policy.path"
 fi
 [[ $(run --check) == =*'instalada'* ]]
 [[ $(TEST_SYSTEMCTL_INACTIVE=1 run --check) == +*'desactualizada o incompleta'* ]]

@@ -35,6 +35,7 @@ jobs:
         run: |
           useradd --create-home --shell /bin/bash dotfiles-ci
           chown -R dotfiles-ci:dotfiles-ci "$GITHUB_WORKSPACE"
+          install -d -m 755 /run/systemd
           runuser -u dotfiles-ci -- just --justfile "$GITHUB_WORKSPACE/justfile" ci
 
   cachyos_packages:
