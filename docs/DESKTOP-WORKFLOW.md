@@ -340,7 +340,7 @@ Chromium impide que las extensiones actúen en `brave://`, Chrome Web Store y
 otras superficies protegidas. En esas páginas usa los atajos nativos de Brave:
 `Ctrl + L`, `Ctrl + Tab`, `Ctrl + W` y `Ctrl + Shift + T`.
 
-Brave sigue automáticamente el color primario de `/appearance` mediante la
+Brave sigue automáticamente el color de superficie oscuro de `/appearance` mediante la
 política dinámica `BrowserThemeColor`. La activación administrativa se realiza
 una sola vez, después de `appearance-switch prepare`:
 
@@ -357,8 +357,8 @@ selector manual de tema mientras la política está instalada. Cada cambio
 posterior de `/appearance` se aplica sin reiniciar el navegador. Rollback:
 `setup-brave-project-atlas-policy --remove`.
 
-El tema desempaquetado **Project Atlas - Obsidian Amber** se conserva como
-fallback manual en `~/.local/share/brave-project-atlas-theme/`.
+No se carga un tema desempaquetado adicional. La política dinámica evita
+conflictos con temas locales bloqueados o desactivados por Brave.
 
 Vimium C conserva una interfaz oscura de alto contraste. Abre sus opciones y
 copia el contenido de
