@@ -66,14 +66,14 @@ count=$((count + 1))
 printf '%s\n' "$count" >"$TEST_CURL_COUNT"
 ((count >= 2))
 EOF
-cat >"$test_root/bin/qutebrowser" <<'EOF'
+cat >"$test_root/bin/brave" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' "$*" >"$TEST_QUTE_LOG"
+printf '%s\n' "$*" >"$TEST_BROWSER_LOG"
 EOF
 chmod +x "$test_root/bin/pnpm" "$test_root/bin/test-shell"
 chmod +x "$test_root/bin/fzf" "$test_root/bin/orca-ide" "$test_root/bin/noctalia" \
-	"$test_root/bin/curl" "$test_root/bin/qutebrowser"
+	"$test_root/bin/curl" "$test_root/bin/brave"
 
 assert_contains() {
 	local needle=$1 haystack=$2
@@ -120,9 +120,9 @@ assert_contains package "$detected"
 [[ "$("$project_preview" --script "$project")" == dev ]]
 [[ "$("$project_preview" --url "$project")" == http://localhost:5173 ]]
 PATH="$test_root/bin:$PATH" TEST_CURL_COUNT="$test_root/curl-count" \
-	TEST_QUTE_LOG="$test_root/qute-log" "$project_preview" --open "$project"
+	TEST_BROWSER_LOG="$test_root/browser-log" "$project_preview" --open "$project"
 [[ "$(<"$test_root/curl-count")" == 2 ]]
-[[ "$(<"$test_root/qute-log")" == http://localhost:5173 ]]
+[[ "$(<"$test_root/browser-log")" == http://localhost:5173 ]]
 
 default_task_output=$(cd -- "$project" && SHELL="$test_root/bin/test-shell" "$project_task")
 assert_contains 'Proyecto:' "$default_task_output"

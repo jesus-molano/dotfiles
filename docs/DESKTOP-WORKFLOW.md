@@ -73,7 +73,7 @@ Usa `/proj-actions` solo cuando necesites una acción distinta de la sesión
 normal. Las tareas se eligen con `fzf` dentro de un terminal. Task Hub de Nvim detecta
 las mismas fuentes más `.vscode/tasks.json`.
 
-Para que `Preview` abra también qutebrowser, añade una URL local explícita al
+Para que `Preview` abra también Brave, añade una URL local explícita al
 `package.json`:
 
 ```json
@@ -160,7 +160,7 @@ Estos flujos son independientes del cockpit de desarrollo:
 ventana. No usa `game-run`. Stremio se abre desde la instalación Flatpak de
 usuario declarada por la base común.
 
-Para YouTube, qutebrowser es la ruta única de la base. `/media` abre la portada
+Para YouTube, Brave es la ruta única de la base. `/media` abre la portada
 o las suscripciones y el vídeo se reproduce en la propia página.
 
 `game-run` sí pertenece al flujo gaming. Activa rendimiento y protege No
@@ -300,8 +300,8 @@ colecciones, añade o retira PNG, JPEG o WebP en
 Los cambios aparecen al volver a abrir `/wall`; no requieren desplegar Stow.
 
 Noctalia regenera Hyprland, Ghostty, GTK, Qt, btop, Starship, Bat/Delta y las
-demás plantillas activas. Starship se genera fuera del checkout. Neovim y
-qutebrowser leen la paleta al abrir una instancia nueva. Orca la aplica antes
+demás plantillas activas. Starship se genera fuera del checkout. Neovim lee la
+paleta al abrir una instancia nueva. Orca la aplica antes
 de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
 abierta.
 Thunderbird recibe los colores de la paleta activa en tiempo real mediante una
@@ -329,56 +329,16 @@ compatible el despliegue existente. La sincronización de Noctalia Greeter no se
 aplica a este SDDM y sus ejecutables auxiliares no están instalados. Solo el
 botón final de apagado usa el color de peligro.
 
-## qutebrowser
+## Brave y Vimium C
 
-qutebrowser conserva sus defaults Vim. Usa `,` como líder local. Los atajos
-nativos siguen siendo preferibles cuando ya existen: `f` y `F` para hints, `J`
-y `K` para pestañas, `gC` para clonar, `ym` para copiar la página actual como
-Markdown y `Ctrl + E` dentro de un campo para editarlo con Neovim.
+Brave es el navegador predeterminado y Vimium C aporta navegación por teclado.
+Sus atajos principales son `f` para hints, `j` y `k` para desplazarse, `J` y
+`K` para cambiar de pestaña, `o` para buscar, `/` para buscar texto, `x` para
+cerrar y `X` para restaurar una pestaña.
 
-### Líder coma
-
-| Atajo | Acción |
-|---|---|
-| `,a` / `,A` | Alternar bloqueo para el dominio actual o globalmente durante la sesión. |
-| `,d` | Alternar modo oscuro para el dominio actual. |
-| `,u` | Actualizar listas de bloqueo. |
-| `,e` / `,r` | Editar o recargar `config.py`. |
-| `,p` | Abrir navegación privada. |
-| `,t` / `,T` | Escribir un comando para enfocar o mover una pestaña. |
-| `,c` / `,g` | Clonar la pestaña actual o volver a la última pestaña. |
-| `,s` / `,S` / `,X` | Escribir un comando para guardar, cargar o borrar una sesión nombrada. |
-| `,y` | Copiar la página actual como enlace Markdown. |
-| `;m` | Elegir un enlace con hints y copiarlo como Markdown. |
-| `,o` / `,O` / `,D` | Abrir la última descarga, abrir su directorio o limpiar descargas terminadas. |
-| `,B` / `;B` | Abrir la página o un enlace elegido en Brave. |
-| `,E` | Editar el campo de texto activo con Neovim. |
-| `,i` / `,I` | Abrir DevTools a la derecha o mover el foco entre DevTools y la página. |
-
-`qutebrowser` limpia parámetros de seguimiento habituales al copiar una URL.
-El userscript de `;m` usa el portapapeles directamente; no transforma el texto
-del sitio en un comando del navegador.
-
-### Búsquedas técnicas
-
-Escribe `o` u `O`, seguido del prefijo y la consulta. Ejemplo:
-
-```text
-O mdn AbortController
-```
-
-| Prefijo | Destino |
-|---|---|
-| `aw` | ArchWiki |
-| `archpkg` | Paquetes oficiales de Arch |
-| `aur` | AUR |
-| `gh` / `ghc` | GitHub general o búsqueda de código |
-| `mdn` | MDN Web Docs |
-| `npm` / `pypi` | npm o PyPI |
-| `qute` | Documentación de qutebrowser |
-| `so` | Stack Overflow |
-| `yt` | YouTube |
-| `g` | Google |
+Chromium impide que las extensiones actúen en `brave://`, Chrome Web Store y
+otras superficies protegidas. En esas páginas usa los atajos nativos de Brave:
+`Ctrl + L`, `Ctrl + Tab`, `Ctrl + W` y `Ctrl + Shift + T`.
 
 ## Flujos cortos
 
@@ -404,8 +364,8 @@ O mdn AbortController
 ### Ver YouTube con teclado
 
 1. Pulsa `Hyper + V` y elige YouTube o suscripciones.
-2. Navega con los hints de qutebrowser.
-3. Reproduce el vídeo directamente en qutebrowser.
+2. Navega con los hints de Vimium C.
+3. Reproduce el vídeo directamente en Brave.
 
 ### Jugar
 
@@ -415,7 +375,7 @@ O mdn AbortController
 
 ### Investigar desde el navegador
 
-1. Abre qutebrowser con `Hyper + B`.
-2. Busca, por ejemplo, `O ghc nombre_de_la_API`.
-3. Usa `;m` para copiar un enlace concreto como Markdown.
+1. Abre Brave con `Hyper + B`.
+2. Pulsa `o` para buscar en historial, marcadores y pestañas mediante Vimium C.
+3. Pulsa `f` para seguir un enlace sin usar el ratón.
 4. Usa `Hyper + P` si necesitas capturar una salida visual antes de abrir Orca.

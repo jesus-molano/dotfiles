@@ -5,7 +5,7 @@ schema = 1
 [base]
 modules = [
   "android", "audio", "codex", "fish", "fonts", "ghostty", "git", "hypr-common", "hypr-host", "kanata",
-  "mimeapps", "npm", "noctalia", "nvim", "qutebrowser", "shell", "starship",
+  "mimeapps", "npm", "noctalia", "nvim", "shell", "starship",
   "vscode", "zellij",
 ]
 

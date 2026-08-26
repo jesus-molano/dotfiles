@@ -2,7 +2,7 @@
 
 TERMINAL     = "ghostty"
 FILE_MANAGER = "dolphin"
-BROWSER      = "qutebrowser"
+BROWSER      = "brave"
 EDITOR       = "ghostty -e nvim"
 CALCULATOR   = "gnome-calculator"
 

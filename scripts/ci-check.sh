@@ -33,8 +33,6 @@ run 'Configuración Zellij' env -u ZELLIJ_CONFIG_FILE ZELLIJ_CONFIG_DIR="$repo_r
 	zellij setup --check
 run 'Pruebas Python' env PYTHONDONTWRITEBYTECODE=1 \
 	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
-run 'Contrato qutebrowser' env PYTHONDONTWRITEBYTECODE=1 \
-	python3 scripts/tests/test_qutebrowser_config.py
 run 'Generación de temas terminales y Micro' env PYTHONDONTWRITEBYTECODE=1 \
 	python3 scripts/tests/test_terminal_theme_generation.py
 
@@ -42,6 +40,7 @@ for test in \
 	test_dotf_function.sh \
 	test_runtime_compatibility.sh \
 	test_keyboard_contract.sh \
+	test_brave_browser_contract.sh \
 	test_desktop_surface.sh \
 	test_thunderbird_theme.sh \
 	test_stow_lint.sh \

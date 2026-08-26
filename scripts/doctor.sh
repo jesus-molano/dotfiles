@@ -113,6 +113,7 @@ check_base_workflows() {
   check 'Acciones locales del launcher' "$repo_root/scripts/tests/test_desktop_launcher_commands.sh"
   check 'Compartir con LocalSend' "$repo_root/scripts/tests/test_local_share.sh"
   check 'Launcher multimedia' "$repo_root/scripts/tests/test_desktop_launcher_media.sh"
+  check 'Navegador Brave' "$repo_root/scripts/tests/test_brave_browser_contract.sh"
   check 'Práctica de mecanografía' "$repo_root/scripts/tests/test_desktop_launcher_typing.sh"
   check 'Apariencias coordinadas' "$repo_root/scripts/tests/test_appearance_switch.sh"
   check 'Tema dinámico de Thunderbird' "$repo_root/scripts/tests/test_thunderbird_theme.sh"
@@ -128,8 +129,6 @@ check_base_workflows() {
   check 'Anchos de ventana' "$repo_root/scripts/tests/test_window_width.sh"
   check 'Migración de enlaces retirados' "$repo_root/scripts/tests/test_migrate_retired_desktop_links.sh"
   check 'Direct scanout reversible' "$repo_root/scripts/tests/test_direct_scanout_toggle.sh"
-  check 'Configuración qutebrowser' env PYTHONDONTWRITEBYTECODE=1 python "$repo_root/scripts/tests/test_qutebrowser_config.py"
-  check 'Enlaces Markdown qutebrowser' "$repo_root/scripts/tests/test_qutebrowser_yank_markdown.sh"
   check 'Kanata' kanata --check -c "$repo_root/kanata/.config/kanata/config.kbd"
 }
 check_optional_config() {

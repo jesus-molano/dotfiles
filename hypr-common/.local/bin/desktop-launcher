@@ -297,7 +297,7 @@ keybinding_category() {
 		'Move one column '* | 'Toggle scrolling column width' | 'Toggle fullscreen' | \
 		'Toggle window group' | 'Focus next window in group' | 'Focus previous window in group' | \
 		'Open Noctalia window switcher' | 'Drag window' | 'Resize window') printf '%s' windows ;;
-	'Open Ghostty' | 'Open qutebrowser' | 'Open Dolphin' | 'Open Yazi in Ghostty' | \
+	'Open Ghostty' | 'Open Brave' | 'Open Dolphin' | 'Open Yazi in Ghostty' | \
 		'Focus or open Orca' | 'Focus or open Spotify' | 'Focus or open Stremio' | \
 		'Focus or open Steam' | 'Open launcher' | 'Open launcher commands' | \
 		'Open launcher projects' | 'Open launcher media' | 'Open 1Password') printf '%s' apps ;;
@@ -454,8 +454,8 @@ run_media() {
 	id=$(record_id_for_selection "$1" media_records) || return 2
 	case "$id" in
 	stremio) exec hypr-stremio ;;
-	youtube) exec uwsm app -- qutebrowser 'https://www.youtube.com/' ;;
-	youtube_subscriptions) exec uwsm app -- qutebrowser 'https://www.youtube.com/feed/subscriptions' ;;
+	youtube) exec uwsm app -- brave 'https://www.youtube.com/' ;;
+	youtube_subscriptions) exec uwsm app -- brave 'https://www.youtube.com/feed/subscriptions' ;;
 	spotify) exec hypr-spotify ;;
 	*) return 2 ;;
 	esac

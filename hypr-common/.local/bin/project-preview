@@ -21,11 +21,11 @@ open_preview() {
 	}
 	for _ in {1..60}; do
 		if curl --fail --silent --show-error --max-time 1 --output /dev/null "$url" 2>/dev/null; then
-			command -v qutebrowser >/dev/null 2>&1 || {
-				printf '%s\n' 'No se encontró qutebrowser.' >&2
+			command -v brave >/dev/null 2>&1 || {
+				printf '%s\n' 'No se encontró Brave.' >&2
 				return 127
 			}
-			exec qutebrowser "$url"
+			exec brave "$url"
 		fi
 		sleep 0.5
 	done

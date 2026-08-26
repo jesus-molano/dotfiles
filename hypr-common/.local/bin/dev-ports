@@ -7,7 +7,7 @@ set -euo pipefail
 
 readonly proc_root="${DEV_PORTS_PROC_ROOT:-/proc}"
 readonly ss_bin="${DEV_PORTS_SS_BIN:-ss}"
-readonly opener="${DEV_PORTS_OPENER:-qutebrowser}"
+readonly opener="${DEV_PORTS_OPENER:-brave}"
 
 usage() {
 	printf '%s\n' \

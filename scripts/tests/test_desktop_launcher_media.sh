@@ -33,8 +33,8 @@ while IFS= read -r selection; do
 done <<<"$media"
 expected=$(cat <<'EOF'
 stremio
-uwsm	app -- qutebrowser https://www.youtube.com/
-uwsm	app -- qutebrowser https://www.youtube.com/feed/subscriptions
+uwsm	app -- brave https://www.youtube.com/
+uwsm	app -- brave https://www.youtube.com/feed/subscriptions
 spotify
 EOF
 )

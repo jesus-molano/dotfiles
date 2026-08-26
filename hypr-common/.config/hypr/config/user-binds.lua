@@ -72,7 +72,7 @@ bind(alt .. " + SHIFT + N", hl.dsp.group.prev(), "Focus previous window in group
 
 -- Hyper application, layout and Noctalia layer.
 bind(hyper .. " + Return", hl.dsp.exec_cmd(launch .. TERMINAL), "Open Ghostty")
-bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Open qutebrowser")
+bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Open Brave")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Open Dolphin")
 bind(hyper .. " + Y", hl.dsp.exec_cmd(launch .. TERMINAL .. " -e fish -ic y"),
     "Open Yazi in Ghostty")
