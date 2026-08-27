@@ -111,6 +111,13 @@ el servidor en su terminal y muestra su salida.
 | `Alt + Z` | Alterna el scratchpad de logs. |
 | `Alt + Shift + S/A/Z` | Envía la ventana activa al scratchpad indicado. |
 
+Si `audio.auto_route` y `audio.preferred_sink_prefix` están definidos en el
+`host.toml` local, el dispositivo preferido toma la salida cuando aparece. Al
+desconectarlo, el audio vuelve a `audio.default_sink` y mueve los streams ya
+abiertos. `Hyper + H` sigue permitiendo un cambio manual hasta el siguiente
+cambio de presencia del dispositivo preferido. El gestor no intenta conectar
+dispositivos Bluetooth apagados.
+
 `/cmd` contiene estas acciones sin tener que recordar el comando de shell:
 
 | Acción | Resultado |

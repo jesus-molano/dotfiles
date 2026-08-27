@@ -52,6 +52,7 @@ for test in \
 	test_game_run_dnd.sh \
 	test_demo_studio.sh \
 	test_orca_background.sh \
+	test_auto_route_audio.sh \
 	test_android_environment.sh; do
 	run "$test" bash "scripts/tests/$test"
 done

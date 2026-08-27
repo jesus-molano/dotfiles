@@ -171,6 +171,8 @@ split_after = 4
 [audio]
 cycle = true
 ensure_on_start = true
+auto_route = true
+preferred_sink_prefix = "bluez_output.20_06_10_13_61_73."
 ''', encoding="utf-8")
             caps = root / "caps.json"
             caps.write_text('{"schema": 1, "gpu_vendors": [], "has_internal_panel": true, "backlights": ["intel_backlight"]}', encoding="utf-8")
@@ -179,7 +181,8 @@ ensure_on_start = true
             monitors = (generated / "monitors.lua").read_text(encoding="utf-8")
             binds = (generated / "hardware-binds.lua").read_text(encoding="utf-8")
             self.assertIn("hl.monitor({ output", monitors)
-            self.assertIn("ensure-configured-audio", monitors)
+            self.assertIn("audio-route-manager.service", monitors)
+            self.assertNotIn("ensure-configured-audio", monitors)
             self.assertNotIn("CONTROL + ALT + SUPER + SHIFT + H", binds)
             self.assertIn(
                 'hl.dsp.exec_cmd("cycle-desktop-audio-output")',
@@ -197,6 +200,7 @@ ensure_on_start = true
             audio = (state / "dotfiles/generated/audio.conf").read_text(encoding="utf-8")
             repository = (state / "dotfiles/staged/restic/repository").read_text(encoding="utf-8")
             self.assertIn("DOTFILES_AUDIO_BASE_PROFILE=output:hdmi-stereo", audio)
+            self.assertIn("DOTFILES_AUDIO_PREFERRED_SINK_PREFIX=bluez_output.20_06_10_13_61_73.", audio)
             self.assertEqual(repository, "/mnt/backups/restic-desktop\n")
             monitors = (state / "dotfiles/generated/hypr/config/monitors.lua").read_text(encoding="utf-8")
             inputs = (state / "dotfiles/generated/hypr/config/inputs.lua").read_text(encoding="utf-8")
@@ -210,6 +214,16 @@ ensure_on_start = true
             self.assertIn("MUSIC_WORKSPACE = 3", user_inputs)
             self.assertIn("SCROLLING_WORKSPACE = 6", user_inputs)
             self.assertIn('[1] = ""', user_inputs)
+
+    def test_auto_route_requires_a_preferred_sink_prefix(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            host = root / "host.toml"
+            host.write_text("schema = 1\nbundles = []\n[audio]\nauto_route = true\n", encoding="utf-8")
+            caps = root / "caps.json"
+            caps.write_text('{"schema": 1, "gpu_vendors": []}', encoding="utf-8")
+            with self.assertRaises(subprocess.CalledProcessError):
+                self.run_tool("resolve", "--host-config", str(host), "--capabilities", str(caps))
 
     def test_detection_isolates_clients_that_write_xdg_state(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

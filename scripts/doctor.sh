@@ -150,6 +150,7 @@ check_optional_config() {
   check 'Acciones audio genéricas' "$repo_root/scripts/tests/test_cycle_desktop_audio_output.sh"
   check 'Selector HDMI configurable' "$repo_root/scripts/tests/test_cycle_desktop_hdmi_audio.sh"
   check 'Audio configurado al iniciar' "$repo_root/scripts/tests/test_ensure_main_hdmi_audio.sh"
+  check 'Enrutado automático de audio' "$repo_root/scripts/tests/test_auto_route_audio.sh"
 }
 check_gaming_packages() {
   if ! has bundles gaming-core && ! has bundles gaming-launchers && ! has bundles gaming-tools; then
@@ -293,6 +294,13 @@ check_desktop_runtime() {
     if has bundles productivity-extra; then grep -Fxq 'salemsayed/codexbar-meter [community] 1.0.0 enabled' <<<"$plugin_list" && ok 'Noctalia CodexBar 1.0.0 habilitado' || fail 'Noctalia CodexBar 1.0.0 no está habilitado'; fi
   else warn 'No se pudo consultar plugins Noctalia activos'; fi
 }
+check_audio_runtime() {
+  if jq -e '.audio.auto_route == true' >/dev/null 2>&1 <<<"$plan_json"; then
+    systemctl --user is-active --quiet audio-route-manager.service 2>/dev/null && ok 'Enrutado automático de audio activo' || fail 'Enrutado automático de audio configurado pero inactivo'
+  else
+    info 'Enrutado automático de audio no configurado'
+  fi
+}
 
 if [[ "$mode" != live ]]; then
   printf 'Configuración reproducible\n'
@@ -348,6 +356,7 @@ if [[ "$mode" != config ]]; then
   fi
   check_backup
   check_desktop_runtime
+  check_audio_runtime
   check_backup_runtime
   check_android
   check_gaming_packages

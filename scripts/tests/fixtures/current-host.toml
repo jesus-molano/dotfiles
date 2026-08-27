@@ -56,6 +56,7 @@ scrolling = 6
 [audio]
 cycle = true
 ensure_on_start = true
+auto_route = true
 card = "alsa_card.pci-0000_07_00.1"
 base_profile = "output:hdmi-stereo"
 secondary_profile = "output:hdmi-stereo-extra1"
@@ -64,6 +65,7 @@ base_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo"
 secondary_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1"
 default_profile = "output:hdmi-stereo-extra1"
 default_sink = "alsa_output.pci-0000_07_00.1.hdmi-stereo-extra1"
+preferred_sink_prefix = "bluez_output.20_06_10_13_61_73."
 
 [backup]
 repository = "/mnt/backups/restic-desktop"

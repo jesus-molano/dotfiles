@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+set -u
+
+audio_config="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/generated/audio.conf"
+load_audio_config() {
+	[[ -r "$audio_config" ]] || return 0
+	local line key value
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ -z "$line" || "$line" == \#* ]] && continue
+		IFS='=' read -r key value <<<"$line"
+		case "$key" in
+		DOTFILES_AUDIO_CARD|DOTFILES_AUDIO_DEFAULT_PROFILE|DOTFILES_AUDIO_DEFAULT_SINK|DOTFILES_AUDIO_PREFERRED_SINK_PREFIX)
+			[[ "$value" =~ ^[A-Za-z0-9_.:-]+$ && -z "${!key:-}" ]] && printf -v "$key" '%s' "$value"
+			;;
+		esac
+	done <"$audio_config"
+}
+load_audio_config
+
+readonly card="${DOTFILES_AUDIO_CARD:-}"
+readonly fallback_profile="${DOTFILES_AUDIO_DEFAULT_PROFILE:-}"
+readonly fallback_sink="${DOTFILES_AUDIO_DEFAULT_SINK:-}"
+readonly preferred_prefix="${DOTFILES_AUDIO_PREFERRED_SINK_PREFIX:-}"
+readonly retries="${AUDIO_ROUTE_RETRIES:-20}"
+
+[[ "$retries" =~ ^[1-9][0-9]*$ ]] || exit 2
+[[ -n "$preferred_prefix" ]] || exit 0
+
+sink_names() {
+	pactl list short sinks 2>/dev/null | awk '{ print $2 }'
+}
+
+preferred_sink() {
+	sink_names | awk -v prefix="$preferred_prefix" 'index($0, prefix) == 1 { print; exit }'
+}
+
+sink_exists() {
+	local target=$1
+	sink_names | grep -Fxq "$target"
+}
+
+move_streams() {
+	local target=$1 target_id
+	target_id=$(pactl list short sinks 2>/dev/null |
+		awk -v sink="$target" '$2 == sink { print $1; exit }')
+	while read -r input_id current_sink_id _; do
+		if [[ -n "$input_id" && "$current_sink_id" != "$target_id" ]]; then
+			pactl move-sink-input "$input_id" "$target" 2>/dev/null || true
+		fi
+	done < <(pactl list short sink-inputs 2>/dev/null)
+}
+
+notify_route() {
+	local target=$1
+	command -v noctalia >/dev/null 2>&1 || return 0
+	noctalia msg notification-show 'Audio' -- "$target" 2>/dev/null || true
+}
+
+select_sink() {
+	local target=$1 notify=${2:-false}
+	sink_exists "$target" || return 1
+	pactl set-default-sink "$target" 2>/dev/null || return 1
+	move_streams "$target"
+	[[ "$notify" == true ]] && notify_route "$target"
+}
+
+available_physical_sink() {
+	pactl -f json list sinks 2>/dev/null | jq -r '
+		[
+			.[]
+			| select(.name | startswith("alsa_output."))
+			| select(any(.ports[]?; .availability == "available"))
+			| {
+				name,
+				priority: ([.ports[]? | select(.availability == "available") | (.priority // 0)] | max // 0)
+			}
+		]
+		| sort_by(-.priority, .name)
+		| first
+		| .name // empty
+	' 2>/dev/null
+}
+
+route_preferred() {
+	local notify=${1:-false} target attempt
+	for ((attempt = 0; attempt < retries; attempt++)); do
+		target=$(preferred_sink)
+		if [[ -n "$target" ]] && select_sink "$target" "$notify"; then
+			return 0
+		fi
+		sleep 0.1
+	done
+	return 1
+}
+
+route_fallback() {
+	local notify=${1:-false} attempt target
+	if [[ -n "$card" && -n "$fallback_profile" && -n "$fallback_sink" ]]; then
+		if ! sink_exists "$fallback_sink"; then
+			pactl set-card-profile "$card" "$fallback_profile" 2>/dev/null || true
+		fi
+		for ((attempt = 0; attempt < retries; attempt++)); do
+			if select_sink "$fallback_sink" "$notify"; then
+				return 0
+			fi
+			sleep 0.1
+		done
+	fi
+	target=$(available_physical_sink)
+	[[ -n "$target" ]] && select_sink "$target" "$notify"
+}
+
+preferred_present=false
+if [[ -n "$(preferred_sink)" ]]; then
+	preferred_present=true
+	route_preferred false || true
+else
+	route_fallback false || true
+fi
+
+case "${1:---watch}" in
+--once) exit 0 ;;
+--watch) ;;
+*) printf 'Uso: %s [--once|--watch]\n' "$0" >&2; exit 2 ;;
+esac
+
+while IFS= read -r _; do
+	current_present=false
+	[[ -n "$(preferred_sink)" ]] && current_present=true
+	[[ "$current_present" == "$preferred_present" ]] && continue
+	preferred_present=$current_present
+	if [[ "$current_present" == true ]]; then
+		route_preferred true || true
+	else
+		route_fallback true || true
+	fi
+done < <(pactl subscribe 2>/dev/null)

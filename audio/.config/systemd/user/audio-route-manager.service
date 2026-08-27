@@ -1,0 +1,11 @@
+[Unit]
+Description=Route desktop audio when the preferred device changes
+After=pipewire.service wireplumber.service
+Wants=pipewire.service wireplumber.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/audio-route-manager --watch
+Restart=always
+RestartSec=2

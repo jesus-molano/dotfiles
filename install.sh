@@ -1968,6 +1968,23 @@ reload_user_manager() {
 	fi
 }
 
+configure_user_services() {
+	command -v jq >/dev/null 2>&1 || { warn 'jq no está disponible; no se puede reconciliar el servicio de audio.'; return 1; }
+	if ! user_manager_available; then
+		info 'No hay un gestor systemd de usuario accesible; el enrutado de audio se reconciliará en la próxima sesión.'
+		return 0
+	fi
+	if jq -e '.audio.auto_route == true' "$PLAN_JSON" >/dev/null 2>&1; then
+		if systemctl --user restart audio-route-manager.service; then
+			ok 'Enrutado automático de audio activo.'
+			return 0
+		fi
+		warn 'No se pudo iniciar audio-route-manager.service después del despliegue.'
+		return 1
+	fi
+	systemctl --user stop audio-route-manager.service >/dev/null 2>&1 || true
+}
+
 reload_live_hyprland() {
 	local context=${1:-'después del despliegue'}
 	local expected_description=${2:-}
@@ -2105,6 +2122,7 @@ main() {
 	install_flatpaks
 	mkdir -p "$STATE_DIR"
 	apply_dotfiles_transaction
+	configure_user_services || true
 	configure_thunderbird_dynamic_theme
 	if plan_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply

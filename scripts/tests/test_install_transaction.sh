@@ -210,6 +210,30 @@ chmod +x "$test_root/bin/systemctl"
 # Ningún caso posterior puede tocar el gestor systemd de la sesión real.
 export PATH="$test_root/bin:$PATH"
 
+# El apply reconcilia inmediatamente la unidad de audio según el plan ya
+# aplicado; no depende de que Hyprland emita otro evento de inicio.
+audio_service_runner="$test_root/audio-user-service.sh"
+cat >"$audio_service_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_PLAN
+configure_user_services
+EOF
+chmod +x "$audio_service_runner"
+audio_plan="$test_root/audio-plan.json"
+audio_systemctl_log="$test_root/audio-systemctl.log"
+printf '%s\n' '{"audio":{"auto_route":true}}' >"$audio_plan"
+TEST_SYSTEMCTL_LOG="$audio_systemctl_log" TEST_PLAN="$audio_plan" FIXTURE_REPO="$fixture_repo" \
+	"$audio_service_runner"
+grep -Fxq -- '--user restart audio-route-manager.service' "$audio_systemctl_log"
+: >"$audio_systemctl_log"
+printf '%s\n' '{"audio":{"auto_route":false}}' >"$audio_plan"
+TEST_SYSTEMCTL_LOG="$audio_systemctl_log" TEST_PLAN="$audio_plan" FIXTURE_REPO="$fixture_repo" \
+	"$audio_service_runner"
+grep -Fxq -- '--user stop audio-route-manager.service' "$audio_systemctl_log"
+
 # Stow puede provocar una recarga automática mientras el árbol de Hyprland
 # está temporalmente incompleto. La recarga final debe recuperar la sesión y
 # detectar el modo de emergencia, que solo registra sus atajos de rescate.
