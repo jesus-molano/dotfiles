@@ -60,7 +60,7 @@ fi
 # Every tracked Hyper binding has an explicit regression assertion. Hyper + R
 # is rendered only when local dictation is selected and Hyper + G is optional
 # with the gaming bundle. Hyper + H remains common across every host.
-for key in D comma period semicolon F Return B E Y O M S Space J V bracketleft bracketright T A N H P Q L K 1 C I U 7; do
+for key in D comma period semicolon F Return B E Y W M S Space J V bracketleft bracketright T A N H P Q L K 1 C I U 7; do
     require_text "$user_binds" "bind(hyper .. \" + $key\""
 done
 require_text "$generated_host" 'HYPR_BIND("CONTROL + ALT + SUPER + SHIFT + R"'
@@ -68,9 +68,9 @@ require_text "$gaming_binds" 'HYPR_BIND(hyper .. " + G"'
 require_text "$user_binds" 'hl.dsp.exec_cmd("cycle-desktop-audio-output")'
 require_text "$audio_compat" 'exec cycle-audio-output "$@"'
 test -x "$audio_compat"
-if grep -Fq 'bind(hyper .. " + W"' "$user_binds" ||
-    grep -Fq 'CONTROL + ALT + SUPER + SHIFT + W' "$generated_host"; then
-    printf '%s\n' 'FAIL: Hyper+W debe permanecer libre.' >&2
+if grep -Fq 'bind(hyper .. " + O"' "$user_binds" ||
+    grep -Fq 'CONTROL + ALT + SUPER + SHIFT + O' "$generated_host"; then
+    printf '%s\n' 'FAIL: Hyper+O queda libre tras migrar Orca.' >&2
     exit 1
 fi
 

@@ -105,7 +105,7 @@ legacy_project_token_for_selection() {
 	local selection=$1 token
 	[[ "$selection" == *$'\t'* ]] || return 1
 	token=${selection%%$'\t'*}
-	[[ "$token" =~ ^(session|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
+	[[ "$token" =~ ^(session|chatgpt|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
 	printf '%s' "$token"
 }
 
@@ -116,15 +116,15 @@ project_records() {
 		context=$(project_context "$path")
 		if [[ "$category" == projects ]]; then
 			emit_record "$(project_token session "$path")" "$title" \
-				"Open in Orca with terminal — $context"
+				"Open ChatGPT with terminal — $context"
 			continue
 		fi
 		action_context=$context
 		if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
 			action_context="$title — $context"
 		fi
-		emit_record "$(project_token session "$path")" 'Orca session and terminal' "$action_context"
-		emit_record "$(project_token orca "$path")" 'Open in Orca' "$action_context"
+		emit_record "$(project_token session "$path")" 'ChatGPT session and terminal' "$action_context"
+		emit_record "$(project_token chatgpt "$path")" 'Open ChatGPT' "$action_context"
 		emit_record "$(project_token term "$path")" 'Open terminal' "$action_context"
 		emit_record "$(project_token nvim "$path")" 'Open in Nvim' "$action_context"
 		local script_dir
@@ -147,7 +147,7 @@ find_project() {
 	local selection=$1 action path
 	action=${selection%%_*}
 	case "$action" in
-	session | orca | term | nvim | tasks | preview) ;;
+	session | chatgpt | orca | term | nvim | tasks | preview) ;;
 	*) return 1 ;;
 	esac
 	while IFS= read -r -d '' path; do

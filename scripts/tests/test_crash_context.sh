@@ -33,7 +33,7 @@ cat >"$test_root/bin/wl-copy" <<'EOF'
 printf '%s\n' "$*" >"$TEST_WL_COPY_ARGS"
 cat >"$TEST_CLIPBOARD"
 EOF
-cat >"$test_root/bin/hypr-orca" <<'EOF'
+cat >"$test_root/bin/hypr-chatgpt" <<'EOF'
 #!/usr/bin/env bash
 printf '%s\n' focused >"$TEST_ORCA_LOG"
 EOF

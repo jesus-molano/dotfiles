@@ -29,7 +29,7 @@ cat >"$test_root/bin/date" <<'EOF'
 printf '%s\n' '2026-08-19_23-00-00'
 EOF
 
-cat >"$test_root/bin/hypr-orca" <<'EOF'
+cat >"$test_root/bin/hypr-chatgpt" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 printf '%s\n' focused >"$TEST_ORCA_LOG"
@@ -48,7 +48,7 @@ output=$(HOME="$test_root/home" \
 	TEST_CLIPBOARD="$test_root/clipboard" \
 	TEST_WL_COPY_ARGS="$test_root/wl-copy-args" \
 	TEST_ORCA_LOG="$test_root/orca" \
-	"$helper" --image "$test_root/input.png" --no-annotate --focus orca --print)
+	"$helper" --image "$test_root/input.png" --no-annotate --focus chatgpt --print)
 
 latest="$test_root/state/desktop-context/latest.md"
 [[ -f "$latest" ]] || {

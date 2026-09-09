@@ -2,7 +2,7 @@
 
 La composición base despliega configuración portable para Node, Python,
 Android y herramientas de terminal. No descarga el SDK de Android, no acepta
-licencias y no instala Orca.
+licencias y no instala automáticamente ChatGPT Community ni Orca.
 
 ## Node y JavaScript
 
@@ -60,13 +60,30 @@ just android-check
 - Zellij deja pasar los atajos de Hyprland hasta abrir su modo con `Ctrl+G`.
 - Bat usa el tema generado por Noctalia y es una dependencia directa.
 
-## Codex, Orca y Project Atlas
+## ChatGPT Community, Codex y Project Atlas
 
-Orca debe instalarse fuera de Pacman y proporcionar `orca-ide` en `PATH`.
-Si no existe, `start-orca-background` avisa y deja operativo el resto del
-escritorio. Durante el arranque, el helper espera a que Orca registre los
-proyectos y reintenta solo las automations programadas en los últimos cinco
-minutos que hayan fallado por no encontrar todavía el proyecto local.
+ChatGPT Community es la app principal. El paquete externo `codex-desktop`
+se instala con Pacman; los dotfiles no descargan ni construyen su contenido.
+El wrapper `codex-desktop`, su entrada de menú y los flags Electron se versionan
+en `hypr-common`. Ambos lanzamientos desactivan el contador comunitario.
+Se usa Wayland nativo; `--lang=es` no garantiza que toda la interfaz esté traducida.
+
+`start-chatgpt-background` inicia la app al entrar en Hyprland, sin duplicar un
+proceso existente. La regla coloca sus ventanas en `special:chatgpt silent`.
+`Hyper + W` alterna ese escritorio; las capturas y proyectos usan `--focus` para
+revelarlo sin ocultarlo cuando ya está visible. `Hyper + O` queda libre y
+`Hyper + C` conserva el modo cafeína.
+
+Orca queda instalada como reserva, sin arranque automático ni atajo principal.
+Sus helpers manuales, datos y workspaces se conservan. Sus automatizaciones no
+se importan a ChatGPT al cambiar el lanzador: requieren una migración explícita
+de instrucciones, horarios y proyectos. No iniciar ambas apps para duplicar
+el mismo trabajo programado. Para usar Orca manualmente permanece `orca-ide`.
+
+La instalación inicial de ChatGPT Community usa la base oficial Linux, sin
+features comunitarias ni actualizador automático. Las actualizaciones de la
+app son manuales. El navegador integrado está disponible; el control nativo
+Linux requiere construir y validar por separado `computer-use-linux`.
 
 CodexBar CLI mantiene una receta local revisada en
 `packages/codexbar-cli/PKGBUILD`. `just codexbar-check` compara la instalación,

@@ -19,9 +19,9 @@ hl.window_rule({ match = { class = "^(org\\.kde\\.ark)$" }, size = { "max(monito
 hl.window_rule({ match = { class = "^(.*satty.*)$", title = "^(Satty)$" }, min_size = { "max(monitor_w, monitor_h)*0.35", "min(monitor_w, monitor_h)*0.35" }, float = true })
 hl.window_rule({ match = { class = "^(dev\\.)?(noctalia\\.Noctalia(\\.Settings)?)$" }, float = true, size = { "monitor_w*0.70", "monitor_h*0.70" } })
 hl.window_rule({
-    name = "route-orca-to-background",
-    match = { initial_class = "^[Oo]rca$" },
-    workspace = "special:orca silent",
+    name = "route-chatgpt-to-background",
+    match = { initial_class = "^codex-desktop$" },
+    workspace = "special:chatgpt silent",
 })
 hl.window_rule({
     name = "demo-studio-webcam-overlay",

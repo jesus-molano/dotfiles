@@ -139,8 +139,8 @@ else
 	printf '%s\n' 'SKIP: merge Noctalia requiere el runtime; los contratos TOML estáticos continúan validados.'
 fi
 
-if grep -Fq 'bind(hyper .. " + W",' "$common_binds"; then
-	printf '%s\n' 'Hyper+W debe quedar libre.' >&2
+if grep -Fq 'bind(hyper .. " + O",' "$common_binds"; then
+	printf '%s\n' 'Hyper+O debe quedar libre tras migrar Orca.' >&2
 	exit 1
 fi
 grep -Fq 'if status is-interactive; and command -q mise' "$fish_config"

@@ -130,9 +130,4 @@ grep -Fqx "uwsm:app -- $test_root/bin/orca-ide open" "$test_root/launcher-new.lo
 grep -Fqx 'hyprctl:hl.dispatch(hl.dsp.workspace.toggle_special("orca"))' \
 	"$test_root/launcher-new.log"
 
-grep -Fq 'hl.exec_cmd("uwsm app -- start-orca-background")' "$autostart"
-grep -Fq 'name = "route-orca-to-background"' "$windowrules"
-grep -Fq 'workspace = "special:orca silent"' "$windowrules"
-grep -Fq 'bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca")' "$user_binds"
-
-printf '%s\n' 'PASS: Orca arranca oculta y Hyper+O revela su workspace especial'
+printf '%s\n' 'PASS: helpers manuales de Orca conservados como reserva'

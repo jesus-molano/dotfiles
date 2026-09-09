@@ -2,22 +2,23 @@
 
 Esta guía describe el uso diario keyboard-first. No sustituye la
 instalación del [README](../README.md). La composición trata desarrollo, gaming y
-multimedia como flujos principales. En desarrollo usa Orca y Codex CLI como
+multimedia como flujos principales. En desarrollo usa ChatGPT Community y Codex CLI como
 núcleo. Usa Neovim para editar, ejecutar tareas, diagnosticar y preparar
 contexto.
 
 `Hyper` es la tecla modificadora que Kanata expone al mantener Caps Lock.
 
-## Orca y Codex CLI
+## ChatGPT Community y Codex CLI
 
 1. Pulsa `Hyper + J` para abrir `/proj`.
 2. Selecciona el repositorio por nombre y ruta.
-3. Trabaja con Orca y Codex CLI desde el terminal que abre la sesión.
+3. Trabaja con ChatGPT Community y Codex CLI desde el terminal que abre la sesión.
 4. Abre Nvim solo cuando necesites editar, ejecutar Task Hub, investigar un
    diagnóstico o revisar contexto.
 
-La sesión predeterminada registra el repositorio en Orca, enfoca o abre Orca y
-abre Ghostty en el directorio del proyecto. Ghostty se adjunta a una sesión de
+La sesión predeterminada enfoca o abre ChatGPT Community y abre Ghostty en el
+directorio del proyecto. Selecciona el proyecto dentro de ChatGPT: no se usa
+un enlace no documentado para registrarlo automáticamente. Ghostty se adjunta a una sesión de
 Zellij identificada por ese repositorio. Reabrir la sesión vuelve a adjuntarse;
 no crea otro proceso de Zellij ni otro servidor de preview.
 
@@ -27,8 +28,8 @@ modo transparente. `Alt + Z` continúa reservado al scratchpad de logs y
 `Alt + X` al cierre de ventanas.
 
 Codex CLI no se inicia automáticamente. Ejecútalo en ese terminal cuando una
-tarea requiera un agente. Orca conserva el trabajo visual, los worktrees y sus
-terminales. Este reparto evita abrir Nvim, un agente y varios terminales para
+tarea requiera un agente. ChatGPT concentra el trabajo visual y la gestión
+de sus proyectos y tareas. Este reparto evita abrir Nvim, un agente y varios terminales para
 cada proyecto aunque solo quieras hablar con Codex.
 
 ## Ventanas, espacios y teclado
@@ -55,15 +56,15 @@ de emergencia es `Ctrl + Space + Esc`.
 
 `/proj` descubre repositorios dentro de `~/projects`, `~/work`, `~/.dotfiles` y
 `~/orca/workspaces`. Muestra exactamente una fila por repositorio, con su nombre
-y ruta. Al elegir una fila, registra el repositorio en Orca, enfoca o abre Orca
+y ruta. Al elegir una fila, enfoca o abre ChatGPT
 y abre Ghostty/Zellij en el directorio del proyecto.
 
 `/proj-actions` muestra acciones específicas para un repositorio:
 
 | Opción | Uso |
 |---|---|
-| `Orca session and terminal` | Repite la sesión normal de `/proj`. |
-| `Open in Orca` | Enfoca o abre Orca después de registrar el repositorio. |
+| `ChatGPT session and terminal` | Repite la sesión normal de `/proj`. |
+| `Open ChatGPT` | Enfoca o abre ChatGPT; el proyecto se selecciona dentro de la app. |
 | `Open terminal` | Abre o recupera el terminal Zellij del repositorio. |
 | `Open in Nvim` | Abre Nvim de forma explícita. Úsalo para código, contexto o diagnóstico. |
 | `Open tasks` | Muestra tareas de `justfile`, `mise.toml` y `package.json`. |
@@ -101,9 +102,9 @@ el servidor en su terminal y muestra su salida.
 | `Hyper + T` | Abre el selector de apariencias. |
 | `Hyper + R` | Inicia o detiene el dictado local y pega el texto. |
 | `Hyper + H` | Recorre las salidas configuradas; sin esa configuración, abre los controles de audio. |
-| `Hyper + O` | Enfoca o abre Orca. |
+| `Hyper + W` | Alterna ChatGPT en `special:chatgpt` o enfoca su ventana. |
 | `Hyper + S` | Enfoca o abre Stremio. |
-| `Hyper + P` | Captura una región y prepara contexto para Orca. |
+| `Hyper + P` | Captura una región y prepara contexto para ChatGPT. |
 | `Hyper + I` | Alterna modo foco. |
 | `Hyper + U` | Activa modo demo y grabación. |
 | `Alt + S` | Alterna el scratchpad general. |
@@ -122,7 +123,7 @@ dispositivos Bluetooth apagados.
 
 | Acción | Resultado |
 |---|---|
-| `Capture context` | Ejecuta la captura OCR y enfoca Orca. |
+| `Capture context` | Ejecuta la captura OCR y enfoca ChatGPT. |
 | `Read QR code` | Selecciona un QR y copia su valor como dato sensible de un solo pegado. |
 | `Create bug capsule` | Agrupa captura, OCR, metadatos limitados y el replay reciente. |
 | `Convert media` | Convierte imágenes o vídeos mediante una interfaz breve. |
@@ -142,7 +143,7 @@ El launcher también ofrece estos proveedores de trabajo:
 | `/appearance` | Aplica una escena de color y fondo coordinados. |
 | `/keys` | Separa los atajos activos por función; cada categoría abre una lista buscable. |
 | `/ports` | Lista solo los servidores TCP del usuario y abre el puerto revalidado. |
-| `/crash` | Prepara contexto Markdown de un coredump reciente y enfoca Orca. |
+| `/crash` | Prepara contexto Markdown de un coredump reciente y enfoca ChatGPT. |
 | `/typing` | Abre Ttyper en inglés, ejercicios de código o Keybr. |
 
 `/typing` usa el teclado inglés del desktop. La práctica rápida abre 50 palabras
@@ -209,9 +210,9 @@ Code, test y depuración DAP.
 `Hyper + P` selecciona una región, abre Satty para anotar y ejecuta OCR en
 español e inglés. Guarda la imagen en `~/Pictures/Screenshots`, genera Markdown
 en `~/.local/state/desktop-context/latest.md`, lo copia al portapapeles y enfoca
-Orca. No envía la imagen ni el texto a ningún agente.
+ChatGPT. No envía la imagen ni el texto a ningún agente.
 
-Para abrir el Markdown en Nvim en vez de Orca:
+Para abrir el Markdown en Nvim en vez de ChatGPT:
 
 ```bash
 capture-context --focus nvim
@@ -377,7 +378,7 @@ inyecta estilos generales en las páginas web.
 
 ### Implementar una tarea
 
-1. `Hyper + J` y selecciona `Orca session and terminal`.
+1. `Hyper + J` y selecciona `ChatGPT session and terminal`.
 2. Ejecuta Codex CLI en Ghostty si la tarea necesita un agente.
 3. Usa `Espacio j r` en Nvim solo para una tarea, test o diagnóstico.
 4. Si aparece un fallo visual, usa `Hyper + P` y pega el contexto preparado en
@@ -411,4 +412,4 @@ inyecta estilos generales en las páginas web.
 1. Abre Brave con `Hyper + B`.
 2. Pulsa `o` para buscar en historial, marcadores y pestañas mediante Vimium C.
 3. Pulsa `f` para seguir un enlace sin usar el ratón.
-4. Usa `Hyper + P` si necesitas capturar una salida visual antes de abrir Orca.
+4. Usa `Hyper + P` si necesitas capturar una salida visual antes de abrir ChatGPT.

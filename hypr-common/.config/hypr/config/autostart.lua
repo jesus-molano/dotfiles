@@ -2,9 +2,9 @@
 -- Do not import the entire shell environment into systemd: it can include
 -- credentials. xhost access for root is neither required nor appropriate.
 hl.on("hyprland.start", function ()
-    -- Keep Orca's local runtime available for scheduled automations. Its first
-    -- window is routed silently to special:orca by the matching window rule.
-    hl.exec_cmd("uwsm app -- start-orca-background")
+    -- Keep ChatGPT's local runtime available for scheduled automations. Its first
+    -- window is routed silently to special:chatgpt by the matching window rule.
+    hl.exec_cmd("uwsm app -- start-chatgpt-background")
     -- Espera a que las salidas externas respondan por DDC. No depende de que
     -- haya dos monitores: también arranca con uno solo o únicamente con eDP.
     hl.exec_cmd("uwsm app -- start-noctalia-ready")

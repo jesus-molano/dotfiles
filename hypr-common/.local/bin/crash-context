@@ -38,7 +38,7 @@ done
 [[ "$limit" =~ ^[1-9][0-9]*$ ]] || fail 'El límite debe ser un entero positivo.' 2
 
 coredumpctl_cmd=${CRASH_CONTEXT_COREDUMPCTL:-coredumpctl}
-orca_cmd=${CRASH_CONTEXT_ORCA_CMD:-hypr-orca}
+chatgpt_cmd=${CRASH_CONTEXT_CHATGPT_CMD:-${CRASH_CONTEXT_ORCA_CMD:-hypr-chatgpt}}
 state_dir=${CRASH_CONTEXT_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/crash-context"}
 command -v "$coredumpctl_cmd" >/dev/null 2>&1 || fail "Falta $coredumpctl_cmd." 127
 command -v jq >/dev/null 2>&1 || fail 'Falta jq.' 127
@@ -153,7 +153,7 @@ markdown="$state_dir/latest.md"
 
 command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
 wl-copy --sensitive --paste-once <"$markdown"
-if command -v "$orca_cmd" >/dev/null 2>&1; then
-	"$orca_cmd"
+if command -v "$chatgpt_cmd" >/dev/null 2>&1; then
+	"$chatgpt_cmd" --focus
 fi
 printf '%s\n' "$markdown"

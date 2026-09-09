@@ -19,7 +19,7 @@ posibilidades; las preferencias son locales.
 | Rollback y migraciones | [docs/RECOVERY.md](docs/RECOVERY.md) |
 | Secretos y Restic | [docs/BACKUP-AND-SECRETS.md](docs/BACKUP-AND-SECRETS.md) |
 | Archivos en `/etc` | [docs/SYSTEM-ETC.md](docs/SYSTEM-ETC.md) |
-| Node, Python, Android, Codex y Orca | [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md) |
+| Node, Python, Android, ChatGPT y Codex | [docs/TOOLCHAIN.md](docs/TOOLCHAIN.md) |
 | Atajos y uso del escritorio | [docs/DESKTOP-WORKFLOW.md](docs/DESKTOP-WORKFLOW.md) |
 | Gaming | [GAMING.md](GAMING.md) |
 
@@ -34,7 +34,7 @@ productividad.
 
 La instalación normal no cambia CHWD, drivers NVIDIA, kernel, initramfs,
 arranque, Btrfs, ZRAM, firmware, PWM ni `/etc`. Tampoco instala el SDK de
-Android ni Orca. Los ajustes de host y los temas generados permanecen fuera de
+Android ni las apps ChatGPT Community/Orca. Los ajustes de host y los temas generados permanecen fuera de
 Git.
 
 ## Antes de empezar

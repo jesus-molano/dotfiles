@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly hyprctl_bin="${HYPRCTL_BIN:-hyprctl}"
+readonly uwsm_bin="${UWSM_BIN:-uwsm}"
+readonly chatgpt_bin="${CHATGPT_BIN:-$script_dir/codex-desktop}"
+focus_only=false
+if [[ ${1:-} == --focus ]]; then
+	focus_only=true
+	shift
+fi
+# App arguments (for example a project URI) must reach the existing instance.
+if (($# > 0)); then
+	"$uwsm_bin" app -- "$chatgpt_bin" "$@"
+	focus_only=true
+fi
+
+show_chatgpt() {
+	local workspace
+	workspace=$("$hyprctl_bin" clients -j | jq -r '
+        [.[] | select(.class == "codex-desktop" or .initialClass == "codex-desktop")][0].workspace.name // empty') || return 2
+	case "$workspace" in
+	special:chatgpt)
+		if "$focus_only" && "$hyprctl_bin" monitors -j | jq -e 'any(.[]; .specialWorkspace.name == "special:chatgpt")' >/dev/null; then
+			"$hyprctl_bin" eval 'hl.dispatch(hl.dsp.focus({ window = "class:^codex-desktop$" }))'
+			return $?
+		fi
+		"$hyprctl_bin" eval 'hl.dispatch(hl.dsp.workspace.toggle_special("chatgpt"))'
+		;;
+	"") return 1 ;;
+	*) "$hyprctl_bin" eval 'hl.dispatch(hl.dsp.focus({ window = "class:^codex-desktop$" }))' ;;
+	esac
+}
+
+if show_chatgpt; then exit 0; else status=$?; fi
+[[ $status == 1 ]] || exit "$status"
+if (($# == 0)); then
+	"$uwsm_bin" app -- "$chatgpt_bin"
+fi
+for _ in {1..50}; do
+	if show_chatgpt; then exit 0; else status=$?; fi
+	[[ $status == 1 ]] || exit "$status"
+	sleep 0.1
+done
+printf '%s\n' 'hypr-chatgpt: no apareció ninguna ventana de ChatGPT Community.' >&2
+exit 1

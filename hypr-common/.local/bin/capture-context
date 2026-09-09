@@ -12,7 +12,7 @@ Opciones:
   --image RUTA       Usa una imagen existente en vez de capturar una región.
   --no-annotate      No abre Satty.
   --no-ocr           No extrae texto.
-  --focus DESTINO    none, orca o nvim. Predeterminado: none.
+  --focus DESTINO    none, chatgpt o nvim (orca: alias antiguo). Predeterminado: none.
   --print            Imprime también el Markdown generado.
   -h, --help         Muestra esta ayuda.
 EOF
@@ -62,7 +62,7 @@ while (($#)); do
 	esac
 done
 
-[[ "$focus" == none || "$focus" == orca || "$focus" == nvim ]] ||
+[[ "$focus" == none || "$focus" == chatgpt || "$focus" == orca || "$focus" == nvim ]] ||
 	fail "Destino de foco no válido: $focus" 2
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/desktop-context"
@@ -129,8 +129,8 @@ command -v wl-copy >/dev/null 2>&1 || fail 'Falta wl-copy.' 127
 wl-copy --sensitive --paste-once <"$context_private"
 
 case "$focus" in
-orca)
-	command -v hypr-orca >/dev/null 2>&1 && hypr-orca >/dev/null 2>&1 || true
+chatgpt | orca)
+	command -v hypr-chatgpt >/dev/null 2>&1 && hypr-chatgpt --focus >/dev/null 2>&1 || true
 	;;
 nvim)
 	if command -v uwsm >/dev/null 2>&1 && command -v ghostty >/dev/null 2>&1; then

@@ -12,10 +12,10 @@ dry_run=false
 
 usage() {
 	printf '%s\n' \
-		'Uso: project-session [--dry-run] {resume|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
+		'Uso: project-session [--dry-run] {resume|chatgpt|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
 		'' \
 		'Acciones:' \
-		'  resume    abre Orca y un terminal Zellij reutilizable' \
+		'  resume    abre ChatGPT y un terminal Zellij reutilizable' \
 		'  tasks     abre el selector de tareas detectadas' \
 		'  preview   inicia el script preview/dev detectado una sola vez'
 }
@@ -115,32 +115,19 @@ nvim_running_for_project() {
 	return 1
 }
 
-register_orca_project() {
-	local path=$1 repo_json
-	command -v orca-ide >/dev/null 2>&1 || {
-		notify_error 'orca-ide no está disponible en PATH.'
-		return 127
-	}
-	if ! repo_json="$(orca-ide repo list --json 2>/dev/null)" ||
-		! jq -e --arg path "$path" \
-			'.ok == true and any(.result.repos[]?; .path == $path)' \
-			>/dev/null <<<"$repo_json"; then
-		if ! orca-ide repo add --path "$path" --json >/dev/null 2>&1; then
-			notify_error 'Orca no pudo registrar el repositorio.'
-			return 1
-		fi
-	fi
-}
-
-launch_orca() {
-	local path=$1
+launch_chatgpt() {
+	# ChatGPT Community has no supported CLI contract to select a local project.
+	# Keep the repository context in the terminal instead of passing an invented
+	# URI or a path that the desktop app could interpret as an upload.
 	if "$dry_run"; then
-		emit orca-register "$path"
-		emit orca "$script_dir/hypr-orca"
+		emit chatgpt "$script_dir/hypr-chatgpt" --focus
 		return 0
 	fi
-	register_orca_project "$path" || return
-	launch_detached orca "$script_dir/hypr-orca"
+	[[ -x "$script_dir/hypr-chatgpt" ]] || {
+		notify_error 'ChatGPT no está disponible en los dotfiles.'
+		return 127
+	}
+	launch_detached chatgpt "$script_dir/hypr-chatgpt" --focus
 }
 
 launch_nvim() {
@@ -204,10 +191,10 @@ path="$(project_path "$2")" || {
 
 case "$action" in
 resume)
-	launch_orca "$path"
+	launch_chatgpt "$path"
 	launch_terminal "$path"
 	;;
-orca) launch_orca "$path" ;;
+chatgpt|orca) launch_chatgpt "$path" ;;
 terminal) launch_terminal "$path" ;;
 nvim) launch_nvim "$path" ;;
 tasks) launch_tasks "$path" ;;

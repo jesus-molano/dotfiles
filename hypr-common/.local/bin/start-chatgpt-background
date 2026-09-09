@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly chatgpt_bin="${CHATGPT_BIN:-$script_dir/codex-desktop}"
+readonly pgrep_bin="${PGREP_BIN:-pgrep}"
+if ! command -v "$chatgpt_bin" >/dev/null 2>&1 || [[ ! -x ${CHATGPT_RUNTIME:-/usr/bin/codex-desktop} ]]; then
+	printf '%s\n' 'start-chatgpt-background: ChatGPT Community no está instalado; se omite el arranque.' >&2
+	exit 0
+fi
+if "$pgrep_bin" -f '^/opt/codex-desktop/ChatGPT( |$)' >/dev/null; then exit 0; fi
+exec "$chatgpt_bin"

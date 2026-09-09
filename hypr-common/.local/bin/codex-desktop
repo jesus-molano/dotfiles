@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# Preferencias locales de ChatGPT Community.
+export CODEX_LINUX_DISABLE_USAGE_REPORTING=1
+exec /usr/bin/codex-desktop "$@"

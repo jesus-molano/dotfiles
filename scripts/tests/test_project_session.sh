@@ -41,14 +41,9 @@ cat >"$test_root/bin/fzf" <<'EOF'
 set -euo pipefail
 awk -F '\t' '$1 == "package" && $2 == "test" { print; exit }'
 EOF
-cat >"$test_root/bin/orca-ide" <<'EOF'
+cat >"$test_root/bin/hypr-chatgpt" <<'EOF'
 #!/usr/bin/env bash
-set -euo pipefail
-case "$*" in
-"repo list --json") printf '%s\n' '{"ok":true,"result":{"repos":[]}}' ;;
-"repo add --path "*" --json") exit 1 ;;
-*) exit 2 ;;
-esac
+exit 0
 EOF
 cat >"$test_root/bin/noctalia" <<'EOF'
 #!/usr/bin/env bash
@@ -72,7 +67,7 @@ set -euo pipefail
 printf '%s\n' "$*" >"$TEST_BROWSER_LOG"
 EOF
 chmod +x "$test_root/bin/pnpm" "$test_root/bin/test-shell"
-chmod +x "$test_root/bin/fzf" "$test_root/bin/orca-ide" "$test_root/bin/noctalia" \
+chmod +x "$test_root/bin/fzf" "$test_root/bin/hypr-chatgpt" "$test_root/bin/noctalia" \
 	"$test_root/bin/curl" "$test_root/bin/brave"
 
 assert_contains() {
@@ -84,11 +79,10 @@ assert_contains() {
 }
 
 resume_output=$("$project_session" --dry-run resume "$project")
-assert_contains $'DRY-RUN\torca-register' "$resume_output"
-assert_contains $'DRY-RUN\torca' "$resume_output"
+assert_contains $'DRY-RUN\tchatgpt' "$resume_output"
 assert_contains $'DRY-RUN\tterminal' "$resume_output"
 [[ "$resume_output" != *$'DRY-RUN\tnvim'* ]] || {
-	printf '%s\n' 'FAIL: la sesión principal abrió Nvim pese a que Orca/Codex son el flujo principal.' >&2
+	printf '%s\n' 'FAIL: la sesión principal abrió Nvim pese a que ChatGPT/Codex es el flujo principal.' >&2
 	exit 1
 }
 
@@ -160,13 +154,7 @@ done
 	exit 1
 }
 
-set +e
-PATH="$test_root/bin:$PATH" "$project_session" orca "$project" >/dev/null 2>&1
-orca_failure_status=$?
-set -e
-[[ $orca_failure_status -ne 0 ]] || {
-	printf '%s\n' 'FAIL: project-session ocultó el fallo de registro en Orca.' >&2
-	exit 1
-}
+compatibility_output=$("$project_session" --dry-run orca "$project")
+assert_contains $'DRY-RUN\tchatgpt' "$compatibility_output"
 
 printf '%s\n' 'PASS: project-session resuelve acciones, tareas y preview sin ejecutar aplicaciones'

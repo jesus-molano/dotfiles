@@ -5,7 +5,7 @@ collections:
     pattern: "**/*.md"
     includeByDefault: true
     context:
-      /: Canonical documentation for the CachyOS, Hyprland, Noctalia, Orca and Codex dotfiles.
+      /: Canonical documentation for the CachyOS, Hyprland, Noctalia, ChatGPT and Codex dotfiles.
       /codex: Canonical Codex operating model and daily workflow.
   project-atlas:
     path: __PROJECT_ATLAS_ROOT__/docs

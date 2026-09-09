@@ -76,7 +76,7 @@ bind(hyper .. " + B", hl.dsp.exec_cmd(launch .. BROWSER), "Open Brave")
 bind(hyper .. " + E", hl.dsp.exec_cmd(launch .. FILE_MANAGER), "Open Dolphin")
 bind(hyper .. " + Y", hl.dsp.exec_cmd(launch .. TERMINAL .. " -e fish -ic y"),
     "Open Yazi in Ghostty")
-bind(hyper .. " + O", hl.dsp.exec_cmd("hypr-orca"), "Focus or open Orca")
+bind(hyper .. " + W", hl.dsp.exec_cmd("hypr-chatgpt"), "Focus or open ChatGPT")
 bind(hyper .. " + M", hl.dsp.exec_cmd("hypr-spotify"), "Focus or open Spotify")
 bind(hyper .. " + S", hl.dsp.exec_cmd("hypr-stremio"), "Focus or open Stremio")
 bind(alt .. " + Space", hl.dsp.exec_cmd(noctalia .. "panel-toggle launcher"), "Open launcher")
@@ -98,8 +98,8 @@ bind(hyper .. " + N", hl.dsp.exec_cmd(noctalia .. "panel-toggle control-center n
     "Open notifications")
 bind(hyper .. " + H", hl.dsp.exec_cmd("cycle-desktop-audio-output"),
     "Use next audio output")
-bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus orca"),
-    "Capture a region and prepare context for Orca")
+bind(hyper .. " + P", hl.dsp.exec_cmd("capture-context --focus chatgpt"),
+    "Capture a region and prepare context for ChatGPT")
 bind(hyper .. " + Q", hl.dsp.exec_cmd(noctalia .. "panel-toggle session"), "Open session menu")
 bind(hyper .. " + L", hl.dsp.exec_cmd(noctalia .. "session lock"), "Lock session")
 bind(hyper .. " + K", hl.dsp.exec_cmd("hyprpicker -a -n"), "Pick and copy a color")
