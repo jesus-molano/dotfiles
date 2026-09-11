@@ -4,9 +4,6 @@ set -euo pipefail
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 readonly starter=${1:-"$repo_root/hypr-common/.local/bin/start-orca-background"}
 readonly launcher=${2:-"$repo_root/hypr-common/.local/bin/hypr-orca"}
-readonly autostart="$repo_root/hypr-common/.config/hypr/config/autostart.lua"
-readonly windowrules="$repo_root/hypr-common/.config/hypr/config/windowrules.lua"
-readonly user_binds="$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 test_root=$(mktemp -d)
 trap 'rm -rf -- "$test_root"' EXIT
 mkdir -p "$test_root/bin"
@@ -86,7 +83,11 @@ TEST_LOG="$test_root/starter-new.log" TEST_PGREP_STATUS=1 \
 	ORCA_SAFE_SETTINGS_BIN="$test_root/bin/orca-safe-settings" \
 	PGREP_BIN="$test_root/bin/pgrep" ORCA_CLI_BIN="$test_root/bin/orca-ide" \
 	"$starter"
-[[ $(<"$test_root/starter-new.log") == $'safe-settings\npgrep:-f [/]orca-ide$\norca:open\norca:status --json\norca:automations list --json\norca:repo list --json\norca:repo list --json\norca:automations runs --id automation-id --json\norca:automations run automation-id --json' ]]
+# The launcher runs open in the background, so its log may follow the first
+# status request. Preserve every other event and its order when comparing.
+startup_log=$(<"$test_root/starter-new.log")
+startup_log=${startup_log//$'orca:status --json\norca:open'/$'orca:open\norca:status --json'}
+[[ "$startup_log" == $'safe-settings\npgrep:-f [/]orca-ide$\norca:open\norca:status --json\norca:automations list --json\norca:repo list --json\norca:repo list --json\norca:automations runs --id automation-id --json\norca:automations run automation-id --json' ]]
 
 TEST_LOG="$test_root/starter-no-retry.log" TEST_PGREP_STATUS=1 \
 	TEST_OPEN_READY_FILE="$test_root/open-ready-no-retry" \
