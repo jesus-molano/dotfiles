@@ -8,7 +8,7 @@ Uso: crash-context list [--limit N]
      crash-context select TOKEN [--limit N]
 
 Lista coredumps recientes o crea un contexto Markdown local del token elegido.
-La selección se revalida antes de copiar el resultado y enfocar Orca.
+La selección se revalida antes de copiar el resultado y enfocar ChatGPT.
 EOF
 }
 

@@ -6,10 +6,10 @@ map("n", "<leader>ya", '<cmd>let @+ = expand("%:p")<cr>', { desc = "Copy absolut
 map("n", "<leader>yr", '<cmd>let @+ = expand("%:.")<cr>', { desc = "Copy relative path" })
 
 -- Codex stays outside Neovim. These mappings copy precise editor context and
--- focus the existing Orca window through the desktop launcher.
+-- focus the existing ChatGPT Community window through the desktop launcher.
 map("n", "<leader>ao", function()
   require("config.orca").copy_context_and_focus()
-end, { desc = "Copy context and focus Orca" })
+end, { desc = "Copy context and focus ChatGPT Community" })
 map("x", "<leader>ao", function()
   require("config.orca").copy_selection_and_focus()
-end, { desc = "Copy selection and focus Orca" })
+end, { desc = "Copy selection and focus ChatGPT Community" })

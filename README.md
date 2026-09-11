@@ -34,8 +34,8 @@ productividad.
 
 La instalación normal no cambia CHWD, drivers NVIDIA, kernel, initramfs,
 arranque, Btrfs, ZRAM, firmware, PWM ni `/etc`. Tampoco instala el SDK de
-Android ni las apps ChatGPT Community/Orca. Los ajustes de host y los temas generados permanecen fuera de
-Git.
+Android ni ChatGPT Community (app principal) ni Orca (respaldo manual).
+Los ajustes de host y los temas generados permanecen fuera de Git.
 
 ## Antes de empezar
 

@@ -146,7 +146,7 @@ Usa búsqueda semántica cuando no recuerdes las palabras exactas y la consulta
 híbrida solo cuando la pregunta justifique cargar los modelos locales:
 
 ```bash
-qmd vsearch "cómo conservamos la configuración de Orca"
+qmd vsearch "cómo usamos ChatGPT Community y Codex CLI"
 qmd query "decisiones para reducir el coste de contexto"
 ```
 

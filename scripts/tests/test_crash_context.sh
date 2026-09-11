@@ -35,17 +35,17 @@ cat >"$TEST_CLIPBOARD"
 EOF
 cat >"$test_root/bin/hypr-chatgpt" <<'EOF'
 #!/usr/bin/env bash
-printf '%s\n' focused >"$TEST_ORCA_LOG"
+printf '%s\n' focused >"$TEST_CHATGPT_LOG"
 EOF
 chmod +x "$test_root/bin/"*
 
-env_base=(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" TEST_LIST_COUNT="$test_root/list-count" TEST_CLIPBOARD="$test_root/clipboard" TEST_WL_COPY_ARGS="$test_root/wl-copy-args" TEST_ORCA_LOG="$test_root/orca" TEST_INFO_ARGS="$test_root/info-args")
+env_base=(PATH="$test_root/bin:$PATH" XDG_STATE_HOME="$test_root/state" TEST_LIST_COUNT="$test_root/list-count" TEST_CLIPBOARD="$test_root/clipboard" TEST_WL_COPY_ARGS="$test_root/wl-copy-args" TEST_CHATGPT_LOG="$test_root/chatgpt" TEST_INFO_ARGS="$test_root/info-args")
 listed=$(env "${env_base[@]}" "$helper" list)
 token=${listed%%$'\t'*}
 [[ "$listed" == *'pid=4242'* && "$listed" == *'exe=/usr/bin/demo'* ]]
 [[ "$listed" == *'signal=11'* && "$listed" == *'time='* && "$listed" != *$'time=\n'* ]]
 [[ $(grep -c $'\tpid=4242\t' <<<"$listed") -eq 2 ]]
-[[ ! -e "$test_root/orca" ]] || { printf 'FAIL: list enfocó Orca\n' >&2; exit 1; }
+[[ ! -e "$test_root/chatgpt" ]] || { printf 'FAIL: list enfocó ChatGPT\n' >&2; exit 1; }
 
 env "${env_base[@]}" "$helper" select "$token" >/dev/null
 latest="$test_root/state/crash-context/latest.md"
@@ -60,10 +60,10 @@ fi
 grep -Fq -- '--sensitive --paste-once' "$test_root/wl-copy-args"
 [[ $(grep -c 'PID: 4242' "$latest") -eq 1 ]]
 grep -Fq -- '--since @1787170221.077012 --until @1787170221.077012 info 4242' "$test_root/info-args"
-[[ "$(<"$test_root/orca")" == focused ]]
+[[ "$(<"$test_root/chatgpt")" == focused ]]
 
-rm -f -- "$test_root/list-count" "$test_root/orca" "$test_root/clipboard"
+rm -f -- "$test_root/list-count" "$test_root/chatgpt" "$test_root/clipboard"
 changed_output=$(set +e; env "${env_base[@]}" TEST_CHANGED_AFTER_FIRST=1 "$helper" select "$token" 2>&1; printf '\nstatus=%s' "$?")
 [[ "$changed_output" == *'status=3'* ]] || { printf 'FAIL: no rechazó token caducado\n%s\n' "$changed_output" >&2; exit 1; }
-[[ ! -e "$test_root/orca" && ! -e "$test_root/clipboard" ]] || { printf 'FAIL: token caducado copió o enfocó Orca\n' >&2; exit 1; }
+[[ ! -e "$test_root/chatgpt" && ! -e "$test_root/clipboard" ]] || { printf 'FAIL: token caducado copió o enfocó ChatGPT\n' >&2; exit 1; }
 printf '%s\n' 'PASS: crash-context lista, revalida, copia y enfoca solo tras selección'

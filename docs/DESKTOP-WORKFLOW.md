@@ -309,9 +309,9 @@ Los cambios aparecen al volver a abrir `/wall`; no requieren desplegar Stow.
 
 Noctalia regenera Hyprland, Ghostty, GTK, Qt, btop, Starship, Bat/Delta y las
 demás plantillas activas. Starship se genera fuera del checkout. Neovim lee la
-paleta al abrir una instancia nueva. Orca la aplica antes
-de abrir su ventana y no reescribe sus ajustes mientras la interfaz está
-abierta.
+paleta al abrir una instancia nueva. Al usar Orca como respaldo mediante
+`hypr-orca`, su helper aplica la paleta antes de abrir la ventana y no reescribe
+sus ajustes mientras la interfaz está abierta.
 Thunderbird recibe los colores de la paleta activa en tiempo real mediante una
 extensión local. `just apply` vuelve a generar la extensión y su manifiesto. En
 una instalación nueva, aplica una vez la política que prepara el instalador:

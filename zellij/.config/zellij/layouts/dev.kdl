@@ -6,7 +6,7 @@ layout {
         children
     }
 
-    // Orca owns worktrees and agents. Standalone Zellij starts with one useful
+    // ChatGPT Community is the main work app. Zellij starts with one useful
     // shell and only creates panes or tabs when requested with Alt+Z.
     tab name="work" focus=true {
         pane name="shell" focus=true

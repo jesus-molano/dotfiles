@@ -32,7 +32,7 @@ EOF
 cat >"$test_root/bin/hypr-chatgpt" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
-printf '%s\n' focused >"$TEST_ORCA_LOG"
+printf '%s\n' focused >"$TEST_CHATGPT_LOG"
 EOF
 
 cat >"$test_root/bin/notify-send" <<'EOF'
@@ -47,7 +47,7 @@ output=$(HOME="$test_root/home" \
 	PATH="$test_root/bin:$PATH" \
 	TEST_CLIPBOARD="$test_root/clipboard" \
 	TEST_WL_COPY_ARGS="$test_root/wl-copy-args" \
-	TEST_ORCA_LOG="$test_root/orca" \
+	TEST_CHATGPT_LOG="$test_root/chatgpt" \
 	"$helper" --image "$test_root/input.png" --no-annotate --focus chatgpt --print)
 
 latest="$test_root/state/desktop-context/latest.md"
@@ -67,7 +67,7 @@ grep -Fxq -- '--sensitive --paste-once' "$test_root/wl-copy-args"
 grep -Fq 'Error E42 en el componente' "$latest"
 grep -Fq 'segunda línea' "$latest"
 grep -Fq '![Captura]' "$latest"
-[[ "$(<"$test_root/orca")" == focused ]]
+[[ "$(<"$test_root/chatgpt")" == focused ]]
 
 cat >"$test_root/bin/tesseract" <<'EOF'
 #!/usr/bin/env bash

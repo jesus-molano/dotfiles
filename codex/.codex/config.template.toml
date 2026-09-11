@@ -1,5 +1,5 @@
-# Preferencias reproducibles. No sustituir config.toml: Orca mantiene allí hooks
-# y hashes específicos de esta máquina.
+# Preferencias reproducibles. No sustituir config.toml: conserva hooks de
+# integraciones (incluido Orca como respaldo) y datos específicos de la máquina.
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 approval_policy = "never"

@@ -1,3 +1,4 @@
+-- Historical module name retained for existing Neovim sessions.
 local M = {}
 
 local severity_names = {
@@ -67,7 +68,7 @@ local function build_context(include_selection)
 
   local cursor = vim.api.nvim_win_get_cursor(0)
   local lines = {
-    "Contexto de Neovim para Orca",
+    "Contexto de Neovim para ChatGPT Community",
     string.format("Archivo: %s", file),
   }
 
@@ -103,13 +104,13 @@ local function copy_to_clipboard(context)
   vim.fn.setreg("*", context)
 end
 
-local function focus_orca()
-  if vim.fn.executable("hypr-orca") == 0 then
-    vim.notify("No se encontró hypr-orca en PATH", vim.log.levels.ERROR)
+local function focus_chatgpt()
+  if vim.fn.executable("hypr-chatgpt") == 0 then
+    vim.notify("No se encontró hypr-chatgpt en PATH", vim.log.levels.ERROR)
     return false
   end
 
-  vim.fn.jobstart({ "hypr-orca" }, { detach = true })
+  vim.fn.jobstart({ "hypr-chatgpt", "--focus" }, { detach = true })
   return true
 end
 
@@ -124,10 +125,10 @@ function M.copy_context(opts)
 
   copy_to_clipboard(context)
   if opts.focus then
-    focus_orca()
+    focus_chatgpt()
   end
 
-  vim.notify(opts.focus and "Contexto copiado y Orca enfocado" or "Contexto copiado", vim.log.levels.INFO)
+  vim.notify(opts.focus and "Contexto copiado y ChatGPT Community enfocado" or "Contexto copiado", vim.log.levels.INFO)
   return context
 end
 

@@ -35,8 +35,8 @@ show_orca || true
 "$safe_settings"
 "$uwsm_bin" app -- "$orca_cli" open
 
-# The window rule maps a new Orca window without focusing it. Reveal it only
-# for an explicit Hyper+O launch, never during session autostart.
+# Orca is a manual fallback without an automatic workspace rule. Focus it
+# only when this helper is invoked manually.
 for _ in {1..50}; do
 	show_orca || true
 	sleep 0.1

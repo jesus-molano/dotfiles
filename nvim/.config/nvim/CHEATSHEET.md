@@ -28,17 +28,17 @@
 
 ## 3. AI — Codex + Copilot
 
-Codex se ejecuta fuera de Neovim, normalmente en un terminal gestionado por
-Orca, para que pueda trabajar sobre el repositorio completo y ejecutar sus
-validaciones. `Hyper + O` enfoca Orca o lo abre si todavía no está activo.
+ChatGPT Community es la app principal de trabajo. Codex CLI se ejecuta fuera
+de Neovim, en el terminal Ghostty/Zellij del proyecto. `Hyper + W` alterna
+ChatGPT; Orca se conserva como respaldo manual, sin atajo principal.
 
 | Atajo | Acción |
 |-------|--------|
-| `<leader>ao` | Copiar archivo, línea y diagnóstico; enfocar Orca |
-| Visual + `<leader>ao` | Copiar archivo, rango y selección; enfocar Orca |
+| `<leader>ao` | Copiar archivo, línea y diagnóstico; enfocar ChatGPT |
+| Visual + `<leader>ao` | Copiar archivo, rango y selección; enfocar ChatGPT |
 
 El contexto queda en los portapapeles `+` y `*`. Pégalo donde corresponda en
-Orca. Neovim no ejecuta Codex ni envía el contenido de forma automática.
+ChatGPT. Neovim no ejecuta Codex ni envía el contenido de forma automática.
 
 ### Copilot (viene con el extra `ai.copilot`)
 
@@ -407,13 +407,13 @@ Resalta automaticamente: `TODO`, `HACK`, `WARN`, `PERF`, `NOTE`, `FIX`, `FIXME`,
 
 ```
 NAVEGACION          CODIGO              GIT                 AI
-<leader>ff files    gd definicion       <leader>gg lazygit  Hyper+O Orca
+<leader>ff files    gd definicion       <leader>gg lazygit  Hyper+W ChatGPT
 <leader>fg grep     gr referencias      ]h next hunk        Tab Copilot
 <leader>e  tree     K  hover            ghgh       stage
 s          flash    <leader>ca actions  <leader>gb blame
 <C-o>      back     <leader>cr rename   <leader>gd diff
 
-TAREAS             CONTEXTO ORCA
+TAREAS             CONTEXTO CHATGPT
 <leader>jr run     <leader>ao archivo/diagnóstico
 <leader>jl list    visual + <leader>ao selección
 <leader>ja action
@@ -434,10 +434,10 @@ Para comprobar que todo funciona:
 2. `:Lazy` — verificar que no hay errores en plugins
 3. `:Mason` — verificar LSP servers instalados
 4. `:LspInfo` en un archivo `.vue`/`.ts` — confirmar que volar/ts_ls estan activos
-5. `Hyper + O` — verificar que Orca se enfoca o abre para gestionar Codex
+5. `Hyper + W` — verificar que ChatGPT se abre o alterna su escritorio especial
 6. `<leader>gg` — verificar que LazyGit funciona
 7. `<leader>ut` — verificar treesitter context toggle
 8. `<leader>tt` en un archivo `.test.ts` — verificar que neotest ejecuta vitest
 9. `<leader>dc` — verificar que aparecen las configuraciones de Nuxt/Vite/Node
 10. `<leader>jr` dentro de un proyecto con tareas — verificar la detección y ejecución
-11. `<leader>ao` — verificar que se copia contexto y se enfoca Orca
+11. `<leader>ao` — verificar que se copia contexto y se enfoca ChatGPT
