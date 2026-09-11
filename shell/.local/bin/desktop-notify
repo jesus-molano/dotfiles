@@ -4,10 +4,16 @@ set -u
 title=${1:-Sistema}
 body=${2:-Tarea completada}
 
+# Noctalia excludes internal notifications from its history. Use the standard
+# notification service with normal urgency and a non-transient hint instead.
+if command -v notify-send >/dev/null 2>&1 &&
+	notify-send --app-name=dotfiles --urgency=normal --hint=boolean:transient:false -- "$title" "$body" >/dev/null 2>&1; then
+	exit 0
+fi
+
+# Best-effort visual fallback when the standard notification service fails.
 if command -v noctalia >/dev/null 2>&1 && noctalia msg status >/dev/null 2>&1; then
 	noctalia msg notification-show "$title" -- "$body" >/dev/null 2>&1 || true
-elif command -v notify-send >/dev/null 2>&1; then
-	notify-send --app-name=dotfiles "$title" "$body" >/dev/null 2>&1 || true
 fi
 
 exit 0

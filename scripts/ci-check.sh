@@ -48,6 +48,7 @@ for test in \
 	test_stow_lint.sh \
 	test_install_transaction.sh \
 	test_backup_portable.sh \
+	test_desktop_notify.sh \
 	test_system_etc_transaction.sh \
 	test_game_run_dnd.sh \
 	test_demo_studio.sh \
