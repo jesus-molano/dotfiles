@@ -5,7 +5,7 @@
 Evitar UI y funcionalidad duplicadas, incluso fuera de `frontend-task`, mediante
 búsqueda ligera, decisión con evidencia y verificación del resultado. Integrar
 continuidad y mejoras de pruebas/tickets sin instalar catálogos externos.
-Evaluar además la utilidad y complejidad actual de Atlas y el uso de Astra.
+Evaluar además la utilidad y complejidad actual de Atlas.
 No incluye cambios en aplicaciones de producto, publicación ni retirada de Atlas.
 
 ## Tareas
@@ -17,7 +17,7 @@ No incluye cambios en aplicaciones de producto, publicación ni retirada de Atla
 - [x] T3: configurar y comprobar el rastreo con Luna, solo lectura, sin heredar
   el historial completo; escalar únicamente lagunas concretas a Terra.
 - [x] T4: reforzar continuidad, tests por comportamiento y tickets verticales.
-- [x] T5: evaluar Atlas y Astra con evidencia y registrar recomendaciones.
+- [x] T5: evaluar Atlas con evidencia y registrar recomendaciones.
 - [x] T6: verificar escenarios de uso, checks del repo y despliegue efectivo;
   revisión independiente del delta para commit local.
 
@@ -35,8 +35,8 @@ Las skills ordinarias y AGENTS global se consumen mediante enlaces canónicos.
 Atlas activo está en `e703a6a`; el sincronizador fija `9bccbde`: divergencia
 preexistente que debe evaluarse sin sobrescribir el checkout activo.
 Evaluación completa en `docs/codex/workflow-assessment-2026-09-18.md`: conservar
-Atlas selectivo, usar Luna para rastreo y reservar Astra para decisiones y
-evaluación. Astra/medium sigue en la configuración efectiva; no se cambió.
+Atlas selectivo y usar Luna para rastreo. La aclaración posterior del usuario
+excluye la evaluación del modelo principal; su elección permanece intacta.
 
 El agente Luna, con instrucciones de `reuse-scout` y sin historial heredado,
 evaluó tres casos en `/tmp/codex-reuse-eval-d_rv10q3`: confirmó los contratos de
@@ -79,8 +79,8 @@ Dos comprobaciones amplias conservan fallos ajenos a este delta:
 No se instalaron paquetes ni se alteró Atlas para ocultar estos resultados.
 Atlas permanece limpio en su OID inicial. La carga del nuevo rol por nombre en
 una sesión nueva sigue sin probarse; se verificaron configuración, despliegue y
-el mismo contrato con una delegación Luna explícita. Tampoco hay un benchmark
-comparativo de Astra ni una prueba de UI en una aplicación real.
+el mismo contrato con una delegación Luna explícita. No se probó la integración
+de UI en una aplicación real.
 
 Entrega: commit local coherente del delta, identificable con
 `git log -1 -- docs/work/codex-reuse-workflow.md`; publicación no solicitada.

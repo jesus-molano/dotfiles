@@ -66,7 +66,7 @@ requiere una sesión nueva y confirmación inmediata antes de cambiar estado.
 `reuse-scout` usa Luna con esfuerzo bajo y solo lectura para localizar componentes
 y funcionalidades. Recibe objetivo, ruta y restricciones; devuelve candidatos,
 contratos, usos y lagunas. Una laguna concreta puede escalarse a Terra. El agente
-principal decide e implementa con esa evidencia; Astra no repite el rastreo.
+principal decide e implementa con esa evidencia sin repetir el rastreo.
 Si el entorno no permite delegación ligera, se declara y se realiza la mínima
 inspección local segura. No se cambia el modelo principal por esta política.
 

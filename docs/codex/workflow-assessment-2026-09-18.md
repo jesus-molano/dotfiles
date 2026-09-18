@@ -1,4 +1,4 @@
-# Evaluación del workflow: Gentle AI, Matt Pocock, Atlas y Astra
+# Evaluación del workflow: Gentle AI, Matt Pocock y Atlas
 
 Fecha de inspección: 18 de septiembre de 2026. Recomendación: adaptar prácticas
 concretas en el flujo existente. No instalar el ecosistema completo de Gentle AI
@@ -63,26 +63,18 @@ Evidencia local: `project-atlas/README.md`, `docs/architecture.md`,
 `docs/project-atlas-v2-audit.md`, `skills/frontend-task/SKILL.md`,
 `skills/reuse-first/SKILL.md`, doctor Linux y sincronizador de dotfiles.
 
-## Astra y reparto de trabajo
+## Búsqueda con modelos ligeros
 
-La configuración efectiva conserva `gpt-6-astra` con esfuerzo `medium`; la
-plantilla de dotfiles declara Sol/medium. No cambiamos esa preferencia existente.
-La mejora consiste en sacar el rastreo rutinario del modelo principal:
+La búsqueda de candidatos usa modelos ligeros por petición del usuario. La
+evaluación de utilidad y complejidad corresponde a Atlas; no implica evaluar
+ni restringir el modelo principal elegido para implementar.
 
 | Trabajo | Política aplicada |
 | --- | --- |
 | Encontrar componentes, funciones, contratos y consumidores | `reuse-scout`: Luna/low, solo lectura y contexto acotado. |
 | Resolver una laguna concreta de la búsqueda | Escalar esa pregunta a Terra, sin repetir todo el rastreo. |
-| Decidir entre contratos incompatibles, cambios transversales o evaluar arquitectura | Agente principal; Astra puede aportar aquí. |
-| Implementación pequeña y bien especificada | No requiere Astra por política. Mantener el modelo elegido sin añadir una cadena de agentes por defecto. |
+| Decidir e implementar | Agente principal con la evidencia del scout, sin repetir el rastreo. |
 | Revisión | Independiente y proporcional al riesgo según las reglas existentes. |
-
-No hay evidencia de que Astra esté obsoleto ni de que compense para toda tarea.
-La ventaja de reservarlo para decisiones difíciles es una recomendación de
-asignación, no una afirmación medida de precio/rendimiento. Para decidir una
-migración del modelo principal faltaría comparar tareas representativas con
-los mismos criterios: corrección, componentes reutilizados, retrabajo, tiempo y
-consumo. No añadimos un router, un benchmark automático ni otra infraestructura.
 
 ## YouTube y X
 

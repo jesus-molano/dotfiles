@@ -19,8 +19,8 @@
   `frontend-task` ya tiene la decisión y evidencia Atlas, consúmelas sin iniciar
   otra evaluación. Si el rol no está disponible, pide
   ese modelo explícitamente a un subagente sin heredar todo el historial.
-  Escala a Terra solo ante una laguna concreta; reserva Astra para decisiones
-  complejas y evaluación, no para repetir la búsqueda. Reutiliza evidencia
+  Escala a Terra solo ante una laguna concreta. El agente principal decide
+  con esa evidencia sin repetir la búsqueda. Reutiliza evidencia
   vigente ya obtenida. Si no hay delegación ligera disponible, comunica el
   límite y haz solo la inspección local mínima necesaria, sin afirmar que usaste
   otro modelo.

@@ -10,8 +10,8 @@ read-only). Give it the repository, requested behavior, relevant platform and
 known owner paths, not the whole conversation. If the role is unavailable,
 request the same model/effort explicitly on a fresh subagent. One bounded search
 returns candidate paths, public contracts, real consumers and evidence gaps.
-Escalate only an unresolved search question to gpt-5.6-terra; do not use Astra
-for the scan or repeat the scout's exploration. The implementing agent owns
+Escalate only an unresolved search question to gpt-5.6-terra; do not repeat
+the scout's exploration with the main agent. The implementing agent owns
 the final compatibility decision and reads only the necessary candidate code.
 Existing current evidence needs no new scout. If lightweight delegation is
 unavailable, disclose it and perform only the minimum local inspection needed;
