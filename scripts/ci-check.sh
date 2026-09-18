@@ -31,6 +31,7 @@ run 'Sintaxis Python' python3 -c \
 run 'Sintaxis Fish Android' fish -n android/.config/fish/conf.d/android.fish
 run 'Configuración Zellij' env -u ZELLIJ_CONFIG_FILE ZELLIJ_CONFIG_DIR="$repo_root/zellij/.config/zellij" \
 	zellij setup --check
+run 'Catálogo versionado de skills y agentes Codex' just codex-skills-check
 run 'Pruebas Python' env PYTHONDONTWRITEBYTECODE=1 \
 	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 run 'Generación de temas terminales y Micro' env PYTHONDONTWRITEBYTECODE=1 \

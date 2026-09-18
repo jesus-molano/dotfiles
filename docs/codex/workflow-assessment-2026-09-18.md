@@ -50,14 +50,18 @@ representan el coste del perfil activo. No hemos medido ahorro de tokens,
 tiempo o defectos en tareas reales con y sin Atlas; su valor aquí se infiere de
 los controles implementados, no de un benchmark.
 
-Hay una deuda concreta de mantenimiento: `scripts/sync-project-atlas.sh` fija
-`9bccbde`, diferente del checkout y skills activos. `just atlas-check` falla por
-esa divergencia. El doctor completo sí reconoce runtime, builds, skills y
-configuración core, y supera el handshake/listado de seis herramientas MCP. El
-smoke no ejecuta herramientas ni indexa productos; no verifica una implementación
-completa con Atlas. No se debe ejecutar el sincronizador para forzar una versión
-sin conciliar primero pin, fuentes, distribución y pruebas. Este cambio preserva
-Atlas y corrige la documentación de su activación selectiva.
+La inspección inicial detectó un pin `9bccbde` desalineado con el checkout y las
+skills activas. Se corrigió en la ampliación de mantenimiento: el sincronizador
+fija ahora `e703a6a`, las tres copias vendorizadas coinciden y la huella JavaScript
+se reprodujo dos veces desde un export limpio con el lockfile fijado.
+`just atlas-check` supera pin, huella, copias y doctor, incluido el handshake y
+listado de seis herramientas MCP. Este smoke no ejecuta tareas de producto ni
+verifica una implementación completa con Atlas.
+
+Las skills activas pueden enlazar al checkout validado, como permite el kit;
+`atlas-sync` mantiene copias versionadas como alternativa de despliegue. Ambas
+deben coincidir con la misma fuente auditada. Una actualización futura debe
+conciliar commit, build y las tres skills juntos antes de cambiar el pin.
 
 Evidencia local: `project-atlas/README.md`, `docs/architecture.md`,
 `docs/project-atlas-v2-audit.md`, `skills/frontend-task/SKILL.md`,
@@ -95,6 +99,8 @@ transcrito. Las conclusiones sobre ODD proceden de las releases y repositorios.
 Las instrucciones globales cubren la ruta que antes omitía Atlas; la revisión
 vuelve a comprobar la decisión. Las pruebas automáticas protegen el contrato del
 agente ligero, pero no pueden garantizar que cada futura respuesta obedezca las
-instrucciones. La evaluación con Luna sobre tres casos sintéticos verificó
-descubrimiento, consumidores y rechazo de una alternativa incompatible; no
-sustituye una prueba de implementación en una aplicación real.
+instrucciones. La evaluación con Luna sobre cuatro casos sintéticos verificó
+la delegación real al rol, contratos, consumidores, rechazo de una alternativa
+incompatible y ausencia de un candidato apto. El procedimiento y sus límites
+están en [workflow-evaluation.md](workflow-evaluation.md); no sustituye una prueba
+de implementación en una aplicación real.

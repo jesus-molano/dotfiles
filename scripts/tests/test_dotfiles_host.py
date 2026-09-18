@@ -750,6 +750,91 @@ frame_rate = 75
             self.assertFalse(noctalia.exists())
             self.assertEqual((migration / "status").read_text(encoding="utf-8"), "retired\n")
 
+    def codex_migration_fixture(self, root: Path, *, agent_backup: bool = False):
+        home, state = root / "home", root / "state"
+        home.mkdir()
+        environment = {
+            "HOME": str(home), "XDG_STATE_HOME": str(state),
+            "XDG_CONFIG_HOME": str(home / ".config"), "CODEX_HOME": str(home / ".codex"),
+            "CODEX_AGENTS_ROOT": str(home / ".codex/agents"),
+            "CODEX_AGENTS_SOURCE_ROOT": str(ROOT / "codex/.codex/agents"),
+        }
+        applied = subprocess.run(
+            ["python3", str(ROOT / "scripts/manage-codex-agent-files.py"), "--apply"],
+            env={**os.environ, **environment}, capture_output=True, text=True, check=True,
+        )
+        backup = applied.stdout.strip().split("Backup: ", 1)[1]
+        migration = state / "dotfiles/migrations/codex-history"
+        migration.mkdir(parents=True)
+        agent_relative = ".codex/agents/reuse-scout.toml"
+        agent = home / agent_relative
+        source = ROOT / "codex/.codex/agents/reuse-scout.toml"
+        ordinary = home / ".config/ordinary.conf"
+        ordinary.parent.mkdir(parents=True)
+        ordinary.symlink_to(root / "ordinary-source")
+        links = f".config/ordinary.conf\t{root / 'ordinary-source'}\n"
+        if not agent_backup:
+            links += f"{agent_relative}\t{source}\n"
+        (migration / "plan.json").write_text(json.dumps({"repo": str(ROOT), "modules": ["codex"]}))
+        for name in ("legacy-modules", "legacy-links.tsv", "previous-applied-links.tsv",
+                     "previous-restore-links.tsv", "pre-stow-restore-links.tsv", "stow-checkpoint"):
+            (migration / name).write_text("")
+        (migration / "applied-links.tsv").write_text(links)
+        (migration / "stow-intent.tsv").write_text(links)
+        (migration / "stow-before.tsv").write_text(
+            "".join(f"{line.split(chr(9))[0]}\tabsent\t\n" for line in links.splitlines())
+        )
+        if agent_backup:
+            (migration / "codex-agent-backup").write_text(backup)
+        else:
+            snapshot = migration / "agent-before.toml"
+            snapshot.write_bytes(source.read_bytes())
+            (migration / "previous-applied-links.tsv").write_text(f"{agent_relative}\t{source}\n")
+            (migration / "previous-restore-links.tsv").write_text(f"{agent_relative}\t{snapshot}\n")
+            (migration / "previous-links-removed").write_text("")
+        (migration / "status").write_text("applied\n")
+        (state / "dotfiles/last-migration").write_text(str(migration))
+        HOST_MODULE.rewrite_migration_checksums(migration)
+        return environment, migration, agent, ordinary
+
+    def test_codex_transferred_files_survive_retire_and_checkpoint_rollback(self) -> None:
+        for command in ("retire", "rollback"):
+            with self.subTest(command=command), tempfile.TemporaryDirectory() as temporary:
+                environment, migration, agent, ordinary = self.codex_migration_fixture(Path(temporary))
+                before = {p.name: p.read_bytes() for p in migration.iterdir() if p.is_file()}
+                preview = json.loads(self.run_tool(command, env=environment).stdout)
+                self.assertNotIn(".codex/agents/reuse-scout.toml", preview.get("remove_links", []))
+                self.assertEqual(before, {p.name: p.read_bytes() for p in migration.iterdir() if p.is_file()})
+                self.run_tool(command, "--apply", env=environment)
+                self.assertTrue(agent.is_file())
+                self.assertFalse(agent.is_symlink())
+                self.assertFalse(ordinary.is_symlink())
+                self.assertEqual((migration / "applied-links.tsv").read_bytes(), before["applied-links.tsv"])
+
+    def test_codex_transfer_never_hides_foreign_edits(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment, migration, agent, ordinary = self.codex_migration_fixture(Path(temporary))
+            agent.write_text("personal edit\n")
+            for command in ("retire", "rollback"):
+                with self.subTest(command=command), self.assertRaises(subprocess.CalledProcessError):
+                    self.run_tool(command, "--apply", env=environment)
+                self.assertTrue(ordinary.is_symlink())
+                self.assertEqual(agent.read_text(), "personal edit\n")
+                self.assertEqual((migration / "status").read_text(), "applied\n")
+
+    def test_codex_manual_rollback_previews_json_and_restores_agent_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            environment, migration, agent, ordinary = self.codex_migration_fixture(Path(temporary), agent_backup=True)
+            preview = json.loads(self.run_tool("rollback", env=environment).stdout)
+            self.assertEqual(preview["remove_modules"], ["codex"])
+            self.assertTrue(agent.is_file())
+            self.assertTrue(ordinary.is_symlink())
+            self.run_tool("rollback", "--apply", env=environment)
+            self.assertFalse(agent.exists())
+            self.assertFalse(ordinary.is_symlink())
+            self.assertFalse((Path(environment["XDG_STATE_HOME"]) / "dotfiles/codex-agents/managed.json").exists())
+            self.assertEqual((migration / "status").read_text(), "rolled-back\n")
+
     def test_retire_does_not_claim_success_when_user_manager_reload_fails(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

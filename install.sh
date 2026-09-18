@@ -910,6 +910,7 @@ manifest_relatives_match() {
 copy_previous_applied_links_to() {
 	local destination_dir=$1 legacy_manifest=$2
 	local previous="${STATE_DIR}/last-migration" previous_dir live_manifest snapshot_manifest snapshot_fallback
+	local -a agent_migration_args=()
 	: >"$destination_dir/previous-applied-links.tsv"
 	: >"$destination_dir/previous-restore-links.tsv"
 	[[ -f "$previous" ]] || return 0
@@ -944,6 +945,13 @@ copy_previous_applied_links_to() {
 	fi
 	[[ -f "$snapshot_manifest" ]] || return 0
 	copy_manifest_without_legacy "$snapshot_manifest" "$legacy_manifest" "$destination_dir/previous-restore-links.tsv"
+	# Los roles regulares ya pertenecen al gestor de agentes. Cuando Codex está
+	# seleccionado, ese gestor también migra sus enlaces exactos anteriores.
+	# Filtra solo estas copias de trabajo; el journal histórico queda intacto.
+	if plan_has_module codex; then agent_migration_args+=(--migrate-legacy-links); fi
+	"$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --filter-manifests \
+		"$destination_dir/previous-applied-links.tsv" \
+		"$destination_dir/previous-restore-links.tsv" "${agent_migration_args[@]}" || return 1
 	if [[ -s "$destination_dir/previous-applied-links.tsv" && ! -s "$destination_dir/previous-restore-links.tsv" ]]; then
 		die "El snapshot de enlaces anterior no cubre la composición activa: $previous_dir"
 	fi
@@ -1799,6 +1807,9 @@ rollback_migration() {
 		warn "El rollback no puede restaurar enlaces de forma segura; conserva el snapshot: $MIGRATION_DIR"
 		return 1
 	fi
+	if [[ -f "$MIGRATION_DIR/codex-agent-backup" ]]; then
+		"$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --rollback "$(<"$MIGRATION_DIR/codex-agent-backup")" || failed=1
+	fi
 	if rollback_stow_checkpoint; then
 		write_checkpoint_restored_links || failed=1
 	else
@@ -2041,6 +2052,14 @@ apply_dotfiles_transaction() {
 		preflight_migration_checkout_links || exit 1
 		generate_derived_state || exit 1
 		backup_targets || exit 1
+		if plan_has_module codex; then
+			agent_output="$("$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --apply)" || exit 1
+			printf '%s\n' "$agent_output"
+			agent_backup="${agent_output##*Backup: }"
+			if [[ "$agent_backup" != "$agent_output" ]]; then
+				printf '%s\n' "$agent_backup" >"$MIGRATION_DIR/codex-agent-backup"
+			fi
+		fi
 		deploy_dotfiles || exit 1
 		install_staged_configs || exit 1
 		validate_deployed_config || exit 1
@@ -2103,6 +2122,7 @@ main() {
 	if plan_has_module codex; then
 		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
 		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --check
+		"$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --check
 	fi
 	if ((CHECK_ONLY)); then
 		ok "Validación terminada sin cambios."

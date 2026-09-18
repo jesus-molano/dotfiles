@@ -8,8 +8,10 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 readonly SCRIPT_DIR
 DOTFILES_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd -P)"
 readonly DOTFILES_DIR
-readonly PINNED_ATLAS_COMMIT="9bccbde8ac6ebcefb59d192a27ef744a453313b7"
-readonly PINNED_ATLAS_DIST_HASH="966e12105e64cd5b38f9fd2ca546fa2e1381551d59f1eb132e4118445affb63d"
+# Reproducido desde un export limpio de e703a6a con Node 26 y pnpm 11.9.0,
+# usando `pnpm install --frozen-lockfile && pnpm build:packages`.
+readonly PINNED_ATLAS_COMMIT="e703a6aadcbc29567d7a5995475505e154289b67"
+readonly PINNED_ATLAS_DIST_HASH="f86c547b9cc3aeac0d1e316008f974640ddf530a4186a2a495b844f23c1c2f3b"
 readonly -a ATLAS_SKILLS=(frontend-task reuse-first visual-direction)
 
 mode=check

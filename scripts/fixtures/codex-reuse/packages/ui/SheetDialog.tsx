@@ -1,0 +1,2 @@
+// Supported web dialog wrapper. Handles focus trap, Escape and focus restoration.
+export function SheetDialog({open, onOpenChange, title, children, footer}: {open:boolean; onOpenChange:(open:boolean)=>void; title:string; children:React.ReactNode; footer?:React.ReactNode}) { return <AccessibleDialog open={open} onOpenChange={onOpenChange} title={title} footer={footer}>{children}</AccessibleDialog> }

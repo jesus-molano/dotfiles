@@ -133,6 +133,25 @@ def walk_error(error: OSError) -> None:
     raise SystemExit(1)
 
 
+def is_declared_codex_agent_link(
+    link: str, destination: str, home: str, checkout: str, codex_selected: bool
+) -> bool:
+    """Allow exact legacy TOML links that the agent manager will migrate."""
+    if not codex_selected:
+        return False
+    codex_home = os.environ.get("CODEX_HOME", os.path.join(home, ".codex"))
+    agents_root = os.path.abspath(os.environ.get("CODEX_AGENTS_ROOT", os.path.join(codex_home, "agents")))
+    if os.path.dirname(link) != agents_root or not is_under(agents_root, home):
+        return False
+    name = os.path.basename(link)
+    if not name.endswith(".toml"):
+        return False
+    source = os.path.join(checkout, "codex", ".codex", "agents", name)
+    if not os.path.isfile(source) or os.path.islink(source):
+        return False
+    return os.path.normpath(os.path.join(os.path.dirname(link), destination)) == source
+
+
 def reject_untracked_links(
     home: str,
     checkout: str,
@@ -217,6 +236,8 @@ def reject_untracked_links(
                 checkout,
                 codex_selected,
             ):
+                continue
+            if is_declared_codex_agent_link(link, destination, home, checkout, codex_selected):
                 continue
             print(f"[AVISO] Enlace del checkout fuera de la composición declarada: {link}")
             raise SystemExit(1)

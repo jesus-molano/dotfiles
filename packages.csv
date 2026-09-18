@@ -38,7 +38,7 @@ bundle:gaming-core,gaming,steam,native
 bundle:gaming-core,gaming,gamescope,native
 bundle:gaming-core,gaming,mangohud,native
 bundle:gaming-core,gaming,lib32-mangohud,native
-bundle:gaming-launchers,gaming,heroic-games-launcher-bin,native
+bundle:gaming-launchers,gaming,heroic-games-launcher,native
 bundle:gaming-launchers,gaming,lutris,native
 bundle:gaming-launchers,gaming,faugus-launcher,native
 bundle:gaming-launchers,gaming,protonplus,native

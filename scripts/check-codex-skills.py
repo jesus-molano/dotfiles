@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -17,6 +18,10 @@ YAML_KEY = re.compile(r"^( {2})([a-z_]+):\s*(.*)$")
 SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 MAX_CATALOG_SKILLS = 20
 MAX_DESCRIPTION_WORDS = 700
+# Las instalaciones normales enlazan una carpeta de skill por entrada. El límite
+# evita que una raíz indicada por error convierta esta comprobación en un paseo
+# ilimitado por HOME, y la identidad (device, inode) corta ciclos de enlaces.
+MAX_INSTALLED_SKILL_DIRECTORIES = 10_000
 # Inventario deliberadamente exhaustivo. Una skill sin clasificación no debe
 # llegar al perfil: su activación sería ambigua y gastaría contexto sin control.
 IMPLICIT_SKILLS = {
@@ -72,6 +77,17 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="NAME",
         help="nombre de agente que debe estar presente; se puede repetir",
+    )
+    parser.add_argument(
+        "--installed-skills-root",
+        action="append",
+        type=Path,
+        default=[],
+        metavar="PATH",
+        help=(
+            "raíz de una instalación efectiva de skills; se puede repetir para "
+            "detectar names duplicados sin validar el catálogo local"
+        ),
     )
     return parser.parse_args()
 
@@ -134,6 +150,104 @@ def parse_yaml_string(raw: str, key: str) -> str:
     if re.search(r":(?:\s|$)|\s#", value):
         raise ValueError(f"{key} debe entrecomillarse para usar ':' o comentarios")
     return value
+
+
+def parse_installed_skill_name(path: Path) -> str:
+    """Extrae solo el name del frontmatter de una skill instalada externa."""
+    with path.open(encoding="utf-8") as document:
+        header = document.read(64 * 1024)
+    match = FRONTMATTER.match(header)
+    if not match:
+        raise ValueError("frontmatter YAML ausente o mal delimitado")
+    names: list[str] = []
+    for line in match.group(1).splitlines():
+        if line.startswith((" ", "\t", "-")) or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        if key == "name":
+            names.append(parse_yaml_string(value, "name"))
+    if len(names) != 1:
+        raise ValueError("frontmatter requiere un único name no vacío")
+    return names[0]
+
+
+def discover_installed_skill_descriptors(
+    root: Path, *, max_directories: int = MAX_INSTALLED_SKILL_DIRECTORIES
+) -> list[Path]:
+    """Encuentra SKILL.md bajo una raíz explícita, siguiendo enlaces de carpeta.
+
+    Dos enlaces que exponen la misma skill siguen contando como dos entradas.
+    Una vez encontrada una skill no se recorren sus recursos internos. Los
+    enlaces de carpeta deben apuntar a una skill, no a contenedores arbitrarios.
+    """
+    if not root.is_dir():
+        raise ValueError("la raíz instalada no es un directorio accesible")
+    pending = [root]
+    visited: set[tuple[int, int]] = set()
+    descriptors: list[Path] = []
+    while pending:
+        directory = pending.pop()
+        descriptor = directory / "SKILL.md"
+        try:
+            if descriptor.is_file():
+                descriptors.append(descriptor)
+                continue
+            if directory.is_symlink():
+                raise ValueError(
+                    f"enlace instalado sin SKILL.md directo: {directory}; "
+                    "no se recorrerá su destino"
+                )
+            status = directory.stat()
+        except OSError as error:
+            raise ValueError(f"no se pudo recorrer {directory}: {error}") from error
+        identity = (status.st_dev, status.st_ino)
+        if identity in visited:
+            continue
+        visited.add(identity)
+        if len(visited) > max_directories:
+            raise ValueError(
+                "la raíz instalada supera el límite de "
+                f"{max_directories} directorios recorridos"
+            )
+        try:
+            with os.scandir(directory) as entries:
+                for entry in entries:
+                    if entry.name == "SKILL.md":
+                        continue
+                    try:
+                        if entry.is_dir(follow_symlinks=True):
+                            pending.append(Path(entry.path))
+                    except OSError:
+                        # Un enlace roto o una entrada que desaparece no es una
+                        # skill legible y no debe bloquear las demás entradas.
+                        continue
+        except OSError as error:
+            raise ValueError(f"no se pudo listar {directory}: {error}") from error
+    return descriptors
+
+
+def check_installed_skill_names(roots: list[Path]) -> list[str]:
+    """Devuelve errores de nombres repetidos en instalaciones efectivas."""
+    names: dict[str, Path] = {}
+    failures: list[str] = []
+    for root in roots:
+        try:
+            descriptors = discover_installed_skill_descriptors(root)
+        except (OSError, ValueError) as error:
+            failures.append(f"{root}: {error}")
+            continue
+        for descriptor in sorted(descriptors):
+            try:
+                name = parse_installed_skill_name(descriptor)
+                if name in names:
+                    failures.append(
+                        f"name instalado duplicado {name}: {descriptor} y {names[name]}"
+                    )
+                else:
+                    names[name] = descriptor
+            except (OSError, ValueError) as error:
+                failures.append(f"{descriptor}: {error}")
+    return failures
 
 
 def check_openai_yaml(path: Path) -> bool | None:
@@ -296,6 +410,7 @@ def main() -> int:
         failures.append(
             "faltan agentes requeridos: " + ", ".join(sorted(missing_agents))
         )
+    failures.extend(check_installed_skill_names(args.installed_skills_root))
     if failures:
         print("Skills Codex inválidas:", file=sys.stderr)
         print("\n".join(f"- {failure}" for failure in failures), file=sys.stderr)

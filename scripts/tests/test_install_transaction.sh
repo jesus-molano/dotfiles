@@ -3,6 +3,7 @@ set -euo pipefail
 
 # Las pruebas nunca deben alcanzar la sesión Hyprland del proceso que las lanza.
 unset HYPRLAND_INSTANCE_SIGNATURE
+unset CODEX_HOME
 
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 test_root=$(mktemp -d)
@@ -15,10 +16,13 @@ fixture_config="$test_root/config"
 mkdir -p "$fixture_repo/scripts/lib" "$fixture_repo/scripts/tests/fixtures" \
 	"$fixture_home" "$fixture_state" "$fixture_config" "$test_root/bin"
 cp -- "$repo_root/install.sh" "$fixture_repo/install.sh"
+cp -- "$repo_root/scripts/manage-codex-agent-files.py" "$fixture_repo/scripts/manage-codex-agent-files.py"
 cp -- "$repo_root/scripts/lib/checkout_link_guard.py" "$fixture_repo/scripts/lib/checkout_link_guard.py"
 cp -- "$repo_root/scripts/lib/install_package_ops.sh" "$fixture_repo/scripts/lib/install_package_ops.sh"
 cp -- "$repo_root/scripts/tests/fixtures/current-host.toml" "$fixture_repo/scripts/tests/fixtures/current-host.toml"
 cp -- "$repo_root/scripts/tests/fixtures/laptop-host.toml" "$fixture_repo/scripts/tests/fixtures/laptop-host.toml"
+mkdir -p "$fixture_repo/codex/.codex"
+cp -a -- "$repo_root/codex/.codex/agents" "$fixture_repo/codex/.codex/agents"
 
 # The old modules model the exact no-folding links that the first profileless
 # deployment must remove. The new module also collides with one personal file,
@@ -50,7 +54,8 @@ printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-te
 printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
 printf '%s\n' '# fixture skill' >"$fixture_repo/codex/.agents/skills/example-skill/SKILL.md"
 printf '%s\n' retired >"$fixture_repo/codex/.agents/retired-skills.txt"
-printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.agents/retired-skills\.txt$' >"$fixture_repo/codex/.stow-local-ignore"
+printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.agents/retired-skills\.txt$' '^/\.codex/agents(?:/|$)' >"$fixture_repo/codex/.stow-local-ignore"
+printf '%s\n' managed-codex >"$fixture_repo/codex/.codex/workflow-test.txt"
 printf '%s\n' 'c = c' >"$fixture_repo/python-app/.config/python-app/config.py"
 printf '%s\n' bytecode >"$fixture_repo/python-app/.config/python-app/__pycache__/config.cpython-314.pyc"
 printf '%s\n' '__pycache__' '.*\.py[co]' >"$fixture_repo/python-app/.stow-local-ignore"
@@ -155,13 +160,24 @@ ln -s "$mise_expected" "$mise_target"
 ln -s "$unit_source" "$HOME/.config/systemd/user/default.target.wants/unit-test.service"
 ln -s "$mise_target" "$HOME/.local/state/mise/tracked-configs/0123456789abcdef"
 ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+mkdir -p "$HOME/.codex/agents"
+ln -s "$DOTFILES_DIR/codex/.codex/agents/reuse-scout.toml" "$HOME/.codex/agents/reuse-scout.toml"
 intent="$XDG_STATE_HOME/stow-intent.tsv"
 build_check_plan_intent "$intent"
 grep -Fq $'.config/python-app/config.py\t' "$intent"
-if grep -Eq 'retired-skills|__pycache__|SKILL\.md' "$intent"; then exit 9; fi
+if grep -Eq 'retired-skills|__pycache__|SKILL\.md|\.codex/agents/' "$intent"; then exit 9; fi
 home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 check_dotfiles
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]
+ln -s "$DOTFILES_DIR/codex/.codex/agents/reuse-scout.toml" "$HOME/.codex/agents/not-reuse-scout.toml"
+if check_dotfiles; then exit 9; fi
+rm -- "$HOME/.codex/agents/not-reuse-scout.toml"
+PLAN_MODULES=(unit-test mise-test python-app)
+if check_dotfiles; then exit 9; fi
+PLAN_MODULES=(unit-test mise-test codex python-app)
+rm -- "$HOME/.codex/agents/reuse-scout.toml"
+ln -s ../../../repo/codex/.codex/agents/reuse-scout.toml "$HOME/.codex/agents/reuse-scout.toml"
+check_dotfiles
 ln -s ../unit-test.service "$HOME/.config/systemd/user/default.target.wants/not-unit-test.service"
 bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 if check_dotfiles; then exit 9; fi
@@ -209,6 +225,104 @@ EOF
 chmod +x "$test_root/bin/systemctl"
 # Ningún caso posterior puede tocar el gestor systemd de la sesión real.
 export PATH="$test_root/bin:$PATH"
+
+# El gestor de agentes participa en la transacción real: tanto una adopción
+# de copias idénticas como una migración mixta deben revertir su propiedad
+# si falla la validación posterior a Stow, conservando los TOML iniciales.
+codex_runner="$test_root/codex-transaction.sh"
+cat >"$codex_runner" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+export DOTFILES_INSTALL_SOURCE_ONLY=1
+source "$FIXTURE_REPO/install.sh"
+PLAN_JSON=$TEST_PLAN
+PLAN_MODULES=(codex)
+BACKUP_DIR="$STATE_DIR/backups/test"
+generate_derived_state() { return 0; }
+validate_resolved_runtime() { return 0; }
+validate_deployed_config() {
+    [[ -L "$HOME/.codex/workflow-test.txt" ]] || exit 8
+    "$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --verify || exit 8
+    printf '%s\n' validated >"$TEST_VALIDATION_MARKER"
+    return 1
+}
+check_dotfiles
+apply_dotfiles_transaction
+EOF
+chmod +x "$codex_runner"
+codex_plan="$test_root/codex-plan.json"
+printf '%s\n' '{"schema":1,"repo":"fixture","modules":["codex"],"bundles":[],"package_scopes":[]}' >"$codex_plan"
+for codex_mode in adopt mixed managed; do
+	codex_home="$test_root/codex-$codex_mode-home"
+	codex_state="$test_root/codex-$codex_mode-state"
+	codex_config="$codex_home/.config"
+	mkdir -p "$codex_home/.codex" "$codex_config" "$codex_state"
+	cp -a -- "$fixture_repo/codex/.codex/agents" "$codex_home/.codex/agents"
+	if [[ "$codex_mode" == mixed ]]; then
+		rm -- "$codex_home/.codex/agents/reuse-scout.toml"
+		ln -s "$fixture_repo/codex/.codex/agents/reuse-scout.toml" "$codex_home/.codex/agents/reuse-scout.toml"
+	fi
+	if [[ "$codex_mode" == managed ]]; then
+		HOME="$codex_home" XDG_STATE_HOME="$codex_state" \
+			"$fixture_repo/scripts/manage-codex-agent-files.py" --apply >/dev/null
+	fi
+	if [[ "$codex_mode" != adopt ]]; then
+		codex_old="$codex_state/dotfiles/migrations/old-agent-links"
+		mkdir -p "$codex_old/snapshots"
+		printf '%s\n' applied >"$codex_old/status"
+		: >"$codex_old/applied-links.tsv"
+		: >"$codex_old/applied-snapshot-links.tsv"
+		for codex_source in "$fixture_repo/codex/.codex/agents/"*.toml; do
+			codex_name=${codex_source##*/}
+			[[ "$codex_mode" == managed || "$codex_name" == reuse-scout.toml ]] || continue
+			cp -- "$codex_source" "$codex_old/snapshots/$codex_name"
+			printf '.codex/agents/%s\t%s\n' "$codex_name" "$codex_source" >>"$codex_old/applied-links.tsv"
+			printf '.codex/agents/%s\t%s\n' "$codex_name" "$codex_old/snapshots/$codex_name" >>"$codex_old/applied-snapshot-links.tsv"
+		done
+		printf '%s\n' "$codex_old" >"$codex_state/dotfiles/last-migration"
+		sha256sum "$codex_old/"*.tsv >"$test_root/codex-$codex_mode-journal.sha256"
+	fi
+	if HOME="$codex_home" XDG_CONFIG_HOME="$codex_config" XDG_STATE_HOME="$codex_state" \
+		FIXTURE_REPO="$fixture_repo" TEST_PLAN="$codex_plan" \
+		TEST_VALIDATION_MARKER="$test_root/codex-$codex_mode-validated" \
+		"$codex_runner" >"$test_root/codex-$codex_mode.log" 2>&1; then
+		printf '%s\n' 'FAIL: la transacción Codex aceptó un fallo posterior a Stow.' >&2
+		exit 1
+	fi
+	[[ -f "$test_root/codex-$codex_mode-validated" ]] || {
+		cat "$test_root/codex-$codex_mode.log" >&2
+		exit 1
+	}
+	[[ ! -e "$codex_home/.codex/workflow-test.txt" && ! -L "$codex_home/.codex/workflow-test.txt" ]]
+	codex_migration=$(<"$codex_state/dotfiles/last-migration")
+	[[ $(<"$codex_migration/status") == rolled-back ]]
+	if [[ "$codex_mode" == managed ]]; then
+		[[ ! -e "$codex_migration/codex-agent-backup" ]]
+	else
+		[[ -s "$codex_migration/codex-agent-backup" ]]
+	fi
+	if [[ "$codex_mode" != adopt ]]; then
+		sha256sum --check "$test_root/codex-$codex_mode-journal.sha256" >/dev/null
+	fi
+	for codex_source in "$fixture_repo/codex/.codex/agents/"*.toml; do
+		codex_target="$codex_home/.codex/agents/${codex_source##*/}"
+		cmp -s -- "$codex_source" "$codex_target"
+		if [[ "$codex_mode" == mixed && "${codex_source##*/}" == reuse-scout.toml ]]; then
+			[[ -L "$codex_target" && $(readlink "$codex_target") == "$codex_source" ]]
+		else
+			[[ ! -L "$codex_target" ]]
+		fi
+	done
+	python3 - "$codex_state/dotfiles/codex-agents/managed.json" "$codex_home/.codex/agents" "$codex_mode" <<'PY'
+import json
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+data = json.loads(path.read_text()) if path.exists() else {}
+assert bool(data.get("destinations", {}).get(sys.argv[2])) == (sys.argv[3] == "managed")
+PY
+done
 
 # El apply reconcilia inmediatamente la unidad de audio según el plan ya
 # aplicado; no depende de que Hyprland emita otro evento de inicio.

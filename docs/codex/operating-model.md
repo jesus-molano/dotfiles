@@ -77,6 +77,23 @@ convención del repositorio y, como alternativa, `docs/work/<tarea>.md`. Los
 cambios pequeños no necesitan documento. Al retomar se contrasta el estado con
 el código actual; una comprobación histórica no acredita el delta nuevo.
 
+## Salud del workflow
+
+CI ejecuta el mismo validador del catálogo versionado que la comprobación local.
+La validación del despliegue se realiza por separado: no considera éxito un
+preflight que solo anuncie sincronizaciones pendientes. Los backups de skills
+viven bajo XDG state, fuera de los directorios que Codex descubre.
+
+Las skills propias usan enlaces de carpeta; los roles TOML usan archivos
+regulares, porque el cargador de Codex 0.155.0 falla al aplicar roles enlazados.
+El despliegue conserva copias previas y verifica el contenido contra la fuente
+canónica. No basta con que un TOML pase el parser.
+
+La [evaluación del workflow](workflow-evaluation.md) conserva casos pequeños y
+criterios de resultado. Se ejecuta cuando cambia la capacidad evaluada o aparece
+un fallo real; no añade llamadas a modelos a CI ni una cadena de agentes para
+cada tarea.
+
 ## Publicación
 
 Antes de publicar, Codex ejecuta las comprobaciones relevantes y vuelve a

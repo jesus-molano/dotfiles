@@ -80,9 +80,21 @@ codex-tests:
 codex-check:
     @just --justfile "{{ justfile() }}" codex-skills-check
     @just --justfile "{{ justfile() }}" codex-tests
-    "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --check
+    @just --justfile "{{ justfile() }}" codex-runtime-check
     "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
+
+# Comprueba el catálogo instalado y exige enlaces actuales; no modifica HOME.
+codex-runtime-check:
+    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --verify
+    "{{ dotfiles_dir }}/scripts/check-codex-skills.py" --agents-root "${CODEX_HOME:-$HOME/.codex}/agents" --required-agent reuse-scout --installed-skills-root "${CODEX_SKILLS_ROOT:-$HOME/.agents/skills}"
+    "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --verify
+
+# Despliega solo los TOML de agentes gestionados con respaldo y verificación.
+codex-agents-sync:
+    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --check
+    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --apply
+    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --verify
 
 # Sincroniza solo las preferencias gestionadas de Codex con confirmación y backup.
 codex-config-sync:

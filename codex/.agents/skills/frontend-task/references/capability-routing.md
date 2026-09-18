@@ -10,9 +10,13 @@ confidence; they do not invalidate repository-first work.
 | --- | --- | --- |
 | Prepare task, refresh code evidence, rank reuse | `atlas_prepare_task` after source preflight | Inspect repository manually and keep the same decision contract |
 | Expand one unresolved item | `atlas_expand_context` with one returned handle | Open the exact local file or confirmed provider item |
+| Freeze criteria and decisions | `atlas_task_state` action `record-contract` before scope lock | Keep the same versioned criteria in the native task brief |
+| Queue an observation or correction | `atlas_task_state` action `append-feedback` | Add it to the active native task; do not create a parallel task |
+| Reconcile sparse progress and Git | `atlas_task_state` action `reconcile` | Update the task brief without inferring acceptance from commits |
+| Persist exact progress/next action | `atlas_task_state` action `checkpoint-continuation` at semantic boundaries | Keep one compact task-local handoff with every criterion |
 | Persist decision and implementation boundary | `atlas_lock_change_scope` after selecting reuse/extend/compose/extract/create/not-applicable | Write the bounded decision and exclusions in the plan |
 | Validate task delta | `atlas_validate_change` after deterministic checks | Inspect staged, unstaged, and untracked task delta manually |
-| Attach evidence/review, resume, checkpoint, block, or technically complete | `atlas_task_state` | Keep a compact task-local handoff in the native task |
+| Attach evidence/review, recover focused checkout-and-branch state, block, or technically complete | `atlas_task_state` | Keep a compact task-local handoff in the native task |
 | Review or write Project Memory | `atlas_memory` with one explicit action | Do not review/write memory; report the unavailable action |
 
 Do not call legacy Atlas tools or assume a `component-atlas` executable exists
@@ -62,20 +66,36 @@ warning rather than silently displacing required authority.
 2. Prefer the active Figma Desktop connection when it is connected,
    authorized, and exposes the needed read operation. Use another configured
    provider only after naming the unavailable operation and permitted fallback.
-3. For a direct node, preserve the exact file/node identity and inspect sparse
+3. Before every deep read, call `atlas_task_state` action
+   `check-figma-snapshot` with the exact file/node and required semantic
+   categories. For an existing cache, the first call permits metadata only;
+   repeat with the current task receipt. Reuse only an exact
+   file/node/version/lastModified identity and complete coverage. With no cache
+   or a mismatch, surface its quota warning and make one bounded read. Never
+   infer an unchanged remote source.
+4. For a direct node, preserve the exact file/node identity and inspect sparse
    metadata before deep context. Do not rank alternatives.
-4. For a file/page, inspect sparse hierarchy, rank only a few task-relevant
+5. For a file/page, inspect sparse hierarchy, rank only a few task-relevant
    candidates, and confirm one before deep retrieval.
-5. Segment broad pages from the start. After timeout, narrow to children and
+6. Segment broad pages from the start. After timeout, narrow to children and
    retain successful results; never repeat the same oversized request.
-6. Treat Ready for dev, global Variables, and Code Connect as useful signals,
+7. Treat Ready for dev, global Variables, and Code Connect as useful signals,
    never eligibility requirements.
-7. Keep binary/SVG bodies out of context. While prepared, call
+8. After the required reads, call `atlas_task_state` action
+   `record-figma-snapshot` while prepared and before locking. Persist the exact
+   file/node/version/lastModified,
+   source receipts, bounded semantic nodes/components/styles/states/assets, and
+   explicit coverage/omissions. Reuse the returned `figma-snapshot:` handle
+   while identity and required coverage still match; never treat partial
+   coverage as complete or cache raw trees, SVG/body data, blobs, or temporary
+   provider URLs. After locking, a new snapshot is accepted only inside a named
+   relock-required window.
+9. Keep binary/SVG bodies out of context. While prepared, call
    `atlas_task_state` action `capture-figma-asset` with one exact task receipt,
    provider-local URL, and scope node. Lock its returned `figma-asset:` handle
    plus the exact destination, then call action `materialize-figma-asset`;
    materialization fails outside `ChangeSurface.allowedFiles`.
-8. Never write to Figma unless the user explicitly requests and approves that
+10. Never write to Figma unless the user explicitly requests and approves that
    separate write.
 
 When visual authority is unresolved rather than unavailable, invoke

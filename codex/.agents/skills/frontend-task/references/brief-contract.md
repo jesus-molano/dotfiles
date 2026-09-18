@@ -6,11 +6,13 @@ mapping to the six core tools is defined below. For a small task, report only
 objective, decision, scope, assumptions, and checks.
 
 ```yaml
+title: Stable short task title
 objective: One observable product outcome
 identity:
   task_id: Stable Atlas/native task ID
   mode: new | continue | correct | finish
   objective_confirmed: true | false
+  parent_task_id: Completed parent for a correction child, or none
 repository:
   root: Absolute path
   package: Target package/route/feature
@@ -24,7 +26,17 @@ classification:
   risk: low | medium | high
   reasons: [Evidence-backed reasons]
 acceptance:
-  - Observable criterion
+  contract_handle: Immutable `contract:` handle after preparation
+  previous_contract_handle: Prior revision or none
+  criteria:
+    - id: Stable criterion ID
+      statement: Observable criterion
+      required: true | false
+      source_refs: [Task-owned receipt or context handles]
+  decisions:
+    - id: Stable product decision ID
+      status: open | resolved | deferred
+      answer: Exact resolved answer or none
 sources:
   ledger:
     - kind: jira | confluence | figma | github | openapi | other
@@ -77,6 +89,11 @@ visual_direction:
   visual_handle: Selected opaque visual handle or none
   contract_hash: Selected contract hash or none
   cleanup: clean | active | cleanup-pending | not-applicable
+  figma_snapshot:
+    handle: Immutable `figma-snapshot:` handle or none
+    identity: Exact fileKey, nodeId, version, and lastModified
+    coverage: Explicit complete/partial/not-requested categories
+    reuse_preflight: metadata-only | reusable | bounded-refresh | not-applicable
 unknowns:
   blocking:
     - Only unresolved decisions that materially change implementation
@@ -88,6 +105,7 @@ validation:
   focused: [Narrow tests/checks]
   required: [Repository-required lint/typecheck/build/e2e]
   atlas: atlas_validate_change
+  visual_cases: Explicit route/state/viewport cases with separate browser and Figma evidence
 review:
   tier: none | correctness | specialist
   domains: [correctness, ux-a11y-fidelity, security-api]
@@ -95,9 +113,22 @@ delivery:
   requested: working-tree | commit | push | pull-request
   external_write_authorized: true | false
 resume:
+  continuation_handle: Latest immutable `continuation:` handle or none
+  criterion_progress:
+    - criterion_id: Stable contract criterion ID
+      status: pending | satisfied | blocked | deferred
+      evidence_refs: [Task-owned expandable handles]
+      validation_refs: [Exact current Atlas validation reference]
   covered: [Bounded completed scope]
   remaining: [Bounded remaining scope]
   next_safe_action: One action
+  feedback:
+    pending_required: Count
+    latest_handle: Immutable `feedback:` handle or none
+  git:
+    relation: same | advanced | diverged | unknown
+    stored_head: Exact prior HEAD or none
+    current_head: Exact current HEAD or none
 technical_close:
   status: pending | complete | blocked
   verification: [Completed checks]
@@ -110,13 +141,17 @@ memory:
 
 | Brief field | Core input/evidence |
 | --- | --- |
-| `objective`, `identity.task_id`, `identity.objective_confirmed` | `atlas_prepare_task.objective`, `task_id`, `objective_confirmed` |
+| `title`, `objective`, `identity.task_id`, `identity.objective_confirmed` | `atlas_prepare_task.title`, `objective`, `task_id`, `objective_confirmed`; an explicit `task_id` creates or continues that identity, omitting it reuses focus, and `start_new_task: true` creates a separate objective without an ID |
 | `sources.ledger[*]` | `sources[*]`; a newly retrieved provider result goes in that source's `evidence`, including stable `observed_at` |
 | `sources.receipt_ids` | Top-level `atlas_prepare_task.receipt_ids`, only for task receipts Atlas already persisted |
 | `sources.relations` | `atlas_prepare_task.source_relations` |
+| `acceptance.*` | `atlas_task_state` action `record-contract`; changed semantics require `previous_handle` |
 | `reuse.*`, `scope.primary_*`, `reference_components`, `allowed_files`, `exclusions` | `atlas_lock_change_scope`; selected/rejected component values are exact graph IDs |
 | `scope.derived_apis`, `scope.derived_impact` | Read-only output derived by Atlas; never pass these as caller assertions |
 | `validation.*` | Repository commands first, then `atlas_validate_change` |
+| Mid-task observation | `atlas_task_state` action `append-feedback`; corrections, decisions, scope changes, and review findings are required by default |
+| Sparse progress and Git reconciliation | `atlas_task_state` action `reconcile`; update only changed criteria and resolve named feedback IDs |
+| `resume.*` | `atlas_task_state` action `checkpoint-continuation`; report every contract criterion exactly once |
 | `technical_close` | `atlas_task_state` action `complete`; the record is not proof of commit/push/PR/deploy |
 | `memory` | Independent `atlas_memory` flow; never implied by technical close |
 
@@ -139,7 +174,10 @@ Before code, report only:
 6. one evidence-backed blocking question, if needed.
 
 Do not include memory closeout before implementation and verification. Do not
-paste full source documents, raw indexes, Figma trees, or receipt bodies.
+paste full source documents, raw indexes, Figma trees, or receipt bodies. Keep
+only semantic Figma snapshot fields and opaque handles; retrieve raw provider
+context again only when the exact identity changed or recorded coverage is
+insufficient.
 
 ## Gate examples
 

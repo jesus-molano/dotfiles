@@ -1257,7 +1257,9 @@ def read_stow_before(path: Path, intents: dict[str, str]) -> dict[str, tuple[str
     return entries
 
 
-def stow_checkpoint_actions(target: Path, home: Path) -> tuple[list[tuple[str, str]], list[tuple[str, str]]] | None:
+def stow_checkpoint_actions(
+    target: Path, home: Path, ignored_relatives: set[str] | None = None
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]] | None:
     """Return exact owned-link removals and private pre-Stow restorations.
 
     The checkpoint is written and checksummed before the real Stow invocation.
@@ -1286,9 +1288,12 @@ def stow_checkpoint_actions(target: Path, home: Path) -> tuple[list[tuple[str, s
     if set(snapshots) != required_snapshots:
         raise ValueError("pre-stow-restore-links.tsv no cubre el estado previo Stow")
     preflight_snapshot_links(list(snapshots.items()))
+    ignored_relatives = ignored_relatives or set()
     removals: list[tuple[str, str]] = []
     restorations: list[tuple[str, str]] = []
     for relative, expected in intents.items():
+        if relative in ignored_relatives:
+            continue
         kind, previous = before[relative]
         destination = link_path(home, relative)
         exists = destination.exists() or destination.is_symlink()
@@ -1311,16 +1316,21 @@ def stow_checkpoint_actions(target: Path, home: Path) -> tuple[list[tuple[str, s
     return removals, restorations
 
 
-def checkpoint_restored_entries(target: Path, home: Path) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def checkpoint_restored_entries(
+    target: Path, home: Path, ignored_relatives: set[str] | None = None
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
     """Record active/recovery manifests for pre-existing links after rollback."""
     if not (target / "stow-checkpoint").is_file():
         return [], []
     intents = dict(read_link_manifest(target / "stow-intent.tsv", "stow-intent.tsv"))
     before = read_stow_before(target / "stow-before.tsv", intents)
     snapshots = dict(read_link_manifest(target / "pre-stow-restore-links.tsv", "pre-stow-restore-links.tsv"))
+    ignored_relatives = ignored_relatives or set()
     active: list[tuple[str, str]] = []
     restored_snapshots: list[tuple[str, str]] = []
     for relative, (kind, previous) in before.items():
+        if relative in ignored_relatives:
+            continue
         if kind != "link":
             continue
         destination = link_path(home, relative)
@@ -1685,11 +1695,82 @@ def restore_derived_state(target: Path) -> None:
             shutil.copy2(source, destination, follow_symlinks=False)
 
 
+def managed_codex_agent_links(repo: Path, home: Path, entries: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """Filter a copied manifest through the agent manager, never the journal."""
+    if not entries:
+        return entries
+    manager = repo / "scripts/manage-codex-agent-files.py"
+    if not manager.is_file():
+        raise ValueError(f"Falta el gestor de agentes Codex: {manager}")
+    with tempfile.TemporaryDirectory(prefix="dotfiles-codex-agents-") as temporary:
+        manifest = Path(temporary) / "applied-links.tsv"
+        content = "".join(f"{relative}\t{destination}\n" for relative, destination in entries)
+        manifest.write_text(content, encoding="utf-8")
+        environment = os.environ.copy()
+        codex_home = Path(environment.get("CODEX_HOME", str(home / ".codex")))
+        agents_root = Path(environment.get("CODEX_AGENTS_ROOT", str(codex_home / "agents")))
+        environment.update(
+            {
+                "HOME": str(home),
+                "XDG_STATE_HOME": str(state_root().parent),
+                "CODEX_AGENTS_SOURCE_ROOT": str(repo / "codex/.codex/agents"),
+                "CODEX_AGENTS_ROOT": str(agents_root),
+            }
+        )
+        subprocess.run(
+            [sys.executable, str(manager), "--filter-manifests", str(manifest), str(manifest)],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=environment,
+        )
+        return read_link_manifest(manifest, "manifiesto temporal de agentes Codex")
+
+
+def codex_agent_backup(target: Path) -> Path | None:
+    marker = target / "codex-agent-backup"
+    if not marker.is_file() or marker.is_symlink():
+        return None
+    backup = Path(marker.read_text(encoding="utf-8").strip()).resolve()
+    root = (state_root() / "codex-agents/backups").resolve()
+    if root not in backup.parents:
+        raise ValueError("El backup de agentes Codex no es seguro")
+    return backup
+
+
+def run_codex_agent_rollback(repo: Path, home: Path, backup: Path, check_only: bool) -> None:
+    manager = repo / "scripts/manage-codex-agent-files.py"
+    if not manager.is_file():
+        raise ValueError(f"Falta el gestor de agentes Codex: {manager}")
+    environment = os.environ.copy()
+    codex_home = Path(environment.get("CODEX_HOME", str(home / ".codex")))
+    agents_root = Path(environment.get("CODEX_AGENTS_ROOT", str(codex_home / "agents")))
+    environment.update(
+        {
+            "HOME": str(home),
+            "XDG_STATE_HOME": str(state_root().parent),
+            "CODEX_AGENTS_SOURCE_ROOT": str(repo / "codex/.codex/agents"),
+            "CODEX_AGENTS_ROOT": str(agents_root),
+        }
+    )
+    mode = "--check-rollback" if check_only else "--rollback"
+    subprocess.run(
+        [sys.executable, str(manager), mode, str(backup)],
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=environment,
+    )
+
+
 def cmd_rollback(args: argparse.Namespace) -> int:
     target = migration_target(args.id)
     verify_migration_checksums(target)
     plan = json.loads((target / "plan.json").read_text(encoding="utf-8"))
     modules = string_list(plan.get("modules"), "plan.modules")
+    repo = repository(args.repo)
     status = (target / "status").read_text(encoding="utf-8").strip() if (target / "status").is_file() else ""
     if status == "rolled-back":
         preview = {"migration": target.name, "already_rolled_back": True, "remove_modules": modules}
@@ -1699,9 +1780,20 @@ def cmd_rollback(args: argparse.Namespace) -> int:
             print(target)
         return 0
     home = Path.home().resolve()
-    checkpoint = stow_checkpoint_actions(target, home)
+    agent_backup = codex_agent_backup(target) if "codex" in modules else None
+    if agent_backup is not None:
+        run_codex_agent_rollback(repo, home, agent_backup, check_only=True)
+    checkpoint_ignored: set[str] = set()
+    if "codex" in modules and (target / "stow-checkpoint").is_file():
+        intents = dict(read_link_manifest(target / "stow-intent.tsv", "stow-intent.tsv"))
+        read_stow_before(target / "stow-before.tsv", intents)
+        remaining = managed_codex_agent_links(repo, home, list(intents.items()))
+        checkpoint_ignored = set(intents) - {relative for relative, _ in remaining}
+    checkpoint = stow_checkpoint_actions(target, home, checkpoint_ignored)
     if checkpoint is None:
         applied = read_link_manifest(target / "applied-links.tsv", "applied-links.tsv")
+        if "codex" in modules:
+            applied = managed_codex_agent_links(repo, home, applied)
         stow_removals = applied
         stow_restorations: list[tuple[str, str]] = []
     else:
@@ -1723,6 +1815,15 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     if previous and not restore_manifest.is_file():
         raise ValueError("Falta previous-restore-links.tsv; esta migración no tiene un rollback seguro")
     previous_restore = read_link_manifest(restore_manifest, "previous-restore-links.tsv") if restore_manifest.is_file() else []
+    if "codex" in modules:
+        previous_paths = {relative for relative, _ in previous}
+        previous = managed_codex_agent_links(repo, home, previous)
+        transferred_previous = previous_paths - {relative for relative, _ in previous}
+        previous_restore = [(relative, link) for relative, link in previous_restore if relative not in transferred_previous]
+        legacy_paths = {relative for relative, _ in legacy_live}
+        legacy_live = managed_codex_agent_links(repo, home, legacy_live)
+        transferred_legacy = legacy_paths - {relative for relative, _ in legacy_live}
+        legacy = [(relative, link) for relative, link in legacy if relative not in transferred_legacy]
     generated, installed, generated_previous, removed = generated_entries(target)
     allow_absent = status in ("retired", "retiring") or (target / "retire-intent").is_file()
     preflight_snapshot_links([*stow_restorations, *previous_restore, *legacy])
@@ -1775,11 +1876,15 @@ def cmd_rollback(args: argparse.Namespace) -> int:
     restore_links(home, stow_restorations)
     restore_links(home, previous_restore_actions)
     restore_links(home, legacy_restore_actions)
+    if agent_backup is not None:
+        run_codex_agent_rollback(repo, home, agent_backup, check_only=False)
     restore_derived_state(target)
     if manager_available:
         subprocess.run(["systemctl", "--user", "daemon-reload"], check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    checkpoint_active, checkpoint_snapshots = checkpoint_restored_entries(target, home)
+    checkpoint_active, checkpoint_snapshots = checkpoint_restored_entries(
+        target, home, checkpoint_ignored
+    )
     if previous_removal_started:
         previous_active, previous_snapshots = removal_active_entries(
             home, previous, previous_restore, completed=previous_was_removed
@@ -1817,9 +1922,14 @@ def cmd_retire(args: argparse.Namespace) -> int:
     status = (target / "status").read_text(encoding="utf-8").strip() if (target / "status").is_file() else ""
     if status != "applied":
         raise ValueError("La última migración no está aplicada; no hay una composición activa que retirar")
+    plan = json.loads((target / "plan.json").read_text(encoding="utf-8"))
+    modules = string_list(plan.get("modules"), "plan.modules")
+    repo = repository(args.repo)
     applied = read_link_manifest(target / "applied-links.tsv", "applied-links.tsv")
     generated, installed, _, _ = generated_entries(target)
     home = Path.home().resolve()
+    if "codex" in modules:
+        applied = managed_codex_agent_links(repo, home, applied)
     preflight_remove_links(home, applied)
     generated_actions = sorted(preflight_generated(generated, installed))
     manager_available = user_manager_available()

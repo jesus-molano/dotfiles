@@ -8,9 +8,9 @@ readonly DOTFILES_DIR
 
 mode=${1:---check}
 case "$mode" in
-	--check | --apply | --check-remove | --remove) ;;
+	--check | --verify | --apply | --check-remove | --remove) ;;
 	*)
-		printf 'Uso: %s [--check|--apply|--check-remove|--remove]\n' "$0" >&2
+		printf 'Uso: %s [--check|--verify|--apply|--check-remove|--remove]\n' "$0" >&2
 		exit 2
 		;;
 esac
@@ -160,7 +160,7 @@ for skill in "${managed_skills[@]}"; do
 done
 ((invalid == 0)) || exit 1
 
-if [[ "$mode" == --check ]]; then
+if [[ "$mode" == --check || "$mode" == --verify ]]; then
 	if ((${#retired_links[@]})); then
 		printf 'RETIRED: se respaldarán y retirarán %d enlace(s) canónicos obsoletos.\n' \
 			"${#retired_links[@]}"
@@ -171,6 +171,12 @@ if [[ "$mode" == --check ]]; then
 	else
 		printf 'OK: %d skills locales usan enlaces de carpeta compatibles con Codex.\n' \
 			"${#managed_skills[@]}"
+	fi
+	# --check es un preflight: una sincronización prevista no es un error.
+	# --verify acredita el despliegue actual y debe fallar ante cualquier pendiente.
+	if [[ "$mode" == --verify ]] && ((pending || ${#retired_links[@]})); then
+		printf 'ERROR: las skills desplegadas no están sincronizadas; revisa --check antes de aplicar.\n' >&2
+		exit 1
 	fi
 	exit 0
 fi

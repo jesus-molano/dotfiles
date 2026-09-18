@@ -14,7 +14,11 @@ CHECKS = runpy.run_path(str(CHECKER), run_name="check_codex_skills_test")
 
 
 def run_checker(
-    skills: Path, agents: Path, *, required_agents: tuple[str, ...] = ()
+    skills: Path,
+    agents: Path,
+    *,
+    required_agents: tuple[str, ...] = (),
+    installed_skills_roots: tuple[Path, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
     command = [
         str(CHECKER),
@@ -25,6 +29,8 @@ def run_checker(
     ]
     for agent in required_agents:
         command.extend(("--required-agent", agent))
+    for installed_root in installed_skills_roots:
+        command.extend(("--installed-skills-root", str(installed_root)))
     return subprocess.run(
         command,
         text=True,
@@ -59,7 +65,119 @@ def write_metadata(skill: Path, *, implicit: bool) -> None:
     )
 
 
+def write_installed_skill(root: Path, directory: str, name: str) -> Path:
+    skill = root / directory
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_text(
+        f"---\nname: {name}\n---\n\n# External skill\n", encoding="utf-8"
+    )
+    return skill
+
+
 class CheckCodexSkillsTest(unittest.TestCase):
+    def test_installed_skills_reject_duplicate_frontmatter_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            write_installed_skill(installed, "active", "frontend-task")
+            write_installed_skill(installed, "backup", "frontend-task")
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("name instalado duplicado frontend-task", checked.stderr)
+
+    def test_installed_skills_compare_all_repeated_roots(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            first = root / "first"
+            second = root / "second"
+            write_installed_skill(first, "first-layout", "shared-name")
+            write_installed_skill(second, "second-layout", "shared-name")
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(first, second)
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("name instalado duplicado shared-name", checked.stderr)
+
+    def test_installed_symlink_and_backup_with_same_name_are_duplicates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            source = write_installed_skill(root / "sources", "active", "reuse-first")
+            installed.mkdir()
+            (installed / "reuse-first").symlink_to(source, target_is_directory=True)
+            write_installed_skill(installed, "reuse-first.backup", "reuse-first")
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("name instalado duplicado reuse-first", checked.stderr)
+
+    def test_installed_external_skills_only_require_distinct_names(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            write_installed_skill(installed, "different-layout", "third-party-skill")
+            write_installed_skill(installed, "another-layout", "another-skill")
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_installed_skill_walk_handles_directory_symlink_cycles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            active = write_installed_skill(installed, "active", "external-skill")
+            (active / "cycle").symlink_to(installed, target_is_directory=True)
+            (installed / "broken").symlink_to(root / "missing", target_is_directory=True)
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_installed_skills_do_not_traverse_linked_containers(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            installed.mkdir()
+            outside = root / "unrelated-home"
+            write_installed_skill(outside, "private-subtree", "must-not-be-read")
+            (installed / "escape").symlink_to(outside, target_is_directory=True)
+
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("no se recorrerá su destino", checked.stderr)
+            self.assertNotIn("must-not-be-read", checked.stderr)
+
+    def test_installed_skill_resources_are_not_discovered_as_extra_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            skills, agents, skill = roots(root, "engineering-flow")
+            write_metadata(skill, implicit=True)
+            installed = root / "installed"
+            active = write_installed_skill(installed, "active", "external-skill")
+            write_installed_skill(active, "examples/template", "external-skill")
+            checked = run_checker(
+                skills, agents, installed_skills_roots=(installed,)
+            )
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_catalog_budget_rejects_skill_or_description_growth(self) -> None:
         with self.assertRaisesRegex(ValueError, "skills"):
             CHECKS["check_catalog_budget"](21, 10)

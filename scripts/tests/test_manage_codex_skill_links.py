@@ -65,6 +65,43 @@ def run_manager(
 
 
 class ManageCodexSkillLinksTest(unittest.TestCase):
+    def test_verify_rejects_missing_links_without_changing_preflight(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            source = create_source(root)
+            skills = home / ".agents/skills"
+            state = root / "state"
+
+            planned = run_manager(home, source, skills, state, "--check")
+            verified = run_manager(home, source, skills, state, "--verify")
+
+            self.assertEqual(planned.returncode, 0, planned.stderr)
+            self.assertNotEqual(verified.returncode, 0)
+            self.assertIn("no están sincronizadas", verified.stderr)
+            self.assertFalse(skills.exists())
+            self.assertFalse(state.exists())
+
+    def test_verify_accepts_current_links_but_rejects_retired_links(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            home = root / "home"
+            source = create_source(root)
+            skills = home / ".agents/skills"
+            skills.mkdir(parents=True)
+            (skills / "example").symlink_to(source / "example")
+            retired = root / "retired-skills.txt"
+            retired.write_text("old-skill\n", encoding="utf-8")
+            state = root / "state"
+
+            current = run_manager(home, source, skills, state, "--verify", retired)
+            self.assertEqual(current.returncode, 0, current.stderr)
+            (skills / "old-skill").symlink_to(source / "old-skill")
+            stale = run_manager(home, source, skills, state, "--verify", retired)
+            self.assertNotEqual(stale.returncode, 0)
+            self.assertTrue((skills / "old-skill").is_symlink())
+            self.assertFalse(state.exists())
+
     def test_apply_backs_up_and_retires_an_exact_broken_skill_link(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

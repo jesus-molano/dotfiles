@@ -224,6 +224,8 @@ trailers `Co-authored-by`.
 ```bash
 just codex-check       # skills, agentes, pruebas, enlaces y configuración
 just atlas-check       # Project Atlas y sus tres skills gestionadas
+just codex-runtime-check # agentes y skills realmente desplegados
+just codex-agents-sync  # actualiza los TOML gestionados con respaldo
 just codex-config-sync # fusiona preferencias estables con backup
 ```
 
