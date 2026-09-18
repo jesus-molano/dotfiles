@@ -14,8 +14,9 @@ los límites de publicación, secretos e irreversibilidad siguen en `AGENTS.md`.
    skills por defecto.
 3. Pregunta solo por una decisión que afecte producto, datos, seguridad,
    compatibilidad, coste, despliegue, autoridad o una acción irreversible.
-4. Aplica el cambio mínimo. Reutiliza patrones, componentes, tokens y comandos
-   ya presentes.
+4. Antes de añadir UI o funcionalidad, busca candidatos existentes, comprueba
+   su contrato y un uso real, y decide si reutilizar, adaptar, componer o crear.
+   Aplica el cambio mínimo y justifica con rutas cualquier nueva alternativa.
 5. Ejecuta la verificación proporcional. Declara los límites que no se puedan
    verificar.
 6. Puede crear un commit local coherente después de verificar. Nunca añade
@@ -42,12 +43,16 @@ requiere una sesión nueva y confirmación inmediata antes de cambiar estado.
 
 - `engineering-flow` posee la implementación ordinaria. `codebase-design` y
   `domain-modeling` se reservan para peticiones de diseño o decisiones que
-  bloquean el cambio.
+  bloquean el cambio. La búsqueda de reutilización se aplica también a cambios
+  pequeños, aunque no se active ninguna skill de Atlas.
 - `review-web-pr` posee las revisiones de ramas Next.js, Nuxt y Vue. La revisión
   de especificaciones, estándares y cambios no web usa
   `spec-and-standards-review`.
-- Las skills de Atlas solo se activan por nombre. Atlas conserva sus fuentes y
-  sincronización propias.
+- `frontend-task` se activa por petición explícita o para frontend complejo:
+  varias autoridades, contratos compartidos, estado entre rutas, migraciones
+  amplias o continuación Atlas. `reuse-first` y `visual-direction` mantienen
+  su activación explícita o subordinada. Atlas conserva sus fuentes y
+  sincronización propias; no se duplica su decisión en otro flujo.
 - La verificación web y TDD son subordinadas: se usan cuando el cambio lo exige,
   no para añadir pasos sin valor.
 - El catálogo admite como máximo 20 skills y 700 palabras de descripciones. El
@@ -55,6 +60,22 @@ requiere una sesión nueva y confirmación inmediata antes de cambiar estado.
   descubrimiento.
 - No se instalan catálogos externos globales. Una idea externa se adopta solo si
   reduce riesgo o contexto y queda versionada, probada y revisable.
+
+## Búsqueda y continuidad
+
+`reuse-scout` usa Luna con esfuerzo bajo y solo lectura para localizar componentes
+y funcionalidades. Recibe objetivo, ruta y restricciones; devuelve candidatos,
+contratos, usos y lagunas. Una laguna concreta puede escalarse a Terra. El agente
+principal decide e implementa con esa evidencia; Astra no repite el rastreo.
+Si el entorno no permite delegación ligera, se declara y se realiza la mínima
+inspección local segura. No se cambia el modelo principal por esta política.
+
+Para trabajo sustancial, `engineering-flow` conserva un único registro con
+objetivo, tareas, decisión de reutilización, comprobaciones y siguiente paso.
+Reutiliza el artefacto existente o la continuidad Atlas. Si no existe, aplica la
+convención del repositorio y, como alternativa, `docs/work/<tarea>.md`. Los
+cambios pequeños no necesitan documento. Al retomar se contrasta el estado con
+el código actual; una comprobación histórica no acredita el delta nuevo.
 
 ## Publicación
 

@@ -6,6 +6,9 @@ description: Prepare precise continuation notes for another engineer or agent so
 # Handoff Notes
 
 Write a compact, evidence-backed continuation packet.
+If implementation already has a task record or Atlas continuation, use and link
+that artifact; do not create a competing plan. Preserve the selected reuse
+contracts, candidate paths and any verification still needed on resume.
 
 Lead with the objective, scope, authority boundaries, current status, and
 definition of done. Include decisions and rationale; files and relevant paths;

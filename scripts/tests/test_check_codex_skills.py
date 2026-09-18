@@ -13,15 +13,20 @@ CHECKER = SCRIPTS / "check-codex-skills.py"
 CHECKS = runpy.run_path(str(CHECKER), run_name="check_codex_skills_test")
 
 
-def run_checker(skills: Path, agents: Path) -> subprocess.CompletedProcess[str]:
+def run_checker(
+    skills: Path, agents: Path, *, required_agents: tuple[str, ...] = ()
+) -> subprocess.CompletedProcess[str]:
+    command = [
+        str(CHECKER),
+        "--skills-root",
+        str(skills),
+        "--agents-root",
+        str(agents),
+    ]
+    for agent in required_agents:
+        command.extend(("--required-agent", agent))
     return subprocess.run(
-        [
-            str(CHECKER),
-            "--skills-root",
-            str(skills),
-            "--agents-root",
-            str(agents),
-        ],
+        command,
         text=True,
         capture_output=True,
         check=False,
@@ -148,6 +153,77 @@ class CheckCodexSkillsTest(unittest.TestCase):
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
             self.assertIn("gpt-5.6-sol", checked.stderr)
+
+    def test_reuse_scout_accepts_its_lightweight_read_only_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
+            (agents / "reuse-scout.toml").write_text(
+                'name = "reuse-scout"\n'
+                'description = "Fixture"\n'
+                'developer_instructions = "Read only."\n'
+                'model = "gpt-5.6-luna"\n'
+                'model_reasoning_effort = "low"\n'
+                'sandbox_mode = "read-only"\n',
+                encoding="utf-8",
+            )
+            checked = run_checker(
+                skills, agents, required_agents=("reuse-scout",)
+            )
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_required_reuse_scout_cannot_be_omitted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
+            checked = run_checker(
+                skills, agents, required_agents=("reuse-scout",)
+            )
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("faltan agentes requeridos: reuse-scout", checked.stderr)
+
+    def test_reuse_scout_rejects_wrong_resource_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, _ = roots(Path(temporary))
+            agent = agents / "reuse-scout.toml"
+            agent.write_text(
+                'name = "reuse-scout"\n'
+                'description = "Fixture"\n'
+                'developer_instructions = "Read only."\n'
+                'model = "gpt-5.6-sol"\n'
+                'model_reasoning_effort = "low"\n'
+                'sandbox_mode = "read-only"\n',
+                encoding="utf-8",
+            )
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("modelo ligero gpt-5.6-luna", checked.stderr)
+
+            agent.write_text(
+                'name = "reuse-scout"\n'
+                'description = "Fixture"\n'
+                'developer_instructions = "Read only."\n'
+                'model = "gpt-5.6-luna"\n'
+                'model_reasoning_effort = "low"\n'
+                'sandbox_mode = "workspace-write"\n',
+                encoding="utf-8",
+            )
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("sandbox_mode = read-only", checked.stderr)
+
+            agent.write_text(
+                'name = "reuse-scout"\n'
+                'description = "Fixture"\n'
+                'developer_instructions = "Read only."\n'
+                'model = "gpt-5.6-luna"\n'
+                'model_reasoning_effort = "medium"\n'
+                'sandbox_mode = "read-only"\n',
+                encoding="utf-8",
+            )
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("model_reasoning_effort = low", checked.stderr)
 
 
 if __name__ == "__main__":

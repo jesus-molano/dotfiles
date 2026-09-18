@@ -8,6 +8,11 @@
 4. Define cómo se demostrará que el trabajo está terminado.
 5. Deja que Codex inspeccione el repositorio y seleccione las skills.
 
+No necesitas pedir reutilización en cada prompt. Antes de crear UI o lógica,
+Codex debe localizar lo existente, leer su contrato y un uso real. La búsqueda
+se delega a `reuse-scout` con Luna; el agente principal decide cómo integrarlo.
+La comprobación también se aplica a cambios pequeños fuera de Atlas.
+
 Plantilla recomendada:
 
 ```text
@@ -106,7 +111,10 @@ consume contexto cuando se carga.
 ## Evita IA slop en frontend
 
 - Indica la fuente de verdad: Figma, ticket, componente, ruta o contrato.
-- Exige reutilizar componentes, tokens y patrones existentes.
+- La reutilización es obligatoria cuando existe una solución compatible: por
+  ejemplo, el diálogo o componente de texto del proyecto antes de recrearlos
+  con HTML y estilos. Si hace falta algo nuevo, Codex debe justificarlo con
+  candidatos y rutas; no basta con afirmar que no encontró nada.
 - Define los estados `loading`, vacío, error, éxito y deshabilitado que apliquen.
 - Incluye responsive, foco visible, teclado y semántica accesible.
 - Pide que no invente copy, iconos, animaciones o componentes sin autoridad.
@@ -197,9 +205,15 @@ implementación interna.
 Antes de aceptar un resultado, comprueba que Codex indique:
 
 - qué cambió;
+- qué componente o función reutilizó/adaptó, o por qué necesitó crear otro;
 - qué pruebas ejecutó y su resultado;
 - qué no pudo verificar;
 - qué riesgo residual permanece.
+
+En trabajos sustanciales, el registro de la tarea conserva estas evidencias y
+el siguiente paso para retomar. Se reutiliza el registro existente; no se crean
+planes paralelos ni copias automáticas en memoria. Los cambios pequeños se
+documentan en el cierre normal.
 
 Una implementación verificada puede producir un commit local coherente. El push
 requiere una petición explícita y publica solo el OID verificado. Nunca se añaden

@@ -23,6 +23,12 @@ Priorizar, en este orden:
 5. Rendimiento medible: waterfalls, bundles, renders y consultas innecesarias.
 6. Cobertura de pruebas y observabilidad.
 
+En UI o funcionalidad nueva, contrasta la decisión de reutilización con el
+componente, wrapper o función existente y un uso real. Señala duplicaciones o
+desvíos de componentes y tokens soportados con rutas y consecuencias concretas
+(comportamiento, accesibilidad, consistencia o mantenimiento). No exijas una
+abstracción incompatible ni confundas HTML nativo establecido con duplicación.
+
 Usar hasta tres subagentes solo cuando los ejes sean independientes y el diff lo justifique. Evitar comentarios puramente estilísticos, hipótesis sin camino de código y recomendaciones genéricas.
 
 ## Validar hallazgos

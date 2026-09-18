@@ -7,6 +7,23 @@
   terminología coherente y sin modismos ni ambigüedad. Define solo el vocabulario
   técnico necesario. No sacrifiques precisión, contexto útil ni código exacto.
 - Conserva los cambios locales ajenos a la tarea.
+- Antes de añadir o sustituir UI o funcionalidad, incluso en cambios pequeños,
+  busca la solución existente en el área y en los módulos compartidos. Lee su
+  contrato y un uso real; prioriza reutilizar, adaptar o componer. En UI incluye
+  componentes, tipografía, tokens y patrones de interacción. No recrees con HTML
+  y estilos un componente adecuado ya disponible. Si creas algo, justifica la
+  carencia o incompatibilidad con rutas concretas. Esta comprobación se aplica
+  aunque no se active `frontend-task` ni Atlas; no exige activarlos.
+- Si falta evidencia vigente, delega el rastreo de candidatos reutilizables a
+  `reuse-scout` (Luna, esfuerzo bajo, solo lectura) con alcance acotado. Si
+  `frontend-task` ya tiene la decisión y evidencia Atlas, consúmelas sin iniciar
+  otra evaluación. Si el rol no está disponible, pide
+  ese modelo explícitamente a un subagente sin heredar todo el historial.
+  Escala a Terra solo ante una laguna concreta; reserva Astra para decisiones
+  complejas y evaluación, no para repetir la búsqueda. Reutiliza evidencia
+  vigente ya obtenida. Si no hay delegación ligera disponible, comunica el
+  límite y haz solo la inspección local mínima necesaria, sin afirmar que usaste
+  otro modelo.
 - Antes de preguntar, inspecciona el repositorio y las fuentes disponibles.
   Resuelve de forma autónoma los hechos descubribles y las decisiones locales,
   reversibles y verificables. Comunica los supuestos que afecten al resultado.

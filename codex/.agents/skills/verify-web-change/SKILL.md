@@ -16,6 +16,11 @@ description: Verify a completed Next.js, Nuxt, or Vue change with the repository
    inspect browser console and server logs. Use safe local or test data only.
 5. Compare visual states and viewports with the Figma authority, accepted
    contract, or established local pattern. Do not invent content or aesthetics.
+   Check new UI against existing components and their real usage: dialogs,
+   typography, variants and tokens as applicable. Flag recreated primitives or
+   CSS overrides that bypass a suitable supported component, citing its path
+   and the compatibility evidence. Native markup is valid when it is the local
+   convention or the existing abstraction is incompatible.
 6. Measure before and after when the change plausibly affects performance.
 
 Report commands and observations actually completed, plus every unverified

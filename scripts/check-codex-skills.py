@@ -66,6 +66,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--agents-root", type=Path, default=root / "codex/.codex/agents"
     )
+    parser.add_argument(
+        "--required-agent",
+        action="append",
+        default=[],
+        metavar="NAME",
+        help="nombre de agente que debe estar presente; se puede repetir",
+    )
     return parser.parse_args()
 
 
@@ -214,6 +221,13 @@ def check_agent(path: Path) -> str:
         and document.get("model_reasoning_effort") != "high"
     ):
         raise ValueError("todo reviewer debe declarar model_reasoning_effort = high")
+    if document["name"] == "reuse-scout":
+        if document.get("sandbox_mode") != "read-only":
+            raise ValueError("reuse-scout debe declarar sandbox_mode = read-only")
+        if document.get("model") != "gpt-5.6-luna":
+            raise ValueError("reuse-scout debe usar el modelo ligero gpt-5.6-luna")
+        if document.get("model_reasoning_effort") != "low":
+            raise ValueError("reuse-scout debe declarar model_reasoning_effort = low")
     return document["name"]
 
 
@@ -277,6 +291,11 @@ def main() -> int:
             agent_names[name] = agent
         except (OSError, ValueError, tomllib.TOMLDecodeError) as error:
             failures.append(f"{agent}: TOML no válido: {error}")
+    missing_agents = set(args.required_agent) - set(agent_names)
+    if missing_agents:
+        failures.append(
+            "faltan agentes requeridos: " + ", ".join(sorted(missing_agents))
+        )
     if failures:
         print("Skills Codex inválidas:", file=sys.stderr)
         print("\n".join(f"- {failure}" for failure in failures), file=sys.stderr)

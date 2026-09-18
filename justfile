@@ -70,7 +70,7 @@ atlas-sync:
 
 # Valida todas las skills locales y los agentes TOML de Codex sin escribir.
 codex-skills-check:
-    "{{ dotfiles_dir }}/scripts/check-codex-skills.py"
+    "{{ dotfiles_dir }}/scripts/check-codex-skills.py" --required-agent reuse-scout
 
 # Ejecuta las regresiones del tooling Codex sin generar bytecode en el repositorio.
 codex-tests:
