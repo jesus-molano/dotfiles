@@ -17,7 +17,8 @@ de IA. Kev ya está instalado y probado aquí: conserva su runtime, checkpoint,
 dependencias y drivers. Completa las comprobaciones necesarias y registra lo
 pendiente; no te limites a darme instrucciones.
 
-Primero lee AGENTS.md, docs/ai.md, docs/work/tessera-jev.md y
+Primero lee AGENTS.md, docs/ai.md, docs/work/tessera-jev.md,
+docs/work/tessera-windows-validation.md y
 ai/skills/tessera/references/contract.md del checkout. Comprueba SO, estado Git,
 remoto, rama y revisión publicada. Comprueba que los fixes Windows que publicamos
 estén incluidos: parche Kev LF/CRLF, fixture CRLF y descarga HF sin symlinks.
@@ -31,6 +32,11 @@ y utilidades. Usa tessera.py locate --repo PROJECT para resolver su almacén
 externo en LOCALAPPDATA/XDG. No crees .tessera ni cambies .gitignore en repos
 del trabajo, y no copies sus fichas, historial o evidencia a dotfiles/GitHub
 personal. Dotfiles distribuye las herramientas, nunca información de empresa.
+Si el catálogo piloto anterior ya existe en otra ruta local externa, conserva
+su copia previa, revisa sus referencias contra el checkout y cópialo al namespace
+devuelto por locate. No pierdas las fichas ni borres el original. Conserva los
+runs históricos; los antiguos sin repo_path necesitan un prepare nuevo antes
+de una evaluación futura, no se deben modificar para reutilizarlos.
 Antes de decidir, ejecuta changes: inspecciona cambios de compañeros presentes
 en el checkout, actualiza las fichas afectadas, incorpora piezas nuevas y
 reconcilia bajas/renombrados. Conserva una copia previa local; actualiza la

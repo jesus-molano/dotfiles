@@ -179,6 +179,10 @@ El PC del trabajo ya tiene runtime. La siguiente actualización conserva su
 checkpoint, drivers y dependencias; no repite la instalación ni amplía el modelo.
 Los arreglos de portabilidad comunicados allí cubren LF/CRLF del parche Kev,
 fixture CRLF de Tessera y descargas Hugging Face sin symlinks en Windows.
+El commit `53c72c15a42231275cf3ae351a841a70851d217a` publicado desde ese equipo
+se integra completo con las correcciones locales. Su informe reproducible está
+en `docs/work/tessera-windows-validation.md`; este host verifica la integración
+con las regresiones Python, no repite la inferencia Windows.
 
 ## Verificación y continuación
 
@@ -215,3 +219,7 @@ independiente detectó y cerró cambios locales fuera de ámbito, revalidación 
 la ubicación de runs trasladados y privacidad POSIX de las entradas. La última
 pasada no encontró más problemas; el filtro de caché conserva backups completos.
 Estas pruebas no hacen llamadas nuevas a Jev/Kev ni acreditan ejecución Windows.
+Tras integrar el commit Windows, la suite conjunta pasa 176 pruebas en este
+host (175 correctas, una omitida), incluida la regresión real Git de parches
+LF/CRLF. Las nuevas comprobaciones de almacenamiento y exportación deben
+ejecutarse también en el PC receptor mediante el prompt de actualización.

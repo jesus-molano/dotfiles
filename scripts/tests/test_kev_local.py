@@ -15,6 +15,24 @@ SPEC.loader.exec_module(kev)
 
 
 class KevLocalTest(unittest.TestCase):
+    def test_patch_accepts_lf_and_crlf_without_changing_result_bytes(self):
+        for newline in (b"\n", b"\r\n"):
+            with self.subTest(newline=newline), tempfile.TemporaryDirectory(prefix="kev patch ") as directory:
+                root = Path(directory)
+                kev.run("git", "init", "-q", root, capture=True)
+                kev.run("git", "config", "core.autocrlf", "false", cwd=root)
+                (root / "kev").mkdir()
+                target = root / "kev/serve.py"
+                target.write_bytes(b"strict = False\n")
+                patch_file = root / "input.patch"
+                patch_file.write_bytes(newline.join([
+                    b"diff --git a/kev/serve.py b/kev/serve.py",
+                    b"--- a/kev/serve.py", b"+++ b/kev/serve.py", b"@@ -1 +1 @@",
+                    b"-strict = False", b"+strict = True", b"",
+                ]))
+                kev.apply_server_patch(root, patch_file)
+                self.assertEqual(target.read_bytes(), b"strict = True\n")
+
     def test_existing_destination_is_never_replaced(self):
         with tempfile.TemporaryDirectory(prefix="kev runtime ") as directory:
             root = Path(directory)
@@ -104,6 +122,8 @@ class KevLocalTest(unittest.TestCase):
             self.assertEqual(args[0][-4:], ["--host", "127.0.0.1", "--port", "8009"])
             self.assertEqual(kwargs["env"]["KEV_DTYPE"], "fp32")
             self.assertEqual(kwargs["env"]["KEV_BACKEND"], "torch")
+            if os.name == "nt":
+                self.assertEqual(kwargs["env"]["HF_HUB_DISABLE_SYMLINKS"], "1")
 
     @unittest.skipIf(os.name == "nt", "XDG is the Linux path contract")
     def test_per_host_xdg_path(self):
