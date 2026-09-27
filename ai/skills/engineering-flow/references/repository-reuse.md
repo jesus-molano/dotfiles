@@ -5,6 +5,12 @@ goal is to use the repository's supported solution, not merely make new code
 look similar. Reuse inspected earlier in the same task remains valid unless
 requirements, contracts, or the relevant code changed.
 
+If `.tessera/catalog.json` exists, use `tessera` to consult the full declared
+catalog and route a material implementation choice to its decision provider.
+Use the scout to fill evidence gaps or expand coverage, not to shortlist or
+filter the catalog before the decision provider sees it. Without Tessera, use
+the existing discovery workflow below. Neither route depends on Atlas.
+
 Delegate candidate discovery to the configured `reuse-scout` (light model,
 read-only). Give it the repository, requested behavior, relevant platform and
 known owner paths, not the whole conversation. One bounded search returns
@@ -23,7 +29,9 @@ inspection; never claim a model switch that did not happen.
    platform/runtime compatibility. For functionality, inspect existing hooks,
    services, helpers, validation and generated clients before adding equivalent
    logic. A search hit or matching name alone does not establish suitability.
-3. Choose `reuse`, `extend`, `compose`, `extract-and-reuse`, `create`, or
+3. When using Tessera, retain its `reuse`, `modify`, `wrap`, `create` or
+   `insufficient_evidence` vocabulary in the decision record. Without Tessera,
+   choose `reuse`, `extend`, `compose`, `extract-and-reuse`, `create`, or
    `not-applicable`. Briefly name the candidate path and the reason. For `create`,
    give the nearest rejected candidate and concrete missing capability, or the
    searched locations when no candidate exists. An incomplete search is an

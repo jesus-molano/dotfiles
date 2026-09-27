@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "kind": "agent_authored_evaluation_criteria_not_model_output",
+  "notes": "Escenarios de evaluación sobre código real; no son nuevas funcionalidades solicitadas. Nunca incluir este archivo en el contexto del decisor. No obligan a Jev a acertar una etiqueta; revisar desacuerdos con evidencia.",
+  "cases": {
+    "action-button": {
+      "action": "reuse",
+      "primary": "button"
+    },
+    "select-order": {
+      "action": "modify",
+      "primary": "select-menu"
+    },
+    "pending-action": {
+      "action": "wrap",
+      "primary": "button"
+    },
+    "signature-pad": {
+      "action": "create",
+      "primary": null
+    }
+  }
+}

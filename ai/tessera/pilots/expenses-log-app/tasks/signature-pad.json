@@ -1,0 +1,8 @@
+{
+  "id": "signature-pad",
+  "requirement": "Añadir una superficie de firma manuscrita con puntero como responsabilidad principal nueva.",
+  "acceptance": [
+    "Registrar trazos de dibujo libres con captura de puntero, limpiar el dibujo y exportar la firma.",
+    "Comparar todas las fichas del ámbito; botones o superficies auxiliares por sí solos no implementan el dibujo."
+  ]
+}

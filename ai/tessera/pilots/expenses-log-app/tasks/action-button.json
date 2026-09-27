@@ -1,0 +1,8 @@
+{
+  "id": "action-button",
+  "requirement": "Añadir una acción secundaria de tamaño pequeño a una fila de ajustes.",
+  "acceptance": [
+    "Debe renderizar un botón nativo type=button, aceptar onClick y desactivarse cuando busy es true.",
+    "No necesita semántica nueva ni modificar el componente compartido."
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "id": "select-order",
+  "requirement": "Permitir a los consumidores de selección única conservar el orden recibido cuando lo soliciten.",
+  "acceptance": [
+    "Mantener el orden alfabético por defecto para los consumidores actuales.",
+    "Añadir una opción para respetar el orden de options; conservar click, teclado y el contrato controlado."
+  ]
+}

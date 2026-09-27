@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "measured_on": "2026-09-27",
+  "provider": "kev",
+  "model": "kev-latest",
+  "post_attempts": 10,
+  "decision_attempts": 4,
+  "overflow_check": {
+    "status": 422,
+    "body": {
+      "detail": "state exceeds 65536 tokens: 70005"
+    }
+  },
+  "server_revision": "9c41005b2180347c3c646dfc9e50c4428483ec6b",
+  "server_patch": "strict=True in Server.submit encode",
+  "server_serve_sha256": "1780dd9f8355a13a09ebe849ac4093b46b59055f7e5c302ab2283b608513418f",
+  "server_metadata": {
+    "name": "kev-latest",
+    "description": "Kev pointer head on Qwen/Qwen3.5-0.8B-Base, serving jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e at temperature 2.35",
+    "release_date": "2026-09-24",
+    "run": "jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e",
+    "base": "Qwen/Qwen3.5-0.8B-Base",
+    "lora": 16,
+    "device": "cuda",
+    "backend": "torch",
+    "dtype": "bfloat16",
+    "temperature": 2.3510958125672174,
+    "cuda_graphs": null,
+    "prefix_cache": {
+      "size": 1,
+      "min_state_tokens": 0,
+      "max_tokens": 8192,
+      "hits": 0,
+      "misses": 0,
+      "cached_states": 0,
+      "oom_retries": 0
+    },
+    "batches": {
+      "count": 0,
+      "requests": 0,
+      "queued": 0
+    }
+  },
+  "gpu": "NVIDIA RTX 3060 Ti 8192 MiB",
+  "observed_total_gpu_used_mib_after_four_calls": 3127,
+  "gpu_measurement_note": "Instantánea total del equipo con escritorio, no pico ni consumo exclusivo de Kev.",
+  "runs": [
+    {
+      "task_id": "action-button",
+      "run_path": "runs/local-kev-action-button",
+      "status": "validated",
+      "raw_choice": "insufficient_evidence",
+      "confidence": 0.1434,
+      "probability_sum": 0.9997,
+      "entry_count": 14,
+      "options": 44,
+      "context_identical_to_jev": true,
+      "context_sha256": "2bb07dae2797b11c285fadc9feab0479794c3afc82f8be2544ccc62ff9944574",
+      "request_sha256": "753efbb6ea6941e7a0e35e96d16e7d7c66da721e7bea33b6735974acbffb6d55",
+      "response_sha256": "b5c346386cbde323e68e18421cb51d0127af95c230bb5efbb6293553ba84720f",
+      "elapsed_seconds": 1.1743936780003423,
+      "usage": {
+        "input_tokens": 4117,
+        "output_tokens": 623
+      },
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "request_bytes": 21722,
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6"
+    },
+    {
+      "task_id": "select-order",
+      "run_path": "runs/local-kev-select-order",
+      "status": "validated",
+      "raw_choice": "insufficient_evidence",
+      "confidence": 0.1439,
+      "probability_sum": 1.0001,
+      "entry_count": 14,
+      "options": 44,
+      "context_identical_to_jev": true,
+      "context_sha256": "4a2d1bca1d4d5e15ff9cbf5c56ea130ab095f23e536073229f6f76419af4d9f3",
+      "request_sha256": "fb28a728c84117df0ffe3409bf5ccaec7d808dafafb5561f5338f18648959000",
+      "response_sha256": "8ba463da5fa781c6e7b28ec2697a83bdc85bf0568e454aeb213bacd2206cb539",
+      "elapsed_seconds": 0.5979403740002454,
+      "usage": {
+        "input_tokens": 4122,
+        "output_tokens": 624
+      },
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "request_bytes": 21759,
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6"
+    },
+    {
+      "task_id": "pending-action",
+      "run_path": "runs/local-kev-pending-action",
+      "status": "validated",
+      "raw_choice": "insufficient_evidence",
+      "confidence": 0.1767,
+      "probability_sum": 0.9999,
+      "entry_count": 14,
+      "options": 44,
+      "context_identical_to_jev": true,
+      "context_sha256": "904ca0b9373c914b37e63305c97ff58451a7cb404830d86bca938fdd8f8f295c",
+      "request_sha256": "45ad31269f49135284708a5a1ac28d25843f5c147bcad417fd90ff4e354fccb9",
+      "response_sha256": "179e00ba27d7fe9ed3f36e3415523b180c5df84852bff904dc009fbce13bce66",
+      "elapsed_seconds": 0.5993148639990977,
+      "usage": {
+        "input_tokens": 4150,
+        "output_tokens": 627
+      },
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "request_bytes": 21851,
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6"
+    },
+    {
+      "task_id": "signature-pad",
+      "run_path": "runs/local-kev-signature-pad",
+      "status": "validated",
+      "raw_choice": "insufficient_evidence",
+      "confidence": 0.1708,
+      "probability_sum": 1.0003,
+      "entry_count": 14,
+      "options": 44,
+      "context_identical_to_jev": true,
+      "context_sha256": "355486772f62907a46277b99584f0c631413954106e66e01911554b403ac5049",
+      "request_sha256": "8bd5682a82f2e8e4be224ce6a6d21ae3ba3ceed953414c964058e3a303ed141b",
+      "response_sha256": "d31d4de5de2d498f0ff81bbdc6b9130435cc1f66ef1d6ebeb50096a3acddd6e5",
+      "elapsed_seconds": 0.5966977730004146,
+      "usage": {
+        "input_tokens": 4132,
+        "output_tokens": 626
+      },
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "request_bytes": 21784,
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6"
+    }
+  ],
+  "assessment": "Protocolo e integridad completos verificados. Kev-0.8B se abstuvo en cuatro de cuatro escenarios; no ha demostrado utilidad como selector en este catálogo español con 44 opciones. Alternativa experimental, sin fallback automático. Una llamada por caso; no atribuir la causa al idioma o al tamaño sin evaluación específica.",
+  "diagnostic_attempts": 5,
+  "diagnostics": [
+    {
+      "case": "simple-english",
+      "choice": "billing",
+      "confidence": 0.7131,
+      "elapsed_seconds": 0.23431146899929445,
+      "usage": {
+        "input_tokens": 48,
+        "output_tokens": 63
+      },
+      "catalog_entries": null,
+      "options": 3
+    },
+    {
+      "case": "component-only-action-button",
+      "choice": "button",
+      "confidence": 0.2247,
+      "elapsed_seconds": 0.41335277300095186,
+      "usage": {
+        "input_tokens": 2871,
+        "output_tokens": 204
+      },
+      "catalog_entries": 14,
+      "options": 15
+    },
+    {
+      "case": "component-only-select-order",
+      "choice": "none",
+      "confidence": 0.2017,
+      "elapsed_seconds": 0.38873445100034587,
+      "usage": {
+        "input_tokens": 2876,
+        "output_tokens": 204
+      },
+      "catalog_entries": 14,
+      "options": 15
+    },
+    {
+      "case": "component-only-pending-action",
+      "choice": "none",
+      "confidence": 0.3343,
+      "elapsed_seconds": 0.3986020690008445,
+      "usage": {
+        "input_tokens": 2904,
+        "output_tokens": 204
+      },
+      "catalog_entries": 14,
+      "options": 15
+    },
+    {
+      "case": "component-only-signature-pad",
+      "choice": "none",
+      "confidence": 0.1843,
+      "elapsed_seconds": 0.3895456030004425,
+      "usage": {
+        "input_tokens": 2886,
+        "output_tokens": 206
+      },
+      "catalog_entries": 14,
+      "options": 15
+    }
+  ],
+  "diagnostic_assessment": "El control simple en inglés eligió billing. Con todas las 14 fichas y selección solo de componente (15 opciones) eligió button/none/none/none: correspondencia esperada en 2 de 4 casos, una muestra pequeña y distinta de la pregunta original. Simplificar ayudó parcialmente; no aísla idioma, tamaño ni un único factor causal. No cambia el protocolo productivo ni elimina candidatos.",
+  "selected_policy": "Usuario: Jev como motor habitual; mantener Kev-0.8B aquí como alternativa. Evaluar un Kev mayor según hardware del PC del trabajo."
+}

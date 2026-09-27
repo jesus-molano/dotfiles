@@ -1,0 +1,13 @@
+diff --git a/kev/serve.py b/kev/serve.py
+index 36af4e8..50a70cf 100644
+--- a/kev/serve.py
++++ b/kev/serve.py
+@@ -113,7 +113,7 @@ class Server:
+         first question) is cached across requests, so a repeated state only pays for its question rows. latency_ms is the
+         model time of the batch the request ran in (not its wait in the queue)."""
+         if self.stopping.is_set(): raise HTTPException(503, "the server is stopping")
+-        try: enc = self.model.encode(self.tok, rec, max_state=SERVE_MAX_STATE, max_branch=SERVE_MAX_BRANCH)
++        try: enc = self.model.encode(self.tok, rec, max_state=SERVE_MAX_STATE, max_branch=SERVE_MAX_BRANCH, strict=True)
+         except ValueError as e: raise HTTPException(422, str(e))
+         done = Future()
+         self.queue.put((enc, done))

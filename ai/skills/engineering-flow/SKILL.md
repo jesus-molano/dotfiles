@@ -13,6 +13,9 @@ description: Implement a scoped feature, bug fix, refactor, or ready ticket from
    consequential decision.
 3. Before adding or replacing UI or behavior, follow
    [repository reuse](references/repository-reuse.md), including small changes.
+   If the project has a Tessera catalog, use `tessera` for the implementation
+   choice and catalog maintenance. Keep visual direction in its independent
+   design capability and memory/continuity in their existing owners.
    Reuse current evidence from the task. For web work use `playwright-cli`
    for browser verification and `review-web-pr` for independent review.
 4. For work that needs recoverable progress across meaningful steps or sessions,

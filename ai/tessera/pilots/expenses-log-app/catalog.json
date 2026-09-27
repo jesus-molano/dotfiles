@@ -1,0 +1,360 @@
+{
+  "schema": 1,
+  "project": "expenses-log-app",
+  "scope": [
+    "src/components/ui",
+    "src/shared/ui.ts"
+  ],
+  "coverage": "Piloto: todos los componentes y hooks de UI compartida, más cn. No cubre todas las features ni utilidades de dominio de la aplicación.",
+  "reviewed_revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+  "reviewed_on": "2026-09-27",
+  "supporting_files": [
+    "package.json",
+    "src/app/styles/tokens.css",
+    "src/app/styles/components.css",
+    "src/app/styles/motion-accessibility.css",
+    "src/shared/design-system-style.test.ts"
+  ],
+  "entries": [
+    {
+      "id": "button",
+      "kind": "component",
+      "summary": "Acción con semántica de botón e iconos opcionales.",
+      "contract": "Props nativas button; variant primary/secondary/danger/ghost/soft; size sm/md/lg/icon/fab; leadingIcon/trailingIcon; type por defecto button.",
+      "constraints": [
+        "No sustituye navegación; no ofrece prop loading, el consumidor controla disabled y contenido."
+      ],
+      "source": "src/components/ui/Button.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/rows/NotificationsRow.tsx",
+          "start": 1,
+          "end": 113
+        }
+      ],
+      "tests": [],
+      "name": "Button",
+      "tags": [
+        "action",
+        "native-button",
+        "icons"
+      ]
+    },
+    {
+      "id": "card",
+      "kind": "component",
+      "summary": "Tarjeta semántica y variantes SectionCard/StatCard.",
+      "contract": "Renderiza section; variant default/section/stat/muted, padding none/sm/md/lg, children, className, interactive.",
+      "constraints": [
+        "interactive solo modifica apariencia hover; no añade semántica de enlace ni callback. Se solapa parcialmente con Surface."
+      ],
+      "source": "src/components/ui/Card.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/SettingsView.tsx",
+          "start": 1,
+          "end": 60
+        }
+      ],
+      "tests": [],
+      "name": "Card / SectionCard / StatCard",
+      "tags": [
+        "container",
+        "section",
+        "statistics"
+      ]
+    },
+    {
+      "id": "compact-menu",
+      "kind": "component",
+      "summary": "Disparador y popup de menú controlado.",
+      "contract": "open/onOpenChange, label, leading, align left/right, menuRole menu/listbox, children; controla Escape, flechas, foco y cierre exterior.",
+      "constraints": [
+        "Opciones por composición; no selecciona ni ordena datos. El test de SelectMenu es cobertura indirecta y parcial."
+      ],
+      "source": "src/components/ui/CompactMenu.tsx",
+      "usages": [
+        {
+          "path": "src/components/ui/SelectMenu.tsx",
+          "start": 1,
+          "end": 96
+        }
+      ],
+      "tests": [
+        "src/components/ui/SelectMenu.test.tsx"
+      ],
+      "name": "CompactMenu",
+      "tags": [
+        "popup",
+        "menu",
+        "focus"
+      ]
+    },
+    {
+      "id": "confirm-action-dialog",
+      "kind": "component",
+      "summary": "Confirmación con acciones y frase opcional.",
+      "contract": "icon/title/body/cancelLabel/confirmLabel, confirmPhrase/confirmPhraseLabel, loading, onCancel/onConfirm. Desactiva confirmar hasta que coincide la frase.",
+      "constraints": [
+        "No reutiliza Sheet; su implementación no ofrece trampa de foco ni Escape. No asumir accesibilidad equivalente a Sheet."
+      ],
+      "source": "src/components/ui/ConfirmActionDialog.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/SettingsDialogs.tsx",
+          "start": 1,
+          "end": 62
+        }
+      ],
+      "tests": [],
+      "name": "ConfirmActionDialog",
+      "tags": [
+        "confirmation",
+        "dialog",
+        "destructive-action"
+      ]
+    },
+    {
+      "id": "date-picker-field",
+      "kind": "component",
+      "summary": "Selector de fecha con calendario en portal.",
+      "contract": "value opcional, onChange string o undefined, label, language es/en, min/max, allowClear, placeholder, className; usa date-fns.",
+      "constraints": [
+        "Fecha sin hora; depende de DOM/React, i18n, calendar y scroll lock; sin test específico de interacción."
+      ],
+      "source": "src/components/ui/DatePickerField.tsx",
+      "usages": [
+        {
+          "path": "src/features/expenses/components/form/ExpenseSchedulePicker.tsx",
+          "start": 1,
+          "end": 153
+        }
+      ],
+      "tests": [],
+      "name": "DatePickerField",
+      "tags": [
+        "form",
+        "date",
+        "calendar"
+      ]
+    },
+    {
+      "id": "field",
+      "kind": "component",
+      "summary": "Etiqueta de formulario con ayuda o error.",
+      "contract": "label/children ReactNode; hint/error string; className. Error tiene prioridad sobre hint.",
+      "constraints": [
+        "No valida datos ni crea el input; el consumidor compone el control."
+      ],
+      "source": "src/components/ui/Field.tsx",
+      "usages": [
+        {
+          "path": "src/features/expenses/components/form/ExpenseField.tsx",
+          "start": 1,
+          "end": 34
+        }
+      ],
+      "tests": [],
+      "name": "Field",
+      "tags": [
+        "form",
+        "label",
+        "validation-message"
+      ]
+    },
+    {
+      "id": "icon-button",
+      "kind": "component",
+      "summary": "Botón para acciones representadas por icono.",
+      "contract": "Props nativas button, variant default/danger/ghost, size sm/md/lg/touch; type button predeterminado.",
+      "constraints": [
+        "El consumidor aporta nombre accesible; el tipo no lo exige. No es un enlace."
+      ],
+      "source": "src/components/ui/IconButton.tsx",
+      "usages": [
+        {
+          "path": "src/features/expenses/components/RecurringOverviewButton.tsx",
+          "start": 1,
+          "end": 25
+        }
+      ],
+      "tests": [],
+      "name": "IconButton",
+      "tags": [
+        "action",
+        "icon",
+        "native-button"
+      ]
+    },
+    {
+      "id": "list-item",
+      "kind": "component",
+      "summary": "Fila presentacional con icono, título, descripción y acción.",
+      "contract": "title requerido; icon/description/action opcionales ReactNode; className.",
+      "constraints": [
+        "Renderiza div; no implementa selección ni navegación; trunca título y descripción."
+      ],
+      "source": "src/components/ui/ListItem.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/SettingRow.tsx",
+          "start": 1,
+          "end": 24
+        }
+      ],
+      "tests": [],
+      "name": "ListItem",
+      "tags": [
+        "list",
+        "row",
+        "presentation"
+      ]
+    },
+    {
+      "id": "offline-link",
+      "kind": "component",
+      "summary": "Enlace Next con navegación primaria offline.",
+      "contract": "Props de Next Link con href string; ejecuta onClick del consumidor y respeta preventDefault y modificadores. Offline usa location.assign.",
+      "constraints": [
+        "Depende de Next y DOM; no es un botón de acción. No se ha verificado offline en este piloto."
+      ],
+      "source": "src/components/ui/OfflineLink.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/SettingsView.tsx",
+          "start": 1,
+          "end": 60
+        }
+      ],
+      "tests": [],
+      "name": "OfflineLink",
+      "tags": [
+        "navigation",
+        "offline",
+        "next-link"
+      ]
+    },
+    {
+      "id": "select-menu",
+      "kind": "component",
+      "summary": "Selección única controlada sobre CompactMenu.",
+      "contract": "T string o number; open/onOpenChange/value/options/onChange; label/align opcionales. Option: value,label,detail,description,leading.",
+      "constraints": [
+        "Ordena siempre por label mediante localeCompare; no prop para mantener orden, búsqueda ni selección múltiple. Prueba click frente a pointerdown."
+      ],
+      "source": "src/components/ui/SelectMenu.tsx",
+      "usages": [
+        {
+          "path": "src/features/settings/components/rows/LanguageRow.tsx",
+          "start": 1,
+          "end": 29
+        }
+      ],
+      "tests": [
+        "src/components/ui/SelectMenu.test.tsx"
+      ],
+      "name": "SelectMenu",
+      "tags": [
+        "selection",
+        "options",
+        "controlled"
+      ]
+    },
+    {
+      "id": "sheet",
+      "kind": "component",
+      "summary": "Panel modal con foco y bloqueo del scroll.",
+      "contract": "children/className/contentClassName/ariaLabel/ariaLabelledBy/onBackdropClick. Foco inicial y restauración, ciclo Tab, Escape y backdrop.",
+      "constraints": [
+        "El consumidor controla montaje/cierre; callback opcional. No es un menú anclado; foco implementado pero sin prueba dedicada."
+      ],
+      "source": "src/components/ui/Sheet.tsx",
+      "usages": [
+        {
+          "path": "src/features/plan/components/PlanSettingsSheet.tsx",
+          "start": 1,
+          "end": 85
+        }
+      ],
+      "tests": [],
+      "name": "Sheet",
+      "tags": [
+        "modal",
+        "focus",
+        "scroll-lock"
+      ]
+    },
+    {
+      "id": "surface",
+      "kind": "component",
+      "summary": "Superficie configurable para composición.",
+      "contract": "as div/section/article; variant default/muted/raised/section/stat/empty; padding none/sm/md/lg; children/className.",
+      "constraints": [
+        "No acepta todos los atributos HTML ni interacciones. Se solapa con Card pero sus variantes y etiqueta son distintas."
+      ],
+      "source": "src/components/ui/Surface.tsx",
+      "usages": [
+        {
+          "path": "src/features/expenses/components/form/ExpenseSchedulePicker.tsx",
+          "start": 1,
+          "end": 153
+        }
+      ],
+      "tests": [],
+      "name": "Surface",
+      "tags": [
+        "container",
+        "semantic-html",
+        "layout"
+      ]
+    },
+    {
+      "id": "body-scroll-lock",
+      "kind": "hook",
+      "summary": "Bloqueo temporal del scroll del documento.",
+      "contract": "useBodyScrollLock(active, {strategy: overflow|fixed}); restaura estilos; fixed conserva scrollY.",
+      "constraints": [
+        "Requiere DOM y ciclo React. No consta prueba de bloqueos anidados; no atribuir esa garantía."
+      ],
+      "source": "src/components/ui/use-body-scroll-lock.ts",
+      "usages": [
+        {
+          "path": "src/components/ui/Sheet.tsx",
+          "start": 1,
+          "end": 145
+        }
+      ],
+      "tests": [],
+      "name": "useBodyScrollLock",
+      "tags": [
+        "hook",
+        "scroll",
+        "dom"
+      ]
+    },
+    {
+      "id": "cn",
+      "kind": "utility",
+      "summary": "Composición simple de nombres de clase.",
+      "contract": "cn(...classes: Array<string | false | null | undefined>) concatena valores truthy con espacios.",
+      "constraints": [
+        "No resuelve conflictos Tailwind ni deduplica clases; no es clsx completo."
+      ],
+      "source": "src/shared/ui.ts",
+      "usages": [
+        {
+          "path": "src/components/ui/Button.tsx",
+          "start": 1,
+          "end": 53
+        }
+      ],
+      "tests": [],
+      "name": "cn",
+      "tags": [
+        "utility",
+        "class-names",
+        "styles"
+      ]
+    }
+  ]
+}

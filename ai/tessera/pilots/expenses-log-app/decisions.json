@@ -1,0 +1,103 @@
+{
+  "cases": [
+    {
+      "agent_explanation": "Button admite variant secondary, size sm y props nativas (onClick/disabled). El consumidor puede bloquear la acción sin cambiar el contrato; la tarea no requiere una nueva API loading. El agente respalda reuse tras inspeccionar fuente y consumidor, aunque Jev reparte probabilidad entre alternativas. La revalidación del cuerpo original aplica el contrato de suma aproximada sin nueva llamada ni normalización.",
+      "context_sha256": "2bb07dae2797b11c285fadc9feab0479794c3afc82f8be2544ccc62ff9944574",
+      "decision": {
+        "action": "reuse",
+        "primary": "button"
+      },
+      "evidence_paths": [
+        "src/components/ui/Button.tsx",
+        "src/features/settings/components/rows/NotificationsRow.tsx"
+      ],
+      "implementation_result": "evaluation_only_no_application_changes",
+      "limitations": [
+        "Sin prueba dedicada de Button. Confianza compacta 0.44, probabilidades reuse 0.46, wrap 0.34 y modify 0.12: no automatizar por la etiqueta ganadora.",
+        "El validador inicial rechazó suma 0.99; el contrato SDK admite suma aproximada. Revalidación separada; failure.json y response.json originales intactos."
+      ],
+      "model": "jev-1.13.0",
+      "provider": "typesafe",
+      "request_sha256": "4f14fc6ae57100bc0c8a009ae7371c5f71ac6b7888ed855634c78ddffef063bc",
+      "response_status": "validated_after_offline_revalidation",
+      "review_status": "supported_within_scope_with_ambiguity",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "task_id": "action-button"
+    },
+    {
+      "agent_explanation": "SelectMenu ordena siempre options por label con localeCompare. Una envoltura no evita ese orden interno; ofrecer orden original opcional requiere modificar el contrato manteniendo el comportamiento predeterminado.",
+      "context_sha256": "4a2d1bca1d4d5e15ff9cbf5c56ea130ab095f23e536073229f6f76419af4d9f3",
+      "decision": {
+        "action": "modify",
+        "primary": "select-menu"
+      },
+      "evidence_paths": [
+        "src/components/ui/SelectMenu.tsx",
+        "src/features/settings/components/rows/LanguageRow.tsx",
+        "src/components/ui/SelectMenu.test.tsx"
+      ],
+      "implementation_result": "evaluation_only_no_application_changes",
+      "limitations": [
+        "El test actual cubre pointerdown/click; no demuestra orden opcional ni todo el teclado."
+      ],
+      "model": "jev-1.13.0",
+      "provider": "typesafe",
+      "request_sha256": "065a0670ae7554638218669243ccda49ba146634f2326c7230422cf908c90ad6",
+      "response_status": "validated",
+      "review_status": "supported_within_scope",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "task_id": "select-order"
+    },
+    {
+      "agent_explanation": "Button ya acepta disabled, aria-busy y children mediante props nativas. Una envoltura puede traducir pending/pendingLabel a esas props, conservar variantes/tamaños/iconos y evitar cambios al contrato base.",
+      "context_sha256": "904ca0b9373c914b37e63305c97ff58451a7cb404830d86bca938fdd8f8f295c",
+      "decision": {
+        "action": "wrap",
+        "primary": "button"
+      },
+      "evidence_paths": [
+        "src/components/ui/Button.tsx",
+        "src/features/settings/components/rows/NotificationsRow.tsx"
+      ],
+      "implementation_result": "evaluation_only_no_application_changes",
+      "limitations": [
+        "El escenario pide una envoltura explícitamente; es comprobación de contrato, no una prueba difícil de razonamiento. No se implementó el wrapper."
+      ],
+      "model": "jev-1.13.0",
+      "provider": "typesafe",
+      "request_sha256": "dfee4b9fcc75586e116aa49590019c211bbce6a7b26a0972b4ee880e5cf69e55",
+      "response_status": "validated",
+      "review_status": "supported_within_scope",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "task_id": "pending-action"
+    },
+    {
+      "agent_explanation": "Ninguna de las 14 fichas del ámbito implementa trazos de puntero, limpieza y exportación de dibujo. Surface y Button pueden apoyar la UI, pero no satisfacen su responsabilidad principal; create encaja dentro del alcance declarado.",
+      "context_sha256": "355486772f62907a46277b99584f0c631413954106e66e01911554b403ac5049",
+      "decision": {
+        "action": "create",
+        "primary": null
+      },
+      "evidence_paths": [
+        "src/components/ui/Surface.tsx",
+        "src/components/ui/Button.tsx"
+      ],
+      "implementation_result": "evaluation_only_no_application_changes",
+      "limitations": [
+        "El catálogo no cubre toda la app; antes de implementar habría que comprobar las áreas de features y utilidades de dominio. No se implementó el dibujo."
+      ],
+      "model": "jev-1.13.0",
+      "provider": "typesafe",
+      "request_sha256": "17f81b21a096fce8af99557cd80514a21b7d9cceb949113685a487794f2c5f09",
+      "response_status": "validated",
+      "review_status": "supported_within_scope",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "task_id": "signature-pad"
+    }
+  ],
+  "note": "Revisión de escenarios, no implementación. Las decisiones originales bajo runs permanecen inmutables; estas explicaciones y límites son del agente.",
+  "project": "expenses-log-app",
+  "reviewed_on": "2026-09-27",
+  "reviewer": "implementing_agent",
+  "schema": 1
+}

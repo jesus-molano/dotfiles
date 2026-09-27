@@ -1,0 +1,205 @@
+{
+  "initial_failures": [
+    {
+      "cause": "body_not_retained",
+      "http_status": 400,
+      "request_bytes": 132252,
+      "request_sha256": "8cc7cd37e106c05efdb16578f1c95335e4f5d66ec9040516d74855ee89ce284c",
+      "run_path": "runs/live-action-button"
+    },
+    {
+      "cause": "max_tokens_exceeded",
+      "http_status": 400,
+      "request_bytes": 132252,
+      "request_sha256": "8cc7cd37e106c05efdb16578f1c95335e4f5d66ec9040516d74855ee89ce284c",
+      "run_path": "runs/diagnostic-action-button"
+    }
+  ],
+  "kind": "live_provider_pilot",
+  "measured_on": "2026-09-27",
+  "model": "jev-1.13.0",
+  "note": "Cuatro escenarios sintéticos sobre código real; una llamada por escenario y estrategia. No prueba general de precisión, estabilidad, escala, idioma ni ambos clientes. La explicación es del agente; no procede de Jev.",
+  "post_attempts": 10,
+  "provider": "typesafe",
+  "runs": [
+    {
+      "catalog_sha256": "409da74031158f2ca0240e0eb4d006fac5202e51651459ba7d7b3ed7f08d2212",
+      "confidence": 0.97,
+      "context_sha256": "8192e3b4a0f12d04589e92100b1d5c2c1cc9ce05779c9f6b83d801a8335cfd1f",
+      "elapsed_seconds": 0.8156111520002014,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "reuse:button",
+      "request_bytes": 89577,
+      "request_sha256": "cb6da5730bdca00ea9adb2658453941b9d6d505838ebff43d7c04c5aa1278ebc",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/bounded-support-action-button",
+      "status": "validated",
+      "strategy": "bounded-support",
+      "task_id": "action-button",
+      "usage": {
+        "input_tokens": 24536,
+        "output_tokens": 462
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "409da74031158f2ca0240e0eb4d006fac5202e51651459ba7d7b3ed7f08d2212",
+      "confidence": 0.98,
+      "context_sha256": "a8701fff1e4315a76e5a427782fa9f362c536ca42380299212c1ffd22b6bcc93",
+      "elapsed_seconds": 0.565917492999688,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "modify:select-menu",
+      "request_bytes": 89614,
+      "request_sha256": "0b5c81aeab308fcbbf188105f54d1dfb265715dd98146c488868ddead086beb8",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/bounded-support-select-order",
+      "status": "validated",
+      "strategy": "bounded-support",
+      "task_id": "select-order",
+      "usage": {
+        "input_tokens": 24540,
+        "output_tokens": 464
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "409da74031158f2ca0240e0eb4d006fac5202e51651459ba7d7b3ed7f08d2212",
+      "confidence": 0.97,
+      "context_sha256": "568f1fcdb30b6db8be0f4d84861fd088b7a7972fc686b6080224882b128ed3f0",
+      "elapsed_seconds": 0.49262326400003076,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "wrap:button",
+      "request_bytes": 89706,
+      "request_sha256": "5dc80db818414e9469a4bec9338b903905f813d7c751578d87912c5bba2126c1",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/bounded-support-pending-action",
+      "status": "validated",
+      "strategy": "bounded-support",
+      "task_id": "pending-action",
+      "usage": {
+        "input_tokens": 24572,
+        "output_tokens": 462
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "409da74031158f2ca0240e0eb4d006fac5202e51651459ba7d7b3ed7f08d2212",
+      "confidence": 0.99,
+      "context_sha256": "ff998e722a3650bbaeb9cf5ed4387c0b3c1b0908e7a02e33bd221d917785603e",
+      "elapsed_seconds": 0.4979556059997776,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "create",
+      "request_bytes": 89639,
+      "request_sha256": "cf247b948f3792be3a14ac6f846490b5b84402e6c5c5a5731bf9f2f1d724fe53",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/bounded-support-signature-pad",
+      "status": "validated",
+      "strategy": "bounded-support",
+      "task_id": "signature-pad",
+      "usage": {
+        "input_tokens": 24552,
+        "output_tokens": 460
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6",
+      "confidence": 0.44,
+      "context_sha256": "2bb07dae2797b11c285fadc9feab0479794c3afc82f8be2544ccc62ff9944574",
+      "elapsed_seconds": 0.4224708729998383,
+      "entry_count": 14,
+      "initial_validation_error": "Distribución no normalizada",
+      "options": 44,
+      "probability_sum": 0.99,
+      "raw_choice": "reuse:button",
+      "request_bytes": 21722,
+      "request_sha256": "4f14fc6ae57100bc0c8a009ae7371c5f71ac6b7888ed855634c78ddffef063bc",
+      "revalidation_path": "runs/compact-action-button/revalidation.json",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/compact-action-button",
+      "status": "validated_after_offline_revalidation",
+      "strategy": "compact",
+      "task_id": "action-button",
+      "usage": {
+        "input_tokens": 5500,
+        "output_tokens": 462
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6",
+      "confidence": 0.98,
+      "context_sha256": "4a2d1bca1d4d5e15ff9cbf5c56ea130ab095f23e536073229f6f76419af4d9f3",
+      "elapsed_seconds": 0.5025213870003427,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "modify:select-menu",
+      "request_bytes": 21759,
+      "request_sha256": "065a0670ae7554638218669243ccda49ba146634f2326c7230422cf908c90ad6",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/compact-select-order",
+      "status": "validated",
+      "strategy": "compact",
+      "task_id": "select-order",
+      "usage": {
+        "input_tokens": 5504,
+        "output_tokens": 464
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6",
+      "confidence": 0.96,
+      "context_sha256": "904ca0b9373c914b37e63305c97ff58451a7cb404830d86bca938fdd8f8f295c",
+      "elapsed_seconds": 0.5582323309999992,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "wrap:button",
+      "request_bytes": 21851,
+      "request_sha256": "dfee4b9fcc75586e116aa49590019c211bbce6a7b26a0972b4ee880e5cf69e55",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/compact-pending-action",
+      "status": "validated",
+      "strategy": "compact",
+      "task_id": "pending-action",
+      "usage": {
+        "input_tokens": 5536,
+        "output_tokens": 462
+      },
+      "validation_error": null
+    },
+    {
+      "catalog_sha256": "551117af01586067b906573c43cb8799e52156f43ae78883c5786541bbf1a9a6",
+      "confidence": 0.98,
+      "context_sha256": "355486772f62907a46277b99584f0c631413954106e66e01911554b403ac5049",
+      "elapsed_seconds": 0.4051492899998266,
+      "entry_count": 14,
+      "options": 44,
+      "probability_sum": 1.0,
+      "raw_choice": "create",
+      "request_bytes": 21784,
+      "request_sha256": "17f81b21a096fce8af99557cd80514a21b7d9cceb949113685a487794f2c5f09",
+      "revision": "95c2f2465e355cffeee7f363d116ec160ff852eb",
+      "run_path": "runs/compact-signature-pad",
+      "status": "validated",
+      "strategy": "compact",
+      "task_id": "signature-pad",
+      "usage": {
+        "input_tokens": 5516,
+        "output_tokens": 460
+      },
+      "validation_error": null
+    }
+  ],
+  "schema": 1
+}

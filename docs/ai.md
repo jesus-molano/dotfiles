@@ -19,7 +19,9 @@ Code de Desktop); no convierte el chat normal ni Cowork en un agente de código.
 | Continuidad | Repositorio | Un documento de tarea | El mismo documento de tarea |
 | Escritorio | `host.toml` local | `special:chatgpt` | `special:claude` |
 
-Hay 16 skills propias y la skill oficial `playwright-cli`. En Windows se excluye
+La fuente incluye 17 skills propias y la skill oficial `playwright-cli`.
+`tessera` se añade en esta fase; su despliegue y prueba con ambos clientes siguen
+pendientes. En Windows se excluye
 `cachyos-host-audit`; los cinco roles siguen disponibles para revisar código,
 incluido código Linux sin ejecutarlo. Los revisores Claude solo tienen Read,
 Glob, Grep, WebFetch y WebSearch. El principal ejecuta las pruebas. Codex mantiene
@@ -197,25 +199,52 @@ ni el manifiesto para resolver un conflicto. Si una interrupción dejó `sync.lo
 comprueba que no hay otra sincronización activa antes de retirar ese archivo exacto.
 La transacción de Stow tiene su propio rollback y respaldo, independientes.
 
-## Siguiente fase: Tessera, JEV y dirección visual
+## Tessera, proveedor de decisión y dirección visual
 
 Los planes aportados en `planes-tessera-jev-claude-codex.zip` quedan como contexto
-para una fase posterior, confirmada por el usuario el 27 de septiembre de 2026.
-Esta entrega prepara su independencia del proveedor, pero no instala ni simula
-Tessera/JEV. La retirada de la skill Atlas `visual-direction` no elimina el
-checkout, datos, referencias ni temas visuales de Atlas.
+para esta fase, confirmada por el usuario el 27 de septiembre de 2026.
+Tessera sustituye la responsabilidad de catálogo de Atlas dentro del workflow
+existente. Es la base de conocimiento versionada por proyecto de componentes y
+utilidades, ampliable conforme se implementa. Memoria, continuidad y workflow
+conservan sus propietarios. La retirada de la skill Atlas `visual-direction`
+no elimina el checkout, datos, referencias ni temas visuales de Atlas.
 
-Orden del siguiente trabajo:
+La [skill neutral Tessera](../ai/skills/tessera/SKILL.md) enruta las decisiones de
+reutilizar, modificar, envolver o crear. Jev de TypeSafe es su primer adaptador
+real; catálogo, contexto e historial no dependen de ese proveedor. Cambiarlo
+requiere otro adaptador verificado, no rehacer Tessera ni simular una futura API
+de Claude o Codex. El código no está integrado como servicio permanente.
 
-1. Identificar la implementación real de JEV y verificar cómo recibe contexto y
-   devuelve decisiones. Acordar su contrato antes de diseñar alrededor de él.
-2. Elegir un proyecto piloto e inventariar componentes/utilidades con contratos,
-   usos y pruebas. Separar fichas curadas, datos derivados y decisiones.
-3. Crear un catálogo Tessera local, versionable y neutral. JEV decide reutilizar,
-   adaptar o crear; evitar filtros o límites arbitrarios antes de medirlo.
+Primer piloto: `Expenses-Log-App`, 14 fichas de UI compartida y utilidad `cn`.
+Se prepara en `ai/tessera/pilots/expenses-log-app`; no se ha escrito en la app.
+Cuatro escenarios se ejecutaron contra Jev con todas las fichas: reutilizar,
+modificar, envolver y crear. Consumo compacto: unos 5.500 tokens por caso.
+El caso de botón mostró ambigüedad; no es una prueba general de calidad.
+Kev tiene adaptador con la misma entrada y runtime local probado en Linux/CUDA.
+Kev-0.8B se abstuvo en los cuatro casos: sigue siendo experimental, sin
+equivalencia de calidad demostrada. Código/pruebas/estilos completos quedan como evidencia
+local; los motores reciben fichas, contratos y restricciones sin top-k.
+Contrato, comandos y límites en la
+[referencia de la skill](../ai/skills/tessera/references/contract.md).
+Estado verificable y continuación en [docs/work/tessera-jev.md](work/tessera-jev.md).
+La instalación de Kev se repite por equipo; el runtime, pesos y claves no se
+versionan. El [prompt para el PC del trabajo](work/tessera-work-pc.md) coordina
+actualización, despliegue de skills e instalación según su propio hardware.
+
+Secuencia de continuación:
+
+1. Usar Jev como motor habitual y conservar Kev-0.8B como alternativa local.
+   Las pruebas comparadas están registradas; no repetirlas automáticamente.
+   En el PC del trabajo elegir Kev según su hardware mediante el prompt.
+   Cada motor recibe todas las fichas; no hay filtros ni top-k en Tessera.
+2. Revisar las decisiones contra contratos, consumidores y pruebas. Completar
+   cobertura del proyecto cuando la tarea la requiera; separar curación,
+   evidencia derivada y explicación atribuida al agente.
+3. Incorporar el catálogo al proyecto y desplegar la skill desde la fuente
+   canónica después de validar. Este worktree no despliega sobre HOME.
 4. Recuperar `visual-direction` como capacidad independiente, con referencias
    compartidas y sin dependencia de Atlas; no fusionarla con Tessera.
-5. Probar reutilización, adaptación y creación con ambos clientes. Añadir Figma
+5. Probar reutilización, modificación, wrappers y creación con ambos clientes. Añadir Figma
    y automatización solo cuando el piloto demuestre una necesidad concreta.
 
 ## Fuentes de compatibilidad

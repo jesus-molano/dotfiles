@@ -38,6 +38,7 @@ IMPLICIT_SKILLS = {
     "review-web-pr",
     "spec-and-standards-review",
     "systematic-debugging",
+    "tessera",
     "to-tickets",
     "verification-before-completion",
 }

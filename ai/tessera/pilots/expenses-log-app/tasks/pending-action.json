@@ -1,0 +1,8 @@
+{
+  "id": "pending-action",
+  "requirement": "Crear una envoltura reutilizable de acción pendiente con etiqueta ocupada y semántica de botón, conservando el botón UI compartido.",
+  "acceptance": [
+    "Recibir pending y pendingLabel además de las props del botón; durante pending desactivar la acción y establecer aria-busy.",
+    "Mantener intacto el contrato del botón UI base; delegar variantes, tamaños e iconos sin copiar estilos."
+  ]
+}
