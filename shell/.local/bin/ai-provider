@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""One local provider preference; switching never starts or closes a client."""
+import argparse
+import fcntl
+import os
+from pathlib import Path
+import re
+import tempfile
+import time
+import tomllib
+import uuid
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('action', choices=['get', 'set', 'desktop', 'cli', 'class', 'workspace'], nargs='?', default='get')
+parser.add_argument('provider', choices=['claude', 'codex'], nargs='?')
+args = parser.parse_args()
+home = Path.home()
+path = Path(os.environ.get('XDG_CONFIG_HOME', home / '.config')) / 'dotfiles/host.toml'
+raw = path.read_bytes() if path.exists() else b'schema = 1\nbundles = []\n'
+config = tomllib.loads(raw.decode('utf-8'))
+settings = config.get('ai', {})
+if not isinstance(settings, dict) or set(settings) - {'provider'}:
+    parser.error('La tabla ai solo admite provider')
+provider = settings.get('provider', 'claude')
+if provider not in {'claude', 'codex'}:
+    parser.error('ai.provider debe ser claude o codex')
+if args.action == 'set':
+    if not args.provider:
+        parser.error('set requiere proveedor')
+    if path.is_symlink() or any(p.is_symlink() for p in path.parents if p != home):
+        parser.error('El host local no puede atravesar enlaces simbólicos')
+    text = raw.decode('utf-8')
+    block = f'[ai]\nprovider = "{args.provider}"\n'
+    pattern = r'^\[ai\][ \t]*(?:#[^\n]*)?\n.*?(?=^\[|\Z)'
+    if re.search(pattern, text, flags=re.M | re.S):
+        text = re.sub(pattern, block + '\n', text, flags=re.M | re.S)
+    elif 'ai' in config:
+        parser.error('Usa una tabla [ai] explícita en host.toml')
+    else:
+        text = text.rstrip() + '\n\n' + block
+    output = text.encode('utf-8')
+    if output != raw:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = path.parent / '.ai-provider.lock'
+        lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        fcntl.flock(lock_fd, fcntl.LOCK_EX)
+        temp = None
+        try:
+            if (path.read_bytes() if path.exists() else b'schema = 1\nbundles = []\n') != raw:
+                raise SystemExit('Cambio concurrente en host.toml; vuelve a intentarlo')
+            state = Path(os.environ.get('XDG_STATE_HOME', home / '.local/state')) / 'dotfiles/ai-provider'
+            state.mkdir(parents=True, exist_ok=True, mode=0o700)
+            backup = state / (time.strftime('%Y%m%d-%H%M%S') + '-' + uuid.uuid4().hex[:8] + '.toml')
+            with backup.open('xb') as out:
+                os.chmod(backup, 0o600)
+                out.write(raw)
+            fd, temp = tempfile.mkstemp(dir=path.parent, prefix='.ai-provider-')
+            with os.fdopen(fd, 'wb') as out:
+                out.write(output)
+            os.replace(temp, path)
+        finally:
+            if temp and os.path.exists(temp):
+                os.unlink(temp)
+            os.close(lock_fd)
+    print(args.provider)
+else:
+    selected = args.provider or provider
+    print({'get': selected,
+           'desktop': 'claude-desktop' if selected == 'claude' else 'codex-desktop',
+           'cli': selected,
+           'class': 'com.anthropic.Claude' if selected == 'claude' else 'codex-desktop',
+           'workspace': 'claude' if selected == 'claude' else 'chatgpt'}[args.action])

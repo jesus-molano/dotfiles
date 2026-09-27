@@ -14,11 +14,21 @@ run() {
 }
 
 mapfile -t shell_files < <(
-	git grep -Il \
-		-e '^#!/usr/bin/env bash' \
-		-e '^#!/usr/bin/bash' \
-		-e '^#!/bin/bash' \
-		-e '^#!/bin/sh' --
+	# Only the first line identifies an executable script. Documentation may
+	# contain shell examples with their own shebangs.
+	git ls-files -z | python3 -c '
+import pathlib,re,sys
+for name in sys.stdin.buffer.read().split(b"\0"):
+    if not name:
+        continue
+    path=pathlib.Path(name.decode())
+    if not path.is_file():
+        continue
+    with path.open("rb") as source:
+        first=source.readline()
+    if re.match(rb"^#!(?:/usr/bin/env bash|/usr/bin/bash|/bin/bash|/bin/sh)(?:\s|$)", first):
+        print(path)
+'
 )
 ((${#shell_files[@]})) || {
 	printf '%s\n' 'No se encontraron scripts Shell versionados.' >&2

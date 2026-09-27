@@ -119,8 +119,8 @@ fi
         by_scope: dict[str, set[str]] = {}
         for scope, _category, package, _source in rows:
             by_scope.setdefault(scope, set()).add(package)
-        self.assertEqual(len(by_scope["base"]), 118)
-        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 139)
+        self.assertEqual(len(by_scope["base"]), 120)
+        self.assertEqual(len({package for packages in by_scope.values() for package in packages}), 141)
         self.assertIn("bat", by_scope["base"])
         self.assertIn("npm", by_scope["base"])
         self.assertEqual(len(by_scope["bundle:gaming-core"]), 6)
@@ -374,7 +374,7 @@ keybord_layouts = ["es"]
             )
             qmd = (state / "dotfiles/staged/qmd/index.yml").read_text(encoding="utf-8")
             expected_atlas_path = json.dumps(str(root / "Atlas # local" / "docs"))
-            self.assertIn(f"path: {expected_atlas_path}", qmd)
+            self.assertNotIn("project-atlas:", qmd)
             exported_path = Path(self.run_tool(
                 "export", "portable", "--host-config", str(ROOT / "scripts/tests/fixtures/current-host.toml"), env=env,
             ).stdout.strip())

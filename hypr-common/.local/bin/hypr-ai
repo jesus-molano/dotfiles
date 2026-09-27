@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+resolver=${AI_PROVIDER_BIN:-ai-provider}
+hyprctl_bin=${HYPRCTL_BIN:-hyprctl}
+uwsm_bin=${UWSM_BIN:-uwsm}
+provider="$("$resolver" get)"
+focus_only=false
+background=false
+directory=$PWD
+while (($#)); do
+	case "$1" in
+	--provider) provider=${2:?}; shift 2 ;;
+	--focus) focus_only=true; shift ;;
+	--background) background=true; shift ;;
+	--directory) directory=${2:?}; shift 2 ;;
+	--) shift; break ;;
+	*) break ;;
+	esac
+done
+case "$provider" in
+claude) desktop=${CLAUDE_DESKTOP_BIN:-claude-desktop}; runtime=${CLAUDE_DESKTOP_RUNTIME:-$desktop} ;;
+codex) desktop=${CHATGPT_BIN:-$script_dir/codex-desktop}; runtime=${CHATGPT_RUNTIME:-/usr/bin/codex-desktop} ;;
+*) printf 'Proveedor inválido: %s\n' "$provider" >&2; exit 2 ;;
+esac
+class="$("$resolver" class "$provider")"
+workspace_name="$("$resolver" workspace "$provider")"
+# Only the fixed resolver supplies these strings; never interpolate user input in Lua.
+[[ "$class" == com.anthropic.Claude || "$class" == codex-desktop ]] || exit 2
+[[ "$workspace_name" == claude || "$workspace_name" == chatgpt ]] || exit 2
+focus_expression="hl.dispatch(hl.dsp.focus({ window = \"class:^${class//./\\.}$\" }))"
+# Lua needs a second escape for the literal dots in its regex string.
+focus_expression=${focus_expression//\\./\\\\.}
+show_window() {
+	local workspace
+	workspace=$("$hyprctl_bin" clients -j | jq -r --arg class "$class" \
+		'[.[] | select(.class == $class or .initialClass == $class)][0].workspace.name // empty') || return 2
+	[[ -n "$workspace" ]] || return 1
+	"$background" && return 0
+	if [[ "$workspace" == "special:$workspace_name" ]]; then
+		if "$focus_only" && "$hyprctl_bin" monitors -j | jq -e --arg name "$workspace" \
+			'any(.[]; .specialWorkspace.name == $name)' >/dev/null; then
+			"$hyprctl_bin" eval "$focus_expression"
+		else
+			"$hyprctl_bin" eval "hl.dispatch(hl.dsp.workspace.toggle_special(\"$workspace_name\"))"
+		fi
+	else
+		"$hyprctl_bin" eval "$focus_expression"
+	fi
+}
+if show_window; then exit 0; else status=$?; fi
+[[ $status == 1 ]] || exit "$status"
+# Serialize startup requests; a second request can focus after the first finishes.
+lock_root=${XDG_RUNTIME_DIR:-${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles}
+mkdir -p -- "$lock_root"
+exec 9>"$lock_root/dotfiles-ai-$provider.lock"
+flock -w 20 9 || exit 1
+if show_window; then exit 0; else status=$?; fi
+[[ $status == 1 ]] || exit "$status"
+if ! command -v "$desktop" >/dev/null 2>&1 || ! command -v "$runtime" >/dev/null 2>&1; then
+	"$background" && exit 0
+	cli="$("$resolver" cli "$provider")"
+	command -v "$cli" >/dev/null 2>&1 || {
+		desktop-notify IA "$provider no está instalado (Desktop ni CLI)." || true
+		exit 127
+	}
+	desktop-notify IA "Desktop no disponible. Abriendo $provider CLI." || true
+	if command -v zellij >/dev/null 2>&1; then
+		digest="$(printf '%s' "$directory" | sha256sum | cut -c1-12)"
+		exec "$uwsm_bin" app -- ghostty --working-directory="$directory" -e \
+			zellij attach --create "ai_${provider}_$digest" options --default-cwd "$directory" --default-shell "$cli" 9>&-
+	fi
+	exec "$uwsm_bin" app -- ghostty --working-directory="$directory" -e "$cli" 9>&-
+fi
+"$uwsm_bin" app -- "$desktop" "$@" 9>&- >/dev/null 2>&1 &
+for _ in {1..100}; do
+	if show_window; then exit 0; else status=$?; fi
+	[[ $status == 1 ]] || exit "$status"
+	sleep 0.1
+done
+printf 'hypr-ai: no apareció la ventana de %s; revisa su inicio.\n' "$provider" >&2
+exit 1

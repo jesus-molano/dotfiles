@@ -28,19 +28,3 @@ theme = "project-atlas"
 status_line = ["model-with-reasoning", "context-remaining", "used-tokens", "five-hour-limit", "weekly-limit", "git-branch"]
 terminal_title = ["spinner", "project", "task-progress"]
 notifications = ["agent-turn-complete", "approval-requested"]
-
-# Project Atlas se genera con `just atlas-sync`: Node y el clon requieren rutas
-# absolutas estables, por lo que no se deben copiar literalmente entre equipos.
-# El bloque efectivo conserva esta forma y el perfil core de seis herramientas:
-# [mcp_servers.component-atlas]
-# command = "/ruta/absoluta/al/node-estable"
-# args = ["/ruta/absoluta/project-atlas/packages/mcp/dist/index.js", "--profile", "core"]
-
-# Integración personal opcional. OAuth no se versiona. El servidor habitual es
-# técnicamente read-only; el de escritura permanece deshabilitado en la base.
-# [mcp_servers.linear]
-# url = "https://mcp.linear.app/mcp/readonly"
-#
-# [mcp_servers.linear-write]
-# url = "https://mcp.linear.app/mcp"
-# enabled = false

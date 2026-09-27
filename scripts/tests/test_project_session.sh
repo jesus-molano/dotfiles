@@ -79,7 +79,7 @@ assert_contains() {
 }
 
 resume_output=$("$project_session" --dry-run resume "$project")
-assert_contains $'DRY-RUN\tchatgpt' "$resume_output"
+assert_contains $'DRY-RUN\tai' "$resume_output"
 assert_contains $'DRY-RUN\tterminal' "$resume_output"
 [[ "$resume_output" != *$'DRY-RUN\tnvim'* ]] || {
 	printf '%s\n' 'FAIL: la sesión principal abrió Nvim pese a que ChatGPT/Codex es el flujo principal.' >&2
@@ -155,6 +155,6 @@ done
 }
 
 compatibility_output=$("$project_session" --dry-run orca "$project")
-assert_contains $'DRY-RUN\tchatgpt' "$compatibility_output"
+assert_contains $'DRY-RUN\tai' "$compatibility_output"
 
 printf '%s\n' 'PASS: project-session resuelve acciones, tareas y preview sin ejecutar aplicaciones'

@@ -35,7 +35,7 @@ mkdir -p \
 	"$fixture_repo/split-new/.config/hypr/config" \
 	"$fixture_repo/unit-test/.config/systemd/user" \
 	"$fixture_repo/mise-test/.config/mise" \
-	"$fixture_repo/codex/.agents/skills/example-skill" \
+	"$fixture_repo/ai/skills/example-skill" "$fixture_repo/codex/.agents" \
 	"$fixture_repo/python-app/.config/python-app/__pycache__" \
 	"$fixture_repo/gaming/.local/bin" \
 	"$fixture_repo/backup/.local/bin"
@@ -52,7 +52,7 @@ printf '%s\n' new-managed >"$fixture_repo/hypr-host/.config/personal.conf"
 printf '%s\n' split-monitors >"$fixture_repo/split-new/.config/hypr/config/monitors.lua"
 printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-test.service"
 printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
-printf '%s\n' '# fixture skill' >"$fixture_repo/codex/.agents/skills/example-skill/SKILL.md"
+printf '%s\n' '# fixture skill' >"$fixture_repo/ai/skills/example-skill/SKILL.md"
 printf '%s\n' retired >"$fixture_repo/codex/.agents/retired-skills.txt"
 printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.agents/retired-skills\.txt$' '^/\.codex/agents(?:/|$)' >"$fixture_repo/codex/.stow-local-ignore"
 printf '%s\n' managed-codex >"$fixture_repo/codex/.codex/workflow-test.txt"
@@ -159,7 +159,7 @@ mkdir -p "$HOME/.agents/skills"
 ln -s "$mise_expected" "$mise_target"
 ln -s "$unit_source" "$HOME/.config/systemd/user/default.target.wants/unit-test.service"
 ln -s "$mise_target" "$HOME/.local/state/mise/tracked-configs/0123456789abcdef"
-ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+ln -s "$DOTFILES_DIR/ai/skills/example-skill" "$HOME/.agents/skills/example-skill"
 mkdir -p "$HOME/.codex/agents"
 ln -s "$DOTFILES_DIR/codex/.codex/agents/reuse-scout.toml" "$HOME/.codex/agents/reuse-scout.toml"
 intent="$XDG_STATE_HOME/stow-intent.tsv"
@@ -193,19 +193,19 @@ bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 if check_dotfiles; then exit 9; fi
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
 rm -- "$HOME/.local/state/mise/tracked-configs/not-a-valid-hash"
-ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/not-example-skill"
+ln -s "$DOTFILES_DIR/ai/skills/example-skill" "$HOME/.agents/skills/not-example-skill"
 bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 if check_dotfiles; then exit 9; fi
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
 rm -- "$HOME/.agents/skills/not-example-skill"
 rm -- "$HOME/.agents/skills/example-skill"
 ln -s "$DOTFILES_DIR" "$HOME/.dotfiles"
-ln -s "$HOME/.dotfiles/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+ln -s "$HOME/.dotfiles/ai/skills/example-skill" "$HOME/.agents/skills/example-skill"
 bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 if check_dotfiles; then exit 9; fi
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$bad_before" ]]
 rm -- "$HOME/.agents/skills/example-skill"
-ln -s "$DOTFILES_DIR/codex/.agents/skills/example-skill" "$HOME/.agents/skills/example-skill"
+ln -s "$DOTFILES_DIR/ai/skills/example-skill" "$HOME/.agents/skills/example-skill"
 PLAN_MODULES=(unit-test mise-test)
 bad_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 if check_dotfiles; then exit 9; fi

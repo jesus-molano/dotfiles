@@ -1,3 +1,5 @@
+> La configuración compartida y la retirada de Atlas se describen en [la guía vigente](../ai.md).
+
 # Modelo operativo de Codex
 
 ## Objetivo
@@ -44,15 +46,12 @@ requiere una sesión nueva y confirmación inmediata antes de cambiar estado.
 - `engineering-flow` posee la implementación ordinaria. `codebase-design` y
   `domain-modeling` se reservan para peticiones de diseño o decisiones que
   bloquean el cambio. La búsqueda de reutilización se aplica también a cambios
-  pequeños, aunque no se active ninguna skill de Atlas.
+  pequeños.
 - `review-web-pr` posee las revisiones de ramas Next.js, Nuxt y Vue. La revisión
   de especificaciones, estándares y cambios no web usa
   `spec-and-standards-review`.
-- `frontend-task` se activa por petición explícita o para frontend complejo:
-  varias autoridades, contratos compartidos, estado entre rutas, migraciones
-  amplias o continuación Atlas. `reuse-first` y `visual-direction` mantienen
-  su activación explícita o subordinada. Atlas conserva sus fuentes y
-  sincronización propias; no se duplica su decisión en otro flujo.
+- Frontend usa `engineering-flow`, `reuse-scout`, `playwright-cli` y revisión web.
+
 - La verificación web y TDD son subordinadas: se usan cuando el cambio lo exige,
   no para añadir pasos sin valor.
 - El catálogo admite como máximo 20 skills y 700 palabras de descripciones. El
@@ -72,7 +71,7 @@ inspección local segura. No se cambia el modelo principal por esta política.
 
 Para trabajo sustancial, `engineering-flow` conserva un único registro con
 objetivo, tareas, decisión de reutilización, comprobaciones y siguiente paso.
-Reutiliza el artefacto existente o la continuidad Atlas. Si no existe, aplica la
+Reutiliza el artefacto existente . Si no existe, aplica la
 convención del repositorio y, como alternativa, `docs/work/<tarea>.md`. Los
 cambios pequeños no necesitan documento. Al retomar se contrasta el estado con
 el código actual; una comprobación histórica no acredita el delta nuevo.

@@ -1,3 +1,5 @@
+> La configuración compartida y la retirada de Atlas se describen en [la guía vigente](../ai.md).
+
 # Guía diaria de Codex
 
 ## Inicio rápido
@@ -11,7 +13,7 @@
 No necesitas pedir reutilización en cada prompt. Antes de crear UI o lógica,
 Codex debe localizar lo existente, leer su contrato y un uso real. La búsqueda
 se delega a `reuse-scout` con Luna; el agente principal decide cómo integrarlo.
-La comprobación también se aplica a cambios pequeños fuera de Atlas.
+La comprobación también se aplica a cambios pequeños .
 
 Plantilla recomendada:
 
@@ -83,8 +85,7 @@ Codex activa automáticamente las skills comunes a partir de la intención del
 prompt. No necesitas memorizar sus nombres.
 
 - Implementación ordinaria: `engineering-flow`.
-- Implementación frontend compleja con varias autoridades, límites compartidos,
-  migraciones amplias o una continuación Atlas: `frontend-task`.
+- Implementación frontend: `engineering-flow`, `reuse-scout` y `playwright-cli`.
 - Diagnóstico general: `systematic-debugging`.
 - Flujo web entre navegador y servidor: `debug-web-flow`.
 - Ambigüedad material: `clarify-change`.
@@ -94,15 +95,12 @@ prompt. No necesitas memorizar sus nombres.
 - Evidencia final: `verification-before-completion`.
 - Continuación en otra sesión: `handoff`.
 
-Usa una invocación explícita cuando quieras imponer un proceso, incluido Atlas
-para una tarea que no active sus señales automáticas:
+Usa una invocación explícita cuando quieras imponer un proceso:
 
 ```text
-$frontend-task Implementa el ticket ATLAS-123.
-$reuse-first Comprueba si ya existe un componente adecuado.
-$visual-direction Define la autoridad visual antes de diseñar.
-$test-driven-development Implementa esta regla con un ciclo rojo-verde.
-$verify-web-change Verifica este flujo real en navegador.
+$engineering-flow Implementa el ticket del proyecto.
+$review-web-pr Revisa el cambio frontend.
+$playwright-cli Comprueba el flujo en el navegador.
 ```
 
 No invoques varias skills por precaución. Cada skill añade instrucciones y
@@ -140,13 +138,13 @@ No inventes nuevos patrones si el repositorio ya resuelve el mismo problema.
 
 ### Busca documentación local con QMD
 
-QMD indexa solo la documentación canónica de dotfiles y Project Atlas. No
+QMD indexa solo la documentación canónica de dotfiles. No
 indexa sesiones de agentes, memoria de Codex, secretos ni todo el directorio
 personal. Usa primero la búsqueda textual, que es rápida y no carga modelos:
 
 ```bash
 qmd search "Noctalia plugin"
-qmd search "token budget" -c project-atlas
+qmd search "proveedor" -c dotfiles
 qmd get qmd://dotfiles/codex/operating-model.md --full
 ```
 
@@ -223,7 +221,7 @@ trailers `Co-authored-by`.
 
 ```bash
 just codex-check       # skills, agentes, pruebas, enlaces y configuración
-just atlas-check       # Project Atlas y sus tres skills gestionadas
+just ai-check          # Claude y Codex desde la fuente neutral
 just codex-runtime-check # agentes y skills realmente desplegados
 just codex-agents-sync  # actualiza los TOML gestionados con respaldo
 just codex-config-sync # fusiona preferencias estables con backup

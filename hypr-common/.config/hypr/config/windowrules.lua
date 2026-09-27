@@ -24,6 +24,11 @@ hl.window_rule({
     workspace = "special:chatgpt silent",
 })
 hl.window_rule({
+    name = "route-claude-to-background",
+    match = { initial_class = "^com\\.anthropic\\.Claude$" },
+    workspace = "special:claude silent",
+})
+hl.window_rule({
     name = "demo-studio-webcam-overlay",
     match = { initial_class = "^(demo-studio-webcam)$" },
     float = true,

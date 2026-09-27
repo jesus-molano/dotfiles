@@ -13,6 +13,13 @@ SYNC = runpy.run_path(SCRIPT, run_name="sync_codex_config_test")
 
 
 class SyncCodexConfigTest(unittest.TestCase):
+    def test_preserves_foreign_notifier_and_accepts_it_on_check(self) -> None:
+        rendered = SYNC["render"]('notify = ["company-notify", "--quiet"]\n')
+        document = tomllib.loads(rendered)
+        self.assertEqual(document["notify"], ["company-notify", "--quiet"])
+        self.assertTrue(SYNC["desired_state"](document))
+        self.assertEqual(SYNC["render"](rendered), rendered)
+
     def test_render_sets_model_defaults_when_missing(self) -> None:
         document = tomllib.loads(SYNC["render"](""))
 

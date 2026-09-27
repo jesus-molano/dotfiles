@@ -75,8 +75,8 @@ cat <<'JSON'
   {"has_description":true,"modmask":8,"key":"H","description":"Move focus left"},
   {"has_description":true,"modmask":64,"key":"Space","description":"Toggle English and Spanish keyboard"},
   {"has_description":true,"modmask":0,"key":"Print","description":"Capture a region"},
-  {"has_description":true,"modmask":77,"key":"W","description":"Focus or open ChatGPT"},
-  {"has_description":true,"modmask":77,"key":"P","description":"Capture a region and prepare context for ChatGPT"},
+  {"has_description":true,"modmask":77,"key":"W","description":"Focus or open selected AI"},
+  {"has_description":true,"modmask":77,"key":"P","description":"Capture a region and prepare context for selected AI"},
   {"has_description":false,"modmask":4,"key":"X","description":"Do not show"}
 ]
 JSON
@@ -126,7 +126,7 @@ for title in 'Capture context' 'Read QR code' 'Create bug capsule' \
 done
 
 expected=$(cat <<'EOF'
-capture-context	--focus chatgpt
+capture-context	--focus ai
 capture-qr
 bug-capsule
 media-convert
@@ -194,8 +194,8 @@ grep -Fxq $'Print\tCapture a region' <<<"$keybindings"
 [[ $(PATH="$test_root/bin:$PATH" "$launcher" list keybindings-windows) == $'Alt + H\tMove focus left' ]]
 media_keys=$(PATH="$test_root/bin:$PATH" "$launcher" list keybindings-media)
 grep -Fxq $'Print\tCapture a region' <<<"$media_keys"
-grep -Fxq $'Hyper + P\tCapture a region and prepare context for ChatGPT' <<<"$media_keys"
-[[ $(PATH="$test_root/bin:$PATH" "$launcher" list keybindings-apps) == $'Hyper + W\tFocus or open ChatGPT' ]]
+grep -Fxq $'Hyper + P\tCapture a region and prepare context for selected AI' <<<"$media_keys"
+[[ $(PATH="$test_root/bin:$PATH" "$launcher" list keybindings-apps) == $'Hyper + W\tFocus or open selected AI' ]]
 system_keys=$(PATH="$test_root/bin:$PATH" "$launcher" list keybindings-system)
 grep -Fxq $'Hyper + 7\tToggle keybindings panel' <<<"$system_keys"
 grep -Fxq $'Super + Space\tToggle English and Spanish keyboard' <<<"$system_keys"

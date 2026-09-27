@@ -60,13 +60,17 @@ doctor-live:
 dictation-setup model="base":
     "{{ dotfiles_dir }}/hypr-common/.local/bin/local-dictation" setup {{ quote(model) }}
 
-# Comprueba la copia vendorizada, las tres skills instaladas y el MCP de Atlas.
-atlas-check:
-    "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --check
+# Previsualiza / aplica / verifica los dos clientes desde ai/.
+ai-plan:
+    python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" plan
 
-# Instala copias reales de las skills y registra solo el bloque MCP de Atlas.
-atlas-sync:
-    "{{ dotfiles_dir }}/scripts/sync-project-atlas.sh" --apply
+ai-sync:
+    python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" apply
+
+ai-check:
+    python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" check
+    python3 "{{ dotfiles_dir }}/scripts/render-ai.py" --check
+    @just --justfile "{{ justfile() }}" codex-check
 
 # Valida todas las skills locales y los agentes TOML de Codex sin escribir.
 codex-skills-check:
@@ -104,11 +108,11 @@ codex-config-sync:
 codex-clean-rules:
     "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --apply
 
-# Prepara Node en mise y muestra si fnm/Atlas siguen pendientes de migración.
+# Prepara Node en mise y muestra si fnm siguen pendientes de migración.
 toolchain-check:
     "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --check
 
-# Retira fnm solo tras validar mise; reconfigura y prueba Atlas con rollback.
+# Retira fnm solo tras validar mise; con rollback.
 toolchain-migrate:
     "{{ dotfiles_dir }}/scripts/migrate-node-to-mise.sh" --apply
 

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 mode=check
 [[ ${1:-} != --apply ]] || mode=apply
 node_version=26.5.1
@@ -31,21 +30,17 @@ node_path="$node_root/bin/node"
 
 if ! pacman -Qq fnm >/dev/null 2>&1; then
 	printf '✓ mise usa %s y fnm ya no está instalado.\n' "$node_path"
-	# Una sesión iniciada con fnm conserva sus directorios en PATH incluso tras
-	# retirar el paquete. Fuerza delante el Node estable que acabamos de validar.
-	exec env PATH="$node_root/bin:$PATH" \
-		"$repo_root/scripts/sync-project-atlas.sh" --check
+	exit 0
 fi
 
 if [[ "$mode" == check ]]; then
 	printf '✓ mise está preparado: %s\n' "$node_path"
-	printf '%s\n' '! Migración pendiente: fnm sigue instalado y Atlas aún depende de él.'
+	printf '%s\n' '! Migración pendiente: fnm sigue instalado.'
 	exit 1
 fi
 
 printf '%s\n' 'Paquete exacto que se retirará: fnm.'
 printf '%s\n' "Node sustituto validado: $node_path"
-printf '%s\n' 'Después se reregistrará únicamente [mcp_servers.component-atlas] con backup.'
 printf 'Escribe MIGRAR: '
 read -r confirmation
 [[ "$confirmation" == MIGRAR ]] || {
@@ -68,9 +63,6 @@ trap rollback ERR INT TERM
 pkexec /usr/bin/shelly remove standard --no-confirm fnm
 fnm_removed=1
 
-env PATH="$node_root/bin:$PATH" \
-	"$repo_root/scripts/sync-project-atlas.sh" --apply
-
 fnm_removed=0
 trap - ERR INT TERM
-printf '✓ Migración completa: Node %s mediante mise y Atlas revalidado.\n' "$node_version"
+printf '✓ Migración completa: Node %s mediante mise.\n' "$node_version"

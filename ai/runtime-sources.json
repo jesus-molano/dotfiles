@@ -1,0 +1,23 @@
+{
+  "reviewed_at": "2026-09-27",
+  "claude_desktop_extra": {
+    "registry": "https://aur.archlinux.org/claude-desktop-extra.git",
+    "recipe_commit": "16402b926812250a7f390a1525720bd983373893",
+    "version": "2.7032.0-3",
+    "upstream": "https://github.com/patrickjaja/claude-desktop-extra/releases/tag/v2.7032.0-3",
+    "source_x86_64_sha256": "04523c9c76961e57714ba029f976d2093dc69eeb7bd1e7600fc64d04e12a5dc3",
+    "build": "shelly build PKGBUILD --reviewed --check",
+    "install": "pacman -U",
+    "note": "No third-party pacman repository. Cowork optional dependencies excluded. Package hook creates AppArmor userns profile when ABI 4 exists."
+  },
+  "claude_code": {
+    "registry": "cachyos",
+    "version_verified": "2.1.283-1",
+    "validation": "Pacman SHA-256 and repository signature"
+  },
+  "playwright_cli": {
+    "package": "@playwright/cli",
+    "version": "0.1.21",
+    "integrity": "sha512-FfxmVJj2wJlsxPksUO+4N7gqimPEQPajpocl2Mk97ENIGfAVZ4aElzPb5sDdGXHI9J/3Y8EtUiUTas0VsTm/sg=="
+  }
+}

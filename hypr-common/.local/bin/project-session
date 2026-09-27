@@ -12,10 +12,10 @@ dry_run=false
 
 usage() {
 	printf '%s\n' \
-		'Uso: project-session [--dry-run] {resume|chatgpt|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
+		'Uso: project-session [--dry-run] {resume|ai|claude|codex|chatgpt|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
 		'' \
 		'Acciones:' \
-		'  resume    abre ChatGPT y un terminal Zellij reutilizable' \
+		'  resume    abre la IA seleccionada y un terminal Zellij reutilizable' \
 		'  tasks     abre el selector de tareas detectadas' \
 		'  preview   inicia el script preview/dev detectado una sola vez'
 }
@@ -115,19 +115,12 @@ nvim_running_for_project() {
 	return 1
 }
 
-launch_chatgpt() {
-	# ChatGPT Community has no supported CLI contract to select a local project.
-	# Keep the repository context in the terminal instead of passing an invented
-	# URI or a path that the desktop app could interpret as an upload.
-	if "$dry_run"; then
-		emit chatgpt "$script_dir/hypr-chatgpt" --focus
-		return 0
-	fi
-	[[ -x "$script_dir/hypr-chatgpt" ]] || {
-		notify_error 'ChatGPT no está disponible en los dotfiles.'
-		return 127
-	}
-	launch_detached chatgpt "$script_dir/hypr-chatgpt" --focus
+launch_ai() {
+	local path=$1 provider=${2:-}
+	local -a arguments=(--focus --directory "$path")
+	[[ -z "$provider" ]] || arguments+=(--provider "$provider")
+	# Neither desktop has a documented local folder argument. Keep cwd in terminal.
+	launch_detached ai "$script_dir/hypr-ai" "${arguments[@]}"
 }
 
 launch_nvim() {
@@ -191,10 +184,12 @@ path="$(project_path "$2")" || {
 
 case "$action" in
 resume)
-	launch_chatgpt "$path"
+	launch_ai "$path"
 	launch_terminal "$path"
 	;;
-chatgpt|orca) launch_chatgpt "$path" ;;
+ai) launch_ai "$path"; launch_terminal "$path" ;;
+claude|codex) launch_ai "$path" "$action"; launch_terminal "$path" ;;
+chatgpt|orca) launch_ai "$path" codex; launch_terminal "$path" ;;
 terminal) launch_terminal "$path" ;;
 nvim) launch_nvim "$path" ;;
 tasks) launch_tasks "$path" ;;

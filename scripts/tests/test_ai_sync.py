@@ -1,0 +1,325 @@
+"""Portable deployment contracts; Windows tests use copies even on Linux."""
+from __future__ import annotations
+
+import importlib.util
+import json
+import os
+from pathlib import Path
+import subprocess
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+SCRIPTS = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(SCRIPTS))
+spec = importlib.util.spec_from_file_location("ai_sync", SCRIPTS / "sync-ai.py")
+sync = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(sync)
+
+
+class AISyncTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory(prefix="ai sync spaces ")
+        self.addCleanup(self.tmp.cleanup)
+        self.home = Path(self.tmp.name) / "User With Spaces"
+        self.home.mkdir()
+
+    def build(self, platform="windows", clients="both"):
+        obj = sync.Sync(self.home, platform, clients)
+        obj.plan()
+        return obj
+
+    def json_write(self, name, data):
+        path = self.home / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_preview_writes_nothing(self):
+        self.assertGreater(len(self.build().operations), 20)
+        self.assertEqual(list(self.home.iterdir()), [])
+
+    @unittest.skipIf(os.name == "nt", "Linux skill link contract")
+    def test_link_replacement_failure_preserves_previous_target(self):
+        path = self.home / "skill"
+        path.symlink_to(self.home / "previous", target_is_directory=True)
+        before = sync.snapshot(path)
+        with patch.object(sync.os, "replace", side_effect=OSError("interrupted")):
+            with self.assertRaises(OSError):
+                sync.restore(path, {"kind": "link", "target": str(self.home / "next")})
+        self.assertEqual(sync.snapshot(path), before)
+        self.assertEqual(list(self.home.iterdir()), [path])
+
+    def test_clean_windows_copies_and_second_apply(self):
+        self.build().apply()
+        self.assertFalse(any(p.is_symlink() for p in self.home.rglob("*")))
+        self.assertFalse((self.home / ".claude/skills/cachyos-host-audit").exists())
+        self.assertTrue((self.home / ".claude/agents/reviewer-linux.md").exists())
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        self.assertNotIn("hooks", settings)
+        self.assertNotIn("model", settings)
+        self.assertEqual(settings["permissions"]["defaultMode"], "bypassPermissions")
+        self.assertEqual(self.build().operations, [])
+        self.assertIsNone(self.build().apply())
+
+    def test_keep_models_connections_corporate_preferences_and_hooks(self):
+        self.json_write(".claude/settings.json", {"model": "local-choice", "effortLevel": "medium",
+            "company": {"keep": True}, "hooks": {"Stop": [{"matcher": "corp", "hooks": []}]}})
+        self.json_write(".claude.json", {"oauthAccount": {"private": "fixture"},
+            "mcpServers": {"company": {"type": "http", "url": "https://example.com"}},
+            "projects": {"C:/Work Space": {"allowedTools": []}}})
+        self.build().apply()
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        self.assertEqual(settings["model"], "local-choice")
+        self.assertEqual(settings["effortLevel"], "medium")
+        self.assertTrue(settings["company"]["keep"])
+        self.assertEqual(settings["hooks"]["Stop"][0]["matcher"], "corp")
+        private = sync.read_json(self.home / ".claude.json")
+        self.assertEqual(private["oauthAccount"]["private"], "fixture")
+        self.assertIn("company", private["mcpServers"])
+        self.assertIn("C:/Work Space", private["projects"])
+
+    def test_unmanaged_edit_after_sync_is_preserved(self):
+        self.build().apply()
+        path = self.home / ".claude/settings.json"
+        data = sync.read_json(path)
+        data["model"] = "later-choice"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        self.assertEqual(self.build().operations, [])
+
+    def test_managed_key_edit_conflicts(self):
+        self.build().apply()
+        path = self.home / ".claude/settings.json"
+        data = sync.read_json(path)
+        data["language"] = "french"
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+            self.build()
+
+    def test_modified_role_conflicts(self):
+        self.build().apply()
+        path = self.home / ".claude/agents/reuse-scout.md"
+        path.write_text("foreign", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "archivo gestionado"):
+            self.build()
+
+    def test_foreign_skill_conflicts_without_overwrite(self):
+        path = self.home / ".claude/skills/handoff/SKILL.md"
+        path.parent.mkdir(parents=True)
+        path.write_text("personal", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "destino ajeno"):
+            self.build()
+        self.assertEqual(path.read_text(), "personal")
+
+    def test_exact_rollback_restores_original_config(self):
+        self.json_write(".claude/settings.json", {"model": "existing"})
+        original = (self.home / ".claude/settings.json").read_bytes()
+        obj = self.build()
+        backup = obj.apply()
+        obj.rollback(backup)
+        self.assertEqual((self.home / ".claude/settings.json").read_bytes(), original)
+        self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
+        self.assertFalse(obj.state_path.exists())
+        with self.assertRaisesRegex(ValueError, "ya restaurado"):
+            obj.rollback(backup)
+        # Per-file rollback retains empty folders; a fresh deployment can adopt
+        # these without treating them as foreign user content.
+        self.build().apply()
+        self.assertEqual(self.build().operations, [])
+
+    def test_rollback_refuses_any_later_edit(self):
+        obj = self.build()
+        backup = obj.apply()
+        path = self.home / ".claude/settings.json"
+        path.write_text(path.read_text() + " ", encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "cambio posterior"):
+            obj.rollback(backup)
+        self.assertTrue((self.home / ".claude/CLAUDE.md").exists())
+
+    def test_toctou_stops_before_write(self):
+        obj = self.build()
+        self.json_write(".claude/settings.json", {"company": True})
+        with self.assertRaisesRegex(ValueError, "concurrente"):
+            obj.apply()
+        self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
+
+    def test_failed_apply_rolls_back_completed_operations(self):
+        obj = self.build()
+        real = sync.restore
+        count = 0
+        def failing(path, value):
+            nonlocal count
+            count += 1
+            if count == 3:
+                raise OSError("fixture failure")
+            return real(path, value)
+        with patch.object(sync, "restore", side_effect=failing):
+            with self.assertRaises(OSError):
+                obj.apply()
+        self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
+        self.assertFalse(obj.state_path.exists())
+
+    def test_codex_model_and_unrelated_tables_preserved_atlas_removed(self):
+        path = self.home / ".codex/config.toml"
+        path.parent.mkdir()
+        path.write_text('model = "chosen"\nmodel_reasoning_effort = "xhigh"\n'
+                        '[mcp_servers.component-atlas]\ncommand = "old"\n'
+                        '[hooks]\ncustom = true\n', encoding="utf-8")
+        self.build().apply()
+        data = sync.tomllib.loads(path.read_text())
+        self.assertEqual(data["model"], "chosen")
+        self.assertEqual(data["model_reasoning_effort"], "xhigh")
+        self.assertTrue(data["hooks"]["custom"])
+        self.assertNotIn("component-atlas", data["mcp_servers"])
+        self.assertFalse(data["mcp_servers"]["linear-write"]["enabled"])
+
+    def test_mcp_collision_fails_closed(self):
+        self.json_write(".claude.json", {"mcpServers": {"linear": {"url": "https://company"}}})
+        with self.assertRaisesRegex(ValueError, "Conexión local diferente"):
+            self.build()
+
+    def test_persistent_linear_write_is_rejected(self):
+        self.json_write(".claude.json", {"mcpServers": {"linear-write": {"type": "http", "url": "https://mcp.linear.app/mcp"}}})
+        with self.assertRaisesRegex(ValueError, "linear-write persistente"):
+            self.build()
+
+    def test_atlas_reintroduction_is_conflict(self):
+        self.build().apply()
+        path = self.home / ".claude.json"
+        document = sync.read_json(path)
+        document["mcpServers"]["component-atlas"] = {"command": "changed"}
+        self.json_write(".claude.json", document)
+        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+            self.build()
+
+    def test_scalar_codex_connection_is_controlled_error(self):
+        path = self.home / ".codex/config.toml"
+        path.parent.mkdir()
+        path.write_text('[mcp_servers]\nlinear = "custom"\n', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "Conexión local diferente"):
+            self.build()
+
+    def test_scalar_codex_mcp_container_is_controlled_error(self):
+        path = self.home / ".codex/config.toml"
+        path.parent.mkdir()
+        path.write_text('mcp_servers = "corporate"\n', encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "debe ser una tabla"):
+            self.build()
+
+    def test_windows_update_copies_files_without_displacing_directory(self):
+        source = Path(self.tmp.name) / "Source With Spaces"
+        shutil.copytree(sync.ROOT / "ai", source / "ai")
+        first = sync.Sync(self.home, "windows", "claude", root=source)
+        first.plan()
+        first.apply()
+        skill = source / "ai/skills/handoff/SKILL.md"
+        original = skill.read_text(encoding="utf-8")
+        skill.write_text(original + "\nUpdated fixture.\n", encoding="utf-8")
+        (skill.parent / "new-reference.md").write_text("New fixture.\n", encoding="utf-8")
+        update = sync.Sync(self.home, "windows", "claude", root=source)
+        operations = update.plan()
+        self.assertFalse(any(item["before"]["kind"] == "dir" or item["after"]["kind"] == "dir" for item in operations))
+        # Simulate a crash after the first file replacement and before the next.
+        backup = update.state_dir / "backups/interrupted-fixture"
+        backup.mkdir()
+        (backup / "transaction.json").write_text(json.dumps({
+            "home": str(self.home), "status": "prepared", "operations": operations}), encoding="utf-8")
+        sync.restore(Path(operations[0]["path"]), operations[0]["after"])
+        update.rollback(backup)
+        self.assertEqual((self.home / ".claude/skills/handoff/SKILL.md").read_text(encoding="utf-8"), original)
+        update = sync.Sync(self.home, "windows", "claude", root=source)
+        update.plan()
+        update.apply()
+        self.assertEqual((self.home / ".claude/skills/handoff/SKILL.md").read_bytes(), skill.read_bytes())
+
+    def test_rollback_path_traversal_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "traversal"):
+            sync.safe_path(self.home / "../outside", self.home)
+
+    def test_interrupted_transaction_is_recoverable(self):
+        obj = self.build()
+        backup = obj.apply()
+        journal = sync.read_json(backup / "transaction.json")
+        journal["status"] = "prepared"
+        first = journal["operations"][0]
+        sync.restore(Path(first["path"]), first["before"])
+        (backup / "transaction.json").write_text(json.dumps(journal), encoding="utf-8")
+        obj.rollback(backup)
+        self.assertFalse(obj.state_path.exists())
+
+    def test_failed_automatic_restore_can_be_retried(self):
+        obj = self.build()
+        real = sync.restore
+        count = 0
+        def failing(path, value):
+            nonlocal count
+            count += 1
+            if count in {3, 4}:
+                raise OSError("fixture failure")
+            return real(path, value)
+        with patch.object(sync, "restore", side_effect=failing):
+            with self.assertRaises(OSError):
+                obj.apply()
+        backup = next((obj.state_dir / "backups").iterdir())
+        self.assertEqual(sync.read_json(backup / "transaction.json")["status"], "needs-recovery")
+        obj.rollback(backup)
+        self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
+
+    @unittest.skipUnless(os.name == "nt", "Native Windows junction protection")
+    def test_windows_junction_parent_rejected(self):
+        outside = Path(self.tmp.name) / "Outside"
+        outside.mkdir()
+        subprocess.run(["cmd", "/c", "mklink", "/J", str(self.home / ".claude"), str(outside)], check=True, capture_output=True)
+        with self.assertRaisesRegex(ValueError, "Directorio enlazado"):
+            self.build()
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_selected_client_only(self):
+        self.build(clients="claude").apply()
+        self.assertFalse((self.home / ".codex").exists())
+        self.assertFalse((self.home / ".agents").exists())
+        self.build(clients="codex").apply()
+        self.assertEqual(self.build().operations, [])
+
+    def test_lock_not_deleted_by_second_invocation(self):
+        state = self.home / "AppData/Local/dotfiles/ai"
+        state.mkdir(parents=True)
+        lock = state / "sync.lock"
+        lock.write_text("owner", encoding="utf-8")
+        result = subprocess.run([sys.executable, str(SCRIPTS / "sync-ai.py"), "apply",
+            "--platform", "windows", "--home", str(self.home)], capture_output=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(lock.read_text(), "owner")
+
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_links_hooks_and_legacy_migration(self):
+        path = self.home / ".agents/skills/handoff"
+        path.parent.mkdir(parents=True)
+        path.symlink_to(sync.ROOT / "codex/.agents/skills/handoff")
+        atlas = path.parent / "frontend-task"
+        atlas.symlink_to(self.home / "dev/project-atlas/skills/frontend-task")
+        self.json_write(".claude/settings.json", {"hooks": {"Stop": [{"hooks": [{"command": "company"}]}]}})
+        self.build("linux").apply()
+        self.assertEqual(path.resolve(), sync.ROOT / "ai/skills/handoff")
+        self.assertFalse(atlas.is_symlink())
+        self.assertFalse((self.home / ".codex/agents/reuse-scout.toml").is_symlink())
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        self.assertEqual(len(settings["hooks"]["Stop"]), 2)
+        self.assertEqual(self.build("linux").operations, [])
+        result = subprocess.run([sys.executable, str(SCRIPTS / "manage-codex-agent-files.py"), "--verify"],
+            env=dict(os.environ, HOME=str(self.home), CODEX_HOME=str(self.home / ".codex"),
+                     XDG_STATE_HOME=str(self.home / ".local/state")), capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipIf(os.name == "nt", "No privileged symlink creation on Windows")
+    def test_symlink_parent_rejected(self):
+        other = self.home / "elsewhere"
+        other.mkdir()
+        (self.home / ".claude").symlink_to(other)
+        with self.assertRaisesRegex(ValueError, "Directorio enlazado"):
+            self.build()
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -200,7 +200,7 @@ just apply-user-timers
 # Toolchain
 just toolchain-check
 just android-check
-just atlas-check
+just ai-check
 ~~~
 
 Para el automount usa [docs/SYSTEM-ETC.md](docs/SYSTEM-ETC.md). Para Restic usa
@@ -237,3 +237,7 @@ gráfica, secretos ni permisos administrativos. GitHub Actions repite la suite e
 Arch. CI no demuestra compatibilidad con hardware físico.
 
 Este repositorio personal no declara una licencia de software.
+
+## Codex y Claude
+
+Configuración compartida, Windows nativo y cambio de proveedor: [guía de IA](docs/ai.md).

@@ -14,6 +14,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows_ai:
+    name: Native Windows AI copies
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Portable sync contracts
+        run: python -m unittest discover -s scripts/tests -p test_ai_sync.py
+      - name: PowerShell deployment with spaces
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'AI User With Spaces'
+          ./scripts/ai-setup.ps1 -Mode plan -TargetHome $target
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/ai-setup.ps1 -Mode apply -TargetHome $target
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./scripts/ai-setup.ps1 -Mode check -TargetHome $target
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
   reproducible:
     runs-on: ubuntu-latest
     container: archlinux:base-devel

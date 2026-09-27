@@ -1,0 +1,6 @@
+interface:
+  display_name: "Playwright CLI"
+  short_description: "Comprueba interfaces web con el CLI oficial de Playwright"
+  default_prompt: "Use $playwright-cli to inspect and verify this web flow."
+policy:
+  allow_implicit_invocation: true

@@ -287,8 +287,17 @@ def toml_value(value: Any, label: str) -> str:
 
 
 def serialize_host(host: dict[str, Any]) -> str:
-    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "backup", "noctalia"}, "host")
+    reject_unknown(host, {"schema", "bundles", "hardware", "input", "workspaces", "audio", "backup", "noctalia", "ai"}, "host")
     lines = [f"schema = {SCHEMA}", "bundles = " + toml_value(string_list(host.get("bundles"), "bundles"), "bundles")]
+
+    ai = host.get("ai", {})
+    if not isinstance(ai, dict):
+        raise ValueError("ai debe ser una tabla")
+    reject_unknown(ai, {"provider"}, "ai")
+    if ai.get("provider", "claude") not in {"claude", "codex"}:
+        raise ValueError("ai.provider debe ser claude o codex")
+    if ai:
+        lines.extend(["", "[ai]", "provider = " + toml_value(ai["provider"], "ai.provider")])
 
     hardware = host.get("hardware", {})
     if not isinstance(hardware, dict):
@@ -718,10 +727,9 @@ def rendered_qmd(plan: dict[str, Any]) -> str | None:
     template = Path(plan["repo"]) / "templates" / "qmd" / "index.yml.in"
     if not template.is_file():
         raise ValueError("Falta la plantilla QMD")
-    atlas = Path(os.environ.get("PROJECT_ATLAS_ROOT", "~/dev/project-atlas")).expanduser()
     return template.read_text(encoding="utf-8").replace(
         "__DOTFILES_REPO__/docs", json.dumps(str(Path(plan["repo"]) / "docs"), ensure_ascii=False)
-    ).replace("__PROJECT_ATLAS_ROOT__/docs", json.dumps(str(atlas / "docs"), ensure_ascii=False))
+    )
 
 
 def rendered_backup_repository(plan: dict[str, Any]) -> str | None:

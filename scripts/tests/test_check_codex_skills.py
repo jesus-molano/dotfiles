@@ -81,13 +81,13 @@ class CheckCodexSkillsTest(unittest.TestCase):
             skills, agents, skill = roots(root, "engineering-flow")
             write_metadata(skill, implicit=True)
             installed = root / "installed"
-            write_installed_skill(installed, "active", "frontend-task")
-            write_installed_skill(installed, "backup", "frontend-task")
+            write_installed_skill(installed, "active", "engineering-flow")
+            write_installed_skill(installed, "backup", "engineering-flow")
             checked = run_checker(
                 skills, agents, installed_skills_roots=(installed,)
             )
             self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("name instalado duplicado frontend-task", checked.stderr)
+            self.assertIn("name instalado duplicado engineering-flow", checked.stderr)
 
     def test_installed_skills_compare_all_repeated_roots(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -110,15 +110,15 @@ class CheckCodexSkillsTest(unittest.TestCase):
             skills, agents, skill = roots(root, "engineering-flow")
             write_metadata(skill, implicit=True)
             installed = root / "installed"
-            source = write_installed_skill(root / "sources", "active", "reuse-first")
+            source = write_installed_skill(root / "sources", "active", "test-driven-development")
             installed.mkdir()
-            (installed / "reuse-first").symlink_to(source, target_is_directory=True)
-            write_installed_skill(installed, "reuse-first.backup", "reuse-first")
+            (installed / "test-driven-development").symlink_to(source, target_is_directory=True)
+            write_installed_skill(installed, "test-driven-development.backup", "test-driven-development")
             checked = run_checker(
                 skills, agents, installed_skills_roots=(installed,)
             )
             self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("name instalado duplicado reuse-first", checked.stderr)
+            self.assertIn("name instalado duplicado test-driven-development", checked.stderr)
 
     def test_installed_external_skills_only_require_distinct_names(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -219,7 +219,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_requires_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "reuse-first")
+            skills, agents, skill = roots(Path(temporary), "test-driven-development")
             write_metadata(skill, implicit=True)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
@@ -227,14 +227,14 @@ class CheckCodexSkillsTest(unittest.TestCase):
 
     def test_explicit_skill_accepts_disabled_implicit_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "reuse-first")
+            skills, agents, skill = roots(Path(temporary), "test-driven-development")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
     def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
-            skills, agents, skill = roots(Path(temporary), "frontend-task")
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)

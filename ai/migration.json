@@ -1,0 +1,8 @@
+{
+  "codex/.codex/AGENTS.md": "1cd8eab8460fae4a05c114b30cb145d920c8d7cfe2fb5cd957c2fabed6967b2c",
+  "codex/.codex/agents/reviewer-web.toml": "07d48dbc4a25f5b392c4ac02e503b86f2c08f5d8d8f4f56095725f1eb877f503",
+  "codex/.codex/agents/reviewer-linux.toml": "2fcfc487a3cebfcea1eae00e42a2ddcd01130b6e210ca453d1c0b1c5f19b82a8",
+  "codex/.codex/agents/reviewer-spec.toml": "4297ce63f64eef9b0f95f2afaff10ad41c6ce89051779eed66b211fb5cbcb993",
+  "codex/.codex/agents/reviewer-standards.toml": "64bb6259dd88b5aece4c97b80b4f3ee33e5fc1045c1f45660476cfb6232f6d4c",
+  "codex/.codex/agents/reuse-scout.toml": "44f5717ef1262c1603eedb91b38bf113b79fc9127c7a339576a57e9fa8da84b2"
+}

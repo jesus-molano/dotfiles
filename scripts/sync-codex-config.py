@@ -114,6 +114,8 @@ def render(original: str) -> str:
         if key not in current:
             set_key(lines, None, key, value)
     for key, value in DESIRED_TOP.items():
+        if key == "notify" and key in current and current[key] != ["codex-notify"]:
+            continue
         set_key(lines, None, key, value)
     for section, values in DESIRED_SECTIONS.items():
         for key, value in values.items():
@@ -132,7 +134,9 @@ def desired_state(document: dict) -> bool:
         document.get("approval_policy") == "never"
         and document.get("approvals_reviewer") == "user"
         and document.get("sandbox_mode") == "danger-full-access"
-        and document.get("notify") == ["codex-notify"]
+        and isinstance(document.get("notify"), list)
+        and bool(document["notify"])
+        and all(isinstance(part, str) for part in document["notify"])
         and document.get("sandbox_workspace_write", {}).get("network_access") is True
         and document.get("features", {}).get("hooks") is True
         and document.get("features", {}).get("memories") is True

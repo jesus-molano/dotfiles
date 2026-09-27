@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -u
+command -v jq >/dev/null 2>&1 || exit 0
+# Read only the hook name. Do not log stdin, prompts, cwd, transcripts or IDs.
+event=$(jq -r '.hook_event_name // ""' 2>/dev/null) || exit 0
+[[ "$event" == Stop ]] || exit 0
+exec "${HOME}/.local/bin/desktop-notify" 'Claude' 'Turno completado'

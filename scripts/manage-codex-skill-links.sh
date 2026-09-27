@@ -15,7 +15,7 @@ case "$mode" in
 		;;
 esac
 
-source_input="${CODEX_SKILLS_SOURCE_ROOT:-$DOTFILES_DIR/codex/.agents/skills}"
+source_input="${CODEX_SKILLS_SOURCE_ROOT:-$DOTFILES_DIR/ai/skills}"
 skills_input="${CODEX_SKILLS_ROOT:-$HOME/.agents/skills}"
 retired_file="${CODEX_RETIRED_SKILLS_FILE:-$DOTFILES_DIR/codex/.agents/retired-skills.txt}"
 home_root="$(realpath -m -s -- "$HOME")"
@@ -23,7 +23,7 @@ source_root="$(realpath -- "$source_input")"
 skills_root="$(realpath -m -s -- "$skills_input")"
 state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/codex-skills/backups"
 readonly home_root source_root skills_root state_root retired_file
-readonly -a externally_managed=(frontend-task reuse-first visual-direction)
+readonly -a externally_managed=()
 
 [[ "$skills_root" == "$home_root"/* ]] || {
 	printf 'ERROR: el destino de skills debe estar dentro de HOME: %s\n' "$skills_root" >&2
@@ -109,9 +109,13 @@ classify_target() {
 		return 0
 	fi
 	if [[ -L "$target" ]]; then
-		resolved="$(readlink -f -- "$target" 2>/dev/null || true)"
+		resolved="$(realpath -m -- "$target" 2>/dev/null || true)"
 		if [[ "$resolved" == "$source_root/$skill" ]]; then
 			REPLY=current
+			return 0
+		fi
+		if [[ "$resolved" == "$DOTFILES_DIR/codex/.agents/skills/$skill" ]]; then
+			REPLY=legacy
 			return 0
 		fi
 		return 1

@@ -116,16 +116,17 @@ def is_declared_codex_skill_link(
     checkout: str,
     codex_selected: bool,
 ) -> bool:
-    """Allow only exact directory links owned by the Codex skill manager."""
+    """Allow exact neutral catalog links and the bounded pre-migration path."""
     if not codex_selected:
         return False
     parts = relative.split("/")
-    if len(parts) != 3 or parts[:2] != [".agents", "skills"] or not parts[2]:
+    if len(parts) != 3 or parts[:2] not in ([".agents", "skills"], [".claude", "skills"]) or not parts[2]:
         return False
-    source = os.path.join(checkout, "codex", ".agents", "skills", parts[2])
+    source = os.path.join(checkout, "ai", "skills", parts[2])
     if not os.path.isdir(source) or os.path.islink(source):
         return False
-    return destination == source
+    legacy = os.path.join(checkout, "codex", ".agents", "skills", parts[2])
+    return destination == source or (parts[0] == ".agents" and destination == legacy)
 
 
 def walk_error(error: OSError) -> None:

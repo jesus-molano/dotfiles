@@ -64,11 +64,11 @@ grep -Fq 'toggle_special("chatgpt")' "$TEST_LOG"
 : >"$TEST_LOG"
 "$bin/hypr-chatgpt" --focus 'codex://example?value=a%20b'
 grep -Fq 'codex://example?value=a%20b' "$TEST_LOG"
-grep -Fq 'start-chatgpt-background' "$repo_root/hypr-common/.config/hypr/config/autostart.lua"
+grep -Fq 'start-ai-background' "$repo_root/hypr-common/.config/hypr/config/autostart.lua"
 if grep -q 'start-orca' "$repo_root/hypr-common/.config/hypr/config/autostart.lua"; then exit 1; fi
 grep -Fq 'special:chatgpt silent' "$repo_root/hypr-common/.config/hypr/config/windowrules.lua"
 if grep -q 'special:orca' "$repo_root/hypr-common/.config/hypr/config/windowrules.lua"; then exit 1; fi
-grep -Fq 'hyper .. " + W", hl.dsp.exec_cmd("hypr-chatgpt")' "$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
+grep -Fq 'hyper .. " + W", hl.dsp.exec_cmd("hypr-ai")' "$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
 if grep -q 'hypr-orca' "$repo_root/hypr-common/.config/hypr/config/user-binds.lua"; then exit 1; fi
 desktop-file-validate "$repo_root/hypr-common/.local/share/applications/codex-desktop.desktop"
 [[ $(grep -c '^Exec=.*CODEX_LINUX_DISABLE_USAGE_REPORTING=1' "$repo_root/hypr-common/.local/share/applications/codex-desktop.desktop") == 2 ]]

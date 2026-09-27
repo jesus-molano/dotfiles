@@ -105,7 +105,7 @@ legacy_project_token_for_selection() {
 	local selection=$1 token
 	[[ "$selection" == *$'\t'* ]] || return 1
 	token=${selection%%$'\t'*}
-	[[ "$token" =~ ^(session|chatgpt|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
+	[[ "$token" =~ ^(session|ai|claude|codex|chatgpt|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
 	printf '%s' "$token"
 }
 
@@ -116,15 +116,16 @@ project_records() {
 		context=$(project_context "$path")
 		if [[ "$category" == projects ]]; then
 			emit_record "$(project_token session "$path")" "$title" \
-				"Open ChatGPT with terminal — $context"
+				"Open selected AI with terminal — $context"
 			continue
 		fi
 		action_context=$context
 		if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
 			action_context="$title — $context"
 		fi
-		emit_record "$(project_token session "$path")" 'ChatGPT session and terminal' "$action_context"
-		emit_record "$(project_token chatgpt "$path")" 'Open ChatGPT' "$action_context"
+		emit_record "$(project_token session "$path")" 'Selected AI session and terminal' "$action_context"
+		emit_record "$(project_token claude "$path")" 'Open Claude and terminal' "$action_context"
+		emit_record "$(project_token codex "$path")" 'Open Codex and terminal' "$action_context"
 		emit_record "$(project_token term "$path")" 'Open terminal' "$action_context"
 		emit_record "$(project_token nvim "$path")" 'Open in Nvim' "$action_context"
 		local script_dir
@@ -147,7 +148,7 @@ find_project() {
 	local selection=$1 action path
 	action=${selection%%_*}
 	case "$action" in
-	session | chatgpt | orca | term | nvim | tasks | preview) ;;
+	session | ai | claude | codex | chatgpt | orca | term | nvim | tasks | preview) ;;
 	*) return 1 ;;
 	esac
 	while IFS= read -r -d '' path; do
@@ -298,11 +299,12 @@ keybinding_category() {
 		'Toggle window group' | 'Focus next window in group' | 'Focus previous window in group' | \
 		'Open Noctalia window switcher' | 'Drag window' | 'Resize window') printf '%s' windows ;;
 	'Open Ghostty' | 'Open Brave' | 'Open Dolphin' | 'Open Yazi in Ghostty' | \
-		'Focus or open ChatGPT' | 'Focus or open Spotify' | 'Focus or open Stremio' | \
+		'Focus or open ChatGPT' | 'Focus or open selected AI' | 'Focus or open Spotify' | 'Focus or open Stremio' | \
 		'Focus or open Steam' | 'Open launcher' | 'Open launcher commands' | \
 		'Open launcher projects' | 'Open launcher media' | 'Open 1Password') printf '%s' apps ;;
 	*volume* | 'Mute audio' | 'Mute microphone' | 'Play or pause' | 'Next track' | \
 		'Previous track' | 'Capture a region' | 'Capture a region and prepare context for ChatGPT' | \
+		'Capture a region and prepare context for selected AI' | \
 		*zoom* | *wallpaper* | *appearance* | 'Pick and copy a color') printf '%s' media ;;
 	*) printf '%s' system ;;
 	esac
@@ -377,10 +379,14 @@ share_records() {
 list_share() { share_records | render_records; }
 
 command_records() {
+	emit_record ai_claude_default 'IA predeterminada — Claude' 'Cambiar preferencia; conservar sesiones'
+	emit_record ai_codex_default 'IA predeterminada — Codex' 'Cambiar preferencia; conservar sesiones'
+	emit_record ai_claude_open 'Abrir Claude' 'Claude Desktop o su CLI'
+	emit_record ai_codex_open 'Abrir Codex' 'Codex Desktop o su CLI'
 	emit_record doctor_host 'Audit this computer' 'Check configuration and current host state'
 	emit_record system_monitor 'System monitor' 'Open btop in Ghostty'
 	emit_record noctalia_settings 'Noctalia settings' 'Open shell configuration'
-	emit_record capture_context 'Capture context' 'Capture, annotate, and prepare context for ChatGPT'
+	emit_record capture_context 'Capture context' 'Capture, annotate, and prepare context for selected AI'
 	emit_record capture_qr 'Read QR code' 'Scan a QR code from the screen'
 	emit_record bug_capsule 'Create bug capsule' 'Collect a screenshot, OCR, and replay locally'
 	emit_record media_convert 'Convert media' 'Convert an image or video'
@@ -560,6 +566,10 @@ run_command() {
 	local dotfiles_root id
 	id=$(record_id_for_selection "$1" command_records) || return 2
 	case "$id" in
+	ai_claude_default) exec ai-provider set claude ;;
+	ai_codex_default) exec ai-provider set codex ;;
+	ai_claude_open) exec hypr-ai --provider claude --focus ;;
+	ai_codex_open) exec hypr-ai --provider codex --focus ;;
 	doctor_host)
 		dotfiles_root="$(readlink -f -- "$HOME/.dotfiles" 2>/dev/null || true)"
 		[[ -d "$dotfiles_root" ]] || return 1
@@ -571,7 +581,7 @@ run_command() {
 		;;
 	system_monitor) exec uwsm app -- ghostty -e btop ;;
 	noctalia_settings) exec noctalia msg settings-open ;;
-	capture_context) exec capture-context --focus chatgpt ;;
+	capture_context) exec capture-context --focus ai ;;
 	capture_qr) exec capture-qr ;;
 	bug_capsule) exec bug-capsule ;;
 	media_convert) exec media-convert ;;

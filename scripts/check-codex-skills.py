@@ -31,7 +31,7 @@ IMPLICIT_SKILLS = {
     "debug-web-flow",
     "domain-modeling",
     "engineering-flow",
-    "frontend-task",
+    "playwright-cli",
     "handoff",
     "linear-workflow",
     "research-primary-sources",
@@ -42,10 +42,8 @@ IMPLICIT_SKILLS = {
     "verification-before-completion",
 }
 EXPLICIT_SKILLS = {
-    "reuse-first",
     "test-driven-development",
     "verify-web-change",
-    "visual-direction",
 }
 ROUTED_SKILLS = IMPLICIT_SKILLS | EXPLICIT_SKILLS
 
@@ -66,7 +64,7 @@ def parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--skills-root", type=Path, default=root / "codex/.agents/skills"
+        "--skills-root", type=Path, default=root / "ai/skills"
     )
     parser.add_argument(
         "--agents-root", type=Path, default=root / "codex/.codex/agents"
@@ -347,6 +345,8 @@ def check_agent(path: Path) -> str:
 
 def check_links(skill: Path, document: Path) -> None:
     content = document.read_text(encoding="utf-8")
+    content = re.sub(r"^```[^\n]*\n.*?^```[^\n]*(?:\n|$)", "", content, flags=re.M | re.S)
+    content = re.sub(r"`+[^`]*`+", "", content)
     for target in MARKDOWN_LINK.findall(content):
         target = target.strip("<>").split("#", 1)[0]
         if not target or "://" in target or target.startswith(("#", "/", "mailto:")):
@@ -416,7 +416,7 @@ def main() -> int:
         print("\n".join(f"- {failure}" for failure in failures), file=sys.stderr)
         return 1
     canonical_skills_root = (
-        Path(__file__).resolve().parents[1] / "codex/.agents/skills"
+        Path(__file__).resolve().parents[1] / "ai/skills"
     ).resolve()
     missing = ROUTED_SKILLS - set(names)
     if args.skills_root.resolve() == canonical_skills_root and missing:

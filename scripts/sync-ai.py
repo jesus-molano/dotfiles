@@ -1,0 +1,535 @@
+#!/usr/bin/env python3
+"""Portable, transactional AI config sync. Preview never prints configuration values."""
+from __future__ import annotations
+
+import argparse
+import base64
+import copy
+import hashlib
+import json
+import os
+import re
+import runpy
+import stat
+import sys
+import tempfile
+import time
+import uuid
+from pathlib import Path
+
+import tomllib
+from ai_sources import ROOT, LINUX_SKILLS, RETIRED, instructions, roles
+
+MISSING = {"$absent": True}
+MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
+       "openaiDeveloperDocs": "https://developers.openai.com/mcp"}
+NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
+CLAUDE_KEYS = {
+    ("language",): "spanish",
+    ("permissions", "defaultMode"): "bypassPermissions",
+    ("attribution", "commit"): "",
+    ("attribution", "pr"): "",
+    ("attribution", "sessionUrl"): False,
+    ("pluginConfigs", "agents-md@builtin", "options", "instructionFiles"): "claude-md-and-agents-md",
+    ("skillOverrides", "test-driven-development"): "user-invocable-only",
+    ("skillOverrides", "verify-web-change"): "user-invocable-only",
+}
+
+
+def encode(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")
+
+
+def digest(value) -> str:
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
+def snapshot(path: Path) -> dict:
+    if is_reparse(path) and not path.is_symlink():
+        raise ValueError(f"Punto de reanálisis no compatible: {path}")
+    if path.is_symlink():
+        return {"kind": "link", "target": os.readlink(path)}
+    if not path.exists():
+        return {"kind": "absent"}
+    if path.is_file():
+        return {"kind": "file", "data": encode(path.read_bytes()),
+                "mode": stat.S_IMODE(path.stat().st_mode)}
+    if path.is_dir():
+        entries = {p.name: snapshot(p) for p in sorted(path.iterdir())}
+        # Empty containers have no content to own or remove during rollback.
+        entries = {name: child for name, child in entries.items()
+                   if child != {"kind": "dir", "entries": {}}}
+        return {"kind": "dir", "entries": entries}
+    raise ValueError(f"Tipo de archivo no compatible: {path}")
+
+
+def file_value(text: str) -> dict:
+    return {"kind": "file", "data": encode(text.encode("utf-8")), "mode": 0o600}
+
+
+def equivalent(a: dict, b: dict) -> bool:
+    # Windows permissions differ; the byte content and link identity are authoritative.
+    def clean(v):
+        if isinstance(v, dict):
+            return {k: clean(x) for k, x in v.items() if k != "mode"}
+        return v
+    return clean(a) == clean(b)
+
+
+def is_reparse(path: Path) -> bool:
+    try:
+        return bool(getattr(path.lstat(), "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0x400))
+    except FileNotFoundError:
+        return False
+
+
+def safe_path(path: Path, home: Path) -> None:
+    if ".." in path.parts:
+        raise ValueError(f"Ruta con traversal no permitida: {path}")
+    if not path.is_relative_to(home) or path == home:
+        raise ValueError(f"Destino fuera del HOME: {path}")
+    for parent in path.parents:
+        if parent == home:
+            break
+        if parent.is_symlink() or is_reparse(parent):
+            raise ValueError(f"Directorio enlazado no permitido: {parent}")
+    if is_reparse(home) or home.is_symlink():
+        raise ValueError("El HOME seleccionado debe ser un directorio real")
+    if is_reparse(path) and not path.is_symlink():
+        raise ValueError(f"Punto de reanálisis no compatible: {path}")
+
+
+def atomic_file(path: Path, data: bytes, mode=0o600) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix=".ai-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as out:
+            out.write(data)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+def restore(path: Path, value: dict) -> None:
+    kind = value["kind"]
+    if kind == "file" and not (path.is_dir() and not path.is_symlink()):
+        atomic_file(path, base64.b64decode(value["data"]), value.get("mode", 0o600))
+        return
+    if kind == "dir" or (path.is_dir() and not path.is_symlink()):
+        raise ValueError(f"Las carpetas se actualizan por archivos, no se reemplazan: {path}")
+    if kind == "link":
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(".ai-link-" + uuid.uuid4().hex)
+        try:
+            temporary.symlink_to(value["target"], target_is_directory=True)
+            os.replace(temporary, path)
+        finally:
+            if temporary.is_symlink():
+                temporary.unlink()
+        return
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    if kind == "absent":
+        return
+    raise ValueError("Tipo de backup inválido")
+
+
+def read_json(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(data, dict):
+        raise ValueError(f"Se esperaba un objeto JSON: {path}")
+    return data
+
+
+def get(data: dict, keys: tuple):
+    node = data
+    for key in keys:
+        if not isinstance(node, dict) or key not in node:
+            return MISSING
+        node = node[key]
+    return node
+
+
+def put(data: dict, keys: tuple, value) -> None:
+    node = data
+    for key in keys[:-1]:
+        node = node.setdefault(key, {})
+        if not isinstance(node, dict):
+            raise ValueError("Una clave gestionada requiere una tabla/objeto")
+    node[keys[-1]] = copy.deepcopy(value)
+
+
+def json_text(value: dict) -> str:
+    return json.dumps(value, indent=2, ensure_ascii=False) + "\n"
+
+
+class Sync:
+    def __init__(self, home: Path, platform: str, clients="both", root=ROOT):
+        self.home = Path(os.path.abspath(home))
+        self.root = root.resolve()
+        self.platform = platform
+        self.clients = {"codex", "claude"} if clients == "both" else {clients}
+        self.state_dir = self.home / ("AppData/Local/dotfiles/ai" if platform == "windows" else ".local/state/dotfiles/ai")
+        self.state_path = self.state_dir / "managed.json"
+        safe_path(self.state_path, self.home)
+        self.state = read_json(self.state_path)
+        self.next_state = copy.deepcopy(self.state)
+        self.operations = []
+        self.asset_expected = {}
+        self.baselines = {}
+        self.migration = read_json(self.root / "ai/migration.json")
+
+    def observe(self, path):
+        safe_path(path, self.home)
+        current = snapshot(path)
+        if str(path) in self.baselines and not equivalent(current, self.baselines[str(path)]):
+            raise ValueError(f"Cambio concurrente durante la lectura: {path}")
+        self.baselines[str(path)] = current
+        return current
+
+    def read_config(self, path: Path, kind="json"):
+        value = self.observe(path)
+        if value["kind"] not in {"file", "absent"}:
+            raise ValueError(f"Configuración enlazada no compatible: {path}")
+        raw = base64.b64decode(value["data"]).decode("utf-8-sig") if value["kind"] == "file" else ""
+        document = (tomllib.loads(raw) if kind == "toml" else json.loads(raw)) if raw else {}
+        if not isinstance(document, dict):
+            raise ValueError(f"Se esperaba un objeto de configuración: {path}")
+        return raw, document
+
+    def asset(self, path: Path, desired: dict, legacy=False):
+        current = self.observe(path)
+        key = str(path.relative_to(self.home))
+        previous = self.state.get(key)
+        if previous and not equivalent(current, previous["value"]) and not equivalent(current, desired):
+            raise ValueError(f"Conflicto: archivo gestionado modificado: {path}")
+        empty_container = current == {"kind": "dir", "entries": {}} and desired["kind"] == "dir"
+        if not previous and current["kind"] != "absent" and not empty_container and not equivalent(current, desired) and not legacy:
+            raise ValueError(f"Conflicto: destino ajeno: {path}")
+        self.next_state[key] = {"value": desired}
+        self.asset_expected[str(path)] = desired
+        if not equivalent(current, desired):
+            self.asset_operations(path, current, desired)
+
+    def asset_operations(self, path: Path, current: dict, desired: dict):
+        if current["kind"] == "dir" or desired["kind"] == "dir":
+            if current["kind"] not in {"dir", "absent"} or desired["kind"] not in {"dir", "absent"}:
+                raise ValueError(f"Cambio de tipo de carpeta requiere revisión: {path}")
+            before_entries = current.get("entries", {})
+            after_entries = desired.get("entries", {})
+            for name in sorted(set(before_entries) | set(after_entries)):
+                before = before_entries.get(name, {"kind": "absent"})
+                after = after_entries.get(name, {"kind": "absent"})
+                if not equivalent(before, after):
+                    self.asset_operations(path / name, before, after)
+        else:
+            self.operations.append({"path": str(path), "before": current, "after": desired})
+
+    def merged(self, path: Path, original: dict, desired: dict, keys: dict, text: str):
+        current = self.observe(path)
+        if current["kind"] not in {"file", "absent"}:
+            raise ValueError(f"Configuración enlazada no compatible: {path}")
+        key = str(path.relative_to(self.home))
+        previous = self.state.get(key, {}).get("keys", [])
+        for item in previous:
+            route = tuple(item["path"])
+            # Unrelated JSON/TOML fields may change freely; managed fields may not.
+            if get(original, route) != item["value"] and get(original, route) != get(desired, route):
+                raise ValueError(f"Conflicto: clave gestionada modificada: {path} ({'.'.join(route)})")
+        projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
+        self.next_state[key] = {"keys": projection}
+        if original != desired:
+            after = file_value(text)
+            if current["kind"] == "file":
+                after["mode"] = current["mode"]
+            self.operations.append({"path": str(path), "before": current, "after": after})
+
+    def known_legacy_file(self, path, source):
+        if path.is_symlink():
+            return path.resolve() == source.resolve()
+        if path.is_file():
+            return hashlib.sha256(path.read_bytes()).hexdigest() == self.migration.get(str(source.relative_to(self.root)))
+        return False
+
+    def skills(self, client):
+        folder = self.home / (".agents/skills" if client == "codex" else ".claude/skills")
+        for source in sorted((self.root / "ai/skills").iterdir()):
+            if not source.is_dir() or (self.platform == "windows" and source.name in LINUX_SKILLS):
+                continue
+            value = snapshot(source)
+            if any(p.is_symlink() for p in source.rglob("*")):
+                raise ValueError(f"Fuente de skill con enlaces: {source}")
+            target = folder / source.name
+            desired = value if self.platform == "windows" else {"kind": "link", "target": str(source)}
+            legacy = target.is_symlink() and target.resolve() == self.root / "codex/.agents/skills" / source.name
+            self.asset(target, desired, legacy)
+        for name in RETIRED:
+            target = folder / name
+            if target.is_symlink() and target.resolve() in {
+                self.root / "codex/.agents/skills" / name,
+                self.home / "dev/project-atlas/skills" / name,
+            }:
+                self.asset(target, {"kind": "absent"}, legacy=True)
+            elif target.exists() or target.is_symlink():
+                raise ValueError(f"Revisar skill Atlas ajena antes de retirarla: {target}")
+
+    def claude(self):
+        base = self.home / ".claude"
+        self.asset(base / "CLAUDE.md", file_value(instructions("claude", self.platform, self.root)))
+        for name, text in roles("claude", self.platform, self.root).items():
+            self.asset(base / "agents" / name, file_value(text))
+        path = base / "settings.json"
+        _, original = self.read_config(path)
+        desired = copy.deepcopy(original)
+        for keys, value in CLAUDE_KEYS.items():
+            put(desired, keys, value)
+        if self.platform == "linux":
+            previous = self.state.get(str(path.relative_to(self.home)), {})
+            if previous.get("notify") and NOTIFY not in original.get("hooks", {}).get("Stop", []):
+                raise ValueError(f"Conflicto: hook gestionado modificado: {path}")
+            entries = desired.setdefault("hooks", {}).setdefault("Stop", [])
+            if NOTIFY not in entries:
+                entries.append(copy.deepcopy(NOTIFY))
+        self.merged(path, original, desired, CLAUDE_KEYS, json_text(desired))
+        if self.platform == "linux":
+            self.next_state[str(path.relative_to(self.home))]["notify"] = True
+        path = self.home / ".claude.json"
+        _, original = self.read_config(path)
+        desired = copy.deepcopy(original)
+        keys = {}
+        if "linear-write" in original.get("mcpServers", {}):
+            raise ValueError("Existe linear-write persistente en Claude. Retíralo explícitamente tras revisar su configuración; solo se admite por sesión temporal.")
+        for name, url in MCP.items():
+            route = ("mcpServers", name)
+            old = get(original, route)
+            if old != MISSING and (not isinstance(old, dict) or old.get("url") != url or old.get("type") != "http"):
+                raise ValueError(f"Conexión local diferente: {name}; se conserva sin sustituirla")
+            for field, value in {"type": "http", "url": url}.items():
+                keys[route + (field,)] = value
+                put(desired, route + (field,), value)
+        # Retire only the named integration, leaving all other connections untouched.
+        desired.get("mcpServers", {}).pop("component-atlas", None)
+        keys[("mcpServers", "component-atlas")] = MISSING
+        self.merged(path, original, desired, keys, json_text(desired))
+        self.skills("claude")
+
+    def codex(self):
+        base = self.home / ".codex"
+        source = self.root / "codex/.codex/AGENTS.md"
+        desired = file_value(instructions("codex", self.platform, self.root))
+        if self.platform == "linux":
+            desired = {"kind": "link", "target": str(source)}
+            # Stow owns this link. Keep its lexical (normally relative) target.
+            if (base / "AGENTS.md").is_symlink() and (base / "AGENTS.md").resolve() == source.resolve():
+                desired = snapshot(base / "AGENTS.md")
+        self.asset(base / "AGENTS.md", desired, self.known_legacy_file(base / "AGENTS.md", source))
+        role_files = roles("codex", self.platform, self.root)
+        for name, text in role_files.items():
+            source = self.root / "codex/.codex/agents" / name
+            self.asset(base / "agents" / name, file_value(text), self.known_legacy_file(base / "agents" / name, source))
+        if self.platform == "linux":
+            # Keep the existing Codex manager's ownership ledger in this transaction.
+            path = self.home / ".local/state/dotfiles/codex-agents/managed.json"
+            _, original_meta = self.read_config(path)
+            desired_meta = copy.deepcopy(original_meta)
+            metadata_keys = {}
+            for name, content in role_files.items():
+                route = ("destinations", str(base / "agents"), name)
+                metadata_keys[route] = hashlib.sha256(content.encode()).hexdigest()
+                put(desired_meta, route, metadata_keys[route])
+            self.merged(path, original_meta, desired_meta, metadata_keys, json_text(desired_meta))
+        mod = runpy.run_path(str(self.root / "scripts/sync-codex-config.py"))
+        path = base / "config.toml"
+        raw, original = self.read_config(path, "toml")
+        # Reuse the existing line-preserving merger, with platform-specific notification.
+        if self.platform == "windows":
+            mod["DESIRED_TOP"].pop("notify", None)
+            # render's desired_state is Linux-specific; use the same set_key contract.
+        lines = raw.splitlines(keepends=True)
+        if lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        keys = {}
+        for key, value in mod["DEFAULT_TOP"].items():
+            if key not in original:
+                mod["set_key"](lines, None, key, value)
+        for key, value in mod["DESIRED_TOP"].items():
+            # A foreign notifier is a local integration, not ours to replace.
+            if key == "notify" and key in original and original[key] != ["codex-notify"]:
+                continue
+            mod["set_key"](lines, None, key, value)
+            keys[(key,)] = True
+        for section, fields in mod["DESIRED_SECTIONS"].items():
+            for key, value in fields.items():
+                mod["set_key"](lines, section, key, value)
+                keys[(section, key)] = True
+        # Only a normal named TOML table is removed. Complex forms fail closed below.
+        raw = "".join(lines)
+        raw = re.sub(r'^\[mcp_servers\.(?:component-atlas|"component-atlas")(?:\.[^\]]+)?\][^\n]*\n.*?(?=^\[|\Z)', '', raw, flags=re.M | re.S)
+        lines = raw.splitlines(keepends=True)
+        current = tomllib.loads(raw)
+        if not isinstance(current.get("mcp_servers", {}), dict):
+            raise ValueError("mcp_servers debe ser una tabla; configuración conservada")
+        if "component-atlas" in current.get("mcp_servers", {}):
+            raise ValueError("Formato MCP Atlas complejo: requiere una migración explícita")
+        for name, url in {**MCP, "linear-write": "https://mcp.linear.app/mcp"}.items():
+            old = current.get("mcp_servers", {}).get(name)
+            if old is not None and (not isinstance(old, dict) or old.get("url") != url):
+                raise ValueError(f"Conexión local diferente: {name}; se conserva")
+            mod["set_key"](lines, f"mcp_servers.{name}", "url", json.dumps(url))
+            keys[("mcp_servers", name, "url")] = True
+            if name == "linear-write":
+                mod["set_key"](lines, f"mcp_servers.{name}", "enabled", "false")
+                keys[("mcp_servers", name, "enabled")] = True
+        raw = "".join(lines)
+        keys[("mcp_servers", "component-atlas")] = MISSING
+        self.merged(path, original, tomllib.loads(raw), keys, raw)
+        self.skills("codex")
+
+    def plan(self):
+        for client in sorted(self.clients):
+            getattr(self, client)()
+        # The manifest is part of the same transaction, including its first creation.
+        current = self.observe(self.state_path)
+        desired = file_value(json_text(self.next_state))
+        if not equivalent(current, desired):
+            self.operations.append({"path": str(self.state_path), "before": current, "after": desired})
+        return self.operations
+
+    def validate_baselines(self):
+        for name, before in self.baselines.items():
+            path = Path(name)
+            safe_path(path, self.home)
+            if not equivalent(snapshot(path), before):
+                raise ValueError(f"Cambio concurrente detectado: {path}")
+
+    def apply(self):
+        self.validate_baselines()
+        if not self.operations:
+            return None
+        backup = self.state_dir / "backups" / (time.strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:8])
+        backup.mkdir(parents=True, mode=0o700)
+        os.chmod(self.state_dir, 0o700)
+        journal = {"home": str(self.home), "status": "prepared", "operations": self.operations}
+        atomic_file(backup / "transaction.json", json_text(journal).encode())
+        touched = []
+        try:
+            for operation in self.operations:
+                path = Path(operation["path"])
+                safe_path(path, self.home)
+                if not equivalent(snapshot(path), operation["before"]):
+                    raise ValueError(f"Cambio concurrente detectado: {path}")
+                touched.append(operation)
+                restore(path, operation["after"])
+                if not equivalent(snapshot(path), operation["after"]):
+                    raise ValueError(f"Verificación de escritura fallida: {path}")
+            for name, expected in self.asset_expected.items():
+                if not equivalent(snapshot(Path(name)), expected):
+                    raise ValueError(f"Verificación de contenido fallida: {name}")
+            journal["status"] = "applied"
+        except BaseException:
+            journal["status"] = "rolled-back"
+            for operation in reversed(touched):
+                path = Path(operation["path"])
+                try:
+                    if equivalent(snapshot(path), operation["after"]):
+                        restore(path, operation["before"])
+                    elif not equivalent(snapshot(path), operation["before"]):
+                        journal["status"] = "needs-recovery"
+                except (OSError, ValueError):
+                    journal["status"] = "needs-recovery"
+            raise
+        finally:
+            atomic_file(backup / "transaction.json", json_text(journal).encode())
+        return backup
+
+    def rollback(self, backup: Path):
+        expected = self.state_dir / "backups"
+        backup = backup.absolute()
+        if backup.parent != expected or backup.is_symlink():
+            raise ValueError("El backup debe pertenecer al HOME seleccionado")
+        journal_path = backup / "transaction.json"
+        safe_path(journal_path, self.home)
+        if journal_path.is_symlink():
+            raise ValueError("El diario debe ser un archivo regular")
+        journal = read_json(journal_path)
+        if journal.get("home") != str(self.home) or journal.get("status") not in {
+            "applied", "prepared", "failed", "needs-recovery", "rolling-back"
+        }:
+            raise ValueError("Backup no aplicable o ya restaurado")
+        operations = journal["operations"]
+        for item in operations:
+            path = Path(item["path"])
+            safe_path(path, self.home)
+            current = snapshot(path)
+            if not equivalent(current, item["after"]) and not equivalent(current, item["before"]):
+                raise ValueError(f"Rollback bloqueado por cambio posterior: {path}")
+        journal["status"] = "rolling-back"
+        atomic_file(journal_path, json_text(journal).encode())
+        for item in reversed(operations):
+            path = Path(item["path"])
+            current = snapshot(path)
+            if equivalent(current, item["before"]):
+                continue
+            if not equivalent(current, item["after"]):
+                raise ValueError(f"Cambio concurrente durante rollback: {path}")
+            restore(path, item["before"])
+        journal["status"] = "rolled-back"
+        atomic_file(journal_path, json_text(journal).encode())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("mode", choices=["plan", "apply", "check", "rollback"])
+    parser.add_argument("--home", type=Path, default=Path.home())
+    parser.add_argument("--platform", choices=["linux", "windows"], default="windows" if os.name == "nt" else "linux")
+    parser.add_argument("--clients", choices=["both", "claude", "codex"], default="both")
+    parser.add_argument("--backup", type=Path)
+    args = parser.parse_args()
+    sync = Sync(args.home, args.platform, args.clients)
+    lock = None
+    try:
+        if args.mode in {"apply", "rollback"}:
+            sync.state_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+            lock_path = sync.state_dir / "sync.lock"
+            fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            lock = lock_path
+            os.close(fd)
+            sync = Sync(args.home, args.platform, args.clients)
+        if args.mode == "rollback":
+            if not args.backup:
+                raise ValueError("rollback requiere --backup")
+            sync.rollback(args.backup)
+            print("OK: rollback verificado")
+            return 0
+        operations = sync.plan()
+        for operation in operations:
+            print(f"{operation['before']['kind']} -> {operation['after']['kind']}: {operation['path']}")
+        if args.mode == "apply":
+            backup = sync.apply()
+            if backup:
+                print(f"Backup privado: {backup}")
+            else:
+                print("OK: sin cambios")
+        else:
+            print(f"Pendientes: {len(operations)}")
+        return 1 if args.mode == "check" and operations else 0
+    except (OSError, ValueError, KeyError, TypeError) as error:
+        # JSON/TOML parser exception strings can include data; report type only.
+        if isinstance(error, (json.JSONDecodeError, tomllib.TOMLDecodeError)):
+            print(f"ERROR: configuración inválida ({type(error).__name__})", file=sys.stderr)
+        else:
+            print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+    finally:
+        if lock is not None and lock.exists():
+            lock.unlink()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

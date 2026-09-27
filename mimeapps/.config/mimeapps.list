@@ -6,6 +6,7 @@ x-scheme-handler/https=brave-browser.desktop
 x-scheme-handler/about=brave-browser.desktop
 x-scheme-handler/unknown=brave-browser.desktop
 application/pdf=org.kde.okular.desktop
+x-scheme-handler/claude=com.anthropic.Claude.desktop
 
 [Added Associations]
 text/markdown=nvim.desktop;
