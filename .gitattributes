@@ -1,0 +1,2 @@
+# Kev's strict-context patch is applied to a byte-verified LF checkout.
+ai/skills/tessera/references/*.patch text eol=lf

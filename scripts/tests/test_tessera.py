@@ -185,7 +185,7 @@ class TesseraTest(unittest.TestCase):
             ["git", "-C", str(self.repo), "rev-parse", "HEAD"], text=True).strip()
         subprocess.run(["git", "-C", str(self.repo), "config", "core.autocrlf", "true"], check=True)
         for path in (self.repo / "src").rglob("*.tsx"):
-            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
+            path.write_bytes(path.read_bytes().replace(b"\r\n", b"\n").replace(b"\n", b"\r\n"))
         subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Test", "-c",
                         "user.email=test@example.invalid", "commit", "--allow-empty", "-qm", "unrelated"], check=True)
         self.assertEqual(self.prepare().returncode, 0)

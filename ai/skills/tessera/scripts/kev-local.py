@@ -59,6 +59,14 @@ def verify_source(runtime):
         raise ValueError("Hay bytecode importable ajeno en el checkout; revisar antes de arrancar.")
 
 
+def apply_server_patch(runtime, patch):
+    # Existing Windows clones may retain CRLF even after adding eol=lf rules.
+    content = patch.read_bytes().replace(b"\r\n", b"\n")
+    for flags in (("--check",), ()):
+        subprocess.run(["git", "apply", *flags, "-"], input=content,
+                       cwd=runtime, check=True)
+
+
 def install(runtime):
     # A failed installation is left for inspection; never remove or overwrite it.
     if runtime.exists() or runtime.is_symlink():
@@ -74,8 +82,7 @@ def install(runtime):
     run("git", "sparse-checkout", "set", "kev", "tests", "docs/model-cards", cwd=runtime)
     run("git", "checkout", "--detach", REVISION, cwd=runtime)
     patch = Path(__file__).resolve().parent.parent / "references/kev-strict-context.patch"
-    run("git", "apply", "--check", patch, cwd=runtime)
-    run("git", "apply", patch, cwd=runtime)
+    apply_server_patch(runtime, patch)
     verify_source(runtime)
     run("uv", "sync", "--locked", "--no-dev", "--extra", "serve", "--python", "3.13", cwd=runtime)
 
@@ -120,6 +127,10 @@ def serve(runtime, info, allow_cpu=False):
     env.update(HF_HUB_DISABLE_TELEMETRY="1", KEV_BACKEND="torch",
                KEV_DTYPE="bf16" if info["bf16"] else "fp32", KEV_PREFIX_CACHE="1",
                KEV_PREFIX_MAX_TOKENS="8192", KEV_CUDA_GRAPHS="0", KEV_FUSED="0")
+    if os.name == "nt":
+        # The Hub's concurrent capability probe can race before detecting that
+        # unprivileged Windows cannot create symlinks. Use its supported copies.
+        env["HF_HUB_DISABLE_SYMLINKS"] = "1"
     command = [str(python_path(runtime)), "-I", "-m", "kev.serve", "--run", CHECKPOINT,
                "--host", "127.0.0.1", "--port", "8009"]
     print(json.dumps({"runtime": str(runtime), "checkpoint": CHECKPOINT, **info}), flush=True)
