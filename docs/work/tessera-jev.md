@@ -2,7 +2,7 @@
 
 ## Objetivo y decisiones del usuario
 
-Tessera es el catálogo versionado de componentes/utilidades por proyecto.
+Tessera es el catálogo local de componentes/utilidades por proyecto.
 Se amplía durante el trabajo y sustituye la responsabilidad de catálogo de
 Atlas. Memoria, ODD, continuidad y diseño mantienen sus propietarios.
 Jev (TypeSafe) y Kev (Jared Palmer, confirmado por el usuario) son proveedores
@@ -15,6 +15,21 @@ wrap, create o insufficient_evidence. El agente verifica la decisión contra
 código y consumidores antes de implementar. Se envían fichas completas con
 nombres, etiquetas, contratos, restricciones y referencias; los archivos
 completos de código, usos, pruebas y estilos permanecen como evidencia local.
+
+Corrección posterior del usuario: al ser tooling personal, no introducir sus
+catálogos ni historial en repos del trabajo ni en GitHub/dotfiles personales.
+El valor por defecto pasa a almacenamiento externo bajo XDG/LOCALAPPDATA,
+separado por proyecto. Compartir en un repo requiere una excepción explícita.
+También exige detectar cambios de compañeros y actualizar las fichas al usar
+Tessera. `locate` resuelve el almacén; `changes` informa del delta; el agente
+inspecciona y actualiza contratos, usos, pruebas, altas, bajas y renombrados.
+Esto detecta cambios presentes en el checkout, no consulta remotos en segundo
+plano. El proveedor sigue recibiendo todas las fichas una vez actualizadas.
+
+Esta corrección sustituye las recomendaciones previas de crear
+`.tessera/catalog.json` y versionarlo automáticamente. El piloto personal
+ya publicado es evidencia histórica, no información corporativa ni una plantilla
+de almacenamiento para el trabajo. No se borró ni se migró ningún repo ajeno.
 
 ## Estado de trabajo
 
@@ -59,6 +74,14 @@ El nombre ODD no se ha localizado en los archivos; no se redefine.
   errores explícitos, sin fallback ni reintentos automáticos.
 - `engineering-flow` consulta Tessera ante decisiones de implementación. La
   skill mantiene separadas dirección visual, memoria y flujo existente.
+- Almacén local por hash del git-common-dir real: worktrees del mismo checkout
+  comparten catálogo, clones independientes no. No emplea URLs ni credenciales
+  para identificar el proyecto. No hay sincronización de datos entre PCs.
+- `changes` detecta cambios de fuente/consumidores/tests, altas y bajas, archivos
+  fuera del catálogo y línea base ausente. El agente conserva copia previa en
+  `history`, actualiza significado y después marca la revisión inspeccionada.
+- `evaluate` verifica de nuevo la evidencia local antes de hacer una petición.
+  Los runs antiguos sin ruta de checkout necesitan preparación nueva.
 
 ## Resultados Jev
 
@@ -135,11 +158,27 @@ a los 8 GB de este PC. La conversión GGUF encontrada usa otro runtime y context
 demanda. Se probó también instalación Linux nueva en ruta temporal con espacios.
 Windows tiene paso explícito `windows-cuda` porque el wheel PyPI inicial es CPU;
 el wheel oficial CUDA está fijado por URL/hash y no cambia el lock upstream.
-Windows/CPU siguen sin inferencia verificada. No se habilita autostart.
+La inferencia Windows no se verificó desde este host; el usuario aporta después
+el resultado indicado abajo. CPU sigue sin inferencia verificada. No se habilita autostart.
 El servidor del piloto quedó detenido y el puerto 8009 libre al terminar.
 El launcher local bajo `~/.local/share/tessera/serve-kev-local.sh` sigue
 disponible para el runtime de casa; la versión portable gestionada pertenece
 a la skill y se despliega mediante el flujo común.
+
+### Resultado comunicado desde el PC Windows
+
+El usuario comunica una prueba real: `/v1/models` confirma checkpoint fijado,
+CUDA y bfloat16; 70.002 tokens de estado producen HTTP 422 frente al límite
+65.536, sin truncado. Con las mismas dos fichas que Jev, Kev responde
+`insufficient_evidence` en 2,27 s. Las dos utilidades del proyecto pasan 19/19
+pruebas. Es evidencia aportada desde ese equipo, no una ejecución en este host.
+Confirma funcionamiento técnico; no establece calidad suficiente del selector.
+Jev permanece como motor habitual y Kev como alternativa experimental.
+
+El PC del trabajo ya tiene runtime. La siguiente actualización conserva su
+checkpoint, drivers y dependencias; no repite la instalación ni amplía el modelo.
+Los arreglos de portabilidad comunicados allí cubren LF/CRLF del parche Kev,
+fixture CRLF de Tessera y descargas Hugging Face sin symlinks en Windows.
 
 ## Verificación y continuación
 
@@ -159,10 +198,20 @@ a la skill y se despliega mediante el flujo común.
   sin fallos/avisos, `just check` correcto con siete avisos de plugins Noctalia
   ausentes en HOME hermético; 18 skills y cinco roles válidos,
   `render-ai.py --check`, quick_validate, Bash/ShellCheck y diff correctos.
-- Staging inequívoco y commit local antes de publicación.
-  El usuario pide subir esta entrega a GitHub; hace falta la confirmación final
-  de remoto/rama/OID concretos exigida por AGENTS.md. El prompt de traslado está
-  en `docs/work/tessera-work-pc.md`; no supone que Windows ya se haya probado.
-- Despliegue de skills desde main, catálogo dentro de la app, evaluación con
-  ambos clientes y recuperación de visual-direction siguen siendo fases
-  posteriores. Este piloto no redefine el workflow ni las ejecuta de forma oculta.
+- El piloto `0bdff86` fue publicado con autorización y desplegado desde main
+  en este equipo. La entrega posterior incorpora almacenamiento externo,
+  comprobación de cambios de compañeros y exclusión de caché Python en las
+  exportaciones de skills. El prompt actualizado está en
+  `docs/work/tessera-work-pc.md`.
+- No se desplegará un catálogo dentro de la app: la corrección del usuario exige
+  almacén local externo. Evaluación con ambos clientes y recuperación de
+  visual-direction siguen siendo fases posteriores; esta entrega no las ejecuta.
+
+Verificación de la actualización local del 28 de septiembre: 40 pruebas Tessera
+y suite completa de 175 pruebas (174 correctas, una omitida), `just lint` sin
+fallos ni avisos, `just check` correcto con los siete avisos Noctalia del HOME
+hermético, render y validación de 18 skills/cinco roles correctos. La revisión
+independiente detectó y cerró cambios locales fuera de ámbito, revalidación de
+la ubicación de runs trasladados y privacidad POSIX de las entradas. La última
+pasada no encontró más problemas; el filtro de caché conserva backups completos.
+Estas pruebas no hacen llamadas nuevas a Jev/Kev ni acreditan ejecución Windows.

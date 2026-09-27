@@ -63,6 +63,30 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(self.build().operations, [])
         self.assertIsNone(self.build().apply())
 
+    def test_windows_skill_exports_exclude_generated_python_cache(self):
+        source = Path(self.tmp.name) / "Source With Spaces"
+        shutil.copytree(sync.ROOT / "ai", source / "ai")
+        shutil.copytree(sync.ROOT / "scripts", source / "scripts")
+        skill = source / "ai/skills/tessera"
+        cache = skill / "scripts/__pycache__"
+        cache.mkdir(exist_ok=True)
+        (cache / "generated.pyc").write_bytes(b"generated")
+        (skill / "scripts/legacy.pyc").write_bytes(b"legacy")
+        (skill / "scripts/legacy.pyo").write_bytes(b"optimized")
+        first = sync.Sync(self.home, "windows", "both", root=source)
+        first.plan()
+        first.apply()
+        for client in (".claude", ".agents"):
+            deployed = self.home / client / "skills/tessera"
+            self.assertTrue((deployed / "scripts/tessera.py").is_file())
+            self.assertFalse(list(deployed.rglob("__pycache__")))
+            self.assertFalse(list(deployed.rglob("*.pyc")))
+            self.assertFalse(list(deployed.rglob("*.pyo")))
+        (cache / "generated.pyc").write_bytes(b"regenerated")
+        self.assertEqual(sync.Sync(self.home, "windows", "both", root=source).plan(), [])
+        # Full snapshots retain cache data when used for backup/rollback.
+        self.assertIn("__pycache__", sync.snapshot(skill / "scripts")["entries"])
+
     def test_keep_models_connections_corporate_preferences_and_hooks(self):
         self.json_write(".claude/settings.json", {"model": "local-choice", "effortLevel": "medium",
             "company": {"keep": True}, "hooks": {"Stop": [{"matcher": "corp", "hooks": []}]}})

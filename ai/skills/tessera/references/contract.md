@@ -2,9 +2,37 @@
 
 ## Propiedad y separación
 
-Cada proyecto es dueño de `.tessera/catalog.json` y de su historial de decisiones.
-El tooling de la skill es compartido. `ai/tessera/pilots/expenses-log-app` es la
-preparación inicial en dotfiles, no un despliegue dentro de la app.
+Tessera es tooling personal. Cada proyecto tiene un catálogo e historial
+independientes, guardados fuera de los repositorios Git por defecto:
+
+- Linux: `${XDG_DATA_HOME:-~/.local/share}/tessera/projects/<id>/`.
+- Windows: `%LOCALAPPDATA%\tessera\projects\<id>\`.
+
+`tessera.py locate --repo PROJECT` resuelve esas rutas sin crear archivos.
+Contienen `catalog.json`, `history/`, `tasks/`, `runs/` y `decisions/`. El ID es
+un hash de la ruta local real de `git-common-dir`: worktrees enlazados comparten
+conocimiento; clones independientes tienen almacenes separados. No usa remotos,
+credenciales ni un archivo de identificación dentro del proyecto. Mover o
+reclonar el checkout cambia el ID: recuperar/revisar el catálogo de forma
+explícita, sin copiarlo automáticamente entre equipos o empresas.
+
+En proyectos del trabajo no se crea `.tessera`, no se modifica `.gitignore` y
+no se versionan fichas ni decisiones. Tampoco se copian a dotfiles/GitHub
+personal. Dotfiles distribuye scripts y skills; los datos permanecen en el PC
+del trabajo. No hay sincronización de catálogos entre ordenadores. Un traslado
+requiere petición explícita y un destino autorizado. Compartir un catálogo en
+un repo es una excepción explícita, no el valor predeterminado.
+
+`prepare` rechaza catálogo, tarea o salida dentro de cualquier checkout Git;
+`evaluate` vuelve a comprobar la ubicación del run antes de escribir o llamar
+al proveedor, incluso si se llega mediante un enlace. `--allow-repo-storage`
+se exige en cada invocación afectada y permite únicamente
+un flujo de compartición expresamente autorizado. La detección usa los marcadores
+de checkout `.git`; no es un sandbox ni un sistema de clasificación de datos.
+No usar la excepción para proyectos del trabajo.
+
+`ai/tessera/pilots/expenses-log-app` es el piloto personal previamente publicado,
+no un patrón para almacenar información de empresa ni un despliegue en la app.
 
 | Capa | Contenido | Propietario |
 |---|---|---|
@@ -61,6 +89,29 @@ añadir ficha, ampliar ámbito si corresponde, registrar pruebas/gaps, ejecutar
 error de cobertura hasta curarlo. No queda oculto por ranking. La primera versión
 prepara evidencia de un checkout limpio; después de implementar, verificar y
 crear el commit local coherente antes de regenerar el snapshot.
+
+### Cambios de compañeros y actualización
+
+Antes de cada decisión, `tessera.py changes --repo PROJECT` compara el checkout
+con `reviewed_revision`. Informa de fuentes nuevas/eliminadas, rutas cambiadas,
+referencias desaparecidas, fichas afectadas y cambios sin commit. Los renombrados
+aparecen como baja y alta, que el agente debe reconciliar conservando identidad
+si corresponde. También devuelve cambios fuera del catálogo, sin decidir por
+nombre cuáles son relevantes, para inspeccionar posibles ampliaciones.
+
+El agente lee los cambios, actualiza el significado de las fichas y guarda una
+copia previa bajo `history/`; solo después actualiza `reviewed_revision` y
+`reviewed_on`. Añadir un componente en el ámbito exige curar su ficha. Una
+revisión ausente/desconocida exige revisar el catálogo completo. Cambios ajenos
+a sus fuentes no invalidan automáticamente las fichas existentes.
+
+Esto sucede al trabajar y consultar el catálogo, incluidos cambios incorporados
+con pull o cambio de rama. No hay watcher ni consulta automática a GitHub.
+Los compañeros no necesitan instalar Tessera. `prepare` sigue exigiendo fuentes
+versionadas y checkout limpio; `evaluate` vuelve a capturar la evidencia antes
+de la red y rechaza un snapshot que haya cambiado. Un run antiguo sin referencia
+local al checkout debe prepararse de nuevo. Las rutas locales del manifiesto
+no se envían al proveedor.
 
 ## Contrato neutral de decisión
 
@@ -155,8 +206,7 @@ destino, credencial y modelo. Transporte y validación compartidos en
 ```bash
 export TESSERA_KEV_ENDPOINT=http://127.0.0.1:8009/v1/systemone
 python3 "$SKILL_DIR/scripts/tessera.py" prepare --provider kev \
-  --repo "$PROJECT" --catalog "$PROJECT/.tessera/catalog.json" \
-  --task /ruta/tarea.json --output /ruta/run-kev-nuevo
+  --repo "$PROJECT" --task /ruta/local/externa/tarea.json
 python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /ruta/run-kev-nuevo
 ```
 
@@ -269,10 +319,19 @@ Resolver `SKILL_DIR` a la carpeta de esta skill y `PROJECT` al checkout del
 proyecto, tanto en Claude como en Codex. Ejemplo Bash:
 
 ```bash
+python3 "$SKILL_DIR/scripts/tessera.py" locate --repo "$PROJECT"
+python3 "$SKILL_DIR/scripts/tessera.py" changes --repo "$PROJECT"
 python3 "$SKILL_DIR/scripts/tessera.py" prepare \
-  --repo "$PROJECT" --catalog "$PROJECT/.tessera/catalog.json" \
-  --task /ruta/tarea.json --output /ruta/run-nuevo --provider typesafe
+  --repo "$PROJECT" --task /ruta/local/externa/tarea.json --provider typesafe
 ```
+
+Tras `locate`, el agente crea/actualiza el catálogo en la ruta devuelta, con
+carpeta privada y archivo 0600 en POSIX. `prepare` usa ese catálogo y elige una
+carpeta nueva bajo `runs/`; devuelve su ruta `run` para `evaluate`. `--catalog`
+y `--output` permiten rutas externas explícitas. Los padres que crea el helper
+tienen modo 0700. En POSIX, `prepare` exige que catálogo y tarea sean privados
+por sus permisos o los de una carpeta antecesora; no cambia permisos existentes.
+Windows hereda ACL del almacenamiento privado del usuario.
 
 `prepare` no llama a red. Crea un directorio nuevo (0700 y archivos 0600 en POSIX;
 en Windows se heredan las ACL del directorio privado elegido) con `context.json`,
@@ -301,6 +360,6 @@ imprimir; inspeccionarlo con cuidado porque el proveedor puede reflejar datos.
 Se comprueban destinos antes de invocar; no se sustituyen archivos
 existentes. Conservar la respuesta
 original y registrar explicación, desacuerdo, resultado y pruebas en un archivo
-separado del historial del proyecto. Verificar de nuevo las fuentes antes de
-implementar una decisión antigua. No versionar indiscriminadamente los runs:
-contienen código y contexto; solo el registro revisado pertenece al historial.
+separado del historial local externo. Verificar de nuevo las fuentes antes de
+implementar una decisión antigua. No versionar automáticamente catálogos,
+historiales ni runs; contienen conocimiento y contexto del proyecto.

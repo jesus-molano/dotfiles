@@ -98,6 +98,8 @@ un Codex instalado. `-TargetHome 'C:\Users\Nombre Con Espacios'` permite un HOME
 explícito para una prueba. Cada skill se copia y se verifica; una edición local
 posterior bloquea su sobrescritura. Revisa/aprueba la ejecución del script según
 la política corporativa, sin cambiar ni eludir la política de PowerShell.
+Las exportaciones de skills excluyen `__pycache__`, `.pyc` y `.pyo` generados
+durante pruebas. Los respaldos conservan snapshots completos para el rollback.
 
 Para Playwright instala Node LTS y ejecuta `npm.cmd install --global
 @playwright/cli@0.1.21`. Usa `playwright-cli.cmd` si la política impide los wrappers
@@ -204,8 +206,13 @@ La transacción de Stow tiene su propio rollback y respaldo, independientes.
 Los planes aportados en `planes-tessera-jev-claude-codex.zip` quedan como contexto
 para esta fase, confirmada por el usuario el 27 de septiembre de 2026.
 Tessera sustituye la responsabilidad de catálogo de Atlas dentro del workflow
-existente. Es la base de conocimiento versionada por proyecto de componentes y
-utilidades, ampliable conforme se implementa. Memoria, continuidad y workflow
+existente. Es la base de conocimiento local por proyecto de componentes y
+utilidades, ampliable conforme se implementa. Catálogos, tareas e historial se
+guardan fuera de Git, separados por proyecto bajo XDG/LOCALAPPDATA. En el trabajo
+no se crea `.tessera` ni se llevan fichas al repositorio corporativo o a dotfiles
+personal. `locate` resuelve el almacén y `changes` detecta cambios de compañeros
+ya presentes en el checkout para que el agente actualice las fichas antes de
+consultar al motor. Memoria, continuidad y workflow
 conservan sus propietarios. La retirada de la skill Atlas `visual-direction`
 no elimina el checkout, datos, referencias ni temas visuales de Atlas.
 
@@ -240,8 +247,8 @@ Secuencia de continuación:
 2. Revisar las decisiones contra contratos, consumidores y pruebas. Completar
    cobertura del proyecto cuando la tarea la requiera; separar curación,
    evidencia derivada y explicación atribuida al agente.
-3. Incorporar el catálogo al proyecto y desplegar la skill desde la fuente
-   canónica después de validar. Este worktree no despliega sobre HOME.
+3. Incorporar el catálogo al almacenamiento local externo del proyecto y
+   desplegar la skill desde la fuente canónica después de validar.
 4. Recuperar `visual-direction` como capacidad independiente, con referencias
    compartidas y sin dependencia de Atlas; no fusionarla con Tessera.
 5. Probar reutilización, modificación, wrappers y creación con ambos clientes. Añadir Figma

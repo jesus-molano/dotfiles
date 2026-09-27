@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import time
+import uuid
 
 # Installed skills are managed files; execution must not mutate their contents.
 sys.dont_write_bytecode = True
@@ -89,11 +90,115 @@ def git(repo, *args):
                           capture_output=True).stdout
 
 
+def storage_paths(repo):
+    """Local identity: linked worktrees share a catalog; independent clones do not.
+
+    No remote URL, credentials, registry or file in the project is needed.
+    """
+    common = Path(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").decode().strip()).resolve()
+    key = digest(os.path.normcase(str(common)).encode("utf-8"))
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
+    else:
+        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
+    root = (base / "tessera/projects" / key).resolve()
+    require_external(root)
+    return {"project_key": key, "root": str(root), "catalog": str(root / "catalog.json"),
+            **{name: str(root / name) for name in ("tasks", "runs", "decisions", "history")}}
+
+
+def require_external(path):
+    # Resolve symlinks too: an external-looking link into a repo is not external.
+    resolved = Path(path).resolve()
+    require(not any((parent / ".git").exists() or parent.name == ".git"
+                    for parent in (resolved, *resolved.parents)),
+            "Almacenamiento dentro de un repositorio Git; usa rutas locales externas. "
+            "--allow-repo-storage requiere autorización explícita para compartir esos archivos")
+
+
+def private_parents(path):
+    missing = []
+    while not path.exists():
+        missing.append(path)
+        path = path.parent
+    for directory in reversed(missing):
+        directory.mkdir(mode=0o700, exist_ok=True)
+
+
+def require_private_input(path):
+    if os.name == "nt":
+        return  # Windows uses the ACL of the user's local storage.
+    resolved = Path(path).resolve()
+    for candidate in (resolved, *resolved.parents):
+        info = candidate.stat()
+        if info.st_uid == os.getuid() and info.st_mode & 0o077 == 0:
+            return
+    raise ValueError("Catálogo/tarea accesible por otros usuarios; usa archivo 0600 o carpeta privada 0700")
+
+
 def require_clean(repo):
     try:
         git(repo, "diff", "--quiet", "--no-ext-diff", "HEAD", "--")
     except subprocess.CalledProcessError:
         raise ValueError("Checkout con cambios versionados; prepara evidencia de una revisión limpia") from None
+
+
+def catalog_changes(catalog_path, repo):
+    """Report changes for agent curation, including entries no longer present.
+
+    This is read-only: only an agent inspecting contracts can refresh their meaning.
+    """
+    catalog = load(catalog_path)
+    scopes, entries = catalog["scope"], catalog["entries"]
+    require(isinstance(scopes, list) and scopes and isinstance(entries, list), "Catálogo inválido")
+    references = set(scopes) | set(catalog.get("supporting_files", []))
+    entry_paths = {}
+    for entry in entries:
+        paths = {entry["source"], *entry["tests"], *(use["path"] for use in entry["usages"])}
+        entry_paths[entry["id"]] = paths
+        references.update(paths)
+    for name in references:
+        local_path(repo, name)
+    refs = sorted(references)
+    def names(*args):
+        return set(git(repo, *args).decode().split("\0")) - {""}
+    revision = git(repo, "rev-parse", "HEAD").decode().strip()
+    tracked = names("ls-files", "-z")
+    untracked = names("--literal-pathspecs", "ls-files", "--others", "-z", "--", *refs)
+    inventory = {name for name in tracked | untracked
+                 if any(name == scope or name.startswith(scope.rstrip("/") + "/") for scope in scopes)
+                 and not re.search(r"\.(test|spec)\.", name) and local_path(repo, name).is_file()}
+    sources = {entry["source"] for entry in entries}
+    missing = sorted(name for name in references - set(scopes) if not local_path(repo, name).exists())
+    working = names("--literal-pathspecs", "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD", "--", *refs)
+    all_working = names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
+    all_untracked = names("ls-files", "--others", "--exclude-standard", "-z")
+    reviewed = catalog.get("reviewed_revision")
+    valid_base = isinstance(reviewed, str) and bool(re.fullmatch(r"[a-f0-9]{40}", reviewed))
+    changed = set()
+    outside = (all_working | all_untracked) - working - untracked
+    if valid_base:
+        try:
+            changed = names("--literal-pathspecs", "diff", "--no-ext-diff", "--no-renames",
+                            "--name-only", "-z", reviewed, revision, "--", *refs)
+            outside |= names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z",
+                             reviewed, revision) - changed
+        except subprocess.CalledProcessError:
+            valid_base = False
+    affected = changed | working | untracked | set(missing)
+    added, removed = sorted(inventory - sources), sorted(sources - inventory)
+    needs_review = not valid_base or bool(affected or added or removed)
+    require(git(repo, "rev-parse", "HEAD").decode().strip() == revision,
+            "El checkout cambió durante la inspección; repite changes")
+    return {"revision": revision, "reviewed_revision": reviewed,
+            "status": "needs_review" if needs_review else "current",
+            "reason": "missing_or_unavailable_baseline" if not valid_base else "source_comparison",
+            "added_sources": added, "removed_sources": removed,
+            "changed_paths": sorted(changed), "working_changes": sorted(working | untracked),
+            "outside_catalog_changes": sorted(outside),
+            "missing_references": missing,
+            "affected_entries": sorted(entry_id for entry_id, paths in entry_paths.items()
+                                       if not valid_base or paths & affected)}
 
 
 def build_evidence(catalog, repo):
@@ -218,7 +323,12 @@ def normalize_decision(context, answer):
             "review_status": "pending", "agent_explanation": None}
 
 
-def prepare(catalog_path, repo, task_path, output, provider_id="typesafe"):
+def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, allow_repo_storage=False):
+    if not allow_repo_storage:
+        for path in (catalog_path, task_path, output):
+            require_external(path)
+        for path in (catalog_path, task_path):
+            require_private_input(path)
     provider = PROVIDERS[provider_id]
     catalog, task = load(catalog_path), load(task_path)
     evidence = build_evidence(catalog, repo.resolve())
@@ -226,17 +336,21 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe"):
     request = provider.build_request(context)
     body = encoded(request)
     manifest = {"schema": 1, "created_at": datetime.now(timezone.utc).isoformat(),
+                "repo_path": str(repo.resolve()),
                 "provider": provider_id, "endpoint": provider.endpoint(), "request_sha256": digest(body),
                 "context_sha256": digest(encoded(context)),
                 "derived_sha256": digest(encoded(evidence)),
                 "request_bytes": len(body), "catalog_sha256": digest(encoded(catalog)),
                 "revision": evidence["revision"], "entry_count": len(catalog["entries"]),
                 "token_count": None, "status": "prepared"}
-    output.mkdir(parents=True, exist_ok=False, mode=0o700)
+    private_parents(output.parent)
+    output.mkdir(exist_ok=False, mode=0o700)
     for name, value in (("context.json", context), ("request.json", request), ("derived.json", evidence), ("manifest.json", manifest)):
         write_private(output / name, value)
     return manifest
-def evaluate(run):
+def evaluate(run, *, allow_repo_storage=False):
+    if not allow_repo_storage:
+        require_external(run)
     manifest, request = load(run / "manifest.json"), load(run / "request.json")
     provider = PROVIDERS[manifest["provider"]]
     context = load(run / "context.json")
@@ -254,6 +368,10 @@ def evaluate(run):
     require(request == provider.build_request(context), "Contrato de petición inesperado")
     require(context["evidence"].get("curation", {}).get("status") != "stale",
             "Curación obsoleta; revisa los contratos y prepara otro run antes de llamar al proveedor")
+    require(text_field(manifest.get("repo_path")), "Run antiguo sin checkout verificable; prepara otro run")
+    latest = build_evidence(context["catalog"], Path(manifest["repo_path"]))
+    require(encoded(latest) == encoded(derived),
+            "El proyecto cambió desde prepare; revisa changes y prepara otro run")
     for name in ("attempt.json", "response.json", "decision.json", "failure.json", "http-error.bin"):
         if os.path.lexists(run / name):
             raise FileExistsError("El run contiene un intento o resultado previo")
@@ -295,18 +413,39 @@ def evaluate(run):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
+    locate = commands.add_parser("locate", help="Resuelve almacenamiento local por proyecto, sin escribir")
+    locate.add_argument("--repo", type=Path, required=True)
+    changes = commands.add_parser("changes", help="Detecta cambios que requieren actualizar fichas, sin escribir")
+    changes.add_argument("--repo", type=Path, required=True)
+    changes.add_argument("--catalog", type=Path)
     prep = commands.add_parser("prepare", help="Valida y prepara contexto completo, sin red")
     prep.add_argument("--provider", choices=PROVIDERS, default="typesafe")
-    prep.add_argument("--catalog", type=Path, required=True)
+    prep.add_argument("--catalog", type=Path, help="Por defecto, catálogo local externo del proyecto")
     prep.add_argument("--repo", type=Path, required=True)
     prep.add_argument("--task", type=Path, required=True)
-    prep.add_argument("--output", type=Path, required=True)
+    prep.add_argument("--output", type=Path, help="Por defecto, un run nuevo en almacenamiento local")
+    prep.add_argument("--allow-repo-storage", action="store_true",
+                      help="Excepción explícita para archivos dentro de Git; no usar en proyectos del trabajo")
     live = commands.add_parser("evaluate", help="Un intento real con el proveedor y contexto revisados")
     live.add_argument("--run", type=Path, required=True)
+    live.add_argument("--allow-repo-storage", action="store_true",
+                      help="Requiere aprobación explícita de compartición también al evaluar")
     args = parser.parse_args()
     try:
-        result = (prepare(args.catalog, args.repo, args.task, args.output, args.provider)
-                  if args.command == "prepare" else evaluate(args.run))
+        if args.command == "locate":
+            result = storage_paths(args.repo)
+        elif args.command == "changes":
+            catalog = args.catalog if args.catalog is not None else Path(storage_paths(args.repo)["catalog"])
+            result = catalog_changes(catalog, args.repo.resolve())
+        elif args.command == "prepare":
+            paths = storage_paths(args.repo) if args.catalog is None or args.output is None else None
+            catalog = args.catalog if args.catalog is not None else Path(paths["catalog"])
+            output = args.output if args.output is not None else Path(paths["runs"]) / uuid.uuid4().hex
+            result = prepare(catalog, args.repo, args.task, output, args.provider,
+                             allow_repo_storage=args.allow_repo_storage)
+            result = {**result, "run": str(output.resolve())}
+        else:
+            result = evaluate(args.run, allow_repo_storage=args.allow_repo_storage)
         print(encoded(result).decode(), end="")
     except (ValueError, OSError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         # Do not print subprocess output, credentials, request bodies or HTTP error bodies.

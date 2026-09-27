@@ -5,6 +5,7 @@ import importlib.util
 import io
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,185 @@ class TesseraTest(unittest.TestCase):
         self.assertNotIn("export function Button", (self.run_dir / "request.json").read_text())
         self.assertEqual(len(evidence["revision"]), 40)
         self.assertFalse((self.run_dir / "decision.json").exists())
+
+    def test_storage_is_external_and_shared_only_by_linked_worktrees(self):
+        env = {"XDG_DATA_HOME": str(self.root / "data"), "LOCALAPPDATA": str(self.root / "data")}
+        with patch.dict(os.environ, env):
+            paths = tessera.storage_paths(self.repo)
+            self.assertEqual(paths, tessera.storage_paths(self.repo / "src"))
+            self.assertFalse(Path(paths["root"]).exists(), "locate must be read-only")
+            worktree = self.root / "linked worktree"
+            subprocess.run(["git", "-C", str(self.repo), "worktree", "add", "--detach", str(worktree)],
+                           check=True, capture_output=True)
+            self.assertEqual(paths, tessera.storage_paths(worktree))
+            clone = self.root / "separate clone"
+            subprocess.run(["git", "clone", str(self.repo), str(clone)], check=True, capture_output=True)
+            self.assertNotEqual(paths["root"], tessera.storage_paths(clone)["root"])
+            self.assertFalse((self.repo / ".tessera").exists())
+
+    def test_default_prepare_uses_local_catalog_and_leaves_repo_untouched(self):
+        env = {"XDG_DATA_HOME": str(self.root / "data"), "LOCALAPPDATA": str(self.root / "data")}
+        with patch.dict(os.environ, env):
+            paths = json.loads(self.call("locate", "--repo", self.repo).stdout)
+            catalog = Path(paths["catalog"])
+            catalog.parent.mkdir(parents=True, mode=0o700)
+            catalog.write_text(json.dumps(self.data))
+            catalog.chmod(0o600)
+            result = self.call("prepare", "--repo", self.repo, "--task", self.task)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            run = Path(json.loads(result.stdout)["run"])
+            self.assertEqual(run.parent, Path(paths["runs"]))
+            request = json.loads((run / "request.json").read_text())
+            self.assertEqual(request["state"]["catalog"], self.data)
+            if os.name != "nt":
+                self.assertEqual(run.stat().st_mode & 0o777, 0o700)
+                self.assertEqual(run.parent.stat().st_mode & 0o777, 0o700)
+                self.assertEqual((run / "request.json").stat().st_mode & 0o777, 0o600)
+        status = subprocess.check_output(["git", "-C", str(self.repo), "status", "--porcelain"])
+        self.assertEqual(status, b"")
+
+    @unittest.skipIf(os.name == "nt", "POSIX permission bits")
+    def test_inputs_require_private_file_or_private_parent(self):
+        self.root.chmod(0o755)
+        self.catalog.chmod(0o644)
+        self.task.chmod(0o644)
+        with self.assertRaisesRegex(ValueError, "accesible por otros"):
+            tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
+        self.assertFalse(self.run_dir.exists())
+        self.catalog.chmod(0o600)
+        with self.assertRaisesRegex(ValueError, "accesible por otros"):
+            tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
+        self.task.chmod(0o600)
+        tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
+        self.catalog.chmod(0o644)
+        self.root.chmod(0o700)
+        tessera.require_private_input(self.catalog)
+
+    def test_repo_storage_requires_opt_in_even_in_another_repository(self):
+        self.catalog.write_text(json.dumps(self.data))
+        for kind in ("catalog", "task", "output"):
+            with self.subTest(kind=kind):
+                catalog, task, output = self.catalog, self.task, self.run_dir
+                target = self.repo / (kind + ".json")
+                if kind == "catalog":
+                    target.write_text(self.catalog.read_text()); catalog = target
+                elif kind == "task":
+                    target.write_text(self.task.read_text()); task = target
+                else:
+                    output = target
+                result = self.call("prepare", "--repo", self.repo, "--catalog", catalog,
+                                   "--task", task, "--output", output)
+                self.assertIn("Almacenamiento dentro", result.stderr)
+                self.assertFalse(output.exists())
+        result = self.call("prepare", "--repo", self.repo, "--catalog", self.repo / "catalog.json",
+                           "--task", self.task, "--output", self.run_dir, "--allow-repo-storage")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        other = self.root / "personal dotfiles"
+        subprocess.run(["git", "init", "-q", str(other)], check=True)
+        with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+            tessera.require_external(other / "work-catalog.json")
+
+    @unittest.skipIf(os.name == "nt", "Requires POSIX symlinks")
+    def test_storage_cannot_be_redirected_into_repo(self):
+        link = self.root / "external looking"
+        link.symlink_to(self.repo, target_is_directory=True)
+        with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+            tessera.require_external(link / "new-run")
+        with patch.dict(os.environ, {"XDG_DATA_HOME": str(self.repo / "data")}):
+            with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+                tessera.storage_paths(self.repo)
+
+    def commit_all(self):
+        subprocess.run(["git", "-C", str(self.repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Test",
+                        "-c", "user.email=test@example.invalid", "commit", "-qm", "colleague change"], check=True)
+
+    def reviewed_catalog(self):
+        self.data["reviewed_revision"] = subprocess.check_output(
+            ["git", "-C", str(self.repo), "rev-parse", "HEAD"], text=True).strip()
+        self.catalog.write_text(json.dumps(self.data))
+
+    def test_changes_detects_colleague_additions_removals_and_modified_usages(self):
+        self.reviewed_catalog()
+        before = self.catalog.read_bytes()
+        self.assertEqual(tessera.catalog_changes(self.catalog, self.repo)["status"], "current")
+        (self.repo / "src/ui/Button.tsx").rename(self.repo / "src/ui/PrimaryButton.tsx")
+        (self.repo / "src/ui/New.tsx").write_text("export function New() {}\n")
+        (self.repo / "src/use.tsx").write_text("PrimaryButton();\n")
+        self.commit_all()
+        changes = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(changes["status"], "needs_review")
+        self.assertEqual(changes["added_sources"], ["src/ui/New.tsx", "src/ui/PrimaryButton.tsx"])
+        self.assertEqual(changes["removed_sources"], ["src/ui/Button.tsx"])
+        self.assertIn("src/use.tsx", changes["changed_paths"])
+        self.assertEqual(changes["affected_entries"], ["button"])
+        self.assertIn("src/ui/Button.tsx", changes["missing_references"])
+        self.assertEqual(self.catalog.read_bytes(), before, "report must not invent updated contracts")
+
+    def test_changes_reports_untracked_and_uncommitted_sources(self):
+        self.reviewed_catalog()
+        (self.repo / "src/ui/Button.tsx").write_text("export function Button() { return 'changed'; }\n")
+        (self.repo / "src/ui/New.tsx").write_text("export function New() {}\n")
+        changes = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(changes["status"], "needs_review")
+        self.assertEqual(changes["working_changes"], ["src/ui/Button.tsx", "src/ui/New.tsx"])
+        self.assertEqual(changes["affected_entries"], ["button"])
+
+    def test_changes_distinguishes_unrelated_commits_and_missing_baselines(self):
+        self.reviewed_catalog()
+        (self.repo / "README.md").write_text("Unrelated documentation\n")
+        self.commit_all()
+        changes = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(changes["status"], "current")
+        self.assertEqual(changes["affected_entries"], [])
+        self.assertEqual(changes["outside_catalog_changes"], ["README.md"])
+        self.data["reviewed_revision"] = "0" * 40
+        self.catalog.write_text(json.dumps(self.data))
+        changes = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(changes["status"], "needs_review")
+        self.assertEqual(changes["reason"], "missing_or_unavailable_baseline")
+        self.assertEqual(changes["affected_entries"], ["button"])
+
+    def test_changes_reports_local_additions_and_edits_outside_catalog(self):
+        helper = self.repo / "src/helper.ts"
+        helper.write_text("export const value = 1;\n")
+        self.commit_all()
+        self.reviewed_catalog()
+        helper.write_text("export const value = 2;\n")
+        (self.repo / "src/new-helper.ts").write_text("export const added = true;\n")
+        changes = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(changes["outside_catalog_changes"], ["src/helper.ts", "src/new-helper.ts"])
+        self.assertEqual(changes["working_changes"], [])
+        self.assertEqual(changes["affected_entries"], [])
+
+    def test_evaluate_rejects_run_moved_inside_repository_before_network(self):
+        self.assertEqual(self.prepare().returncode, 0)
+        moved = self.repo / "copied-run"
+        shutil.move(self.run_dir, moved)
+        with patch.object(tessera.tessera_typesafe, "invoke") as invoke:
+            with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+                tessera.evaluate(moved)
+            if os.name != "nt":
+                self.run_dir.symlink_to(moved, target_is_directory=True)
+                with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+                    tessera.evaluate(self.run_dir)
+            invoke.assert_not_called()
+        self.assertFalse((moved / "attempt.json").exists())
+        _, response = self.request_and_answer()
+        with patch.object(tessera.tessera_typesafe, "check_credentials"), \
+             patch.object(tessera.tessera_typesafe, "invoke", return_value=tessera.encoded(response)):
+            decision = tessera.evaluate(moved, allow_repo_storage=True)
+        self.assertEqual(decision["action"], "wrap")
+
+    def test_evaluate_rechecks_checkout_after_preparation_before_network(self):
+        self.assertEqual(self.prepare().returncode, 0)
+        (self.repo / "src/ui/Button.tsx").write_text("export function Button() { return 'new contract'; }\n")
+        self.commit_all()
+        with patch.object(tessera.tessera_typesafe, "invoke") as invoke:
+            with self.assertRaisesRegex(ValueError, "proyecto cambió"):
+                tessera.evaluate(self.run_dir)
+            invoke.assert_not_called()
+        self.assertFalse((self.run_dir / "attempt.json").exists())
 
     def test_new_candidate_cannot_disappear_and_can_be_curated(self):
         (self.repo / "src/ui/New.tsx").write_text("export function New() {}\n")
