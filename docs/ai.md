@@ -216,6 +216,13 @@ consultar al motor. Memoria, continuidad y workflow
 conservan sus propietarios. La retirada de la skill Atlas `visual-direction`
 no elimina el checkout, datos, referencias ni temas visuales de Atlas.
 
+`status` distingue sin inicializar, inicializando, actualización pendiente,
+revisión completa necesaria, listo y bloqueado. `init`/`scan` inventarían todo
+el árbol Git; el agente revisa por tandas y `finalize` valida su cobertura.
+El flujo normal usa `prepare --require-ready`. Un catálogo piloto actualizado
+no se presenta como proyecto completo. Procedimiento y límites de cobertura en
+[lifecycle.md](../ai/skills/tessera/references/lifecycle.md).
+
 La [skill neutral Tessera](../ai/skills/tessera/SKILL.md) enruta las decisiones de
 reutilizar, modificar, envolver o crear. Jev de TypeSafe es su primer adaptador
 real; catálogo, contexto e historial no dependen de ese proveedor. Cambiarlo

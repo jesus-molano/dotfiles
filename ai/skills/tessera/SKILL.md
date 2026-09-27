@@ -1,6 +1,6 @@
 ---
 name: tessera
-description: Consult and maintain a project's Tessera component and utility catalog, and use a replaceable decision provider to choose reuse, modification, wrapping or creation for a software task.
+description: Initialize, check coverage and maintain a project's Tessera component and utility catalog; use a replaceable provider to choose reuse, modification, wrapping or creation for a software task.
 ---
 
 # Tessera
@@ -15,15 +15,16 @@ Claude and Codex consume the same catalog, protocol and decision history.
 ## Route the task
 
 - When a task adds or replaces a component, utility, hook or reusable behavior,
-  run `tessera.py locate --repo PROJECT` to find its external catalog and read
+  run `tessera.py status --repo PROJECT` to find its external catalog and read
   the project's instructions. Consult this skill before implementation. Use the
   configured decision adapter with the task's requirements and acceptance checks.
 - Documentation-only work, running checks and diagnosis without an implementation
   choice do not require a provider call. Do not turn this skill into a universal
   gate or call the service on every tool action.
-- If the project has no catalog, inspect its actual contracts, consumers and
-  tests; use the existing reuse-scout workflow to collect evidence. Create a
-  scoped catalog at the external location when that fits the authorized work.
+- If initialization, full review or an update is needed, follow
+  [project lifecycle](references/lifecycle.md). Inventory the whole repository
+  and resume pending files in batches; use reuse-scout to fill actual evidence
+  gaps. A current scoped catalog is not proof of complete project coverage.
   Never create `.tessera`, edit `.gitignore`, or commit personal tool data in a
   work repository. Do not copy work catalogs into personal dotfiles or GitHub.
   Repository-owned storage is an explicit sharing opt-in, never inferred from
@@ -41,7 +42,10 @@ Read [the neutral contract and adapter protocol](references/contract.md) before
 the first run. The helper is [scripts/tessera.py](scripts/tessera.py), relative to
 this skill. Python 3.11+ and Git suffice; no global installation or server.
 
-1. Before every decision, run `tessera.py changes --repo PROJECT`. This compares
+1. Before every decision, run `status` and follow its `next_action` using the
+   [lifecycle](references/lifecycle.md). Reach `ready` through reviewed coverage
+   and `finalize`; do not change a revision/date to clear pending work. For updates,
+   `tessera.py changes --repo PROJECT` additionally compares
    the current checkout with the catalog's reviewed revision, including changes
    from colleagues after a pull or branch switch. For affected entries, read the
    changed implementation, consumers and tests; refresh contracts, constraints,
@@ -50,11 +54,12 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    need broader coverage. With a missing baseline, review the whole catalog.
    Preserve the previous catalog in local `history`, update the external catalog
    and set `reviewed_revision` only after inspection. Run `changes` again before
-   preparing the request. Do this as part of the task, without asking permission
+   finalizing and preparing the request. Do this as part of the task, without asking permission
    again for routine local curation. The tool detects changes; the agent refreshes
    meaning, not an automatic hash replacement. It does not fetch or pull remotely.
    Read the whole catalog; its scope is not proof that nothing useful exists elsewhere.
-2. Write a task JSON with `id`, `requirement` and `acceptance`. `prepare` assembles
+2. Write a task JSON with `id`, `requirement` and `acceptance`. Use
+   `prepare --require-ready`; it checks full project coverage and assembles
    every catalog entry into a compact neutral decision context. Keep names,
    tags, contracts and constraints useful; tags alone do not prove a fit. Source,
    consumers, tests and styles stay in a separate local evidence snapshot; the
@@ -85,7 +90,8 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
 6. Implement through the established engineering workflow, then test and review.
    Update the affected curated entries or add reusable components/utilities with
    stable IDs, actual usage and explicit test gaps. Regenerate derived evidence;
-   do not overwrite curated knowledge with extracted data.
+   do not overwrite curated knowledge with extracted data. Scan/review/finalize
+   the new clean revision so the next task can distinguish ready from stale.
 
 Keep catalogs, history, tasks, raw contexts, responses and reviewed decisions in
 the project's external local namespace. Record catalog/context hashes, provider,

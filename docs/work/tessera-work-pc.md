@@ -43,6 +43,11 @@ reconcilia bajas/renombrados. Conserva una copia previa local; actualiza la
 revisión del catálogo después de inspeccionar código, usos y pruebas. No hace
 pull ni consulta GitHub automáticamente. El código debe estar actualizado en
 este checkout; los compañeros no necesitan Tessera.
+Usa ahora status como punto de entrada: distingue inicialización, actualización,
+revisión completa y listo. Sigue references/lifecycle.md de la skill para
+init/scan, revisar todos los archivos por tandas y finalize. Un catálogo previo
+de dos fichas no acredita cobertura completa. Usa prepare --require-ready en
+las tareas normales; no cambies fechas/revisiones para saltarte la revisión.
 Envía TODAS las fichas al motor elegido: nombres, etiquetas, contratos,
 restricciones y referencias, sin ranking previo ni top-k. Los archivos de código
 completos quedan como evidencia local. Jev, Kev y futuros motores son adaptadores
@@ -60,7 +65,7 @@ Abre una sesión nueva de los clientes disponibles para comprobar la skill
 tessera y su enlace desde engineering-flow.
 
 En Windows usa python con PYTHONDONTWRITEBYTECODE=1. Ejecuta las regresiones
-scripts/tests/test_tessera.py, test_kev_local.py y test_ai_sync.py por unittest
+scripts/tests/test_tessera.py, test_tessera_lifecycle.py, test_kev_local.py y test_ai_sync.py por unittest
 discover. Comprueba que el despliegue excluye __pycache__, .pyc y .pyo. No borres
 copias ajenas si el sincronizador detecta un conflicto; inspecciónalo y conserva
 su respaldo antes de resolverlo.

@@ -1,5 +1,44 @@
 # Tessera y motores de decisión: piloto
 
+## En curso: inicialización y estado por proyecto
+
+Petición del usuario: saber cuándo inicializar, continuar una catalogación,
+actualizar cambios o revisar el proyecto completo. Base `755588b`.
+
+- Inventario de todo el árbol Git, sin selección por tarea o extensión. Los
+  secretos, enlaces y submódulos se identifican por metadata y no se leen.
+- `status` solo lee; `init`/`scan` generan inventario externo reanudable.
+  El agente clasifica por tandas, escribe fichas y registra razones de exclusión.
+  `finalize` valida cobertura y contratos antes de declarar listo el catálogo.
+- Estados: sin inicializar, inicializando, actualización pendiente, revisión
+  completa necesaria, listo y bloqueado. Cobertura y vigencia se distinguen.
+- Los catálogos previos se conservan; no adquieren cobertura completa por tener
+  una revisión Git actual. Sin consumidores encontrados se registra una razón
+  explícita, sin inventar usos.
+- Reutilización: helper Git, rutas externas, permisos y captura de Tessera;
+  patrón de lock O_EXCL, backup y reemplazo atómico de sync-ai/sync-codex-config.
+  Scout no encontró un inventario integral ya implementado.
+- Mantener todas las fichas en cada petición al motor. No nuevas llamadas a
+  Jev/Kev, no cambios de modelos ni servicio automático.
+
+Aceptación: transiciones probadas sobre repos Git reales temporales; tandas
+reanudables; altas/bajas/renombrados, cambios de consumidores, ramas y baseline
+ausente; no escritura en repo ni lectura de secretos; respaldo/concurrencia;
+rechazo de preparación cuando se exige cobertura completa y no está lista.
+Implementado el flujo y la guía `references/lifecycle.md`. Pruebas nuevas sobre
+repos temporales cubren transiciones, tandas/locks obsoletos, privacidad,
+rollback de escritura interrumpida y cambios del catálogo antes de red.
+El status real de Expenses detecta `needs_full_review`: su catálogo de 14 fichas
+no acredita revisión del árbol completo (266 archivos, uno protegido). No se
+leyeron sus fuentes ni se amplió su catálogo para esta verificación de estado.
+Revisión independiente cerrada en dos pasadas: corregidas la política de rutas
+privadas, lectura consistente de inventario/hash, recaptura de cobertura durante
+prepare y compatibilidad Git SHA-256. Última pasada sin hallazgos accionables.
+Verificación: 59 pruebas Tessera correctas; suite completa de 195 (194 correctas,
+una omitida), quick_validate, render y 18 skills/cinco roles válidos. No hubo
+peticiones a Jev/Kev. La catalogación semántica completa de Expenses sigue
+pendiente: esta entrega implementa y prueba el flujo, no inventa fichas.
+
 ## Objetivo y decisiones del usuario
 
 Tessera es el catálogo local de componentes/utilidades por proyecto.

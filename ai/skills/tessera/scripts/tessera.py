@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -12,6 +13,7 @@ import re
 import subprocess
 import sys
 import time
+import tempfile
 import uuid
 
 # Installed skills are managed files; execution must not mutate their contents.
@@ -36,7 +38,7 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
-def load(path):
+def decoded(data):
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -44,7 +46,15 @@ def load(path):
                 raise ValueError("Clave JSON duplicada")
             result[key] = value
         return result
-    return json.loads(Path(path).read_text(encoding="utf-8"), object_pairs_hook=unique)
+    return json.loads(data, object_pairs_hook=unique)
+
+
+def load(path):
+    return decoded(Path(path).read_text(encoding="utf-8"))
+
+
+def is_git_oid(value):
+    return isinstance(value, str) and bool(re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", value))
 
 
 def require(condition, message):
@@ -77,6 +87,7 @@ def local_path(root, name):
     require(parts and not PurePosixPath(name).is_absolute()
             and all(p not in ("..", ".git") and not p.startswith(".env") for p in parts),
             "Ruta fuera del contrato o privada")
+    require(protected_file(name, "100644") is None, "Ruta privada fuera de evidencia")
     path = root
     for part in parts:
         path = path / part
@@ -104,6 +115,7 @@ def storage_paths(repo):
     root = (base / "tessera/projects" / key).resolve()
     require_external(root)
     return {"project_key": key, "root": str(root), "catalog": str(root / "catalog.json"),
+            "inventory": str(root / "inventory.json"),
             **{name: str(root / name) for name in ("tasks", "runs", "decisions", "history")}}
 
 
@@ -143,6 +155,263 @@ def require_clean(repo):
         raise ValueError("Checkout con cambios versionados; prepara evidencia de una revisión limpia") from None
 
 
+INVENTORY_POLICY = 1
+
+
+def protected_file(name, mode):
+    parts = PurePosixPath(name).parts
+    private_names = {".git", ".ssh", ".aws", ".kube", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+                     ".npmrc", ".netrc", ".pypirc", ".git-credentials", ".yarnrc.yml", ".htpasswd",
+                     "credentials", "credentials.json", "credentials.yaml", "credentials.yml",
+                     "credentials.toml", "credentials.xml", "credentials.ini"}
+    if any(part.lower().startswith((".env", "secrets.", ".secrets.")) or part.lower() in private_names
+           or part.lower() in {"secrets", ".secrets"}
+           or Path(part).suffix.lower() in {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".tfstate"}
+           or part.lower().endswith(".tfstate.backup") for part in parts):
+        return "private_path"
+    return {"120000": "symlink", "160000": "submodule"}.get(mode)
+
+
+def project_snapshot(repo):
+    """Inventory Git metadata for every tracked path, never read file bodies."""
+    repo = Path(git(repo, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+    revision = git(repo, "rev-parse", "HEAD").decode().strip()
+    files = {}
+    for record in git(repo, "ls-tree", "-rz", "--full-tree", revision).split(b"\0"):
+        if not record:
+            continue
+        metadata, raw_name = record.split(b"\t", 1)
+        mode, _, oid = metadata.decode().split()
+        name = raw_name.decode()
+        protection = protected_file(name, mode)
+        files[name] = {"oid": oid, "mode": mode, "review":
+                       {"kind": "protected", "reason": protection} if protection else None}
+    dirty = set(git(repo, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD").decode().split("\0"))
+    dirty.update(git(repo, "ls-files", "--others", "--exclude-standard", "-z").decode().split("\0"))
+    require(git(repo, "rev-parse", "HEAD").decode().strip() == revision,
+            "El checkout cambió durante el inventario; repite la operación")
+    return {"revision": revision, "files": files, "checkout_changes": sorted(dirty - {""})}
+
+
+def inventory_valid(state, paths):
+    if not isinstance(state, dict) or state.get("schema") != 1 or state.get("policy") != INVENTORY_POLICY \
+            or state.get("project_key") != paths["project_key"] or not isinstance(state.get("files"), dict):
+        return False
+    for name, item in state["files"].items():
+        if not isinstance(name, str) or not isinstance(item, dict) or set(item) != {"oid", "mode", "review"}:
+            return False
+        if not is_git_oid(item["oid"]) \
+                or item["mode"] not in {"100644", "100755", "120000", "160000"}:
+            return False
+        review = item["review"]
+        if review is not None and (not isinstance(review, dict) or set(review) != {"kind", "reason"}
+                or review["kind"] not in {"catalogued", "supporting", "excluded", "protected"}
+                or not text_field(review["reason"])):
+            return False
+        protected = protected_file(name, item["mode"])
+        if protected and review != {"kind": "protected", "reason": protected}:
+            return False
+        if not protected and review is not None and review["kind"] == "protected":
+            return False
+    return True
+
+
+def inventory_baseline_available(repo, state):
+    revision = state.get("revision")
+    if not is_git_oid(revision):
+        return False
+    try:
+        git(repo, "cat-file", "-e", revision + "^{commit}")
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def project_status(repo):
+    paths = storage_paths(repo)
+    snapshot = project_snapshot(repo)
+    path = Path(paths["inventory"])
+    protected_paths = {name: item["review"]["reason"] for name, item in snapshot["files"].items() if item["review"]}
+    result = {"status": "uninitialized", "next_action": "init", "paths": paths,
+              "revision": snapshot["revision"], "checkout_changes": snapshot["checkout_changes"],
+              "inventory_sha256": None, "coverage": {"total": len(snapshot["files"]), "reviewed": 0,
+              "protected": len(protected_paths), "pending": len(snapshot["files"]) - len(protected_paths)},
+              "pending_paths": sorted(set(snapshot["files"]) - set(protected_paths)),
+              "protected_paths": protected_paths, "removed_paths": [], "reasons": []}
+    if path.exists():
+        try:
+            require(not path.is_symlink(), "Inventario enlazado; conserva e inspecciona el archivo")
+            raw = path.read_bytes()
+            state = decoded(raw)
+            result["inventory_sha256"] = digest(raw)
+            if not inventory_valid(state, paths) or not inventory_baseline_available(repo, state):
+                result.update(status="needs_full_review", next_action="scan --full", reasons=["incompatible_inventory_or_missing_baseline"])
+            else:
+                current = snapshot["files"]
+                previous = state["files"]
+                pending = sorted(name for name, item in current.items()
+                                 if item["review"] is None and (name not in previous
+                                     or any(item[key] != previous[name][key] for key in ("oid", "mode"))
+                                     or previous[name]["review"] is None))
+                removed = sorted(set(previous) - set(current))
+                protected = sum(item["review"] is not None for item in current.values())
+                final = state.get("finalized")
+                catalog = Path(paths["catalog"])
+                require(not catalog.is_symlink(), "Catálogo enlazado; inspecciona su ubicación")
+                same_files = not removed and set(current) == set(previous) and all(
+                    all(item[key] == previous[name][key] for key in ("oid", "mode")) for name, item in current.items())
+                ready = (not pending and same_files and isinstance(final, dict)
+                         and final.get("files_sha256") == digest(encoded(previous)) and catalog.is_file()
+                         and final.get("catalog_sha256") == digest(catalog.read_bytes()))
+                reasons = (["inventory_changed"] if not same_files else []) + (["unreviewed_paths"] if pending else [])
+                if not catalog.is_file():
+                    reasons.append("catalog_missing")
+                elif not final:
+                    reasons.append("not_finalized")
+                elif not ready and not reasons:
+                    reasons.append("catalog_or_classification_changed")
+                result.update(status="ready" if ready else "needs_update" if final else "initializing",
+                              next_action="prepare --require-ready" if ready else "review" if same_files and pending
+                              else "curate_catalog" if same_files and not catalog.is_file()
+                              else "finalize" if same_files and not pending else "scan", reasons=reasons,
+                              pending_paths=pending, removed_paths=removed,
+                              coverage={"total": len(current), "protected": protected, "pending": len(pending),
+                                        "reviewed": len(current) - protected - len(pending)})
+        except (ValueError, OSError, KeyError, TypeError):
+            result.update(status="blocked", next_action="repair_inventory", reasons=["unreadable_or_invalid_inventory"])
+    elif Path(paths["catalog"]).exists():
+        result.update(status="needs_full_review", next_action="init", reasons=["catalog_without_project_inventory"])
+    if snapshot["checkout_changes"]:
+        result.update(status="blocked", next_action="resolve_checkout_changes", reasons=[*result["reasons"], "checkout_not_clean"])
+    return result
+
+
+@contextmanager
+def inventory_transaction(repo):
+    paths = storage_paths(repo)
+    root, path = Path(paths["root"]), Path(paths["inventory"])
+    private_parents(root)
+    require_private_input(root)
+    require(not path.is_symlink(), "Inventario enlazado; conserva e inspecciona el archivo")
+    lock = root / "inventory.lock"
+    descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    os.close(descriptor)
+    try:
+        before = path.read_bytes() if path.exists() else None
+        snapshot = project_snapshot(repo)
+        require(not snapshot["checkout_changes"], "Checkout con cambios; resuélvelos antes de catalogar")
+        yield paths, snapshot, before
+    finally:
+        lock.unlink()
+
+
+def save_inventory(repo, paths, snapshot, before, state):
+    path = Path(paths["inventory"])
+    require(project_snapshot(repo) == snapshot, "El proyecto cambió; repite la operación")
+    require((path.read_bytes() if path.exists() else None) == before, "El inventario cambió concurrentemente")
+    data = encoded(state)
+    if data == before:
+        return
+    if before is not None:
+        history = Path(paths["history"])
+        require_external(history)
+        private_parents(history)
+        require_private_input(history)
+        write_bytes_private(history / ("inventory-" + uuid.uuid4().hex + ".json"), before)
+    descriptor, name = tempfile.mkstemp(prefix=".inventory-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(data)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def scan_project(repo, *, full=False, initialize=False):
+    with inventory_transaction(repo) as (paths, snapshot, before):
+        old = decoded(before) if before is not None else None
+        if initialize and old is not None:
+            return project_status(repo)
+        valid = old is not None and inventory_valid(old, paths) and inventory_baseline_available(repo, old)
+        require(old is None or valid or full, "Se necesita scan --full; se conservará el inventario anterior")
+        files = {name: dict(item) for name, item in snapshot["files"].items()}
+        if valid and not full:
+            for name, item in files.items():
+                previous = old["files"].get(name)
+                if item["review"] is None and previous and all(item[key] == previous[key] for key in ("oid", "mode")):
+                    item["review"] = previous["review"]
+        state = {"schema": 1, "policy": INVENTORY_POLICY, "project_key": paths["project_key"],
+                 "revision": snapshot["revision"], "files": files,
+                 "finalized": old.get("finalized") if valid and not full else None}
+        save_inventory(repo, paths, snapshot, before, state)
+    return project_status(repo)
+
+
+def current_inventory(repo, paths, snapshot, before):
+    require(before is not None, "Inicializa el inventario antes de revisar")
+    state = decoded(before)
+    require(inventory_valid(state, paths) and inventory_baseline_available(repo, state),
+            "Se necesita scan --full")
+    require(state["revision"] == snapshot["revision"] and set(state["files"]) == set(snapshot["files"])
+            and all(all(state["files"][name][key] == item[key] for key in ("oid", "mode"))
+                    for name, item in snapshot["files"].items()), "El inventario cambió; ejecuta scan")
+    return state
+
+
+def review_project(repo, batch_path):
+    require_external(batch_path)
+    require_private_input(batch_path)
+    batch = load(batch_path)
+    fields(batch, {"schema", "revision", "inventory_sha256", "files"})
+    require(batch["schema"] == 1 and isinstance(batch["files"], list), "Tanda inválida")
+    with inventory_transaction(repo) as (paths, snapshot, before):
+        state = current_inventory(repo, paths, snapshot, before)
+        require(batch["revision"] == snapshot["revision"] and batch["inventory_sha256"] == digest(before),
+                "La tanda corresponde a otra revisión/inventario; lee status y revisa los cambios")
+        seen = set()
+        for review in batch["files"]:
+            fields(review, {"path", "kind", "reason"})
+            name = review["path"]
+            require(isinstance(name, str) and name in state["files"] and name not in seen,
+                    "Ruta ausente o repetida en la tanda")
+            seen.add(name)
+            require(not protected_file(name, state["files"][name]["mode"]), "No se revisan contenidos protegidos")
+            require(review["kind"] in {"catalogued", "supporting", "excluded"} and text_field(review["reason"]),
+                    "Clasificación y razón explícita requeridas")
+            state["files"][name]["review"] = {key: review[key] for key in ("kind", "reason")}
+        save_inventory(repo, paths, snapshot, before, state)
+    return project_status(repo)
+
+
+def finalize_project(repo):
+    repo = Path(git(repo, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+    with inventory_transaction(repo) as (paths, snapshot, before):
+        state = current_inventory(repo, paths, snapshot, before)
+        require(all(item["review"] is not None for item in state["files"].values()),
+                "Hay archivos pendientes de revisión")
+        catalog_path = Path(paths["catalog"])
+        require_external(catalog_path)
+        require(not catalog_path.is_symlink(), "Catálogo enlazado; inspecciona su ubicación")
+        require_private_input(catalog_path)
+        catalog_before = catalog_path.read_bytes()
+        catalog = decoded(catalog_before)
+        evidence = build_evidence(catalog, repo)
+        require(evidence["curation"]["status"] == "current", "Curación no vigente; revisa fichas y reviewed_revision")
+        classified = {name for name, item in state["files"].items() if item["review"]["kind"] == "catalogued"}
+        require(classified == {entry["source"] for entry in catalog["entries"]},
+                "La clasificación y las fuentes del catálogo no coinciden")
+        require(all(state["files"].get(name, {}).get("review", {}).get("kind") in {"catalogued", "supporting"}
+                    for name in evidence["files"]), "Evidencia excluida o sin revisión en el inventario")
+        require(catalog_path.read_bytes() == catalog_before, "El catálogo cambió concurrentemente")
+        state["finalized"] = {"revision": snapshot["revision"], "catalog_sha256": digest(catalog_before),
+                              "files_sha256": digest(encoded(state["files"]))}
+        save_inventory(repo, paths, snapshot, before, state)
+    return project_status(repo)
+
+
 def catalog_changes(catalog_path, repo):
     """Report changes for agent curation, including entries no longer present.
 
@@ -150,7 +419,7 @@ def catalog_changes(catalog_path, repo):
     """
     catalog = load(catalog_path)
     scopes, entries = catalog["scope"], catalog["entries"]
-    require(isinstance(scopes, list) and scopes and isinstance(entries, list), "Catálogo inválido")
+    require(isinstance(scopes, list) and isinstance(entries, list), "Catálogo inválido")
     references = set(scopes) | set(catalog.get("supporting_files", []))
     entry_paths = {}
     for entry in entries:
@@ -174,7 +443,7 @@ def catalog_changes(catalog_path, repo):
     all_working = names("diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
     all_untracked = names("ls-files", "--others", "--exclude-standard", "-z")
     reviewed = catalog.get("reviewed_revision")
-    valid_base = isinstance(reviewed, str) and bool(re.fullmatch(r"[a-f0-9]{40}", reviewed))
+    valid_base = is_git_oid(reviewed)
     changed = set()
     outside = (all_working | all_untracked) - working - untracked
     if valid_base:
@@ -207,8 +476,8 @@ def build_evidence(catalog, repo):
     require(catalog.get("schema") == 1 and text_field(catalog.get("project")),
             "Catálogo schema=1 y project requeridos")
     scopes, entries = catalog.get("scope"), catalog.get("entries")
-    require(isinstance(scopes, list) and scopes, "scope debe enumerar archivos/directorios")
-    require(isinstance(entries, list) and entries, "entries debe contener fichas")
+    require(isinstance(scopes, list), "scope debe enumerar archivos/directorios")
+    require(isinstance(entries, list), "entries debe contener fichas")
     revision = git(repo, "rev-parse", "HEAD").decode().strip()
     require_clean(repo)
     tracked = set(git(repo, "ls-files", "-z").decode().split("\0")) - {""}
@@ -235,7 +504,7 @@ def build_evidence(catalog, repo):
 
     for entry in entries:
         fields(entry, {"id", "kind", "summary", "contract", "constraints", "source", "usages", "tests"},
-               {"name", "tags"})
+               {"name", "tags", "usage_gap"})
         identity = entry.get("id")
         require(isinstance(identity, str) and re.fullmatch(r"[a-z][a-z0-9-]*", identity)
                 and identity not in ids, "ID inválido o duplicado")
@@ -247,11 +516,13 @@ def build_evidence(catalog, repo):
                 and all(text_field(tag) for tag in entry["tags"]), "tags inválidas")
         require(isinstance(entry.get("constraints"), list)
                 and all(text_field(v) for v in entry["constraints"]), "constraints inválidas")
+        require("usage_gap" not in entry or text_field(entry["usage_gap"]), "usage_gap inválido")
         source = entry["source"]
         require(source not in sources, "Fuente duplicada; agrupa sus exports en una ficha")
         sources.add(source)
         capture(source)
-        require(isinstance(entry.get("usages"), list) and entry["usages"], "Falta uso real")
+        require(isinstance(entry.get("usages"), list) and (entry["usages"] or text_field(entry.get("usage_gap"))),
+                "Falta uso real o usage_gap explícito tras buscar consumidores")
         for use in entry["usages"]:
             fields(use, {"path", "start", "end"})
             lines = capture(use["path"])
@@ -274,7 +545,7 @@ def build_evidence(catalog, repo):
             and git(repo, "rev-parse", "HEAD").decode().strip() == revision,
             "El checkout cambió durante la captura; prepara otro snapshot")
     reviewed = catalog.get("reviewed_revision")
-    require(reviewed is None or isinstance(reviewed, str) and re.fullmatch(r"[a-f0-9]{40}", reviewed),
+    require(reviewed is None or is_git_oid(reviewed),
             "reviewed_revision debe ser un OID completo")
     for name in ("coverage", "reviewed_on"):
         require(name not in catalog or text_field(catalog[name]), "Metadata de revisión inválida")
@@ -323,15 +594,28 @@ def normalize_decision(context, answer):
             "review_status": "pending", "agent_explanation": None}
 
 
-def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, allow_repo_storage=False):
+def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, allow_repo_storage=False,
+            require_ready=False):
     if not allow_repo_storage:
         for path in (catalog_path, task_path, output):
             require_external(path)
         for path in (catalog_path, task_path):
             require_private_input(path)
+    if require_ready:
+        status = project_status(repo)
+        require(status["status"] == "ready", "Proyecto no listo; consulta status y completa su next_action")
+        require(Path(catalog_path).resolve() == Path(status["paths"]["catalog"]).resolve(),
+                "El catálogo no pertenece al inventario validado")
     provider = PROVIDERS[provider_id]
     catalog, task = load(catalog_path), load(task_path)
     evidence = build_evidence(catalog, repo.resolve())
+    if require_ready:
+        after = project_status(repo)
+        require(after["status"] == "ready" and after["revision"] == evidence["revision"]
+                and status["revision"] == after["revision"]
+                and status["inventory_sha256"] == after["inventory_sha256"]
+                and digest(encoded(load(after["paths"]["catalog"]))) == digest(encoded(catalog)),
+                "La cobertura cambió durante prepare; repite status y la preparación")
     context = build_context(catalog, evidence, task)
     request = provider.build_request(context)
     body = encoded(request)
@@ -342,6 +626,7 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 "derived_sha256": digest(encoded(evidence)),
                 "request_bytes": len(body), "catalog_sha256": digest(encoded(catalog)),
                 "revision": evidence["revision"], "entry_count": len(catalog["entries"]),
+                "project_status": "ready" if require_ready else "not_checked",
                 "token_count": None, "status": "prepared"}
     private_parents(output.parent)
     output.mkdir(exist_ok=False, mode=0o700)
@@ -372,6 +657,10 @@ def evaluate(run, *, allow_repo_storage=False):
     latest = build_evidence(context["catalog"], Path(manifest["repo_path"]))
     require(encoded(latest) == encoded(derived),
             "El proyecto cambió desde prepare; revisa changes y prepara otro run")
+    if manifest.get("project_status") == "ready":
+        status = project_status(Path(manifest["repo_path"]))
+        require(status["status"] == "ready" and digest(encoded(load(status["paths"]["catalog"]))) == manifest["catalog_sha256"],
+                "El catálogo o su cobertura cambió desde prepare; prepara otro run")
     for name in ("attempt.json", "response.json", "decision.json", "failure.json", "http-error.bin"):
         if os.path.lexists(run / name):
             raise FileExistsError("El run contiene un intento o resultado previo")
@@ -415,6 +704,13 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     locate = commands.add_parser("locate", help="Resuelve almacenamiento local por proyecto, sin escribir")
     locate.add_argument("--repo", type=Path, required=True)
+    for name in ("status", "init", "scan", "review", "finalize"):
+        command = commands.add_parser(name, help="Estado e inventario de todo el proyecto")
+        command.add_argument("--repo", type=Path, required=True)
+        if name == "scan":
+            command.add_argument("--full", action="store_true", help="Reinicia revisión con respaldo; conserva catálogo")
+        if name == "review":
+            command.add_argument("--batch", type=Path, required=True, help="Tanda JSON externa con revisión y hash del inventario")
     changes = commands.add_parser("changes", help="Detecta cambios que requieren actualizar fichas, sin escribir")
     changes.add_argument("--repo", type=Path, required=True)
     changes.add_argument("--catalog", type=Path)
@@ -426,14 +722,25 @@ def main():
     prep.add_argument("--output", type=Path, help="Por defecto, un run nuevo en almacenamiento local")
     prep.add_argument("--allow-repo-storage", action="store_true",
                       help="Excepción explícita para archivos dentro de Git; no usar en proyectos del trabajo")
+    prep.add_argument("--require-ready", action="store_true", help="Exige cobertura completa y vigente del proyecto")
     live = commands.add_parser("evaluate", help="Un intento real con el proveedor y contexto revisados")
     live.add_argument("--run", type=Path, required=True)
     live.add_argument("--allow-repo-storage", action="store_true",
                       help="Requiere aprobación explícita de compartición también al evaluar")
     args = parser.parse_args()
     try:
+        if hasattr(args, "repo"):
+            args.repo = Path(git(args.repo, "rev-parse", "--show-toplevel").decode().strip()).resolve()
         if args.command == "locate":
             result = storage_paths(args.repo)
+        elif args.command == "status":
+            result = project_status(args.repo)
+        elif args.command in {"init", "scan"}:
+            result = scan_project(args.repo, initialize=args.command == "init", full=getattr(args, "full", False))
+        elif args.command == "review":
+            result = review_project(args.repo, args.batch)
+        elif args.command == "finalize":
+            result = finalize_project(args.repo)
         elif args.command == "changes":
             catalog = args.catalog if args.catalog is not None else Path(storage_paths(args.repo)["catalog"])
             result = catalog_changes(catalog, args.repo.resolve())
@@ -442,7 +749,7 @@ def main():
             catalog = args.catalog if args.catalog is not None else Path(paths["catalog"])
             output = args.output if args.output is not None else Path(paths["runs"]) / uuid.uuid4().hex
             result = prepare(catalog, args.repo, args.task, output, args.provider,
-                             allow_repo_storage=args.allow_repo_storage)
+                             allow_repo_storage=args.allow_repo_storage, require_ready=args.require_ready)
             result = {**result, "run": str(output.resolve())}
         else:
             result = evaluate(args.run, allow_repo_storage=args.allow_repo_storage)

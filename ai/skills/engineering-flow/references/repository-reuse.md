@@ -5,9 +5,10 @@ goal is to use the repository's supported solution, not merely make new code
 look similar. Reuse inspected earlier in the same task remains valid unless
 requirements, contracts, or the relevant code changed.
 
-Use `tessera.py locate --repo PROJECT` from the Tessera skill to find the local
-external catalog. If present, run its `changes` check, update affected knowledge
-from actual code, then consult the full catalog for the implementation choice.
+Use `tessera.py status --repo PROJECT` from the Tessera skill to find the local
+external catalog and its coverage/freshness. Follow its lifecycle to initialize,
+resume, update or fully review the project. Finalize reviewed coverage before
+`prepare --require-ready`, then consult the full catalog for the implementation choice.
 Personal tool data stays outside work repositories and personal dotfiles. Do
 not create `.tessera` or change a work project's `.gitignore` for this workflow.
 Use the scout to fill evidence gaps or expand coverage, not to shortlist or

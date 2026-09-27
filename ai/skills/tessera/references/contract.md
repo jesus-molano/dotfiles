@@ -9,7 +9,7 @@ independientes, guardados fuera de los repositorios Git por defecto:
 - Windows: `%LOCALAPPDATA%\tessera\projects\<id>\`.
 
 `tessera.py locate --repo PROJECT` resuelve esas rutas sin crear archivos.
-Contienen `catalog.json`, `history/`, `tasks/`, `runs/` y `decisions/`. El ID es
+Contienen `catalog.json`, `inventory.json`, `history/`, `tasks/`, `runs/` y `decisions/`. El ID es
 un hash de la ruta local real de `git-common-dir`: worktrees enlazados comparten
 conocimiento; clones independientes tienen almacenes separados. No usa remotos,
 credenciales ni un archivo de identificación dentro del proyecto. Mover o
@@ -45,6 +45,12 @@ no un patrón para almacenar información de empresa ni un despliegue en la app.
 No guarda memoria conversacional, planes de trabajo ni referencias de inspiración.
 No usa Atlas, una base vectorial, Figma ni un servidor.
 
+El [ciclo de vida](lifecycle.md) define `status`, `init`, `scan`, `review` y
+`finalize`: cobertura del árbol Git completo, revisión reanudable y vigencia.
+`current` en `changes` describe las fichas del ámbito; solo `ready` en `status`
+acredita inventario revisado y catálogo finalizado. El flujo habitual prepara
+con `--require-ready`. Un piloto antiguo sin inventario requiere revisión completa.
+
 ## Catálogo y crecimiento
 
 JSON UTF-8 con `schema: 1`, `project`, `scope` y `entries`. `scope` enumera rutas
@@ -63,6 +69,8 @@ Cada ficha contiene:
 - `source`: archivo que implementa el contrato. Una ficha puede describir varios
   exports de ese archivo. El piloto usa una ficha por archivo de implementación.
 - `usages`: objetos `path`, `start`, `end`, con líneas inclusivas de un uso real.
+  Si no se encuentran consumidores, admite `[]` con `usage_gap` textual que
+  explique la búsqueda o uso implícito del framework. No inventar un consumidor.
 - `tests`: rutas a pruebas, o `[]` cuando faltan; no significa que pasan.
 
 `supporting_files` opcional enumera rutas de tokens, estilos o manifiestos para
@@ -73,6 +81,10 @@ Si falta un dato para decidir, el agente inspecciona la fuente y enriquece el
 contrato o las restricciones antes de preparar otro run. No se recortan fichas
 ni se sube el código completo automáticamente.
 `coverage` y `reviewed_revision` documentan alcance y revisión humana/agente.
+Un proyecto sin piezas catalogables puede tener `scope: []` y `entries: []`;
+la revisión de todos sus archivos y exclusiones sigue siendo necesaria para
+finalizarlo. `kind` es una clasificación semántica extensible, asignada por el
+agente leyendo código y consumidores, no por un detector de nombres de archivo.
 Todas las rutas son relativas al proyecto. El helper rechaza escapes, enlaces,
 `.env*`, campos desconocidos, evidencia no versionada, IDs repetidos y diferencias entre ámbito y fichas.
 La evidencia local registra archivos completos, no solo rangos de uso; deduplica
@@ -319,10 +331,11 @@ Resolver `SKILL_DIR` a la carpeta de esta skill y `PROJECT` al checkout del
 proyecto, tanto en Claude como en Codex. Ejemplo Bash:
 
 ```bash
-python3 "$SKILL_DIR/scripts/tessera.py" locate --repo "$PROJECT"
+python3 "$SKILL_DIR/scripts/tessera.py" status --repo "$PROJECT"
+# Resolver next_action con el flujo lifecycle.md antes de preparar.
 python3 "$SKILL_DIR/scripts/tessera.py" changes --repo "$PROJECT"
 python3 "$SKILL_DIR/scripts/tessera.py" prepare \
-  --repo "$PROJECT" --task /ruta/local/externa/tarea.json --provider typesafe
+  --repo "$PROJECT" --task /ruta/local/externa/tarea.json --provider typesafe --require-ready
 ```
 
 Tras `locate`, el agente crea/actualiza el catálogo en la ruta devuelta, con
