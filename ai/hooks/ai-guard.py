@@ -191,9 +191,9 @@ def check_powershell(command: str, depth: int = 0) -> str | None:
     for token in PS_TOKEN.findall(command):
         if skip:
             skip = False
-        elif re.fullmatch(r"[0-9*]?>>?(&[0-9])?", token):
+        elif re.fullmatch(r"[0-9*&]?>>?(&[0-9])?", token):
             skip = not token.endswith(("&1", "&2"))
-        elif re.fullmatch(r"[0-9*]?>>?\S+", token):
+        elif re.fullmatch(r"[0-9*&]?>>?\S+", token):
             continue  # redirection with its target attached
         elif token in PS_SEPARATORS:
             if current:
@@ -278,6 +278,10 @@ def decide(event: dict) -> str | None:
 
 
 def main() -> int:
+    for stream in (sys.stdin, sys.stderr):
+        # Windows defaults to the ANSI code page; hooks exchange UTF-8.
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         event = json.load(sys.stdin)
     except (json.JSONDecodeError, UnicodeDecodeError):

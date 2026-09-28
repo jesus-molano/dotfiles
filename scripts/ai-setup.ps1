@@ -4,7 +4,9 @@ param(
     [ValidateSet('plan', 'apply', 'check', 'rollback')][string]$Mode = 'plan',
     [ValidateSet('both', 'claude', 'codex')][string]$Clients = 'claude',
     [string]$TargetHome = $env:USERPROFILE,
-    [string]$Backup
+    [string]$Backup,
+    # Adopt copies from an earlier deployment of this repo when the ledger is missing.
+    [switch]$Adopt
 )
 $ErrorActionPreference = 'Stop'
 $python = Get-Command python -ErrorAction SilentlyContinue
@@ -14,5 +16,6 @@ if ($LASTEXITCODE -ne 0) { throw 'Se necesita Python 3.11 o posterior.' }
 $arguments = @((Join-Path $PSScriptRoot 'sync-ai.py'), $Mode,
     '--platform', 'windows', '--clients', $Clients, '--home', $TargetHome)
 if ($Backup) { $arguments += @('--backup', $Backup) }
+if ($Adopt) { $arguments += '--adopt' }
 & $python.Source @arguments
 exit $LASTEXITCODE

@@ -35,7 +35,8 @@ class GuardTest(unittest.TestCase):
                         "git push origin 0123456789abcdef0123456789abcdef01234567:refs/heads/main",
                         "git status && git diff --check", "stow -t ~ shell git", "rm -rf build dist",
                         "cat .env.op.example", "with-secrets npm run deploy", "python3 tessera.py index --repo .",
-                        "grep -rn TODO src", "echo 'see .env docs'"):
+                        "grep -rn TODO src", "echo 'see .env docs'",
+                        "python3 ai/skills/tessera/scripts/tessera.py consent-status --repo ."):
             self.assertAllowed(command)
 
     def test_destructive_publication_is_blocked(self):
@@ -128,7 +129,8 @@ class PowerShellGuardTest(unittest.TestCase):
         for command in ("git push origin main", "git push origin feat 2>&1 | Out-Null",
                         "Remove-Item -Recurse .\\build", "Copy-Item .env.example .env",
                         "Write-Host 'it''s fine'; git status", "Get-ChildItem -Recurse src",
-                        "git push origin main >push.log", "Test-Path .env", "Set-Content .env 'A=1'"):
+                        "git push origin main >push.log", "Test-Path .env", "Set-Content .env 'A=1'",
+                        "git push origin feat &>/dev/null"):
             result = powershell(command)
             self.assertEqual((result.returncode, result.stderr), (0, ""), command)
 
@@ -145,6 +147,13 @@ class StatusLineTest(unittest.TestCase):
         line = result.stdout.strip()
         self.assertTrue(line.startswith(f"Opus · {repo.name}"), line)
         self.assertTrue(line.endswith("ctx 42% · 5h 10% · 7d 9%"), line)
+
+    def test_output_is_utf8_whatever_the_locale(self):
+        env = {"PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+        result = subprocess.run([sys.executable, str(HOOKS / "statusline.py")],
+                                input=json.dumps({"model": {"display_name": "Opus"}, "context_window": {"used_percentage": 5}}).encode(),
+                                capture_output=True, env={**os.environ, **env})
+        self.assertEqual(result.stdout.decode("utf-8").strip(), "Opus · ctx 5%")
 
     def test_missing_fields_do_not_fail(self):
         self.assertEqual(run("statusline.py", {}).stdout.strip(), "")

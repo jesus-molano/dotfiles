@@ -16,6 +16,9 @@ Claude and Codex use the same catalog and protocol.
 - Run `tessera.py status --repo PROJECT`. It is local, read-only and offline.
 - `uninitialized`: no catalog. Use the ordinary reuse search from
   `engineering-flow`. Do **not** start `init` unless the user asks.
+- `next_action: adopt_store`: an earlier store exists (old Windows or MSIX app
+  location). Tell the user which one looks freshest and run
+  `adopt-store --repo PROJECT --from PATH` once they agree; the source is kept.
 - `ready` or `needs_update`: run `tessera.py index --repo PROJECT`. It returns
   one short line per card (id, kind, name, tags, summary, source). Pick the
   plausible cards and read only those with
@@ -60,7 +63,8 @@ or when reuse is genuinely ambiguous between specific cards.
 
 1. The user must have granted consent for this project and provider in their
    own terminal: `tessera.py consent --repo PROJECT --provider typesafe`.
-   Never try to grant it yourself; the guard blocks it. For work projects this
+   Check it with `tessera.py consent-status --repo PROJECT`. Never try to grant
+   it yourself; the guard blocks it. For work projects this
    also requires the company's authorization to send project material out.
 2. Decide first. Write the task JSON with `id`, `requirement`, `acceptance` and
    your own `agent_choice` (`action`, `primary` card id or null, `reason`).

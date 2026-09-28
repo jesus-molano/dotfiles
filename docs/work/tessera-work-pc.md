@@ -20,8 +20,11 @@ overwrite changes to resolve a divergence. Do not assume paths, GPU, RAM,
 credentials or installed clients match the home computer.
 
 Deploy with the existing tooling. On native Windows review and run
-scripts/ai-setup.ps1 in plan, apply and check modes; choose Claude or both
-clients depending on what is installed. Keep models, effort, memory, accounts,
+scripts/ai-setup.ps1 in plan, apply and check modes from a normal PowerShell
+(not a tool launched by an MSIX app); choose Claude or both clients depending
+on what is installed. If the plan stops with "destino ajeno" because the
+ownership ledger is missing, rerun the plan with -Adopt and review the adopt:
+lines before applying. Keep models, effort, memory, accounts,
 plugins and local preferences. If the sync reports a conflict, inspect it and
 keep its backup; never delete other copies to get past it.
 
@@ -29,7 +32,11 @@ Run the Python regressions with PYTHONDONTWRITEBYTECODE=1 through unittest
 discover on scripts/tests (test_tessera*.py, test_kev_local.py, test_ai_sync.py,
 test_ai_guard.py). Confirm the deployment excludes __pycache__, .pyc and .pyo.
 
-Tessera: catalogs stay in LOCALAPPDATA outside every repository. Do not create
+Tessera: catalogs now live in %USERPROFILE%\.local\share\tessera, outside every
+repository and outside the MSIX-virtualized AppData. For each project whose
+status says adopt_store, show me the candidate stores with their status and
+dates and adopt the freshest with tessera.py adopt-store after I agree; the
+source is kept. Do not create
 .tessera, change .gitignore or copy cards, history or evidence to dotfiles or
 GitHub. For each existing catalog run status and, when it is not ready, changes;
 refresh the affected cards and finalize. Check that index and card work. Do

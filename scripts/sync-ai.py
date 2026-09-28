@@ -11,6 +11,7 @@ import os
 import re
 import runpy
 import stat
+import subprocess
 import sys
 import tempfile
 import time
@@ -43,10 +44,10 @@ CLAUDE_DEFAULTS = {("model",): "opus"}
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
         "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)",
-        "Write(~/.local/share/tessera/projects/*/provider-consent.json)",
+        # Claude applies Edit rules to every file write; Write deny rules are ignored.
         "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
-        "Write(~/AppData/Local/tessera/projects/*/provider-consent.json)",
-        "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)"]
+        "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
+        "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)"]
 
 # Rules for the auto-mode classifier. Inert under bypassPermissions; they make a
 # switch to `auto` safe from the first session. "$defaults" keeps the built-ins.
@@ -199,13 +200,28 @@ def put(data: dict, keys: tuple, value) -> None:
     node[keys[-1]] = copy.deepcopy(value)
 
 
+def git_blob(data: bytes) -> str:
+    return hashlib.sha1(b"blob %d\0" % len(data) + data).hexdigest()
+
+
+def known_blob(data: bytes, blobs: set[str]) -> bool:
+    # A Windows checkout may have converted line endings on the way out.
+    return git_blob(data) in blobs or git_blob(data.replace(b"\r\n", b"\n")) in blobs
+
+
 def json_text(value: dict) -> str:
     return json.dumps(value, indent=2, ensure_ascii=False) + "\n"
 
 
 class Sync:
-    def __init__(self, home: Path, platform: str, clients="both", root=ROOT):
+    def __init__(self, home: Path, platform: str, clients="both", root=ROOT, adopt=False):
         self.home = Path(os.path.abspath(home))
+        # Adopt copies left by an earlier deployment of this repository when the
+        # ownership ledger is missing (lost state, another machine, a virtualized
+        # AppData). Only provably generated or historical content is adopted.
+        self.adopt = adopt
+        self.adopted = []
+        self._history = None
         self.root = root.resolve()
         self.platform = platform
         self.clients = {"codex", "claude"} if clients == "both" else {clients}
@@ -245,7 +261,9 @@ class Sync:
             raise ValueError(f"Conflicto: archivo gestionado modificado: {path}")
         empty_container = current == {"kind": "dir", "entries": {}} and desired["kind"] == "dir"
         if not previous and current["kind"] != "absent" and not empty_container and not equivalent(current, desired) and not legacy:
-            raise ValueError(f"Conflicto: destino ajeno: {path}")
+            if not (self.adopt and self.recognized(path, current)):
+                raise ValueError(f"Conflicto: destino ajeno: {path}")
+            self.adopted.append(str(path))
         self.next_state[key] = {"value": desired}
         self.asset_expected[str(path)] = desired
         if not equivalent(current, desired):
@@ -279,7 +297,8 @@ class Sync:
         owned = {tuple(item["path"]) for item in previous}
         for route in keys:
             # Adopting a key the user already set to something else would erase their choice.
-            if route not in owned and get(desired, route) != MISSING and get(original, route) not in (MISSING, get(desired, route)):
+            if (route not in owned and not (self.adopt and not previous) and get(desired, route) != MISSING
+                    and get(original, route) not in (MISSING, get(desired, route))):
                 raise ValueError(f"Conflicto: valor local distinto en clave nueva: {path} ({'.'.join(map(str, route))})")
         projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
         self.next_state[key] = {"keys": projection}
@@ -316,6 +335,44 @@ class Sync:
             if entry not in items:
                 items.append(copy.deepcopy(entry))
         return [[list(route), entry] for route, entry in wanted]
+
+    def history_blobs(self) -> set[str]:
+        """Git blob ids of every version of ai/ and the old Codex skill folder."""
+        if self._history is None:
+            try:
+                out = subprocess.run(["git", "-C", str(self.root), "log", "--all", "--no-renames", "--format=",
+                                      "--raw", "--no-abbrev", "--", "ai", "codex/.agents/skills"],
+                                     capture_output=True, text=True, check=True).stdout
+                self._history = {line.split()[3] for line in out.splitlines() if line.startswith(":")}
+            except (OSError, subprocess.CalledProcessError):
+                self._history = set()
+        return self._history
+
+    def recognized(self, path: Path, value: dict) -> bool:
+        """True when a foreign-looking destination is an earlier copy of this repository's output."""
+        if value["kind"] == "link":
+            return Path(os.path.abspath(os.path.join(path.parent, value["target"]))).is_relative_to(self.root)
+        if value["kind"] == "dir":
+            files = []
+            def walk(node):
+                for child in node.get("entries", {}).values():
+                    if child["kind"] == "dir":
+                        walk(child)
+                    elif child["kind"] == "file":
+                        files.append(base64.b64decode(child["data"]))
+                    else:
+                        files.append(None)
+            walk(value)
+            blobs = self.history_blobs()
+            return bool(files) and all(data is not None and known_blob(data, blobs) for data in files)
+        if value["kind"] != "file":
+            return False
+        data = base64.b64decode(value["data"])
+        if data.startswith((b"<!-- Generated by scripts/render-ai.py from ai/", b"# Generated from ai/roles.")):
+            return True
+        if path.parent.name == "agents" and data.startswith(f"---\nname: {path.stem}\n".encode()):
+            return (self.root / "ai/roles" / f"{path.stem}.json").is_file()
+        return known_blob(data, self.history_blobs())
 
     def known_legacy_file(self, path, source):
         if path.is_symlink():
@@ -578,8 +635,10 @@ def main():
     parser.add_argument("--platform", choices=["linux", "windows"], default="windows" if os.name == "nt" else "linux")
     parser.add_argument("--clients", choices=["both", "claude", "codex"], default="both")
     parser.add_argument("--backup", type=Path)
+    parser.add_argument("--adopt", action="store_true",
+                        help="Adopt copies from an earlier deployment of this repo when the ledger is missing")
     args = parser.parse_args()
-    sync = Sync(args.home, args.platform, args.clients)
+    sync = Sync(args.home, args.platform, args.clients, adopt=args.adopt)
     lock = None
     try:
         if args.mode in {"apply", "rollback"}:
@@ -588,7 +647,7 @@ def main():
             fd = os.open(lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
             lock = lock_path
             os.close(fd)
-            sync = Sync(args.home, args.platform, args.clients)
+            sync = Sync(args.home, args.platform, args.clients, adopt=args.adopt)
         if args.mode == "rollback":
             if not args.backup:
                 raise ValueError("rollback requiere --backup")
@@ -596,6 +655,8 @@ def main():
             print("OK: rollback verificado")
             return 0
         operations = sync.plan()
+        for adopted in sync.adopted:
+            print(f"adopt: {adopted}")
         for operation in operations:
             print(f"{operation['before']['kind']} -> {operation['after']['kind']}: {operation['path']}")
         if args.mode == "apply":
