@@ -36,22 +36,29 @@ indivisible demasiado grande sigue provocando error explícito.
    contenido. Respetar además las rutas privadas de las instrucciones del
    proyecto: excluirlas con esa razón sin abrirlas. No asumir que un pendiente
    está libre de secretos ni abrir indiscriminadamente almacenes de credenciales.
-3. Inspeccionar todos los pendientes por tandas reanudables. El agente principal
+3. Opcional: `skeleton --repo PROJECT` escribe en `curation/` del almacén externo
+   la evidencia de partida: fuentes candidatas, exports, primer uso real fuera de
+   tests por tag, import, `import()`, `require()` o `src=`, convenciones de Nuxt,
+   Vite, Vue CLI o Next y pistas de código minificado. Lee objetos Git de la
+   revisión; nunca abre tests ni rutas protegidas. Es evidencia, no un catálogo:
+   no crea fichas ni registra revisiones, y sus usos son coincidencias iniciales.
+   El agente lee cada fuente y consumidor antes de escribir contratos.
+4. Inspeccionar todos los pendientes por tandas reanudables. El agente principal
    puede delegar áreas independientes a `reuse-scout`, solo lectura, para obtener
    evidencia. El scout ayuda a descubrir; no filtra candidatos antes de Jev.
    Clasificar cada archivo como `catalogued`, `supporting` o `excluded`, con razón
    concreta. Excluir documentación, dependencias o código generado por su
    naturaleza comprobada, nunca por irrelevancia para la tarea del momento.
-4. Crear/ampliar `catalog.json`, con respaldo previo en `history/`. Leer contratos,
+5. Crear/ampliar `catalog.json`, con respaldo previo en `history/`. Leer contratos,
    exports y consumidores que no sean tests; agrupar los exports reutilizables de un archivo
    en su ficha. No inventar usos: si no se encuentran, `usages: []` necesita
    `usage_gap` explicando la búsqueda o el uso implícito del framework. Omitir el campo
    `tests`; no buscar ni leer pruebas. Mantener `scope` coherente con todas
    las fuentes catalogadas; puede enumerar archivos concretos de todo el repo.
-5. Registrar cada tanda con `review --repo PROJECT --batch EXTERNAL_BATCH.json`.
+6. Registrar cada tanda con `review --repo PROJECT --batch EXTERNAL_BATCH.json`.
    Usar `revision` e `inventory_sha256` de un `status` reciente. La tanda no escribe
    fichas ni acredita que el agente las leyó: registra su revisión explícita.
-6. Con cero pendientes, ejecutar `finalize --repo PROJECT`. Valida el catálogo,
+7. Con cero pendientes, ejecutar `finalize --repo PROJECT`. Valida el catálogo,
    su revisión, correspondencia con las fuentes clasificadas y sus evidencias.
    Solo entonces puede aparecer `ready`. Si falla, corregir la causa y reanudar.
 

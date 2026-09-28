@@ -218,11 +218,19 @@ no elimina el checkout, datos, referencias ni temas visuales de Atlas.
 
 `status` distingue sin inicializar, inicializando, actualización pendiente,
 revisión completa necesaria, listo y bloqueado. `init`/`scan` inventarían
-el árbol Git excluyendo tests por ruta antes de leerlos; el agente revisa por
-tandas y `finalize` valida esa cobertura. No analizar tests ni citarlos como evidencia.
+el árbol Git excluyendo tests por ruta antes de leerlos; `skeleton` deja en el
+almacén externo fuentes candidatas, exports y primeros usos reales como punto de
+partida; el agente revisa por tandas y `finalize` valida esa cobertura. No analizar tests ni citarlos como evidencia.
 El flujo normal usa `prepare --require-ready`. Un catálogo piloto actualizado
 no se presenta como proyecto completo. Procedimiento y límites de cobertura en
 [lifecycle.md](../ai/skills/tessera/references/lifecycle.md).
+
+Para consultar catálogos, inventario y decisiones de forma visual existe
+[Tessera Studio](https://github.com/jesus-molano/tessera-studio), un repositorio
+aparte: `python -m tessera_studio --open`. Solo lee el almacén local, escucha en
+`127.0.0.1`, no escribe y no sirve texto de fuentes. Detecta también el almacén
+virtualizado de apps MSIX como Claude Desktop en Windows. Contiene la herramienta,
+nunca catálogos; dotfiles tampoco versiona datos de proyectos.
 
 La [skill neutral Tessera](../ai/skills/tessera/SKILL.md) enruta las decisiones de
 reutilizar, modificar, envolver o crear. Jev de TypeSafe es su primer adaptador

@@ -65,7 +65,7 @@ Abre una sesión nueva de los clientes disponibles para comprobar la skill
 tessera y su enlace desde engineering-flow.
 
 En Windows usa python con PYTHONDONTWRITEBYTECODE=1. Ejecuta las regresiones
-scripts/tests/test_tessera.py, test_tessera_lifecycle.py, test_tessera_batches.py, test_kev_local.py y test_ai_sync.py por unittest
+scripts/tests/test_tessera.py, test_tessera_lifecycle.py, test_tessera_batches.py, test_tessera_skeleton.py, test_kev_local.py y test_ai_sync.py por unittest
 discover. Comprueba que el despliegue excluye __pycache__, .pyc y .pyo. No borres
 copias ajenas si el sincronizador detecta un conflicto; inspecciónalo y conserva
 su respaldo antes de resolverlo.

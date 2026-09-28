@@ -21,6 +21,7 @@ sys.dont_write_bytecode = True
 import tessera_typesafe
 import tessera_kev
 import tessera_batches
+import tessera_skeleton
 
 PROVIDERS = {"typesafe": tessera_typesafe, "kev": tessera_kev}
 ACTIONS = {
@@ -443,6 +444,30 @@ def finalize_project(repo):
     return project_status(repo)
 
 
+def skeleton_project(repo, output=None):
+    """Write curation evidence for the whole project; reads Git objects, never tests or protected paths."""
+    snapshot = project_snapshot(repo)
+    skeleton = tessera_skeleton.build(repo, snapshot["revision"], snapshot["files"])
+    if output is None:
+        directory = Path(storage_paths(repo)["root"]) / "curation"
+        stem = f"skeleton-{snapshot['revision'][:12]}"
+        output, number = directory / f"{stem}.json", 1
+        while output.exists():
+            number += 1
+            output = directory / f"{stem}-{number}.json"
+    output = Path(output).resolve()
+    require_external(output)
+    require(not output.exists(), "El esqueleto ya existe; indica otro --output")
+    private_parents(output.parent)
+    write_private(output, skeleton)
+    entries = skeleton["entries"]
+    return {"skeleton": str(output), "revision": snapshot["revision"], "frameworks": skeleton["frameworks"],
+            "entries": len(entries), "usage_gaps": sum(1 for entry in entries if not entry["usages"]),
+            "hints": [entry["source"] for entry in entries if entry.get("hints")],
+            "duplicate_ids": skeleton["duplicate_ids"], "other_paths": len(skeleton["other_paths"]),
+            "checkout_changes": snapshot["checkout_changes"]}
+
+
 def catalog_changes(catalog_path, repo):
     """Report changes for agent curation, including entries no longer present.
 
@@ -795,6 +820,9 @@ def main():
             command.add_argument("--full", action="store_true", help="Reinicia revisión con respaldo; conserva catálogo")
         if name == "review":
             command.add_argument("--batch", type=Path, required=True, help="Tanda JSON externa con revisión y hash del inventario")
+    skeleton = commands.add_parser("skeleton", help="Evidencia de curación: fuentes, exports y usos reales, sin tests")
+    skeleton.add_argument("--repo", type=Path, required=True)
+    skeleton.add_argument("--output", type=Path, help="Por defecto, curation/ en el almacenamiento local externo")
     changes = commands.add_parser("changes", help="Detecta cambios que requieren actualizar fichas, sin escribir")
     changes.add_argument("--repo", type=Path, required=True)
     changes.add_argument("--catalog", type=Path)
@@ -825,6 +853,8 @@ def main():
             result = review_project(args.repo, args.batch)
         elif args.command == "finalize":
             result = finalize_project(args.repo)
+        elif args.command == "skeleton":
+            result = skeleton_project(args.repo, args.output)
         elif args.command == "changes":
             catalog = args.catalog if args.catalog is not None else Path(storage_paths(args.repo)["catalog"])
             result = catalog_changes(catalog, args.repo.resolve())

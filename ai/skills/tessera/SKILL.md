@@ -23,8 +23,9 @@ Claude and Codex consume the same catalog, protocol and decision history.
   gate or call the service on every tool action.
 - If initialization, full review or an update is needed, follow
   [project lifecycle](references/lifecycle.md). Inventory the repository excluding tests
-  and resume pending files in batches; use reuse-scout to fill actual evidence
-  gaps. A current scoped catalog is not proof of complete project coverage.
+  and resume pending files in batches; `skeleton` gives deterministic starting
+  evidence (sources, exports, first real usages), never finished cards. Use
+  reuse-scout to fill actual evidence gaps. A current scoped catalog is not proof of complete project coverage.
   Never create `.tessera`, edit `.gitignore`, or commit personal tool data in a
   work repository. Do not copy work catalogs into personal dotfiles or GitHub.
   Repository-owned storage is an explicit sharing opt-in, never inferred from
