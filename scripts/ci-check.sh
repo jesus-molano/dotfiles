@@ -63,7 +63,6 @@ for test in \
 	test_system_etc_transaction.sh \
 	test_game_run_dnd.sh \
 	test_demo_studio.sh \
-	test_orca_background.sh \
 	test_chatgpt_background.sh \
 	test_auto_route_audio.sh \
 	test_android_environment.sh; do

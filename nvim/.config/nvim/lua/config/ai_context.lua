@@ -1,4 +1,4 @@
--- Historical module name retained for existing Neovim sessions.
+-- Copies precise editor context for the desktop AI window.
 local M = {}
 
 local severity_names = {

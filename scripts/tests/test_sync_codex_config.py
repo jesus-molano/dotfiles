@@ -138,7 +138,7 @@ matcher = "^Bash$"
 
 [[hooks.PreToolUse.hooks]]
 type = "command"
-command = "/opt/orca/pre-tool-use"
+command = "/opt/foreign-tool/pre-tool-use"
 timeout = 30
 """
 
@@ -151,7 +151,7 @@ timeout = 30
             document["hooks"]["PreToolUse"][0]["hooks"][0],
             {
                 "type": "command",
-                "command": "/opt/orca/pre-tool-use",
+                "command": "/opt/foreign-tool/pre-tool-use",
                 "timeout": 30,
             },
         )

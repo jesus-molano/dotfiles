@@ -12,7 +12,7 @@ dry_run=false
 
 usage() {
 	printf '%s\n' \
-		'Uso: project-session [--dry-run] {resume|ai|claude|codex|chatgpt|orca|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
+		'Uso: project-session [--dry-run] {resume|ai|claude|codex|chatgpt|terminal|nvim|tasks|preview|has-tasks|has-preview} RUTA' \
 		'' \
 		'Acciones:' \
 		'  resume    abre la IA seleccionada y un terminal Zellij reutilizable' \
@@ -189,7 +189,7 @@ resume)
 	;;
 ai) launch_ai "$path"; launch_terminal "$path" ;;
 claude|codex) launch_ai "$path" "$action"; launch_terminal "$path" ;;
-chatgpt|orca) launch_ai "$path" codex; launch_terminal "$path" ;;
+chatgpt) launch_ai "$path" codex; launch_terminal "$path" ;;
 terminal) launch_terminal "$path" ;;
 nvim) launch_nvim "$path" ;;
 tasks) launch_tasks "$path" ;;

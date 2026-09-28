@@ -179,7 +179,6 @@ def reject_untracked_links(
             checkout,
             state,
             os.path.join(home, ".dotfiles"),
-            os.path.join(home, "orca", "workspaces", ".dotfiles"),
         )
     }
 

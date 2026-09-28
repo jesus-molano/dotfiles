@@ -140,7 +140,7 @@ else
 fi
 
 if grep -Fq 'bind(hyper .. " + O",' "$common_binds"; then
-	printf '%s\n' 'Hyper+O debe quedar libre tras migrar Orca.' >&2
+	printf '%s\n' 'Hyper+O debe quedar libre.' >&2
 	exit 1
 fi
 grep -Fq 'if status is-interactive; and command -q mise' "$fish_config"
