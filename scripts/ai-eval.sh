@@ -21,8 +21,9 @@ JSON
 
 results="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles/ai-evals/$(date +%Y%m%d-%H%M%S)"
 mkdir -p -- "$results"
-# Defaults keep a check cheap: one run per case, no published report, a cost cap.
+# Defaults keep a check cheap: one run per case, one arm (the no-plugin arm would
+# still see skills installed in ~/.claude), no published report, a cost cap.
 # Later arguments override them.
-claude plugin eval "$plugin" --trust-plugin --no-publish --runs 1 --max-cost-usd 2 \
+claude plugin eval "$plugin" --trust-plugin --no-publish --ablation none --runs 1 --max-cost-usd 2 \
 	--output-dir "$results" "$@"
 printf 'Results: %s\n' "$results"

@@ -163,7 +163,7 @@ def check_segment(words: list[str], depth: int) -> str | None:
 
 
 # PowerShell: its own quoting and cmdlet names, mapped onto the POSIX checks.
-PS_TOKEN = re.compile(r"""'(?:[^']|'')*'|"(?:[^"`]|`.)*"|\|\||&&|[;|(){}\n]|[^\s;|(){}]+""")
+PS_TOKEN = re.compile(r"""'(?:[^']|'')*'|"(?:[^"`]|`.)*"|\$\{[^}]*\}\S*|\|\||&&|[;|(){}\n]|[^\s;|(){}]+""")
 PS_SEPARATORS = {";", "|", "||", "&&", "(", ")", "{", "}", "\n"}
 PS_PROGRAMS = {
     "rm": {"remove-item", "ri", "rm", "del", "erase", "rd", "rmdir"},
@@ -171,7 +171,8 @@ PS_PROGRAMS = {
     "cp": {"copy-item", "cpi", "cp", "copy"},
     "mv": {"move-item", "mi", "mv", "move"},
 }
-PS_HOME = re.compile(r"^(\$env:(userprofile|home)|\$home|\$\{home\}|~)(?=$|[\\/])", re.I)
+PS_HOME = re.compile(r"^(\$env:(userprofile|home)|\$\{env:(userprofile|home)\}|\$home|\$\{home\}"
+                     r"|%userprofile%|%homedrive%%homepath%|~)(?=$|[\\/])", re.I)
 
 
 def ps_word(token: str) -> str:
@@ -192,6 +193,8 @@ def check_powershell(command: str, depth: int = 0) -> str | None:
             skip = False
         elif re.fullmatch(r"[0-9*]?>>?(&[0-9])?", token):
             skip = not token.endswith(("&1", "&2"))
+        elif re.fullmatch(r"[0-9*]?>>?\S+", token):
+            continue  # redirection with its target attached
         elif token in PS_SEPARATORS:
             if current:
                 segments_ps.append(current)
@@ -213,12 +216,16 @@ def check_powershell(command: str, depth: int = 0) -> str | None:
                     return reason
             continue
         program = next((posix for posix, names in PS_PROGRAMS.items() if name in names), name)
+        if name in {"iex", "invoke-expression"} and depth < 3:
+            if reason := check_powershell(" ".join(words[1:]), depth + 1):
+                return reason
+            continue
         if name == "cmd" and depth < 3:
             flags = [i for i, w in enumerate(words) if w.lower() in {"/c", "/k"}]
             if flags and (reason := check_powershell(" ".join(words[flags[0] + 1:]), depth + 1)):
                 return reason
             continue
-        recursive = re.compile(r"-r(e(c(u(r(s(e)?)?)?)?)?)?|/s", re.I)
+        recursive = re.compile(r"-r(e(c(u(r(s(e)?)?)?)?)?)?(:\$true)?|/s", re.I)
         args = ["-r" if program == "rm" and recursive.fullmatch(w) else w for w in words[1:]]
         if reason := check_segment([program, *args], depth):
             return reason
@@ -227,7 +234,8 @@ def check_powershell(command: str, depth: int = 0) -> str | None:
 
 def secret_use(program: str, words: list[str]) -> str | None:
     """Block reading a secret file; writing or naming it in text is fine."""
-    if program in {"echo", "printf", "touch"} or (program == "git" and "check-ignore" in words):
+    if program.lower() in {"echo", "printf", "touch", "test-path", "set-content", "add-content", "new-item",
+                           "write-host", "write-output"} or (program == "git" and "check-ignore" in words):
         return None
     secrets = [i for i, w in enumerate(words) if i and SECRET.search(w.split("=", 1)[-1])
                and not w.endswith(SAFE_SECRET_SUFFIXES)]
@@ -239,16 +247,31 @@ def secret_use(program: str, words: list[str]) -> str | None:
     return "secret files (.env*) are never read or shown; use with-secrets"
 
 
+def strings(value) -> list[str]:
+    """Every string inside a tool input, whatever its field names."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for item in value.values() for text in strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in strings(item)]
+    return []
+
+
 def decide(event: dict) -> str | None:
     tool = event.get("tool_name")
     data = event.get("tool_input") or {}
     if tool == "Workflow" and os.environ.get("AI_ALLOW_WORKFLOW") != "1":
         return ("multi-agent workflows need an explicit request; ask the user, who can start "
                 "the session with AI_ALLOW_WORKFLOW=1")
-    if tool in {"Write", "Edit", "MultiEdit", "apply_patch"} and "provider-consent" in json.dumps(data):
+    if tool in {"Write", "Edit", "MultiEdit"} and "provider-consent" in str(data.get("file_path", "")):
+        return "provider consent is granted by the user in their own terminal"
+    if tool == "apply_patch" and any("provider-consent" in path for text in strings(data) for path in
+                                     re.findall(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", text, re.M)):
         return "provider consent is granted by the user in their own terminal"
     if tool == "Bash" and isinstance(data.get("command"), str):
-        return check_bash(data["command"])
+        # Codex on Windows may report PowerShell commands as Bash: check both there.
+        return check_bash(data["command"]) or (check_powershell(data["command"]) if os.name == "nt" else None)
     if tool == "PowerShell" and isinstance(data.get("command"), str):
         return check_powershell(data["command"])
     return None

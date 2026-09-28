@@ -89,6 +89,12 @@ class GuardTest(unittest.TestCase):
         event["tool_input"]["file_path"] = "/h/.local/share/tessera/projects/k/catalog.json"
         self.assertEqual(run("ai-guard.py", event).returncode, 0)
 
+    def test_editing_text_that_mentions_the_consent_file_is_allowed(self):
+        for event in ({"tool_name": "Edit", "tool_input": {"file_path": "docs/ai.md", "old_string": "provider-consent.json"}},
+                      {"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content": "see provider-consent.json"}},
+                      {"tool_name": "apply_patch", "tool_input": {"command": "*** Update File: docs/ai.md\n+provider-consent.json"}}):
+            self.assertEqual(run("ai-guard.py", event).returncode, 0, event)
+
     def test_workflow_needs_explicit_opt_in(self):
         event = {"tool_name": "Workflow", "tool_input": {"script": "x"}}
         self.assertEqual(run("ai-guard.py", event).returncode, 2)
@@ -113,13 +119,16 @@ class PowerShellGuardTest(unittest.TestCase):
         for command in ("git push --force origin main", "& git push -f", 'pwsh -Command "git push --tags"',
                         "Remove-Item -Recurse -Force $env:USERPROFILE", "rd /s /q C:\\", "ri -rec ~",
                         "Get-Content .env", "gc .\\app\\.env.local", 'cmd /c "type .env"',
-                        "python tessera.py consent --repo . --provider typesafe"):
+                        "python tessera.py consent --repo . --provider typesafe",
+                        "Remove-Item -Recurse -Force ${HOME}", "Remove-Item -Recurse:$true ${env:USERPROFILE}",
+                        "rd /s /q %USERPROFILE%", 'iex "git push -f"', "Invoke-Expression 'git push --tags'"):
             self.assertEqual(powershell(command).returncode, 2, command)
 
     def test_allows_ordinary_powershell_work(self):
         for command in ("git push origin main", "git push origin feat 2>&1 | Out-Null",
                         "Remove-Item -Recurse .\\build", "Copy-Item .env.example .env",
-                        "Write-Host 'it''s fine'; git status", "Get-ChildItem -Recurse src"):
+                        "Write-Host 'it''s fine'; git status", "Get-ChildItem -Recurse src",
+                        "git push origin main >push.log", "Test-Path .env", "Set-Content .env 'A=1'"):
             result = powershell(command)
             self.assertEqual((result.returncode, result.stderr), (0, ""), command)
 

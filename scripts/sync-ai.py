@@ -26,9 +26,6 @@ MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
 NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
 CLAUDE_KEYS = {
     ("language",): "spanish",
-    # Main agent executes and reasons: Opus (the alias follows the latest Opus,
-    # Opus 5.5 today). Reading roles use Haiku/Sonnet in their own role files.
-    ("model",): "opus",
     ("permissions", "defaultMode"): "bypassPermissions",
     ("attribution", "commit"): "",
     ("attribution", "pr"): "",
@@ -38,6 +35,10 @@ CLAUDE_KEYS = {
 # User skills are hidden from the model; named skills show only their name.
 CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in sorted(USER_SKILLS)})
 CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAMED_SKILLS)})
+# Defaults set only when the key is absent and never owned afterwards, so a later
+# /model or local choice is kept. Main agent: Opus (the alias follows the latest
+# Opus, Opus 5.5 today); reading roles set Haiku/Sonnet in their own files.
+CLAUDE_DEFAULTS = {("model",): "opus"}
 # Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
@@ -362,6 +363,9 @@ class Sync:
                                  "command": hook_command(self.home, self.platform, "statusline.py")}
         for route, value in keys.items():
             put(desired, route, value)
+        for route, value in CLAUDE_DEFAULTS.items():
+            if get(original, route) == MISSING:
+                put(desired, route, value)
         guard = {"matcher": "Bash|PowerShell|Workflow|Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]

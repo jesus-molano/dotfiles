@@ -39,7 +39,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | Setting | Value | Why |
 |---|---|---|
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
-| `model` | `opus` | The main agent executes and reasons on Opus (Opus 5.5 today). |
+| `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
 | `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, Tessera `provider-consent.json` writes | Deny rules still apply in bypass mode. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
@@ -81,8 +81,10 @@ asking for authorization before publishing stays in the global rules.
 
 Known limits: the guard is a safety net against mistakes, not a sandbox, and
 code running as your user can still reach anything you can. PowerShell has its
-own parser (quoting, cmdlet aliases such as `ri`, `gc`, `rd /s`, `cmd /c` and
-`pwsh -Command`). The `Read(**/.env.*)` deny rule also hides
+own parser (quoting, `${...}` and `%USERPROFILE%` paths, cmdlet aliases such as
+`ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested `cmd /c`, `pwsh -Command`
+and `Invoke-Expression`). On Windows a command reported as Bash is checked with
+both parsers. The `Read(**/.env.*)` deny rule also hides
 `.env.example` templates from the Read tool; read them through the shell.
 
 ## Token efficiency
@@ -304,7 +306,8 @@ in `ai/evals/cases/`, runs it and keeps results under
 | `named-tdd` | `test-driven-development` (name-only) | 3/3 |
 | `explain-only` | no skill at all | 3/3 |
 
-A full run of all cases at 3 runs costs about $1.50 with Sonnet.
+A full run of all cases at 3 runs costs about $1.50 with Sonnet. With Opus,
+the main model, one run per case also scored 9/9 (about $0.90).
 
 Haiku as the main model skipped the skill and searched files directly: another
 reason to keep the main agent on Opus. Run the evals after changing a

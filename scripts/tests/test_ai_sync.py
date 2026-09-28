@@ -95,14 +95,14 @@ class AISyncTest(unittest.TestCase):
         self.assertIn("__pycache__", sync.snapshot(skill / "scripts")["entries"])
 
     def test_keep_models_connections_corporate_preferences_and_hooks(self):
-        self.json_write(".claude/settings.json", {"effortLevel": "medium",
+        self.json_write(".claude/settings.json", {"model": "local-choice", "effortLevel": "medium",
             "company": {"keep": True}, "hooks": {"Stop": [{"matcher": "corp", "hooks": []}]}})
         self.json_write(".claude.json", {"oauthAccount": {"private": "fixture"},
             "mcpServers": {"company": {"type": "http", "url": "https://example.com"}},
             "projects": {"C:/Work Space": {"allowedTools": []}}})
         self.build().apply()
         settings = sync.read_json(self.home / ".claude/settings.json")
-        self.assertEqual(settings["model"], "opus")
+        self.assertEqual(settings["model"], "local-choice")
         self.assertEqual(settings["effortLevel"], "medium")
         self.assertTrue(settings["company"]["keep"])
         self.assertEqual(settings["hooks"]["Stop"][0]["matcher"], "corp")
@@ -115,7 +115,7 @@ class AISyncTest(unittest.TestCase):
         self.build().apply()
         path = self.home / ".claude/settings.json"
         data = sync.read_json(path)
-        data["theme"] = "later-choice"
+        data["model"] = "later-choice"
         path.write_text(json.dumps(data), encoding="utf-8")
         self.assertEqual(self.build().operations, [])
 
@@ -374,13 +374,14 @@ class AISyncTest(unittest.TestCase):
         self.json_write(".claude/settings.json", {"statusLine": {"type": "command", "command": "my-status"}})
         with self.assertRaisesRegex(ValueError, "clave nueva"):
             self.build()
-        self.json_write(".claude/settings.json", {"model": "sonnet"})
-        with self.assertRaisesRegex(ValueError, "clave nueva.*model"):
-            self.build()
-        self.json_write(".claude/settings.json", {"model": "opus"})
-        self.build()
         self.json_write(".claude/settings.json", {})
         self.build().apply()
+        self.assertEqual(sync.read_json(self.home / ".claude/settings.json")["model"], "opus")
+        self.assertEqual(self.build().operations, [])
+        # The model is a default, never owned: a later /model or local choice survives.
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        settings["model"] = "sonnet"
+        self.json_write(".claude/settings.json", settings)
         self.assertEqual(self.build().operations, [])
 
     @unittest.skipIf(os.name == "nt", "Linux mode links skills; no symlink privilege on Windows")
