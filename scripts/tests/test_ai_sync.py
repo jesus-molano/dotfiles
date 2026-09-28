@@ -57,7 +57,11 @@ class AISyncTest(unittest.TestCase):
         self.assertFalse((self.home / ".claude/skills/cachyos-host-audit").exists())
         self.assertTrue((self.home / ".claude/agents/reviewer-linux.md").exists())
         settings = sync.read_json(self.home / ".claude/settings.json")
-        self.assertNotIn("hooks", settings)
+        self.assertNotIn("Stop", settings["hooks"])
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
+        self.assertTrue((self.home / ".claude/hooks/ai-guard.py").is_file())
+        self.assertIn("Read(**/.env)", settings["permissions"]["deny"])
+        self.assertTrue(settings["statusLine"]["command"].startswith("python "))
         self.assertNotIn("model", settings)
         self.assertEqual(settings["permissions"]["defaultMode"], "bypassPermissions")
         self.assertEqual(self.build().operations, [])
@@ -335,6 +339,54 @@ class AISyncTest(unittest.TestCase):
             env=dict(os.environ, HOME=str(self.home), CODEX_HOME=str(self.home / ".codex"),
                      XDG_STATE_HOME=str(self.home / ".local/state")), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_list_entries_keep_foreign_items_and_conflict_when_removed(self):
+        self.json_write(".claude/settings.json", {"permissions": {"deny": ["Bash(curl *)"]},
+                                                  "hooks": {"PreToolUse": [{"matcher": "Edit", "hooks": []}]}})
+        self.build().apply()
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        self.assertEqual(settings["permissions"]["deny"][0], "Bash(curl *)")
+        self.assertEqual(len(settings["permissions"]["deny"]), 1 + len(sync.DENY))
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 2)
+        settings["permissions"]["deny"].remove("Read(**/.env)")
+        self.json_write(".claude/settings.json", settings)
+        with self.assertRaisesRegex(ValueError, "entrada gestionada retirada"):
+            self.build()
+
+    def test_entries_no_longer_wanted_are_removed_and_legacy_notify_state_migrates(self):
+        self.build("linux").apply()
+        state_path = self.home / ".local/state/dotfiles/ai/managed.json"
+        state = sync.read_json(state_path)
+        key = ".claude/settings.json"
+        state[key]["entries"] = [e for e in state[key]["entries"] if e[0] != ["hooks", "Stop"]]
+        state[key]["entries"].append([["permissions", "deny"], "Read(~/retired/**)"])
+        state[key]["notify"] = True
+        state_path.write_text(sync.json_text(state))
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        settings["permissions"]["deny"].append("Read(~/retired/**)")
+        self.json_write(".claude/settings.json", settings)
+        self.build("linux").apply()
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        self.assertNotIn("Read(~/retired/**)", settings["permissions"]["deny"])
+        self.assertEqual(settings["hooks"]["Stop"], [sync.NOTIFY])
+        self.assertNotIn("notify", sync.read_json(state_path)[key])
+        self.assertEqual(self.build("linux").operations, [])
+
+    def test_invocation_policy_roles_and_hooks_come_from_one_source(self):
+        sources = sys.modules["ai_sources"]
+        skills = {p.name for p in (sync.ROOT / "ai/skills").iterdir() if p.is_dir()}
+        self.assertEqual(skills, sources.IMPLICIT_SKILLS | sources.EXPLICIT_SKILLS)
+        overrides = {route[1] for route, value in sync.CLAUDE_KEYS.items()
+                     if route[0] == "skillOverrides" and value == "user-invocable-only"}
+        self.assertEqual(overrides, set(sources.EXPLICIT_SKILLS))
+        agents = sources.roles("claude", "linux")
+        self.assertEqual(set(agents), {p.stem + ".md" for p in (sync.ROOT / "ai/roles").glob("*.json")})
+        for text in agents.values():
+            header = text.split("---")[1]
+            self.assertIn("tools: Read, Glob, Grep", header)
+            self.assertNotIn("Bash", header, "Roles are read-only")
+        self.assertIn("maxTurns: 25", agents["reuse-scout.md"])
+        self.assertEqual(set(sources.hook_scripts()), {"ai-guard.py", "statusline.py"})
 
     @unittest.skipIf(os.name == "nt", "No privileged symlink creation on Windows")
     def test_symlink_parent_rejected(self):

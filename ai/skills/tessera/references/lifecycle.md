@@ -1,147 +1,144 @@
-# Estado e inicialización completa
+# Status and full initialization
 
-Ejecutar `tessera.py status --repo PROJECT` antes de decidir una implementación.
-Es local, sin red ni escrituras. Devuelve estado, `next_action`, razones, revisión,
-rutas, hash del inventario, recuentos y archivos pendientes/protegidos/eliminados.
+Run `tessera.py status --repo PROJECT` before an implementation choice. It is
+local, offline and read-only. It returns the status, `next_action`, reasons,
+revision, paths, inventory hash, counts and pending, protected or deleted files.
 
-| Estado | Significado | Siguiente paso |
+| Status | Meaning | Next step |
 |---|---|---|
-| `uninitialized` | Sin inventario ni catálogo | `init` y catalogación inicial |
-| `initializing` | Inventario creado; revisión/finalización incompleta | Reanudar pendientes |
-| `needs_update` | Un catálogo finalizado cambió o cambió su inventario | `scan`, revisar delta y `finalize` |
-| `needs_full_review` | Catálogo antiguo sin inventario, política incompatible o baseline no disponible | `init` o `scan --full`, según `next_action` |
-| `ready` | Inventario revisado, catálogo validado y ambos vigentes | `prepare --require-ready` |
-| `blocked` | Checkout con cambios, inventario ilegible o ubicación inválida | Resolver la causa conservando datos |
+| `uninitialized` | No inventory or catalog | Ordinary reuse search; `init` only when the user asks |
+| `initializing` | Inventory exists; review or finalization incomplete | Resume pending files |
+| `needs_update` | A finalized catalog or its inventory changed | `changes`, `scan`, review the delta, `finalize` |
+| `needs_full_review` | Old catalog without inventory, incompatible policy or missing baseline | `init` or `scan --full`, as `next_action` says |
+| `ready` | Inventory reviewed, catalog validated, both current | `index` and `card`; `prepare --require-ready` for a provider decision |
+| `blocked` | Uncommitted changes, unreadable inventory or invalid location | Fix the cause and keep the data |
 
-`curate_catalog` y `resolve_checkout_changes` son acciones del agente, no comandos.
-`ready` acredita cobertura del árbol Git revisado, no calidad de una decisión,
-pruebas superadas ni capacidad suficiente del proveedor. Los motores mantienen
-sus límites por petición. El helper evalúa catálogos grandes mediante
-[lotes exhaustivos](batching.md); cada ficha se conserva completa. Una ficha
-indivisible demasiado grande sigue provocando error explícito.
+`curate_catalog` and `resolve_checkout_changes` are agent actions, not
+commands. `ready` proves coverage of the reviewed Git tree, not decision
+quality, passing tests or enough provider capacity. Large catalogs are
+evaluated through [exhaustive batches](batching.md); every card stays whole, and
+an indivisible card that is too large is an explicit error.
 
-## Primera pasada y reanudación
+## First pass and resume
 
-1. `init --repo PROJECT` crea `inventory.json` en el namespace externo de
-   `locate`. Conserva el catálogo existente y es idempotente. Trabajar sobre un
-   checkout limpio; no hacer commits de cambios ajenos, reset ni pull para
-   despejar el estado. No editar `.gitignore` del proyecto para instalar Tessera.
-2. El inventario incluye **los archivos del árbol Git salvo tests y sus artefactos**, sin filtrar por
-   lenguaje, carpeta de UI o relevancia para la tarea entre las implementaciones. Los archivos sin seguimiento
-   no ignorados bloquean la captura; los ignorados no forman parte de la cobertura.
-   Secretos reconocibles por ruta, enlaces y submódulos aparecen como `protected`:
-   no se abre su contenido. Un submódulo se cataloga separadamente como proyecto;
-   no afirmar cobertura de su interior ni del destino de un enlace.
-   La protección por rutas es conservadora, no detecta cualquier secreto por
-   contenido. Respetar además las rutas privadas de las instrucciones del
-   proyecto: excluirlas con esa razón sin abrirlas. No asumir que un pendiente
-   está libre de secretos ni abrir indiscriminadamente almacenes de credenciales.
-3. Opcional: `skeleton --repo PROJECT` escribe en `curation/` del almacén externo
-   la evidencia de partida: fuentes candidatas, exports, primer uso real fuera de
-   tests por tag, import, `import()`, `require()` o `src=`, convenciones de Nuxt,
-   Vite, Vue CLI o Next y pistas de código minificado. Lee objetos Git de la
-   revisión; nunca abre tests ni rutas protegidas. Es evidencia, no un catálogo:
-   no crea fichas ni registra revisiones, y sus usos son coincidencias iniciales.
-   El agente lee cada fuente y consumidor antes de escribir contratos.
-4. Inspeccionar todos los pendientes por tandas reanudables. El agente principal
-   puede delegar áreas independientes a `reuse-scout`, solo lectura, para obtener
-   evidencia. El scout ayuda a descubrir; no filtra candidatos antes de Jev.
-   Clasificar cada archivo como `catalogued`, `supporting` o `excluded`, con razón
-   concreta. Excluir documentación, dependencias o código generado por su
-   naturaleza comprobada, nunca por irrelevancia para la tarea del momento.
-5. Crear/ampliar `catalog.json`, con respaldo previo en `history/`. Leer contratos,
-   exports y consumidores que no sean tests; agrupar los exports reutilizables de un archivo
-   en su ficha. No inventar usos: si no se encuentran, `usages: []` necesita
-   `usage_gap` explicando la búsqueda o el uso implícito del framework. Omitir el campo
-   `tests`; no buscar ni leer pruebas. Mantener `scope` coherente con todas
-   las fuentes catalogadas; puede enumerar archivos concretos de todo el repo.
-6. Registrar cada tanda con `review --repo PROJECT --batch EXTERNAL_BATCH.json`.
-   Usar `revision` e `inventory_sha256` de un `status` reciente. La tanda no escribe
-   fichas ni acredita que el agente las leyó: registra su revisión explícita.
-7. Con cero pendientes, ejecutar `finalize --repo PROJECT`. Valida el catálogo,
-   su revisión, correspondencia con las fuentes clasificadas y sus evidencias.
-   Solo entonces puede aparecer `ready`. Si falla, corregir la causa y reanudar.
+1. `init --repo PROJECT` writes `inventory.json` in the external namespace from
+   `locate`. It keeps an existing catalog and is idempotent. Work on a clean
+   checkout; never commit other people's changes, reset or pull to clear the
+   state, and never edit the project's `.gitignore` to install Tessera.
+2. The inventory holds **every file in the Git tree except tests and their
+   artifacts**, with no filter by language, UI folder or task relevance.
+   Untracked, non-ignored files block the capture; ignored files are not part
+   of coverage. Secrets recognizable by path, links and submodules are
+   `protected`: their content is never opened. A submodule is catalogued as its
+   own project; do not claim coverage of its content or of a link target. Path
+   protection is conservative and does not detect every secret by content.
+   Respect the private paths in the project instructions as well: exclude them
+   with that reason without opening them.
+3. Optional but recommended: `skeleton --repo PROJECT` writes starting evidence
+   to `curation/` in the external store: candidate sources, exports, the first
+   real non-test usage by tag, import, `import()`, `require()` or `src=`, Nuxt,
+   Vite, Vue CLI or Next conventions and hints about minified code. It reads Git
+   objects of the revision and never opens tests or protected paths. It is
+   evidence, not a catalog: it creates no cards and records no review, and its
+   usages are first matches only. The agent reads each source and consumer
+   before writing contracts.
+4. Inspect all pending files in resumable batches. Delegate independent areas
+   to `catalog-writer` (read-only drafts) or `reuse-scout` (evidence gaps); the
+   main agent validates and writes. Classify each file as `catalogued`,
+   `supporting` or `excluded` with a concrete reason. Exclude documentation,
+   dependencies or generated code for their verified nature, never for
+   irrelevance to the current task.
+5. Create or extend `catalog.json`, with a prior copy in `history/`. Read
+   contracts, exports and non-test consumers; group a file's reusable exports
+   into its card. Never invent usages: `usages: []` needs a `usage_gap` that
+   explains the search or the framework's implicit use. Omit the `tests` field.
+   Keep `scope` consistent with every catalogued source.
+6. Record each batch with `review --repo PROJECT --batch EXTERNAL_BATCH.json`,
+   using `revision` and `inventory_sha256` from a recent `status`. The batch
+   writes no cards and does not prove the agent read them: it records the review.
+7. With zero pending files, run `finalize --repo PROJECT`. It validates the
+   catalog, its revision, the match with the classified sources and their
+   evidence. Only then can `ready` appear. If it fails, fix the cause and resume.
 
-Ejemplo de tanda (las revisiones y rutas deben proceder del proyecto real):
+Batch example (revisions and paths must come from the real project):
 
 ```json
 {
   "schema": 1,
-  "revision": "OID_DE_STATUS",
-  "inventory_sha256": "HASH_DE_STATUS",
+  "revision": "OID_FROM_STATUS",
+  "inventory_sha256": "HASH_FROM_STATUS",
   "files": [
-    {"path": "src/format.ts", "kind": "catalogued", "reason": "Contrato y consumidores revisados"},
-    {"path": "README.md", "kind": "excluded", "reason": "Documentación sin implementación reutilizable"}
+    {"path": "src/format.ts", "kind": "catalogued", "reason": "Contract and consumers reviewed"},
+    {"path": "README.md", "kind": "excluded", "reason": "Documentation without reusable implementation"}
   ]
 }
 ```
 
-## Exclusión de tests antes de leer
+## Test exclusion before reading
 
-El helper aplica `is_test_path` al nombre, antes de abrir contenido. Omite
-carpetas `test`, `tests`, `spec`, `specs`, `__tests__`, `e2e`, `cypress`,
-`__fixtures__`, `__mocks__`, `__snapshots__`, `test-results`, `playwright-report`,
-`coverage`, `.pytest_cache` y `.nyc_output`; nombres `test_...`, `test-...`,
-`*.test.*`, `*.spec.*`, `*_test.*` y equivalentes con guion/punto, además de
-`*Test.java`, `*Tests.java`, Kotlin y C#. También omite `conftest.py` y
-`vitest`/`jest`/`playwright`/`cypress` con sufijos `.config.*` o `.setup.*`.
-No analiza contenido para descubrir
-si un archivo es un test. Si el proyecto declara otra convención, identificarla
-por su ruta y ampliar el predicado antes de inspeccionar esos archivos.
+The helper applies `is_test_path` to the name before opening any content. It
+skips the folders `test`, `tests`, `spec`, `specs`, `__tests__`, `e2e`,
+`cypress`, `__fixtures__`, `__mocks__`, `__snapshots__`, `test-results`,
+`playwright-report`, `coverage`, `.pytest_cache` and `.nyc_output`; the names
+`test_...`, `test-...`, `*.test.*`, `*.spec.*`, `*_test.*` and their dash or dot
+variants, plus `*Test.java`, `*Tests.java`, Kotlin and C#. It also skips
+`conftest.py` and `vitest`/`jest`/`playwright`/`cypress` files with `.config.*`
+or `.setup.*` suffixes. It never analyzes content to decide whether a file is a
+test. If the project declares another convention, identify it by path and
+extend the predicate before inspecting those files.
 
-No aparecen en pendientes, fuentes, consumidores ni evidencia de soporte. No
-leerlos manualmente ni delegar su análisis. `ready` acredita únicamente el árbol
-incluido por esta política. Los cambios confirmados solo en tests no invalidan
-el catálogo; sigue siendo obligatorio trabajar con un checkout limpio.
+Tests never appear in pending files, sources, consumers or supporting evidence.
+Do not read them by hand or delegate their analysis. `ready` covers only the
+tree this policy includes. Commits that touch only tests do not invalidate the
+catalog; a clean checkout is still required.
 
-La política 2 migra inventarios de política 1 con `scan`: guarda copia en
-`history`, retira tests por ruta y conserva clasificaciones de los otros archivos
-solo si su objeto Git y modo no cambiaron. Requiere finalizar de nuevo, sin
-repetir la revisión válida. No usar `scan --full` para esta migración compatible.
-Los campos antiguos `tests` se aceptan pero se ignoran sin resolver sus rutas y
-se eliminan del contexto del proveedor. Al curar el catálogo, retirarlos con
-copia previa. Una referencia test en `source`, `usages` o `supporting_files`
-se rechaza; retirarla y revisar el contrato/consumidor real. Conservar los runs
-históricos y preparar uno nuevo; nunca reescribir evidencia antigua.
+Policy 2 migrates policy-1 inventories with `scan`: it keeps a copy in
+`history`, removes tests by path and keeps the other classifications only when
+their Git object and mode did not change. It requires a new `finalize` without
+repeating valid review. Do not use `scan --full` for this compatible migration.
+Old `tests` fields are accepted but ignored without resolving their paths and
+are removed from the provider context; remove them with a prior copy when you
+curate. A test reference in `source`, `usages` or `supporting_files` is
+rejected: remove it and review the real contract or consumer. Keep historical
+runs and prepare a new one; never rewrite old evidence.
 
-## Tipo de pieza y responsabilidad del agente
+## Card kind and agent responsibility
 
-El `kind` de una ficha describe su naturaleza; es distinto de la clasificación
-del archivo en el inventario. Es texto extensible, no una inferencia del nombre:
+A card's `kind` describes its nature; it differs from the file classification
+in the inventory. It is extensible text, not inferred from the name:
 
-- `component`: UI y su contrato de propiedades, eventos, slots o composición.
-- `hook` / `composable`: estado, reactividad o ciclo de vida del framework.
-- `utility`: operación reutilizable, con entradas, salidas y efectos explícitos.
-- `page`: pantalla/ruta; revisar también exports y comportamiento reutilizable.
-- `service`: acceso a API, persistencia u otras operaciones compartidas.
-- Otros tipos/módulos mixtos: describir todos sus exports relevantes, sin forzar
-  categorías incorrectas. Usar `name`, `tags`, contrato y restricciones para
-  distinguirlos. Ubicación y nombre son pistas; comprobar código y consumidores.
+- `component`: UI and its contract of props, events, slots or composition.
+- `hook` / `composable`: framework state, reactivity or lifecycle.
+- `utility`: reusable operation with explicit inputs, outputs and effects.
+- `page`: screen or route; also review its reusable exports and behavior.
+- `service`: API access, persistence or other shared operations.
+- Other types or mixed modules: describe every relevant export without forcing
+  a wrong category. Use `name`, `tags`, contract and constraints to tell them
+  apart. Location and name are hints; check code and consumers.
 
-Una pieza ambigua sigue pendiente. `excluded` necesita una razón verificable,
-no "no la necesito ahora". El sistema prueba contabilidad de archivos y vigencia;
-la calidad semántica de la clasificación depende de la inspección del agente.
+An ambiguous piece stays pending. `excluded` needs a verifiable reason, not
+"not needed now". The system proves file accounting and freshness; the semantic
+quality of the classification depends on the agent's inspection.
 
-## Mantenimiento
+## Maintenance
 
-`scan` compara todo el árbol actual y conserva revisiones solo si el objeto Git
-y modo del archivo coinciden. Altas, cambios y renombrados requieren revisión;
-las bajas se reconcilian con el catálogo. `changes` complementa el informe con
-fichas y evidencias afectadas. Revisar dependientes cuando cambie un contrato.
-Actualizar `reviewed_revision` después de la inspección, no para quitar un aviso.
-Finalizar de nuevo antes de la decisión. Tras implementar y verificar, repetir
-la actualización sobre la revisión confirmada.
+`scan` compares the whole current tree and keeps reviews only when the file's
+Git object and mode match. Additions, changes and renames need review; deletions
+are reconciled with the catalog. `changes` adds the affected cards and evidence.
+Review dependents when a contract changes. Update `reviewed_revision` after the
+inspection, not to silence a warning. Finalize again before a decision. After
+implementing and verifying, repeat the update on the committed revision.
 
-`scan --full` invalida las clasificaciones anteriores con respaldo y conserva
-las fichas. Usarlo ante política incompatible, baseline perdido o revisión total
-solicitada; no en cada tarea ni por el mero paso del tiempo. Cambiar de rama o
-worktree compara el árbol correspondiente; no exige repetir lo que sigue igual.
+`scan --full` invalidates previous classifications with a backup and keeps the
+cards. Use it for an incompatible policy, a lost baseline or a requested full
+review, not on every task or merely because time passed. Switching branch or
+worktree compares the corresponding tree and does not repeat unchanged work.
 
-Las escrituras usan `inventory.lock`, respaldo privado y reemplazo atómico.
-Una tanda obsoleta se rechaza. Si queda un lock tras una interrupción, comprobar
-que no haya otro proceso y aplicar las reglas del proyecto antes de retirarlo;
-no borrarlo automáticamente. No hay watcher, fetch, pull ni llamada al proveedor.
+Writes use `inventory.lock`, a private backup and an atomic replace. A stale
+batch is rejected. If a lock remains after an interruption, check that no other
+process runs and apply the project rules before removing it; never delete it
+automatically. There is no watcher, fetch, pull or provider call.
 
-Los flujos manuales antiguos pueden usar `prepare` sin `--require-ready`, pero
-el manifiesto dice `project_status: not_checked`; no acreditan cobertura completa.
-El workflow normal exige la opción. `evaluate` vuelve a comprobarla antes de red.
+Old manual flows may use `prepare` without `--require-ready`, but the manifest
+then says `project_status: not_checked` and proves no complete coverage. The
+normal flow requires the option. `evaluate` checks it again before the network.

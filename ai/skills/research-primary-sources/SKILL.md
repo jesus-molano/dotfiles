@@ -1,6 +1,6 @@
 ---
 name: research-primary-sources
-description: Research technical or product questions using current primary sources and communicate evidence, limits, and uncertainty. Use when decisions depend on APIs, standards, releases, policies, or compatibility claims.
+description: Research technical or product questions with current primary sources and report evidence, limits and uncertainty. Use when a decision depends on APIs, standards, releases, policies or compatibility claims.
 ---
 
 # Research Primary Sources

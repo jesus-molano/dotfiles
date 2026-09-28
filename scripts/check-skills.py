@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Comprueba la estructura estática de las skills y agentes locales de Codex."""
+"""Check the static structure of the shared skills and the Codex agent files."""
 
 from __future__ import annotations
 
@@ -11,6 +11,9 @@ import sys
 from pathlib import Path
 
 import tomllib
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from ai_sources import EXPLICIT_SKILLS, IMPLICIT_SKILLS  # noqa: E402
 
 FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 MARKDOWN_LINK = re.compile(r"!?\[[^]]*]\(([^)\s]+)(?:\s+[^)]*)?\)")
@@ -24,28 +27,6 @@ MAX_DESCRIPTION_WORDS = 700
 MAX_INSTALLED_SKILL_DIRECTORIES = 10_000
 # Inventario deliberadamente exhaustivo. Una skill sin clasificación no debe
 # llegar al perfil: su activación sería ambigua y gastaría contexto sin control.
-IMPLICIT_SKILLS = {
-    "cachyos-host-audit",
-    "clarify-change",
-    "codebase-design",
-    "debug-web-flow",
-    "domain-modeling",
-    "engineering-flow",
-    "playwright-cli",
-    "handoff",
-    "linear-workflow",
-    "research-primary-sources",
-    "review-web-pr",
-    "spec-and-standards-review",
-    "systematic-debugging",
-    "tessera",
-    "to-tickets",
-    "verification-before-completion",
-}
-EXPLICIT_SKILLS = {
-    "test-driven-development",
-    "verify-web-change",
-}
 ROUTED_SKILLS = IMPLICIT_SKILLS | EXPLICIT_SKILLS
 
 

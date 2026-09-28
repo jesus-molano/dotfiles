@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: Diagnose a bug, test failure, build failure, or unexpected technical behavior before proposing a fix. Use for generic issues; route Next.js, Nuxt, or Vue browser-to-server flows to debug-web-flow.
+description: Diagnose a bug, test failure, build failure or unexpected technical behavior before proposing a fix. Use for generic failures; route Next.js, Nuxt or Vue browser-to-server flows to debug-web-flow.
 ---
 
 # Systematic Debugging
@@ -16,4 +16,4 @@ description: Diagnose a bug, test failure, build failure, or unexpected technica
 5. Report cause, fix, evidence, and any unverified environment-dependent risk.
 
 For a complete Next.js, Nuxt, or Vue flow involving UI, SSR, hydration,
-navigation, forms, auth, network, or API boundaries, use `$debug-web-flow`.
+navigation, forms, auth, network, or API boundaries, use `debug-web-flow`.

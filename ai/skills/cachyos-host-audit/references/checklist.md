@@ -1,12 +1,12 @@
-# Checklist de cierre
+# Closing checklist
 
-- Kernel y distribución identificados.
-- Perfil CHWD y `nvidia-smi` coherentes, sin proponer otro driver.
-- Unidades fallidas y timers relevantes inspeccionados.
-- Subvolumen/sistema de archivos y política Snapper identificados antes de tocar Btrfs.
-- Hyprland y Noctalia validados por sus herramientas, si están disponibles.
-- Composición resuelta y cambios de capacidades comprobados antes del estado vivo.
-- Paquetes gaming y coexistencia Ananicy/GameMode comprobados solo si hay un bundle gaming seleccionado.
-- Estado de backup separado de la presencia de credenciales; nunca mostrar valores.
-- Cambios de `/etc` o servicios quedan como propuesta con destino y rollback.
-- Diferencias entre rama de trabajo, dotfiles desplegados y host vivo explicadas.
+- Kernel and distribution identified.
+- CHWD profile and `nvidia-smi` consistent; no other driver proposed.
+- Failed units and relevant timers inspected.
+- Subvolume, filesystem and Snapper policy identified before touching Btrfs.
+- Hyprland and Noctalia validated by their own tools, when available.
+- Composition resolved and capability changes checked before the live state.
+- Gaming packages and Ananicy/GameMode coexistence checked only when a gaming bundle is selected.
+- Backup state separated from credential presence; values never shown.
+- `/etc` or service changes left as a proposal with target and rollback.
+- Differences between the working branch, deployed dotfiles and live host explained.

@@ -53,8 +53,7 @@ printf '%s\n' split-monitors >"$fixture_repo/split-new/.config/hypr/config/monit
 printf '%s\n' '[Service]' >"$fixture_repo/unit-test/.config/systemd/user/unit-test.service"
 printf '%s\n' '[settings]' >"$fixture_repo/mise-test/.config/mise/config.toml"
 printf '%s\n' '# fixture skill' >"$fixture_repo/ai/skills/example-skill/SKILL.md"
-printf '%s\n' retired >"$fixture_repo/codex/.agents/retired-skills.txt"
-printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.agents/retired-skills\.txt$' '^/\.codex/agents(?:/|$)' >"$fixture_repo/codex/.stow-local-ignore"
+printf '%s\n' '^/\.agents/skills(?:/|$)' '^/\.codex/agents(?:/|$)' >"$fixture_repo/codex/.stow-local-ignore"
 printf '%s\n' managed-codex >"$fixture_repo/codex/.codex/workflow-test.txt"
 printf '%s\n' 'c = c' >"$fixture_repo/python-app/.config/python-app/config.py"
 printf '%s\n' bytecode >"$fixture_repo/python-app/.config/python-app/__pycache__/config.cpython-314.pyc"
@@ -165,7 +164,7 @@ ln -s "$DOTFILES_DIR/codex/.codex/agents/reuse-scout.toml" "$HOME/.codex/agents/
 intent="$XDG_STATE_HOME/stow-intent.tsv"
 build_check_plan_intent "$intent"
 grep -Fq $'.config/python-app/config.py\t' "$intent"
-if grep -Eq 'retired-skills|__pycache__|SKILL\.md|\.codex/agents/' "$intent"; then exit 9; fi
+if grep -Eq '__pycache__|SKILL\.md|\.codex/agents/' "$intent"; then exit 9; fi
 home_before="$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)"
 check_dotfiles
 [[ "$(find "$HOME" -printf '%y\t%i\t%P\t%l\n' | LC_ALL=C sort)" == "$home_before" ]]

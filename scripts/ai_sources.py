@@ -7,6 +7,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LINUX_SKILLS = {"cachyos-host-audit"}
 RETIRED = {"frontend-task", "reuse-first", "visual-direction"}
+# Invocation policy for every skill. Explicit skills run only when the user or
+# another skill names them: Codex gets allow_implicit_invocation = false and
+# Claude gets skillOverrides "user-invocable-only". Unlisted skills fail checks.
+IMPLICIT_SKILLS = frozenset({
+    "cachyos-host-audit", "clarify-change", "debug-web-flow", "engineering-flow",
+    "handoff", "linear-workflow", "playwright-cli", "research-primary-sources",
+    "review-web-pr", "spec-and-standards-review", "systematic-debugging", "tessera",
+    "verification-before-completion",
+})
+EXPLICIT_SKILLS = frozenset({
+    "codebase-design", "domain-modeling", "test-driven-development", "to-tickets",
+    "verify-web-change",
+})
 
 
 def instructions(client: str, platform: str, root: Path = ROOT) -> str:
@@ -16,27 +29,38 @@ def instructions(client: str, platform: str, root: Path = ROOT) -> str:
         path.read_text(encoding="utf-8").rstrip() + "\n" for path in files)
 
 
+ROLE_FOOTER = ("\n\nThe main agent runs the tests. Use read-only tools only. "
+               "Do not run tests or commands that change state.\n")
+
+
 def roles(client: str, platform: str, root: Path = ROOT) -> dict[str, str]:
+    """Render each neutral role for one client; models live in the role data."""
     result = {}
     for path in sorted((root / "ai/roles").glob("*.json")):
         role = json.loads(path.read_text(encoding="utf-8"))
-        scout = role["name"] == "reuse-scout"
-        body = role["instructions"].strip() + "\n\nEl agente principal ejecuta las pruebas. Usa solo herramientas de lectura. No ejecutes pruebas ni comandos que cambien estado.\n"
+        body = role["instructions"].strip() + ROLE_FOOTER
+        settings = role[client]
         if client == "codex":
-            fields = dict(name=role["name"], description=role["description"],
-                          model="gpt-5.6-luna" if scout else "gpt-5.6-sol",
-                          model_reasoning_effort="low" if scout else "high", sandbox_mode="read-only")
+            fields = dict(name=role["name"], description=role["description"], model=settings["model"],
+                          model_reasoning_effort=settings["effort"], sandbox_mode="read-only")
             result[path.stem + ".toml"] = (
                 "# Generated from ai/roles.\n" +
                 "".join(f"{key} = {json.dumps(value, ensure_ascii=False)}\n" for key, value in fields.items()) +
                 f"developer_instructions = {json.dumps(body, ensure_ascii=False)}\n")
         else:
-            result[path.stem + ".md"] = (
-                f"---\nname: {role['name']}\ndescription: {json.dumps(role['description'], ensure_ascii=False)}\n"
-                "tools: Read, Glob, Grep, WebFetch, WebSearch\n" +
-                ("model: haiku\n" if scout else "model: opus\neffort: high\n") +
-                "---\n\n" + body)
+            lines = [f"name: {role['name']}",
+                     f"description: {json.dumps(role['description'], ensure_ascii=False)}",
+                     "tools: " + ", ".join(settings["tools"]),
+                     f"model: {settings['model']}"]
+            lines += [f"{key}: {settings[key]}" for key in ("effort", "maxTurns") if key in settings]
+            result[path.stem + ".md"] = "---\n" + "\n".join(lines) + "\n---\n\n" + body
     return result
+
+
+def hook_scripts(root: Path = ROOT) -> dict[str, str]:
+    """Client-neutral hook programs deployed as regular files under ~/.claude/hooks."""
+    return {path.name: path.read_text(encoding="utf-8")
+            for path in sorted((root / "ai/hooks").glob("*.py"))}
 
 
 def codex_outputs(root: Path = ROOT) -> dict[Path, str]:

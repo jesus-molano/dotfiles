@@ -1,40 +1,48 @@
 ---
 name: review-web-pr
-description: Own review of a Next.js, Nuxt, or Vue branch or pull request, including checks against its specification. Use for review requests, branch comparisons, or `/review`; keep the task read-only unless the user separately requests a fix.
+description: Own the review of a Next.js, Nuxt or Vue branch or pull request, including checks against its specification. Use when the user asks to review a web branch, compare it with its base or check a web PR; stays read-only unless a fix is requested separately.
 ---
 
-# Revisar una PR web
+# Review a Web PR
 
-## Establecer el alcance
+## Set the scope
 
-1. Leer las instrucciones del repositorio y comprobar el estado local.
-2. Resolver la base desde los metadatos de la PR o el upstream; no asumir `main` si Git indica otra base.
-3. Leer el diff completo y rastrear los caminos de ejecución afectados antes de opinar.
-4. Mantener la revisión en solo lectura. No arreglar hallazgos salvo petición explícita.
+1. Read the repository instructions and check the local state.
+2. Resolve the base from the PR metadata or the upstream; do not assume `main`
+   if Git says otherwise.
+3. Read the complete diff and trace the affected execution paths before judging.
+4. Stay read-only. Do not fix findings unless the user asks.
 
-## Revisar por riesgo
+## Review by risk
 
-Priorizar, en este orden:
+In this order:
 
-1. Corrección, regresiones y condiciones de carrera.
-2. Límites de confianza, autenticación, autorización, validación y exposición de datos.
-3. SSR, hidratación, caché, navegación y estados asíncronos.
-4. Accesibilidad por teclado, foco, nombres accesibles y semántica.
-5. Rendimiento medible: waterfalls, bundles, renders y consultas innecesarias.
-6. Cobertura de pruebas y observabilidad.
+1. Correctness, regressions and race conditions.
+2. Trust boundaries: authentication, authorization, validation and data exposure.
+3. SSR, hydration, caching, navigation and async states.
+4. Keyboard accessibility, focus, accessible names and semantics.
+5. Measurable performance: waterfalls, bundles, renders and redundant queries.
+6. Test coverage and observability.
 
-En UI o funcionalidad nueva, contrasta la decisión de reutilización con el
-componente, wrapper o función existente y un uso real. Señala duplicaciones o
-desvíos de componentes y tokens soportados con rutas y consecuencias concretas
-(comportamiento, accesibilidad, consistencia o mantenimiento). No exijas una
-abstracción incompatible ni confundas HTML nativo establecido con duplicación.
+For new UI or functionality, compare the reuse decision with the existing
+component, wrapper or function and one real usage. Report duplication and
+drift from supported components and tokens with paths and concrete
+consequences (behavior, accessibility, consistency or maintenance). Do not
+demand an incompatible abstraction, and do not treat established native HTML
+as duplication.
 
-Usar hasta tres subagentes solo cuando los ejes sean independientes y el diff lo justifique. Evitar comentarios puramente estilísticos, hipótesis sin camino de código y recomendaciones genéricas.
+Use `reviewer-web` or up to three subagents only when the axes are independent
+and the diff justifies it. Avoid style-only comments, hypotheses without a code
+path and generic advice.
 
-## Validar hallazgos
+## Validate findings
 
-Reproducir o ejecutar la comprobación más pequeña que confirme cada riesgo. Consultar documentación primaria cuando el hallazgo dependa de una versión concreta de Next, Nuxt, Vue o una API de navegador.
+Reproduce or run the smallest check that confirms each risk. Consult primary
+documentation when a finding depends on a specific Next, Nuxt or Vue version or
+a browser API.
 
-## Informar
+## Report
 
-Listar hallazgos por severidad con archivo/línea, comportamiento observable, evidencia y corrección mínima. Si no hay hallazgos, decirlo claramente y mencionar riesgos residuales o pruebas no ejecutables.
+List findings by severity with file/line, observable behavior, evidence and the
+minimal fix. If there are no findings, say so and name residual risks or checks
+that could not run.

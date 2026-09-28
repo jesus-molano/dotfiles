@@ -9,8 +9,8 @@ import unittest
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
-CHECKER = SCRIPTS / "check-codex-skills.py"
-CHECKS = runpy.run_path(str(CHECKER), run_name="check_codex_skills_test")
+CHECKER = SCRIPTS / "check-skills.py"
+CHECKS = runpy.run_path(str(CHECKER), run_name="check_skills_test")
 
 
 def run_checker(

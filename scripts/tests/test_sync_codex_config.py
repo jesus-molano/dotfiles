@@ -35,7 +35,8 @@ class SyncCodexConfigTest(unittest.TestCase):
         self.assertEqual(document["approval_policy"], "never")
         self.assertEqual(document["approvals_reviewer"], "user")
         self.assertEqual(document["sandbox_mode"], "danger-full-access")
-        self.assertTrue(document["sandbox_workspace_write"]["network_access"])
+        # danger-full-access already has network; the workspace-write table is not managed.
+        self.assertNotIn("sandbox_workspace_write", document)
         self.assertEqual(document["notify"], ["codex-notify"])
         self.assertTrue(document["features"]["hooks"])
         self.assertTrue(document["features"]["memories"])

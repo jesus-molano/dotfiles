@@ -1,6 +1,6 @@
-# Adaptador Windows nativo
+# Native Windows adapter
 
-- Usa PowerShell y rutas nativas; no presupongas WSL, Bash, Stow ni enlaces simbólicos.
-- Respeta las políticas administradas y la configuración corporativa. No las eludas.
-- No ejecutes herramientas de Hyprland, Pacman, Polkit, systemd ni otras exclusivas de Linux.
-- Usa Git y `gh` si están disponibles. Inspecciona el entorno antes de instalar herramientas.
+- Use PowerShell and native paths. Do not assume WSL, Bash, Stow or symlinks.
+- Respect managed policies and corporate configuration. Never bypass them.
+- Do not run Hyprland, Pacman, Polkit, systemd or other Linux-only tools.
+- Use Git and `gh` when available. Inspect the environment before installing tools.

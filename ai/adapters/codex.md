@@ -1,6 +1,7 @@
-# Adaptador Codex
+# Codex adapter
 
-- `reuse-scout` usa Luna con esfuerzo bajo. Los revisores usan Sol con esfuerzo alto.
-- Conserva la selección local de modelo y esfuerzo del agente principal.
-- Para Linear usa el MCP `linear` de lectura. `linear-write` permanece desactivado;
-  una sesión temporal de escritura necesita autorización explícita y el flujo de la skill.
+- Invoke skills as `$name`. `reuse-scout` uses the light model with low effort;
+  `catalog-writer` uses the medium model; reviewers use the main model with high effort.
+- Keep the locally selected model and effort of the main agent.
+- Linear: use the read-only `linear` server. `linear-write` stays disabled; a
+  temporary write session needs explicit authorization and the skill's flow.

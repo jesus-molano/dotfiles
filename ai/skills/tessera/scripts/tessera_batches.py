@@ -84,6 +84,14 @@ def plan(context, provider, encoded):
             "requests": requests}
 
 
+def coordinator(choice, last):
+    """A rule-derived result, recorded as such; never attributed to the provider."""
+    rule = ("every partition answered create" if choice == "create"
+            else "no partition proposed a card and at least one lacked evidence")
+    return {"choice": choice, "decided_by": "coordinator", "rule": rule,
+            "model": last["model"], "usage": {"input_tokens": 0, "output_tokens": 0}}
+
+
 def run(context, plan, provider, encoded, invoke):
     requests = plan["requests"]
     winners, uncertain, count = [], False, 0
@@ -103,5 +111,11 @@ def run(context, plan, provider, encoded, invoke):
             if uncertain and answer["choice"] == "create":
                 raise ValueError("Creación global sin evidencia suficiente en todos los lotes")
             return raw, answer, count
+        if not winners:
+            # No partition proposed a card. Asking the provider to compare an empty
+            # set adds a call and no information, so the documented rule decides:
+            # unanimous create means no card fits; any uncertainty means abstention.
+            return None, coordinator(
+                "insufficient_evidence" if uncertain else "create", answer), count
         requests = pack(context, [[key] for key in winners], provider, encoded,
                         reduction=True, uncertain=uncertain)

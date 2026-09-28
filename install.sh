@@ -399,7 +399,7 @@ module_sources() {
 	# aquí esa semántica con Bash o Python: materializa el paquete en un destino
 	# privado y deja que el propio Stow decida sus fuentes exactas. Esto mantiene
 	# los manifests/checkpoints alineados con Stow incluso si aparece estado local
-	# ignorado dentro del checkout (por ejemplo __pycache__ o retired-skills.txt).
+	# ignorado dentro del checkout (por ejemplo __pycache__).
 	(
 		set -euo pipefail
 		local temporary_root=${TMPDIR:-/tmp} probe_root target relative
@@ -2120,8 +2120,6 @@ main() {
 	check_packages
 	check_runtime_compatibility available
 	if plan_has_module codex; then
-		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --check
-		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --check
 		"$DOTFILES_DIR/scripts/manage-codex-agent-files.py" --check
 	fi
 	if ((CHECK_ONLY)); then
@@ -2145,8 +2143,7 @@ main() {
 	configure_user_services || true
 	configure_thunderbird_dynamic_theme
 	if plan_has_module codex; then
-		"$DOTFILES_DIR/scripts/migrate-codex-skill-paths.sh" --apply
-		"$DOTFILES_DIR/scripts/manage-codex-skill-links.sh" --apply
+		printf '%s\n' 'Skills, roles and AI settings: run "just ai-plan" and then "just ai-sync".'
 	fi
 	command -v fc-cache >/dev/null && fc-cache -f
 	ok "Instalación terminada. Reinicia la sesión si cambiaste teclado o shell."

@@ -652,6 +652,95 @@ def normalize_decision(context, answer):
             "review_status": "pending", "agent_explanation": None}
 
 
+DECISIONS = (*ACTIONS, "create", "insufficient_evidence")
+
+
+def validate_agent_choice(choice, catalog):
+    """The implementing agent's own decision, recorded before the provider answers."""
+    require(isinstance(choice, dict), "La tarea necesita agent_choice: tu decisión antes de consultar al proveedor")
+    fields(choice, {"action", "primary", "reason"})
+    require(set(choice) == {"action", "primary", "reason"} and choice["action"] in DECISIONS
+            and text_field(choice["reason"]), "agent_choice inválido")
+    ids = {entry["id"] for entry in catalog["entries"]}
+    if choice["action"] in ACTIONS:
+        require(choice["primary"] in ids, "agent_choice.primary debe ser un id del catálogo")
+    else:
+        require(choice["primary"] is None, "create/insufficient_evidence no llevan primary")
+
+
+def consent_path(repo):
+    return Path(storage_paths(repo)["root"]) / "provider-consent.json"
+
+
+def require_provider_consent(repo, provider_id, endpoint):
+    """Sending cards off the machine needs a per-project grant made by the user.
+
+    The grant lives in local storage, names the exact endpoint and is written by
+    `consent`, which the agent guard blocks: the agent cannot approve itself.
+    """
+    path = consent_path(repo)
+    grant = load(path).get(provider_id) if path.is_file() else None
+    require(isinstance(grant, dict) and grant.get("endpoint") == endpoint,
+            f"Sin consentimiento para enviar fichas de este proyecto a {provider_id}; "
+            "el usuario debe ejecutar tessera.py consent en su terminal")
+
+
+def set_consent(repo, provider_id, grant):
+    path = consent_path(repo)
+    data = load(path) if path.is_file() else {}
+    if grant:
+        data[provider_id] = {"endpoint": PROVIDERS[provider_id].endpoint(),
+                             "granted_at": datetime.now(timezone.utc).isoformat()}
+    else:
+        data.pop(provider_id, None)
+    require_external(path.parent)
+    private_parents(path.parent)
+    descriptor, name = tempfile.mkstemp(prefix=".consent-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded(data))
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+    return {"consent": data, "path": str(path)}
+
+
+INDEX_FIELDS = ("id", "kind", "name", "tags", "summary", "source")
+
+
+def catalog_index(repo):
+    """Compact lookup for agents: one short line per card, full cards on demand."""
+    status = project_status(repo)
+    path = Path(status["paths"]["catalog"])
+    entries = load(path)["entries"] if path.is_file() else []
+    return {"status": status["status"], "next_action": status.get("next_action"),
+            "entries": [{key: entry[key] for key in INDEX_FIELDS if key in entry} for entry in entries]}
+
+
+def catalog_cards(repo, ids):
+    catalog = load(storage_paths(repo)["catalog"])
+    found = {entry["id"]: entry for entry in catalog["entries"] if entry["id"] in ids}
+    require(set(ids) <= set(found), f"Ids desconocidos: {sorted(set(ids) - set(found))}")
+    return {"entries": [{k: v for k, v in found[i].items() if k != "tests"} for i in ids]}
+
+
+def decision_report(repo):
+    """Measured value of the provider: agreement with the blind agent choice and cost."""
+    rows = []
+    for decision in sorted(Path(storage_paths(repo)["runs"]).glob("*/decision.json")):
+        record = load(decision)
+        rows.append({"run": decision.parent.name, "action": record["action"],
+                     "primary": record["primary"], "decided_by": record.get("decided_by", "provider"),
+                     "agreement": record.get("agreement"), "usage": record["usage"],
+                     "calls": len(record.get("calls", [])) or 1})
+    compared = [row for row in rows if row["agreement"] is not None]
+    return {"decisions": len(rows), "compared": len(compared),
+            "agreements": sum(row["agreement"] for row in compared),
+            "input_tokens": sum(row["usage"]["input_tokens"] for row in rows),
+            "output_tokens": sum(row["usage"]["output_tokens"] for row in rows), "runs": rows}
+
+
 def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, allow_repo_storage=False,
             require_ready=False):
     if not allow_repo_storage:
@@ -666,6 +755,9 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 "El catálogo no pertenece al inventario validado")
     provider = PROVIDERS[provider_id]
     catalog, task = load(catalog_path), load(task_path)
+    agent_choice = task.pop("agent_choice", None) if isinstance(task, dict) else None
+    if agent_choice is not None or require_ready:
+        validate_agent_choice(agent_choice, catalog)
     evidence = build_evidence(catalog, repo.resolve())
     if require_ready:
         after = project_status(repo)
@@ -686,7 +778,7 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 "source_catalog_sha256": digest(encoded(catalog)),
                 "revision": evidence["revision"], "entry_count": len(catalog["entries"]),
                 "project_status": "ready" if require_ready else "not_checked",
-                "token_count": None, "status": "prepared"}
+                "token_count": None, "status": "prepared", "agent_choice": agent_choice}
     if request.get("mode") == "exhaustive-batches-v1":
         manifest.update(strategy=request["mode"], initial_batches=len(request["requests"]),
                         max_calls=request["max_calls"])
@@ -729,6 +821,7 @@ def evaluate(run, *, allow_repo_storage=False):
         if os.path.lexists(run / name):
             raise FileExistsError("El run contiene un intento o resultado previo")
     provider.check_credentials()
+    require_provider_consent(Path(manifest["repo_path"]), manifest["provider"], manifest["endpoint"])
     # Reserve before invoking the provider. Never retry an uncertain or billable attempt.
     write_private(run / "attempt.json", {"started_at": datetime.now(timezone.utc).isoformat(),
                                          "request_sha256": digest(body)})
@@ -775,6 +868,9 @@ def evaluate(run, *, allow_repo_storage=False):
         else:
             raw = provider.invoke(body)
         phase = "persist-response"
+        if raw is None:
+            # Coordinator result: store the rule-derived answer, not a fake provider body.
+            raw = encoded(answer)
         write_bytes_private(run / "response.json", raw)
         phase = "parse-response"
         response = provider.parse_response(raw)
@@ -798,7 +894,13 @@ def evaluate(run, *, allow_repo_storage=False):
               "context_sha256": manifest["context_sha256"], "revision": context["evidence"]["revision"],
               "response_sha256": digest(raw),
               "model": answer["model"], "elapsed_seconds": elapsed,
-              "usage": answer["usage"], "answer": answer, **decision}
+              "usage": answer["usage"], "answer": answer, **decision,
+              "decided_by": answer.get("decided_by", "provider")}
+    agent = manifest.get("agent_choice")
+    if agent is not None:
+        # Blind comparison: the agent committed before the provider answered.
+        record.update(agent_choice=agent, agreement=(agent["action"], agent["primary"])
+                      == (decision["action"], decision["primary"]))
     if calls:
         record.update(strategy="exhaustive-batches-v1", calls=calls,
                       evaluated_entry_ids=request["entry_ids"],
@@ -823,6 +925,17 @@ def main():
     skeleton = commands.add_parser("skeleton", help="Evidencia de curación: fuentes, exports y usos reales, sin tests")
     skeleton.add_argument("--repo", type=Path, required=True)
     skeleton.add_argument("--output", type=Path, help="Por defecto, curation/ en el almacenamiento local externo")
+    index = commands.add_parser("index", help="Índice compacto del catálogo para consulta del agente, sin escribir")
+    index.add_argument("--repo", type=Path, required=True)
+    card = commands.add_parser("card", help="Fichas completas por id, sin escribir")
+    card.add_argument("--repo", type=Path, required=True)
+    card.add_argument("--id", action="append", required=True, dest="ids")
+    report = commands.add_parser("report", help="Acuerdo con la decisión ciega del agente y consumo del proveedor")
+    report.add_argument("--repo", type=Path, required=True)
+    consent = commands.add_parser("consent", help="Solo el usuario: autoriza o retira el envío de fichas a un proveedor")
+    consent.add_argument("--repo", type=Path, required=True)
+    consent.add_argument("--provider", choices=PROVIDERS, required=True)
+    consent.add_argument("--revoke", action="store_true")
     changes = commands.add_parser("changes", help="Detecta cambios que requieren actualizar fichas, sin escribir")
     changes.add_argument("--repo", type=Path, required=True)
     changes.add_argument("--catalog", type=Path)
@@ -855,6 +968,14 @@ def main():
             result = finalize_project(args.repo)
         elif args.command == "skeleton":
             result = skeleton_project(args.repo, args.output)
+        elif args.command == "index":
+            result = catalog_index(args.repo)
+        elif args.command == "card":
+            result = catalog_cards(args.repo, args.ids)
+        elif args.command == "report":
+            result = decision_report(args.repo)
+        elif args.command == "consent":
+            result = set_consent(args.repo, args.provider, not args.revoke)
         elif args.command == "changes":
             catalog = args.catalog if args.catalog is not None else Path(storage_paths(args.repo)["catalog"])
             result = catalog_changes(catalog, args.repo.resolve())

@@ -60,53 +60,31 @@ doctor-live:
 dictation-setup model="base":
     "{{ dotfiles_dir }}/hypr-common/.local/bin/local-dictation" setup {{ quote(model) }}
 
-# Previsualiza / aplica / verifica los dos clientes desde ai/.
+# AI clients (Claude Code and Codex) from the neutral source in ai/.
+# Preview the exact files and keys that ai-sync would change.
 ai-plan:
     python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" plan
 
+# Apply ai/ to both clients in one transaction with a private backup.
 ai-sync:
     python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" apply
 
+# Verify the deployed state, generated files, skills and tests without writing.
 ai-check:
     python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" check
     python3 "{{ dotfiles_dir }}/scripts/render-ai.py" --check
-    @just --justfile "{{ justfile() }}" codex-check
+    @just --justfile "{{ justfile() }}" skills-check
+    @just --justfile "{{ justfile() }}" ai-tests
+    python3 "{{ dotfiles_dir }}/scripts/check-skills.py" --agents-root "${CODEX_HOME:-$HOME/.codex}/agents" --required-agent reuse-scout --required-agent catalog-writer --installed-skills-root "$HOME/.agents/skills"
+    @if command -v claude >/dev/null; then claude plugin validate "{{ dotfiles_dir }}/ai/skills"; else echo 'claude not installed: skipped plugin validate'; fi
 
-# Valida todas las skills locales y los agentes TOML de Codex sin escribir.
-codex-skills-check:
-    "{{ dotfiles_dir }}/scripts/check-codex-skills.py" --required-agent reuse-scout
+# Static checks of the versioned skills and Codex agent files (also run by CI).
+skills-check:
+    python3 "{{ dotfiles_dir }}/scripts/check-skills.py" --required-agent reuse-scout --required-agent catalog-writer
 
-# Ejecuta las regresiones del tooling Codex sin generar bytecode en el repositorio.
-codex-tests:
-    env PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s "{{ dotfiles_dir }}/scripts/tests" -p 'test_*.py'
-
-# Comprueba skills, regresiones y preferencias sin reemplazar hooks o MCP.
-codex-check:
-    @just --justfile "{{ justfile() }}" codex-skills-check
-    @just --justfile "{{ justfile() }}" codex-tests
-    @just --justfile "{{ justfile() }}" codex-runtime-check
-    "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --check
-    "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --check
-
-# Comprueba el catálogo instalado y exige enlaces actuales; no modifica HOME.
-codex-runtime-check:
-    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --verify
-    "{{ dotfiles_dir }}/scripts/check-codex-skills.py" --agents-root "${CODEX_HOME:-$HOME/.codex}/agents" --required-agent reuse-scout --installed-skills-root "${CODEX_SKILLS_ROOT:-$HOME/.agents/skills}"
-    "{{ dotfiles_dir }}/scripts/manage-codex-skill-links.sh" --verify
-
-# Despliega solo los TOML de agentes gestionados con respaldo y verificación.
-codex-agents-sync:
-    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --check
-    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --apply
-    "{{ dotfiles_dir }}/scripts/manage-codex-agent-files.py" --verify
-
-# Sincroniza solo las preferencias gestionadas de Codex con confirmación y backup.
-codex-config-sync:
-    "{{ dotfiles_dir }}/scripts/sync-codex-config.py" --apply
-
-# Retira solo las reglas temporales exactas detectadas durante la investigación.
-codex-clean-rules:
-    "{{ dotfiles_dir }}/scripts/clean-codex-rules.sh" --apply
+# Python regressions for the AI tooling, without writing bytecode to the repository.
+ai-tests:
+    env PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "{{ dotfiles_dir }}/scripts/tests" -p 'test_*.py'
 
 # Prepara Node en mise y muestra si fnm siguen pendientes de migración.
 toolchain-check:

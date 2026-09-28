@@ -102,25 +102,6 @@ directorio de caché. El rollback usa esa ruta exacta con
 `pkexec pacman -U <paquete-anterior>` y vuelve a ejecutar
 `just codexbar-test` después de la transacción.
 
-Comprobaciones disponibles:
-
-~~~bash
-just atlas-check
-just codex-skills-check
-just codex-tests
-just codex-check
-~~~
-
-Las operaciones que escriben son explícitas:
-
-~~~bash
-just atlas-sync
-just codex-config-sync
-just codex-clean-rules
-~~~
-
-La sincronización conserva trusts, hooks de Orca y MCP no gestionados. Linear
-permanece opcional y su escritura necesita autorización humana nueva.
-
-Consulta la [guía diaria de Codex](codex/guia-diaria.md) y el
-[modelo operativo](codex/operating-model.md).
+AI configuration (rules, skills, roles, hooks and MCP for Claude Code and
+Codex) is deployed and checked with `just ai-plan`, `just ai-sync` and
+`just ai-check`. See the [AI guide](ai.md).

@@ -1,29 +1,26 @@
 # Task continuity
 
-Use one recoverable record for substantial authorized implementation: several
-meaningful steps, an interruption, or work likely to span sessions. A file count
-alone is not a trigger. Research, review and small fixes do not create artifacts
-under this rule.
+Keep one recoverable record for substantial authorized implementation: several
+meaningful steps, an interruption, or work likely to span sessions. A file
+count alone is not a trigger. Research, review and small fixes create no record.
 
-Reuse the existing task/spec/progress artifact. Do not
-mirror it into a second plan or memory store. If none exists, use the repository's
-task-document convention, falling back to `docs/work/<task-name>.md`; create the
-record before source edits and name it once. This local task record is part of
-implementation, not permission to update an external tracker or persistent
-agent memory.
+Reuse the existing task, spec or progress artifact; do not mirror it into a
+second plan or memory store. If none exists, use the repository's convention,
+falling back to `docs/work/<task-name>.md`. Create it before source edits and
+name it once. This local record is part of the implementation; it does not
+authorize tracker updates or persistent agent memory.
 
-Keep only the objective, scope/non-goals, accepted decisions, reuse candidates
+Keep only: objective, scope and non-goals, accepted decisions, reuse candidates
 and chosen contracts, tasks with stable IDs and acceptance checks, verification
-commands/results, relevant commit IDs, remaining uncertainty and next step.
-Update at meaningful boundaries, not after every tool call. Distinguish failed,
-skipped and unexecuted checks from passes; record the tested revision or delta.
+commands and results, relevant commit IDs, remaining uncertainty and the next
+step. Update it at meaningful boundaries, not after every tool call. Separate
+failed, skipped and unexecuted checks from passes, and record the tested revision.
 
-Accepted changes revise the affected tasks and checks. Preserve valid completed
-work and explain why an item is reopened. New product scope still needs authority.
-On resume, read the record and current code/diff; reconcile discrepancies and
-rerun checks invalidated by changes. Do not treat an old checkbox as current
-evidence. Pass the record locator and relevant context to delegated writers.
+Accepted changes revise the affected tasks and checks; explain why an item is
+reopened. New product scope still needs authority. On resume, read the record
+and the current code and diff, reconcile differences and rerun checks that the
+changes invalidated. An old checkbox is not current evidence. Pass the record
+locator to delegated writers.
 
-Close with verified outcomes and pending work; a task checklist is not delivery
-authority. Commit coherent verified units under repository policy; do not force
-one commit per checkbox or split solely to meet a line-count target.
+Close with verified outcomes and pending work. Commit coherent verified units
+under repository policy; do not force one commit per checkbox.

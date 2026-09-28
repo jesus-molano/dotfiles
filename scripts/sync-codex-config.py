@@ -32,9 +32,6 @@ DESIRED_SECTIONS = {
     "memories": {
         "disable_on_external_context": "true",
     },
-    "sandbox_workspace_write": {
-        "network_access": "true",
-    },
     "agents": {
         "enabled": "true",
         "max_concurrent_threads_per_session": "3",
@@ -137,7 +134,6 @@ def desired_state(document: dict) -> bool:
         and isinstance(document.get("notify"), list)
         and bool(document["notify"])
         and all(isinstance(part, str) for part in document["notify"])
-        and document.get("sandbox_workspace_write", {}).get("network_access") is True
         and document.get("features", {}).get("hooks") is True
         and document.get("features", {}).get("memories") is True
         and document.get("memories", {}).get("disable_on_external_context") is True

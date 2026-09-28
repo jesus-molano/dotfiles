@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 
 import tomllib
-from ai_sources import ROOT, LINUX_SKILLS, RETIRED, instructions, roles
+from ai_sources import EXPLICIT_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
 
 MISSING = {"$absent": True}
 MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
@@ -31,9 +31,18 @@ CLAUDE_KEYS = {
     ("attribution", "pr"): "",
     ("attribution", "sessionUrl"): False,
     ("pluginConfigs", "agents-md@builtin", "options", "instructionFiles"): "claude-md-and-agents-md",
-    ("skillOverrides", "test-driven-development"): "user-invocable-only",
-    ("skillOverrides", "verify-web-change"): "user-invocable-only",
 }
+# Explicit skills stay invocable as /name but are hidden from the model.
+CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in sorted(EXPLICIT_SKILLS)})
+# Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
+DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
+        "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
+        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)"]
+
+
+def hook_command(home: Path, platform: str, script: str) -> str:
+    python = "python" if platform == "windows" else "python3"
+    return f'{python} "{(home / ".claude/hooks" / script).as_posix()}"'
 
 
 def encode(data: bytes) -> str:
@@ -252,6 +261,34 @@ class Sync:
                 after["mode"] = current["mode"]
             self.operations.append({"path": str(path), "before": current, "after": after})
 
+    def managed_entries(self, path: Path, original: dict, desired: dict, wanted: list) -> list:
+        """Own single list items (deny rules, hook groups), never the whole list.
+
+        Foreign entries stay untouched. A managed entry that the user removed is a
+        conflict; one that the source no longer wants is removed.
+        """
+        previous = self.state.get(str(path.relative_to(self.home)), {})
+        owned = [(tuple(route), entry) for route, entry in previous.get("entries", [])]
+        if previous.get("notify"):
+            owned.append((("hooks", "Stop"), NOTIFY))
+        for route, entry in owned:
+            current = get(original, route)
+            present = isinstance(current, list) and entry in current
+            if (route, entry) in wanted and not present:
+                raise ValueError(f"Conflicto: entrada gestionada retirada: {path} ({'.'.join(route)})")
+            if (route, entry) not in wanted and present:
+                get(desired, route).remove(entry)
+        for route, entry in wanted:
+            items = get(desired, route)
+            if items == MISSING:
+                put(desired, route, [])
+                items = get(desired, route)
+            if not isinstance(items, list):
+                raise ValueError(f"Se esperaba una lista: {path} ({'.'.join(route)})")
+            if entry not in items:
+                items.append(copy.deepcopy(entry))
+        return [[list(route), entry] for route, entry in wanted]
+
     def known_legacy_file(self, path, source):
         if path.is_symlink():
             return path.resolve() == source.resolve()
@@ -288,21 +325,24 @@ class Sync:
         self.asset(base / "CLAUDE.md", file_value(instructions("claude", self.platform, self.root)))
         for name, text in roles("claude", self.platform, self.root).items():
             self.asset(base / "agents" / name, file_value(text))
+        for name, text in hook_scripts(self.root).items():
+            self.asset(base / "hooks" / name, file_value(text))
         path = base / "settings.json"
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
-        for keys, value in CLAUDE_KEYS.items():
-            put(desired, keys, value)
+        keys = dict(CLAUDE_KEYS)
+        keys[("statusLine",)] = {"type": "command", "padding": 0,
+                                 "command": hook_command(self.home, self.platform, "statusline.py")}
+        for route, value in keys.items():
+            put(desired, route, value)
+        guard = {"matcher": "Bash|PowerShell|Workflow", "hooks": [
+            {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
+        wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
         if self.platform == "linux":
-            previous = self.state.get(str(path.relative_to(self.home)), {})
-            if previous.get("notify") and NOTIFY not in original.get("hooks", {}).get("Stop", []):
-                raise ValueError(f"Conflicto: hook gestionado modificado: {path}")
-            entries = desired.setdefault("hooks", {}).setdefault("Stop", [])
-            if NOTIFY not in entries:
-                entries.append(copy.deepcopy(NOTIFY))
-        self.merged(path, original, desired, CLAUDE_KEYS, json_text(desired))
-        if self.platform == "linux":
-            self.next_state[str(path.relative_to(self.home))]["notify"] = True
+            wanted.append((("hooks", "Stop"), NOTIFY))
+        entries = self.managed_entries(path, original, desired, wanted)
+        self.merged(path, original, desired, keys, json_text(desired))
+        self.next_state[str(path.relative_to(self.home))]["entries"] = entries
         path = self.home / ".claude.json"
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)

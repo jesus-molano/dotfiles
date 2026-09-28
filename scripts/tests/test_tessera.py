@@ -21,6 +21,9 @@ SPEC.loader.exec_module(tessera)
 
 class TesseraTest(unittest.TestCase):
     def setUp(self):
+        consent = patch.object(tessera, "require_provider_consent")
+        consent.start()
+        self.addCleanup(consent.stop)
         self.tmp = tempfile.TemporaryDirectory(prefix="tessera test ")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)

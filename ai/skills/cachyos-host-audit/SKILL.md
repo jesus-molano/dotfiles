@@ -1,50 +1,50 @@
 ---
 name: cachyos-host-audit
-description: Audita de forma no destructiva un host CachyOS con Hyprland, Noctalia, capacidades, bundles, NVIDIA, gaming, Btrfs y systemd. Úsala al diagnosticar el estado del equipo, revisar cambios de dotfiles, evaluar mantenimiento o preparar una mejora que dependa del hardware y los servicios reales.
+description: Non-destructive audit of a CachyOS host with Hyprland, Noctalia, capabilities, bundles, NVIDIA, gaming, Btrfs and systemd. Use when diagnosing the machine, reviewing dotfiles changes against the live host, assessing maintenance or preparing a change that depends on real hardware and services.
 ---
 
-# Auditoría de host CachyOS
+# CachyOS Host Audit
 
-## Objetivo
+## Goal
 
-Recopila evidencia separando la validez reproducible de los dotfiles del estado
-vivo. Produce hallazgos priorizados y no cambia paquetes, servicios, `/etc`,
-GPU, arranque, Btrfs ni dispositivos.
+Collect evidence while keeping the reproducible validity of the dotfiles
+separate from the live state. Produce prioritized findings. Never change
+packages, services, `/etc`, GPU, boot, Btrfs or devices.
 
-## Flujo
+## Flow
 
-1. Lee el `AGENTS.md` aplicable y detecta el repositorio de dotfiles.
-2. Ejecuta primero comprobaciones reproducibles. Si existe, usa:
+1. Read the applicable `AGENTS.md` and locate the dotfiles repository.
+2. Run the reproducible checks first, when available:
 
    ```bash
    just lint
    ```
 
-3. Ejecuta después el wrapper de solo lectura desde el directorio de la skill:
+3. Then run the read-only wrapper from the skill directory:
 
    ```bash
    bash scripts/host-audit.sh
    ```
 
-4. Si no está el doctor del repositorio, recopila manualmente solo la evidencia
-   que necesite la pregunta. No sustituyas inspecciones fallidas por supuestos.
-5. Clasifica cada resultado como fallo, riesgo, aviso u observación. Separa:
-   configuración propuesta, estado desplegado y acciones aún no autorizadas.
-6. Recomienda el cambio mínimo y reversible. No lo apliques salvo petición
-   explícita; para `/etc` o servicios exige destino exacto y copia previa.
+4. If the repository doctor is missing, collect by hand only the evidence the
+   question needs. Never replace a failed inspection with an assumption.
+5. Classify each result as failure, risk, warning or observation. Separate the
+   proposed configuration, the deployed state and actions not yet authorized.
+6. Recommend the smallest reversible change. Do not apply it unless asked; for
+   `/etc` or services require the exact target and a prior backup.
 
-## Límites de seguridad
+## Safety limits
 
-- En Arch/CachyOS usa Pacman o Shelly, nunca `apt`.
-- CHWD conserva la propiedad del driver NVIDIA.
-- No leas `.env` ni imprimas variables que puedan contener secretos.
-- No habilites unidades, cambies parámetros, montes, desmontes ni escribas en
-  `/sys`, `/proc`, `/etc` o dispositivos durante la auditoría.
-- Usa `pkexec` solo en una fase de aplicación solicitada, no para diagnosticar.
-- Consulta [references/checklist.md](references/checklist.md) antes de cerrar.
+- On Arch/CachyOS use Pacman or Shelly, never `apt`.
+- CHWD owns the NVIDIA driver.
+- Never read `.env` files or print variables that may hold secrets.
+- Do not enable units, change parameters, mount, unmount or write to `/sys`,
+  `/proc`, `/etc` or devices during the audit.
+- Use `pkexec` only in an apply phase the user requested, never to diagnose.
+- Check [references/checklist.md](references/checklist.md) before closing.
 
-## Entrega
+## Delivery
 
-Resume primero el estado general. Después lista hallazgos por prioridad con su
-evidencia, impacto, cambio recomendado y rollback. Termina con pruebas ejecutadas
-y riesgos que no pudieron verificarse en el host actual.
+Summarize the overall state first. Then list findings by priority with
+evidence, impact, recommended change and rollback. End with the checks that ran
+and the risks that could not be verified on the current host.

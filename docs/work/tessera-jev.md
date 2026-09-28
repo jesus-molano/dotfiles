@@ -1,4 +1,13 @@
-# Tessera y motores de decisión: piloto
+# Tessera and decision providers: pilot
+
+> **Current policy (2026-09-28).** After the first real decisions (3 with Jev,
+> final verdict right once), provider decisions are optional and explicit. The
+> normal path is `status` → `index` → `card` plus reading the code. `evaluate`
+> needs per-project consent granted by the user and a blind `agent_choice`;
+> an empty final round is resolved by rule without a provider call, and
+> `tessera.py report` measures agreement and cost. See
+> [the skill](../../ai/skills/tessera/SKILL.md) and [docs/ai.md](../ai.md).
+> The Spanish record below is kept as history.
 
 ## En curso: inicialización y estado por proyecto
 
