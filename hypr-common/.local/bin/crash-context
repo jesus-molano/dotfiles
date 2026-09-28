@@ -38,7 +38,7 @@ done
 [[ "$limit" =~ ^[1-9][0-9]*$ ]] || fail 'El límite debe ser un entero positivo.' 2
 
 coredumpctl_cmd=${CRASH_CONTEXT_COREDUMPCTL:-coredumpctl}
-chatgpt_cmd=${CRASH_CONTEXT_CHATGPT_CMD:-${CRASH_CONTEXT_ORCA_CMD:-hypr-chatgpt}}
+chatgpt_cmd=${CRASH_CONTEXT_CHATGPT_CMD:-hypr-chatgpt}
 state_dir=${CRASH_CONTEXT_STATE_DIR:-"${XDG_STATE_HOME:-$HOME/.local/state}/crash-context"}
 command -v "$coredumpctl_cmd" >/dev/null 2>&1 || fail "Falta $coredumpctl_cmd." 127
 command -v jq >/dev/null 2>&1 || fail 'Falta jq.' 127

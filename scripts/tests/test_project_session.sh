@@ -154,7 +154,11 @@ done
 	exit 1
 }
 
-compatibility_output=$("$project_session" --dry-run orca "$project")
+compatibility_output=$("$project_session" --dry-run chatgpt "$project")
 assert_contains $'DRY-RUN\tai' "$compatibility_output"
+if "$project_session" --dry-run orca "$project" >/dev/null 2>&1; then
+	printf '%s\n' 'FAIL: project-session aceptó la acción retirada orca.' >&2
+	exit 1
+fi
 
 printf '%s\n' 'PASS: project-session resuelve acciones, tareas y preview sin ejecutar aplicaciones'

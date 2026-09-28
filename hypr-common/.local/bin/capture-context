@@ -12,7 +12,7 @@ Opciones:
   --image RUTA       Usa una imagen existente en vez de capturar una región.
   --no-annotate      No abre Satty.
   --no-ocr           No extrae texto.
-  --focus DESTINO    none, ai, claude, codex, chatgpt o nvim (orca: alias antiguo). Predeterminado: none.
+  --focus DESTINO    none, ai, claude, codex, chatgpt o nvim. Predeterminado: none.
   --print            Imprime también el Markdown generado.
   -h, --help         Muestra esta ayuda.
 EOF
@@ -62,7 +62,7 @@ while (($#)); do
 	esac
 done
 
-[[ "$focus" == ai || "$focus" == claude || "$focus" == codex || "$focus" == none || "$focus" == chatgpt || "$focus" == orca || "$focus" == nvim ]] ||
+[[ "$focus" == ai || "$focus" == claude || "$focus" == codex || "$focus" == none || "$focus" == chatgpt || "$focus" == nvim ]] ||
 	fail "Destino de foco no válido: $focus" 2
 
 state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/desktop-context"
@@ -135,7 +135,7 @@ ai)
 claude | codex)
 	hypr-ai --provider "$focus" --focus >/dev/null 2>&1 || true
 	;;
-chatgpt | orca)
+chatgpt)
 	command -v hypr-chatgpt >/dev/null 2>&1 && hypr-chatgpt --focus >/dev/null 2>&1 || true
 	;;
 nvim)

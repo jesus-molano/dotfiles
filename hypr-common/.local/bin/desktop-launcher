@@ -18,8 +18,7 @@ project_roots() {
 	printf '%s\0' \
 		"$HOME/projects" \
 		"$HOME/work" \
-		"$HOME/.dotfiles" \
-		"$HOME/orca/workspaces"
+		"$HOME/.dotfiles"
 }
 
 projects() {
@@ -52,22 +51,11 @@ project_token() {
 project_title() {
 	local path=$1 title
 	title=$(basename -- "$path")
-	if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
-		title=${title#auto-}
-		title=$(printf '%s' "$title" | sed -E \
-			's/-run-[0-9]+-[0-9]{8}T[0-9]{4,6}$//; s/[-_]+/ /g; s/[[:space:]]+/ /g')
-		title=${title^}
-	fi
 	printf '%s' "$title"
 }
 
 project_context() {
-	local path=$1 repository
-	if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
-		repository=$(basename -- "$(dirname -- "$path")")
-		printf 'Orca workspace for %s' "$repository"
-		return
-	fi
+	local path=$1
 	safe_display "$path"
 }
 
@@ -105,7 +93,7 @@ legacy_project_token_for_selection() {
 	local selection=$1 token
 	[[ "$selection" == *$'\t'* ]] || return 1
 	token=${selection%%$'\t'*}
-	[[ "$token" =~ ^(session|ai|claude|codex|chatgpt|orca|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
+	[[ "$token" =~ ^(session|ai|claude|codex|chatgpt|term|nvim|tasks|preview)_[[:alnum:]_-]+_[0-9a-f]{12}$ ]] || return 1
 	printf '%s' "$token"
 }
 
@@ -120,9 +108,6 @@ project_records() {
 			continue
 		fi
 		action_context=$context
-		if [[ "$path" == "$HOME/orca/workspaces/"*/* ]]; then
-			action_context="$title — $context"
-		fi
 		emit_record "$(project_token session "$path")" 'Selected AI session and terminal' "$action_context"
 		emit_record "$(project_token claude "$path")" 'Open Claude and terminal' "$action_context"
 		emit_record "$(project_token codex "$path")" 'Open Codex and terminal' "$action_context"
@@ -148,7 +133,7 @@ find_project() {
 	local selection=$1 action path
 	action=${selection%%_*}
 	case "$action" in
-	session | ai | claude | codex | chatgpt | orca | term | nvim | tasks | preview) ;;
+	session | ai | claude | codex | chatgpt | term | nvim | tasks | preview) ;;
 	*) return 1 ;;
 	esac
 	while IFS= read -r -d '' path; do

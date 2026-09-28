@@ -25,12 +25,10 @@ grep -Fxq $'demo\tOpen selected AI with terminal — ~/work/demo' <<<"$project_l
 	printf 'FAIL: /proj debe publicar una fila con nombre y ruta por repositorio:\n%s\n' "$project_list" >&2
 	exit 1
 }
-grep -Fxq $'Hyprland upstream radar\tOpen selected AI with terminal — Orca workspace for dotfiles' \
-	<<<"$project_list" || {
-	printf 'FAIL: /proj no convirtió el nombre técnico del workspace:\n%s\n' "$project_list" >&2
+[[ "$project_list" != *'upstream'* ]] || {
+	printf 'FAIL: /proj no debe explorar ~/orca/workspaces:\n%s\n' "$project_list" >&2
 	exit 1
 }
-[[ "$project_list" != *'auto-hyprland-upstream-radar-run-1-20260805T1000'* ]]
 
 demo_selection=$(grep '^demo'$'\t' <<<"$project_list")
 run_output=$(HOME="$test_root" PROJECT_SESSION_DRY_RUN=1 "$launcher" run projects "$demo_selection")

@@ -427,8 +427,7 @@ target_is_managed_dotfile() {
 	resolved="$(readlink -f "$target" 2>/dev/null || true)"
 	[[ -n "$resolved" ]] || return 1
 	[[ "$resolved" == "$DOTFILES_DIR"/* ||
-		"$resolved" == "$HOME/.dotfiles"/* ||
-		"$resolved" == "$HOME/orca/workspaces/.dotfiles"/* ]]
+		"$resolved" == "$HOME/.dotfiles"/* ]]
 }
 
 target_has_symlink_parent() {

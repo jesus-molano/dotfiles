@@ -221,7 +221,21 @@ if run apply dracula >/dev/null 2>&1; then
 	printf '%s\n' 'FAIL: no respetó el bloqueo de apariencia.' >&2
 	exit 1
 fi
-flock -u 8
+# Con coma decimal en LC_NUMERIC, flock debe seguir aceptando un plazo fraccionario.
+if locale -a 2>/dev/null | grep -qiE '^es_ES\.utf-?8$'; then
+	if LC_ALL='' LC_NUMERIC=es_ES.UTF-8 run apply dracula >/dev/null 2>"$test_root/locale-busy.err"; then
+		printf '%s\n' 'FAIL: no respetó el bloqueo con LC_NUMERIC=es_ES.UTF-8.' >&2
+		exit 1
+	fi
+	if grep -q 'invalid timeout' "$test_root/locale-busy.err"; then
+		printf '%s\n' 'FAIL: flock depende de LC_NUMERIC.' >&2
+		exit 1
+	fi
+	flock -u 8
+	LC_ALL='' LC_NUMERIC=es_ES.UTF-8 run apply atlas >/dev/null
+else
+	flock -u 8
+fi
 
 python3 - "$repo_root" <<'PY'
 import csv

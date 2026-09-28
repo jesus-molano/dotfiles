@@ -210,7 +210,8 @@ select_remembered_wallpaper() {
 acquire_lock() {
 	install -d -m 700 -- "$state_dir"
 	exec 9>"$lock_file"
-	flock -w "$lock_timeout" 9 || fail 'otra operación de apariencia sigue activa.' 75
+	# flock interpreta -w con LC_NUMERIC; con es_ES rechaza "0.1". Fija la locale C.
+	LC_ALL=C flock -w "$lock_timeout" 9 || fail 'otra operación de apariencia sigue activa.' 75
 }
 
 resolve_appearance_assets() {
