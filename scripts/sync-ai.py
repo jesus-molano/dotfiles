@@ -37,11 +37,17 @@ CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in 
 # Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
-        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)"]
+        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)",
+        "Write(~/.local/share/tessera/projects/*/provider-consent.json)",
+        "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
+        "Write(~/AppData/Local/tessera/projects/*/provider-consent.json)",
+        "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)"]
 
 
 def hook_command(home: Path, platform: str, script: str) -> str:
-    python = "python" if platform == "windows" else "python3"
+    # Windows has no reliable `python` on PATH (py launcher, Store alias), and a hook
+    # that fails to start is ignored, so pin the interpreter that runs this sync.
+    python = f'"{Path(sys.executable).as_posix()}"' if platform == "windows" else "python3"
     return f'{python} "{(home / ".claude/hooks" / script).as_posix()}"'
 
 
@@ -253,6 +259,11 @@ class Sync:
             # Unrelated JSON/TOML fields may change freely; managed fields may not.
             if get(original, route) != item["value"] and get(original, route) != get(desired, route):
                 raise ValueError(f"Conflicto: clave gestionada modificada: {path} ({'.'.join(route)})")
+        owned = {tuple(item["path"]) for item in previous}
+        for route in keys:
+            # Adopting a key the user already set to something else would erase their choice.
+            if route not in owned and get(desired, route) != MISSING and get(original, route) not in (MISSING, get(desired, route)):
+                raise ValueError(f"Conflicto: valor local distinto en clave nueva: {path} ({'.'.join(map(str, route))})")
         projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
         self.next_state[key] = {"keys": projection}
         if original != desired:
@@ -335,7 +346,7 @@ class Sync:
                                  "command": hook_command(self.home, self.platform, "statusline.py")}
         for route, value in keys.items():
             put(desired, route, value)
-        guard = {"matcher": "Bash|PowerShell|Workflow", "hooks": [
+        guard = {"matcher": "Bash|PowerShell|Workflow|Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
         if self.platform == "linux":

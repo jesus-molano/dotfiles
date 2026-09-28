@@ -40,8 +40,8 @@ kept, including foreign hooks, deny rules, models and projects.
 |---|---|---|
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json` | Deny rules still apply in bypass mode. |
-| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow` | Blocks the hard limits deterministically. |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, Tessera `provider-consent.json` writes | Deny rules still apply in bypass mode. |
+| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
@@ -49,12 +49,15 @@ kept, including foreign hooks, deny rules, models and projects.
 | `skillOverrides` | `user-invocable-only` for explicit skills | Hidden from the model, still `/name`. |
 
 A managed entry that you remove by hand is reported as a conflict instead of
-being silently re-added; review it and reconcile it with the source.
+being silently re-added: put the entry back, or change the source in `ai/` or
+`scripts/sync-ai.py` if you no longer want it. A key the sync adopts for the
+first time never overwrites a different value you set yourself (for example
+your own `statusLine`); the apply stops and names the key.
 
 ## Guardrails
 
-`ai/hooks/ai-guard.py` runs before every shell command and every `Workflow`
-call. It exits 2 (block) with a short reason, and never prints the command,
+`ai/hooks/ai-guard.py` runs before every shell command, every `Workflow` call
+and every file write or edit. It exits 2 (block) with a short reason, and never prints the command,
 file contents or environment. It blocks only what is never part of a normal task:
 
 | Blocked | Rule it enforces |
@@ -62,14 +65,20 @@ file contents or environment. It blocks only what is never part of a normal task
 | `git push` with force, `--force-with-lease`, delete, mirror, `--tags`, `--all`, `+ref`, `:ref` or several refspecs | Publish one verified ref, never rewrite or delete remote history. |
 | `stow` with a glob of packages | Never run Stow over every directory. |
 | `rm -r` of `/`, `~`, `$HOME` or the dotfiles checkout | No catastrophic deletion. |
-| Any command naming a `.env` file (templates `*.example`, `*.template`, `*.sample` allowed); `op read`, `op inject`, `op item`, `op document` | Secrets only through `with-secrets`. |
-| `tessera.py consent` | Only the user grants provider consent. |
+| Commands that read a `.env` file (templates `*.example`, `*.template`, `*.sample`, `echo`, `git check-ignore` and copying a template to `.env` are allowed); `op read`, `op inject`, `op item`, `op document` | Secrets only through `with-secrets`. |
+| `tessera.py consent` and any write to `provider-consent.json` | Only the user grants provider consent. |
 | `Workflow` tool | Multi-agent workflows only on request. Start a session with `AI_ALLOW_WORKFLOW=1 claude` to allow them. |
 
-A normal `git push origin <branch>` is allowed: the rule to show the exact OID
-and ask for authorization before publishing stays in the global rules. The
-guard is a safety net, not a sandbox: a determined script can still reach a
-secret, so keep secrets out of the environment and use `with-secrets`.
+The guard looks through wrappers (`sudo`, `env`, `timeout`, `nohup`, `xargs`),
+nested shells (`bash -c`, `eval`), command substitutions and chained commands,
+and ignores redirections and heredoc bodies, so `git push -u origin feat 2>&1`
+works. A normal `git push origin <branch>` is allowed: showing the exact OID and
+asking for authorization before publishing stays in the global rules.
+
+Known limits: the guard is a safety net against mistakes, not a sandbox, and
+code running as your user can still reach anything you can. PowerShell commands
+are parsed with POSIX quoting rules. The `Read(**/.env.*)` deny rule also hides
+`.env.example` templates from the Read tool; read them through the shell.
 
 ## Token efficiency
 
@@ -176,7 +185,8 @@ cd 'C:\Users\you\dotfiles'
 
 The default deploys Claude only; `-Clients both` also keeps an installed Codex.
 Each skill is copied and verified; a later local edit blocks its overwrite.
-Hooks run with `python`; the status line and `ai-guard` need Python on PATH.
+Hooks and the status line run with the absolute path of the Python that ran
+`ai-setup.ps1`; after moving or upgrading Python, run `-Mode apply` again.
 `cachyos-host-audit` and the Stop notification are Linux-only. In a new session
 check `/memory`, `/skills`, `/agents`, `/hooks`, `/permissions` and `/mcp`.
 This GUI check must happen on the work PC; Linux tests do not replace it.

@@ -676,7 +676,8 @@ def require_provider_consent(repo, provider_id, endpoint):
     """Sending cards off the machine needs a per-project grant made by the user.
 
     The grant lives in local storage, names the exact endpoint and is written by
-    `consent`, which the agent guard blocks: the agent cannot approve itself.
+    `consent`. The ai-guard hook and deny rules stop an agent from running that
+    command or writing the file; this is a guardrail, not a security boundary.
     """
     path = consent_path(repo)
     grant = load(path).get(provider_id) if path.is_file() else None
@@ -719,7 +720,9 @@ def catalog_index(repo):
 
 
 def catalog_cards(repo, ids):
-    catalog = load(storage_paths(repo)["catalog"])
+    path = Path(storage_paths(repo)["catalog"])
+    require(path.is_file(), "Proyecto sin catálogo; consulta status")
+    catalog = load(path)
     found = {entry["id"]: entry for entry in catalog["entries"] if entry["id"] in ids}
     require(set(ids) <= set(found), f"Ids desconocidos: {sorted(set(ids) - set(found))}")
     return {"entries": [{k: v for k, v in found[i].items() if k != "tests"} for i in ids]}

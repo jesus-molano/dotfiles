@@ -61,7 +61,8 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
         self.assertTrue((self.home / ".claude/hooks/ai-guard.py").is_file())
         self.assertIn("Read(**/.env)", settings["permissions"]["deny"])
-        self.assertTrue(settings["statusLine"]["command"].startswith("python "))
+        self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
+        self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
         self.assertNotIn("model", settings)
         self.assertEqual(settings["permissions"]["defaultMode"], "bypassPermissions")
         self.assertEqual(self.build().operations, [])
@@ -352,6 +353,14 @@ class AISyncTest(unittest.TestCase):
         self.json_write(".claude/settings.json", settings)
         with self.assertRaisesRegex(ValueError, "entrada gestionada retirada"):
             self.build()
+
+    def test_new_key_never_overwrites_a_different_local_value(self):
+        self.json_write(".claude/settings.json", {"statusLine": {"type": "command", "command": "my-status"}})
+        with self.assertRaisesRegex(ValueError, "clave nueva"):
+            self.build()
+        self.json_write(".claude/settings.json", {})
+        self.build().apply()
+        self.assertEqual(self.build().operations, [])
 
     def test_entries_no_longer_wanted_are_removed_and_legacy_notify_state_migrates(self):
         self.build("linux").apply()

@@ -63,6 +63,30 @@ class GuardTest(unittest.TestCase):
         self.assertBlocked("python3 ai/skills/tessera/scripts/tessera.py consent --repo . --provider typesafe",
                            "consent")
 
+    def test_redirections_heredocs_and_templates_are_not_false_positives(self):
+        for command in ("git push -u origin feat 2>&1", "git push -u origin feat 2>&1 | tail -5",
+                        "git push origin feat > /tmp/log", "git push origin feat &>/dev/null",
+                        "cp .env.example .env", "echo '.env' >> .gitignore", "git check-ignore -q .env",
+                        "git commit -F - <<'EOF'\nDon't push this yet; rm it later\nEOF",
+                        "rm -rf node_modules", "cat .envrc", "grep -rn process.env src"):
+            self.assertAllowed(command)
+
+    def test_wrapped_and_nested_commands_are_still_checked(self):
+        for command in ("bash -c 'git push --force origin main'", "timeout 60 git push --force",
+                        "x=`git push -f`", "true# ; git push --force origin main", 'eval "git push --tags"',
+                        "nohup git push --mirror &", "$(git push --force)"):
+            self.assertBlocked(command, "git push")
+        self.assertBlocked("rm -rf ~/.dotfiles/", "recursive deletion")
+        self.assertBlocked('sh -c "cat .env"', "secret files")
+
+    def test_consent_file_cannot_be_written_by_the_agent(self):
+        self.assertBlocked("python3 -X utf8 t/tessera.py consent --repo .", "consent")
+        self.assertBlocked("echo {} > ~/.local/share/tessera/projects/x/provider-consent.json", "consent")
+        event = {"tool_name": "Write", "tool_input": {"file_path": "/h/.local/share/tessera/projects/k/provider-consent.json"}}
+        self.assertEqual(run("ai-guard.py", event).returncode, 2)
+        event["tool_input"]["file_path"] = "/h/.local/share/tessera/projects/k/catalog.json"
+        self.assertEqual(run("ai-guard.py", event).returncode, 0)
+
     def test_workflow_needs_explicit_opt_in(self):
         event = {"tool_name": "Workflow", "tool_input": {"script": "x"}}
         self.assertEqual(run("ai-guard.py", event).returncode, 2)
