@@ -13,12 +13,15 @@ from pathlib import Path
 import tomllib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from ai_sources import EXPLICIT_SKILLS, IMPLICIT_SKILLS  # noqa: E402
+from ai_sources import EXPLICIT_SKILLS, IMPLICIT_SKILLS, USER_SKILLS  # noqa: E402
 
 FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 MARKDOWN_LINK = re.compile(r"!?\[[^]]*]\(([^)\s]+)(?:\s+[^)]*)?\)")
 YAML_KEY = re.compile(r"^( {2})([a-z_]+):\s*(.*)$")
 SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+# Claude Code frontmatter accepted in shared skills (verified: the Codex parser
+# ignores unknown keys). Invocation fields must match the routing inventory.
+CLAUDE_FIELDS = {"disable-model-invocation": {"true"}, "context": {"fork"}}
 MAX_CATALOG_SKILLS = 20
 MAX_DESCRIPTION_WORDS = 700
 # Las instalaciones normales enlazan una carpeta de skill por entrada. El límite
@@ -85,10 +88,18 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
                 "frontmatter debe contener solo pares simples name/description"
             )
         key, value = line.split(":", 1)
-        if key not in {"name", "description"} or key in values:
+        if key in values:
+            raise ValueError(f"clave de frontmatter repetida: {key}")
+        if key in CLAUDE_FIELDS:
+            # Claude-only fields; Codex ignores unknown frontmatter keys.
+            if value.strip() not in CLAUDE_FIELDS[key]:
+                raise ValueError(f"valor no admitido para {key}")
+            values[key] = value.strip()
+            continue
+        if key not in {"name", "description"}:
             raise ValueError(f"clave de frontmatter no permitida: {key}")
         values[key] = parse_yaml_string(value, key)
-    if set(values) != {"name", "description"} or not all(values.values()):
+    if not {"name", "description"} <= set(values) or not values.get("name") or not values.get("description"):
         raise ValueError("frontmatter requiere name y description no vacíos")
     if not SKILL_NAME.fullmatch(values["name"]) or len(values["name"]) > 64:
         raise ValueError("name debe ser kebab-case válido de hasta 64 caracteres")
@@ -366,6 +377,10 @@ def main() -> int:
                 raise ValueError("la skill requiere agents/openai.yaml con routing")
             if skill.name in EXPLICIT_SKILLS and implicit is not False:
                 raise ValueError("la skill requiere invocación explícita")
+            if (skill.name in USER_SKILLS) != ("disable-model-invocation" in frontmatter):
+                raise ValueError(
+                    "disable-model-invocation: true debe marcar exactamente las skills de usuario"
+                )
             if skill.name in IMPLICIT_SKILLS and implicit is not True:
                 raise ValueError(
                     "la disciplina de referencia debe permitir invocación implícita"

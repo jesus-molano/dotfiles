@@ -85,7 +85,9 @@ Each card contains:
 
 Optional `supporting_files` lists token, style or manifest paths for local
 inspection. `derived.json` keeps the full files and hashes. The provider gets
-cards, references and curation state, not files. Paths grant no access: no
+cards, references and curation state, not files. On the wire each card keeps
+every curated field but at most three usage references plus `usage_count`; the
+local context keeps the complete card. Paths grant no access: no
 remote engine can open them. If a fact needed to decide is missing, the agent
 inspects the source and enriches the contract or constraints before preparing
 another run. Cards are never trimmed and source is never uploaded automatically.
@@ -163,8 +165,8 @@ responsibilities needs those decisions made explicit; the verdict does not
 validate complete plans or multi-target selection.
 
 The normalized output keeps `action`, `primary`, `decided_by` (`provider` or
-`coordinator`), provenance, context and request hashes and the revision, plus
-`agent_choice` and `agreement` when present. Distribution and confidence, when
+`coordinator`), provenance, context and request hashes and the revision, the
+first-round `batch_proposals`, plus `agent_choice` and `agreement` when present. Distribution and confidence, when
 the provider offers them, are evidence, never an arbitrary action threshold.
 `agent_explanation: null` and `review_status: pending` keep the pending review
 visible. Later explanations and references belong to the agent that writes

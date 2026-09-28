@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 
 import tomllib
-from ai_sources import EXPLICIT_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
+from ai_sources import NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
 
 MISSING = {"$absent": True}
 MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
@@ -26,14 +26,18 @@ MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
 NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
 CLAUDE_KEYS = {
     ("language",): "spanish",
+    # Main agent executes and reasons: Opus (the alias follows the latest Opus,
+    # Opus 5.5 today). Reading roles use Haiku/Sonnet in their own role files.
+    ("model",): "opus",
     ("permissions", "defaultMode"): "bypassPermissions",
     ("attribution", "commit"): "",
     ("attribution", "pr"): "",
     ("attribution", "sessionUrl"): False,
     ("pluginConfigs", "agents-md@builtin", "options", "instructionFiles"): "claude-md-and-agents-md",
 }
-# Explicit skills stay invocable as /name but are hidden from the model.
-CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in sorted(EXPLICIT_SKILLS)})
+# User skills are hidden from the model; named skills show only their name.
+CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in sorted(USER_SKILLS)})
+CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAMED_SKILLS)})
 # Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
@@ -43,12 +47,24 @@ DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Write(~/AppData/Local/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)"]
 
+# Rules for the auto-mode classifier. Inert under bypassPermissions; they make a
+# switch to `auto` safe from the first session. "$defaults" keeps the built-ins.
+AUTO_SOFT_DENY = [
+    "$defaults",
+    "Pushing to a remote unless the user authorized that exact repository, branch and commit in this conversation",
+    "Reading, printing or copying secret files such as .env or credential stores, or revealing secret values",
+    "Deleting, overwriting or formatting data outside the current task, or without confirming the exact target",
+    "Running GNU Stow over every package, or changing /etc, boot, Btrfs, GPU drivers or system services without an explicit request",
+    "Creating, editing or commenting on issues or pull requests in Linear or GitHub without explicit authorization",
+    "Sending project source or catalog data to an external service the task has not already been authorized to use",
+]
 
-def hook_command(home: Path, platform: str, script: str) -> str:
+
+def hook_command(home: Path, platform: str, script: str, folder: str = ".claude/hooks") -> str:
     # Windows has no reliable `python` on PATH (py launcher, Store alias), and a hook
     # that fails to start is ignored, so pin the interpreter that runs this sync.
     python = f'"{Path(sys.executable).as_posix()}"' if platform == "windows" else "python3"
-    return f'{python} "{(home / ".claude/hooks" / script).as_posix()}"'
+    return f'{python} "{(home / folder / script).as_posix()}"'
 
 
 def encode(data: bytes) -> str:
@@ -349,6 +365,7 @@ class Sync:
         guard = {"matcher": "Bash|PowerShell|Workflow|Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
+        wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
         if self.platform == "linux":
             wanted.append((("hooks", "Stop"), NOTIFY))
         entries = self.managed_entries(path, original, desired, wanted)
@@ -399,6 +416,18 @@ class Sync:
                 metadata_keys[route] = hashlib.sha256(content.encode()).hexdigest()
                 put(desired_meta, route, metadata_keys[route])
             self.merged(path, original_meta, desired_meta, metadata_keys, json_text(desired_meta))
+        # Same guard as Claude: Codex hooks.json uses the same schema and stdin
+        # contract. Codex runs a new user hook only after it is trusted in /hooks.
+        guard_script = hook_scripts(self.root)["ai-guard.py"]
+        self.asset(base / "hooks/ai-guard.py", file_value(guard_script))
+        path = base / "hooks.json"
+        _, original = self.read_config(path)
+        desired = copy.deepcopy(original)
+        guard = {"matcher": "Bash|apply_patch", "hooks": [{"type": "command", "timeout": 10,
+                 "command": hook_command(self.home, self.platform, "ai-guard.py", ".codex/hooks")}]}
+        entries = self.managed_entries(path, original, desired, [(("hooks", "PreToolUse"), guard)])
+        self.merged(path, original, desired, {}, json_text(desired))
+        self.next_state[str(path.relative_to(self.home))]["entries"] = entries
         mod = runpy.run_path(str(self.root / "scripts/sync-codex-config.py"))
         path = base / "config.toml"
         raw, original = self.read_config(path, "toml")

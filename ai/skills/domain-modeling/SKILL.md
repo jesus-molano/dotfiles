@@ -1,6 +1,7 @@
 ---
 name: domain-modeling
 description: Model ambiguous business concepts, invariants, lifecycle states and boundaries before software design. Use when the user asks for a domain model or unresolved business rules block a decision; not for routine implementation.
+disable-model-invocation: true
 ---
 
 # Domain Modeling

@@ -11,6 +11,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parents[1]
 CHECKER = SCRIPTS / "check-skills.py"
 CHECKS = runpy.run_path(str(CHECKER), run_name="check_skills_test")
+USER_SKILLS = CHECKS["USER_SKILLS"]
 
 
 def run_checker(
@@ -53,6 +54,10 @@ def roots(root: Path, name: str = "example") -> tuple[Path, Path, Path]:
 
 
 def write_metadata(skill: Path, *, implicit: bool) -> None:
+    if not implicit and skill.name in USER_SKILLS:
+        document = skill / "SKILL.md"
+        document.write_text(document.read_text(encoding="utf-8").replace(
+            "\n---\n", "\ndisable-model-invocation: true\n---\n", 1), encoding="utf-8")
     metadata = skill / "agents"
     metadata.mkdir()
     (metadata / "openai.yaml").write_text(
@@ -231,6 +236,28 @@ class CheckCodexSkillsTest(unittest.TestCase):
             write_metadata(skill, implicit=False)
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
+
+    def test_explicit_skill_requires_claude_invocation_field(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "to-tickets")
+            write_metadata(skill, implicit=False)
+            document = skill / "SKILL.md"
+            document.write_text(document.read_text(encoding="utf-8").replace(
+                "disable-model-invocation: true\n", ""), encoding="utf-8")
+            checked = run_checker(skills, agents)
+            self.assertNotEqual(checked.returncode, 0)
+            self.assertIn("disable-model-invocation", checked.stderr)
+
+    def test_claude_fields_accept_only_known_values(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
+            document = skill / "SKILL.md"
+            text = document.read_text(encoding="utf-8")
+            document.write_text(text.replace("\n---\n", "\ncontext: fork\n---\n", 1), encoding="utf-8")
+            self.assertEqual(run_checker(skills, agents).returncode, 0)
+            document.write_text(text.replace("\n---\n", "\ncontext: inline\n---\n", 1), encoding="utf-8")
+            self.assertNotEqual(run_checker(skills, agents).returncode, 0)
 
     def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

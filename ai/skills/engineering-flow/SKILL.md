@@ -1,6 +1,6 @@
 ---
 name: engineering-flow
-description: Implement a scoped feature, bug fix, refactor or ready ticket from inspection through verification and a concise handoff. Use for any implementation request; do not use for research-only, review-only or diagnosis-only requests.
+description: Load first for any request to implement, add, build, change, refactor or fix code or configuration, from inspection through verification and handoff. Not for research-only, review-only or diagnosis-only requests.
 ---
 
 # Engineering Flow

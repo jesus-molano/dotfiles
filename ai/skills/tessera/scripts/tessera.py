@@ -45,7 +45,7 @@ def decoded(data):
         result = {}
         for key, value in pairs:
             if key in result:
-                raise ValueError("Clave JSON duplicada")
+                raise ValueError("Duplicate JSON key")
             result[key] = value
         return result
     return json.loads(data, object_pairs_hook=unique)
@@ -66,7 +66,7 @@ def require(condition, message):
 
 def fields(value, required, optional=()):
     require(isinstance(value, dict) and set(required) <= set(value)
-            and set(value) <= set(required) | set(optional), "Campos ausentes o desconocidos")
+            and set(value) <= set(required) | set(optional), "Missing or unknown fields")
 
 
 def write_private(path, value):
@@ -84,18 +84,18 @@ def text_field(value):
 
 
 def local_path(root, name):
-    require(isinstance(name, str) and "\\" not in name, "Ruta relativa POSIX requerida")
+    require(isinstance(name, str) and "\\" not in name, "A relative POSIX path is required")
     parts = PurePosixPath(name).parts
     require(parts and not PurePosixPath(name).is_absolute()
             and all(p not in ("..", ".git") and not p.startswith(".env") for p in parts),
-            "Ruta fuera del contrato o privada")
-    require(protected_file(name, "100644") is None, "Ruta privada fuera de evidencia")
-    require(not is_test_path(name), "Tests fuera de Tessera: elimina esta referencia del catálogo")
+            "Path outside the contract or private")
+    require(protected_file(name, "100644") is None, "Private path excluded from evidence")
+    require(not is_test_path(name), "Tests are outside Tessera: remove this reference from the catalog")
     path = root
     for part in parts:
         path = path / part
-        require(not path.is_symlink(), "Enlaces no admitidos en evidencia")
-    require(path.resolve().is_relative_to(root.resolve()), "Ruta fuera del proyecto")
+        require(not path.is_symlink(), "Links are not allowed in evidence")
+    require(path.resolve().is_relative_to(root.resolve()), "Path outside the project")
     return path
 
 
@@ -127,8 +127,8 @@ def require_external(path):
     resolved = Path(path).resolve()
     require(not any((parent / ".git").exists() or parent.name == ".git"
                     for parent in (resolved, *resolved.parents)),
-            "Almacenamiento dentro de un repositorio Git; usa rutas locales externas. "
-            "--allow-repo-storage requiere autorización explícita para compartir esos archivos")
+            "Storage inside a Git repository; use external local paths. "
+            "--allow-repo-storage needs explicit authorization to share those files")
 
 
 def private_parents(path):
@@ -158,14 +158,14 @@ def require_private_input(path):
         info = candidate.stat()
         if info.st_uid == os.getuid() and info.st_mode & 0o077 == 0:
             return
-    raise ValueError("Catálogo/tarea accesible por otros usuarios; usa archivo 0600 o carpeta privada 0700")
+    raise ValueError("Catalog/task readable by other users; use a 0600 file or a private 0700 folder")
 
 
 def require_clean(repo):
     try:
         git(repo, "diff", "--quiet", "--no-ext-diff", "HEAD", "--")
     except subprocess.CalledProcessError:
-        raise ValueError("Checkout con cambios versionados; prepara evidencia de una revisión limpia") from None
+        raise ValueError("Checkout has tracked changes; prepare evidence from a clean revision") from None
 
 
 INVENTORY_POLICY = 2
@@ -215,7 +215,7 @@ def project_snapshot(repo):
     dirty = set(git(repo, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD").decode().split("\0"))
     dirty.update(git(repo, "ls-files", "--others", "--exclude-standard", "-z").decode().split("\0"))
     require(git(repo, "rev-parse", "HEAD").decode().strip() == revision,
-            "El checkout cambió durante el inventario; repite la operación")
+            "The checkout changed during the inventory; repeat the operation")
     return {"revision": revision, "files": files, "checkout_changes": sorted(dirty - {""})}
 
 
@@ -269,7 +269,7 @@ def project_status(repo):
               "protected_paths": protected_paths, "removed_paths": [], "reasons": []}
     if path.exists():
         try:
-            require(not path.is_symlink(), "Inventario enlazado; conserva e inspecciona el archivo")
+            require(not path.is_symlink(), "Linked inventory; keep and inspect the file")
             raw = path.read_bytes()
             state = decoded(raw)
             result["inventory_sha256"] = digest(raw)
@@ -289,7 +289,7 @@ def project_status(repo):
                 protected = sum(item["review"] is not None for item in current.values())
                 final = state.get("finalized")
                 catalog = Path(paths["catalog"])
-                require(not catalog.is_symlink(), "Catálogo enlazado; inspecciona su ubicación")
+                require(not catalog.is_symlink(), "Linked catalog; inspect its location")
                 same_files = not removed and set(current) == set(previous) and all(
                     all(item[key] == previous[name][key] for key in ("oid", "mode")) for name, item in current.items())
                 ready = (not pending and same_files and isinstance(final, dict)
@@ -324,14 +324,14 @@ def inventory_transaction(repo):
     root, path = Path(paths["root"]), Path(paths["inventory"])
     private_parents(root)
     require_private_input(root)
-    require(not path.is_symlink(), "Inventario enlazado; conserva e inspecciona el archivo")
+    require(not path.is_symlink(), "Linked inventory; keep and inspect the file")
     lock = root / "inventory.lock"
     descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     os.close(descriptor)
     try:
         before = path.read_bytes() if path.exists() else None
         snapshot = project_snapshot(repo)
-        require(not snapshot["checkout_changes"], "Checkout con cambios; resuélvelos antes de catalogar")
+        require(not snapshot["checkout_changes"], "Checkout has changes; resolve them before cataloguing")
         yield paths, snapshot, before
     finally:
         lock.unlink()
@@ -339,8 +339,8 @@ def inventory_transaction(repo):
 
 def save_inventory(repo, paths, snapshot, before, state):
     path = Path(paths["inventory"])
-    require(project_snapshot(repo) == snapshot, "El proyecto cambió; repite la operación")
-    require((path.read_bytes() if path.exists() else None) == before, "El inventario cambió concurrentemente")
+    require(project_snapshot(repo) == snapshot, "The project changed; repeat the operation")
+    require((path.read_bytes() if path.exists() else None) == before, "The inventory changed concurrently")
     data = encoded(state)
     if data == before:
         return
@@ -368,7 +368,7 @@ def scan_project(repo, *, full=False, initialize=False):
         if initialize and old is not None:
             return project_status(repo)
         valid = old is not None and inventory_valid(old, paths, allow_legacy=True) and inventory_baseline_available(repo, old)
-        require(old is None or valid or full, "Se necesita scan --full; se conservará el inventario anterior")
+        require(old is None or valid or full, "scan --full is needed; the previous inventory is kept")
         files = {name: dict(item) for name, item in snapshot["files"].items()}
         if valid and not full:
             for name, item in files.items():
@@ -383,13 +383,13 @@ def scan_project(repo, *, full=False, initialize=False):
 
 
 def current_inventory(repo, paths, snapshot, before):
-    require(before is not None, "Inicializa el inventario antes de revisar")
+    require(before is not None, "Initialize the inventory before reviewing")
     state = decoded(before)
     require(inventory_valid(state, paths) and inventory_baseline_available(repo, state),
-            "Se necesita scan --full")
+            "scan --full is needed")
     require(state["revision"] == snapshot["revision"] and set(state["files"]) == set(snapshot["files"])
             and all(all(state["files"][name][key] == item[key] for key in ("oid", "mode"))
-                    for name, item in snapshot["files"].items()), "El inventario cambió; ejecuta scan")
+                    for name, item in snapshot["files"].items()), "The inventory changed; run scan")
     return state
 
 
@@ -398,21 +398,21 @@ def review_project(repo, batch_path):
     require_private_input(batch_path)
     batch = load(batch_path)
     fields(batch, {"schema", "revision", "inventory_sha256", "files"})
-    require(batch["schema"] == 1 and isinstance(batch["files"], list), "Tanda inválida")
+    require(batch["schema"] == 1 and isinstance(batch["files"], list), "Invalid batch")
     with inventory_transaction(repo) as (paths, snapshot, before):
         state = current_inventory(repo, paths, snapshot, before)
         require(batch["revision"] == snapshot["revision"] and batch["inventory_sha256"] == digest(before),
-                "La tanda corresponde a otra revisión/inventario; lee status y revisa los cambios")
+                "The batch belongs to another revision/inventory; read status and review the changes")
         seen = set()
         for review in batch["files"]:
             fields(review, {"path", "kind", "reason"})
             name = review["path"]
             require(isinstance(name, str) and name in state["files"] and name not in seen,
-                    "Ruta ausente o repetida en la tanda")
+                    "Path missing or repeated in the batch")
             seen.add(name)
-            require(not protected_file(name, state["files"][name]["mode"]), "No se revisan contenidos protegidos")
+            require(not protected_file(name, state["files"][name]["mode"]), "Protected contents are never reviewed")
             require(review["kind"] in {"catalogued", "supporting", "excluded"} and text_field(review["reason"]),
-                    "Clasificación y razón explícita requeridas")
+                    "Classification and an explicit reason are required")
             state["files"][name]["review"] = {key: review[key] for key in ("kind", "reason")}
         save_inventory(repo, paths, snapshot, before, state)
     return project_status(repo)
@@ -423,21 +423,21 @@ def finalize_project(repo):
     with inventory_transaction(repo) as (paths, snapshot, before):
         state = current_inventory(repo, paths, snapshot, before)
         require(all(item["review"] is not None for item in state["files"].values()),
-                "Hay archivos pendientes de revisión")
+                "Files are still pending review")
         catalog_path = Path(paths["catalog"])
         require_external(catalog_path)
-        require(not catalog_path.is_symlink(), "Catálogo enlazado; inspecciona su ubicación")
+        require(not catalog_path.is_symlink(), "Linked catalog; inspect its location")
         require_private_input(catalog_path)
         catalog_before = catalog_path.read_bytes()
         catalog = decoded(catalog_before)
         evidence = build_evidence(catalog, repo)
-        require(evidence["curation"]["status"] == "current", "Curación no vigente; revisa fichas y reviewed_revision")
+        require(evidence["curation"]["status"] == "current", "Curation is not current; review the cards and reviewed_revision")
         classified = {name for name, item in state["files"].items() if item["review"]["kind"] == "catalogued"}
         require(classified == {entry["source"] for entry in catalog["entries"]},
-                "La clasificación y las fuentes del catálogo no coinciden")
+                "The classification and the catalog sources do not match")
         require(all(state["files"].get(name, {}).get("review", {}).get("kind") in {"catalogued", "supporting"}
-                    for name in evidence["files"]), "Evidencia excluida o sin revisión en el inventario")
-        require(catalog_path.read_bytes() == catalog_before, "El catálogo cambió concurrentemente")
+                    for name in evidence["files"]), "Evidence excluded or unreviewed in the inventory")
+        require(catalog_path.read_bytes() == catalog_before, "The catalog changed concurrently")
         state["finalized"] = {"revision": snapshot["revision"], "catalog_sha256": digest(catalog_before),
                               "files_sha256": digest(encoded(state["files"]))}
         save_inventory(repo, paths, snapshot, before, state)
@@ -457,7 +457,7 @@ def skeleton_project(repo, output=None):
             output = directory / f"{stem}-{number}.json"
     output = Path(output).resolve()
     require_external(output)
-    require(not output.exists(), "El esqueleto ya existe; indica otro --output")
+    require(not output.exists(), "The skeleton already exists; pass another --output")
     private_parents(output.parent)
     write_private(output, skeleton)
     entries = skeleton["entries"]
@@ -475,7 +475,7 @@ def catalog_changes(catalog_path, repo):
     """
     catalog = load(catalog_path)
     scopes, entries = catalog["scope"], catalog["entries"]
-    require(isinstance(scopes, list) and isinstance(entries, list), "Catálogo inválido")
+    require(isinstance(scopes, list) and isinstance(entries, list), "Invalid catalog")
     references = set(scopes) | set(catalog.get("supporting_files", []))
     entry_paths = {}
     for entry in entries:
@@ -514,7 +514,7 @@ def catalog_changes(catalog_path, repo):
     added, removed = sorted(inventory - sources), sorted(sources - inventory)
     needs_review = not valid_base or bool(affected or added or removed)
     require(git(repo, "rev-parse", "HEAD").decode().strip() == revision,
-            "El checkout cambió durante la inspección; repite changes")
+            "The checkout changed during the inspection; run changes again")
     return {"revision": revision, "reviewed_revision": reviewed,
             "status": "needs_review" if needs_review else "current",
             "reason": "missing_or_unavailable_baseline" if not valid_base else "source_comparison",
@@ -530,30 +530,30 @@ def build_evidence(catalog, repo):
     fields(catalog, {"schema", "project", "scope", "entries"},
            {"coverage", "reviewed_revision", "reviewed_on", "supporting_files"})
     require(catalog.get("schema") == 1 and text_field(catalog.get("project")),
-            "Catálogo schema=1 y project requeridos")
+            "Catalog schema=1 and project are required")
     scopes, entries = catalog.get("scope"), catalog.get("entries")
-    require(isinstance(scopes, list), "scope debe enumerar archivos/directorios")
-    require(isinstance(entries, list), "entries debe contener fichas")
+    require(isinstance(scopes, list), "scope must list files/directories")
+    require(isinstance(entries, list), "entries must contain cards")
     revision = git(repo, "rev-parse", "HEAD").decode().strip()
     require_clean(repo)
     tracked = set(git(repo, "ls-files", "-z").decode().split("\0")) - {""}
     inventory = set()
     for scope in scopes:
         path = local_path(repo, scope)
-        require(path.exists(), "Ámbito inexistente")
+        require(path.exists(), "Scope path does not exist")
         names = [scope] if path.is_file() else [p.relative_to(repo).as_posix()
                                                for p in path.rglob("*") if p.is_file()]
         for name in names:
             if is_test_path(name):
                 continue
             local_path(repo, name)
-            require(name in tracked, "Candidato sin versionar; revisa el inventario")
+            require(name in tracked, "Untracked candidate; review the inventory")
             inventory.add(name)
     ids, sources, files, usages = set(), set(), {}, []
 
     def capture(name):
         path = local_path(repo, name)
-        require(name in tracked and path.is_file(), "Evidencia no versionada o inexistente")
+        require(name in tracked and path.is_file(), "Evidence untracked or missing")
         if name not in files:
             content = path.read_bytes()
             files[name] = {"sha256": digest(content), "text": content.decode("utf-8-sig")}
@@ -564,33 +564,33 @@ def build_evidence(catalog, repo):
                {"name", "tags", "usage_gap", "tests"})
         identity = entry.get("id")
         require(isinstance(identity, str) and re.fullmatch(r"[a-z][a-z0-9-]*", identity)
-                and identity not in ids, "ID inválido o duplicado")
+                and identity not in ids, "Invalid or duplicate ID")
         ids.add(identity)
         for key in ("kind", "summary", "contract", "source"):
-            require(text_field(entry.get(key)), f"Ficha sin {key}")
-        require("name" not in entry or text_field(entry["name"]), "name inválido")
+            require(text_field(entry.get(key)), f"Card without {key}")
+        require("name" not in entry or text_field(entry["name"]), "Invalid name")
         require("tags" not in entry or isinstance(entry["tags"], list)
-                and all(text_field(tag) for tag in entry["tags"]), "tags inválidas")
+                and all(text_field(tag) for tag in entry["tags"]), "Invalid tags")
         require(isinstance(entry.get("constraints"), list)
-                and all(text_field(v) for v in entry["constraints"]), "constraints inválidas")
-        require("usage_gap" not in entry or text_field(entry["usage_gap"]), "usage_gap inválido")
+                and all(text_field(v) for v in entry["constraints"]), "Invalid constraints")
+        require("usage_gap" not in entry or text_field(entry["usage_gap"]), "Invalid usage_gap")
         source = entry["source"]
-        require(source not in sources, "Fuente duplicada; agrupa sus exports en una ficha")
+        require(source not in sources, "Duplicate source; group its exports into one card")
         sources.add(source)
         capture(source)
         require(isinstance(entry.get("usages"), list) and (entry["usages"] or text_field(entry.get("usage_gap"))),
-                "Falta uso real o usage_gap explícito tras buscar consumidores")
+                "A real usage or an explicit usage_gap after searching consumers is required")
         for use in entry["usages"]:
             fields(use, {"path", "start", "end"})
             lines = capture(use["path"])
             start, end = use.get("start"), use.get("end")
             require(type(start) is int and type(end) is int and 1 <= start <= end <= len(lines),
-                    "Rango de uso inválido")
+                    "Invalid usage range")
             usages.append({"entry": identity, **use})
         # Legacy schema-1 catalogs may still list tests. Never resolve/read them.
-        require(isinstance(entry.get("tests", []), list), "tests antiguo debe ser una lista")
-    require(sources == inventory, "Cobertura incompleta: fichas y ámbito difieren")
-    require(isinstance(catalog.get("supporting_files", []), list), "supporting_files debe ser una lista")
+        require(isinstance(entry.get("tests", []), list), "Legacy tests must be a list")
+    require(sources == inventory, "Incomplete coverage: cards and scope differ")
+    require(isinstance(catalog.get("supporting_files", []), list), "supporting_files must be a list")
     for name in catalog.get("supporting_files", []):
         capture(name)
     # Evidence is an immutable snapshot of a clean checkout, not a claim about HEAD
@@ -599,12 +599,12 @@ def build_evidence(catalog, repo):
     require(all(digest(local_path(repo, name).read_bytes()) == value["sha256"]
                 for name, value in files.items())
             and git(repo, "rev-parse", "HEAD").decode().strip() == revision,
-            "El checkout cambió durante la captura; prepara otro snapshot")
+            "The checkout changed during the capture; prepare another snapshot")
     reviewed = catalog.get("reviewed_revision")
     require(reviewed is None or is_git_oid(reviewed),
-            "reviewed_revision debe ser un OID completo")
+            "reviewed_revision must be a full OID")
     for name in ("coverage", "reviewed_on"):
-        require(name not in catalog or text_field(catalog[name]), "Metadata de revisión inválida")
+        require(name not in catalog or text_field(catalog[name]), "Invalid review metadata")
     curation = "unverified"
     if reviewed:
         try:
@@ -623,11 +623,13 @@ def build_context(catalog, evidence, task):
     require(set(task) == {"id", "requirement", "acceptance"}
             and text_field(task["id"]) and text_field(task["requirement"])
             and isinstance(task["acceptance"], list) and task["acceptance"]
-            and all(text_field(v) for v in task["acceptance"]), "Tarea inválida")
+            and all(text_field(v) for v in task["acceptance"]), "Invalid task")
+    # The card itself travels in state; repeating its summary in three option
+    # descriptions only inflated every request.
     options = {
         f"{action}:{entry['id']}": {
             "action": action, "primary": entry["id"],
-            "description": f"{meaning} Primary: {entry['id']}. {entry['summary']}"}
+            "description": f"{meaning} Primary: {entry['id']}."}
         for entry in catalog["entries"] for action, meaning in ACTIONS.items()
     }
     options.update(
@@ -646,7 +648,7 @@ def build_context(catalog, evidence, task):
 
 
 def normalize_decision(context, answer):
-    require(answer.get("choice") in context["options"], "Opción fuera del contrato neutral")
+    require(answer.get("choice") in context["options"], "Option outside the neutral contract")
     option = context["options"][answer["choice"]]
     return {"action": option["action"], "primary": option["primary"],
             "review_status": "pending", "agent_explanation": None}
@@ -657,15 +659,15 @@ DECISIONS = (*ACTIONS, "create", "insufficient_evidence")
 
 def validate_agent_choice(choice, catalog):
     """The implementing agent's own decision, recorded before the provider answers."""
-    require(isinstance(choice, dict), "La tarea necesita agent_choice: tu decisión antes de consultar al proveedor")
+    require(isinstance(choice, dict), "The task needs agent_choice: your decision before consulting the provider")
     fields(choice, {"action", "primary", "reason"})
     require(set(choice) == {"action", "primary", "reason"} and choice["action"] in DECISIONS
-            and text_field(choice["reason"]), "agent_choice inválido")
+            and text_field(choice["reason"]), "Invalid agent_choice")
     ids = {entry["id"] for entry in catalog["entries"]}
     if choice["action"] in ACTIONS:
-        require(choice["primary"] in ids, "agent_choice.primary debe ser un id del catálogo")
+        require(choice["primary"] in ids, "agent_choice.primary must be a catalog id")
     else:
-        require(choice["primary"] is None, "create/insufficient_evidence no llevan primary")
+        require(choice["primary"] is None, "create/insufficient_evidence take no primary")
 
 
 def consent_path(repo):
@@ -682,8 +684,8 @@ def require_provider_consent(repo, provider_id, endpoint):
     path = consent_path(repo)
     grant = load(path).get(provider_id) if path.is_file() else None
     require(isinstance(grant, dict) and grant.get("endpoint") == endpoint,
-            f"Sin consentimiento para enviar fichas de este proyecto a {provider_id}; "
-            "el usuario debe ejecutar tessera.py consent en su terminal")
+            f"No consent to send this project's cards to {provider_id}; "
+            "the user must run tessera.py consent in their own terminal")
 
 
 def set_consent(repo, provider_id, grant):
@@ -721,10 +723,10 @@ def catalog_index(repo):
 
 def catalog_cards(repo, ids):
     path = Path(storage_paths(repo)["catalog"])
-    require(path.is_file(), "Proyecto sin catálogo; consulta status")
+    require(path.is_file(), "Project without a catalog; check status")
     catalog = load(path)
     found = {entry["id"]: entry for entry in catalog["entries"] if entry["id"] in ids}
-    require(set(ids) <= set(found), f"Ids desconocidos: {sorted(set(ids) - set(found))}")
+    require(set(ids) <= set(found), f"Unknown ids: {sorted(set(ids) - set(found))}")
     return {"entries": [{k: v for k, v in found[i].items() if k != "tests"} for i in ids]}
 
 
@@ -736,6 +738,7 @@ def decision_report(repo):
         rows.append({"run": decision.parent.name, "action": record["action"],
                      "primary": record["primary"], "decided_by": record.get("decided_by", "provider"),
                      "agreement": record.get("agreement"), "usage": record["usage"],
+                     "batch_proposals": record.get("batch_proposals", []),
                      "calls": len(record.get("calls", [])) or 1})
     compared = [row for row in rows if row["agreement"] is not None]
     return {"decisions": len(rows), "compared": len(compared),
@@ -753,9 +756,9 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
             require_private_input(path)
     if require_ready:
         status = project_status(repo)
-        require(status["status"] == "ready", "Proyecto no listo; consulta status y completa su next_action")
+        require(status["status"] == "ready", "Project not ready; check status and complete its next_action")
         require(Path(catalog_path).resolve() == Path(status["paths"]["catalog"]).resolve(),
-                "El catálogo no pertenece al inventario validado")
+                "The catalog does not belong to the validated inventory")
     provider = PROVIDERS[provider_id]
     catalog, task = load(catalog_path), load(task_path)
     agent_choice = task.pop("agent_choice", None) if isinstance(task, dict) else None
@@ -768,7 +771,7 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 and status["revision"] == after["revision"]
                 and status["inventory_sha256"] == after["inventory_sha256"]
                 and digest(encoded(load(after["paths"]["catalog"]))) == digest(encoded(catalog)),
-                "La cobertura cambió durante prepare; repite status y la preparación")
+                "Coverage changed during prepare; repeat status and prepare")
     context = build_context(catalog, evidence, task)
     request = tessera_batches.plan(context, provider, encoded)
     body = encoded(request)
@@ -807,22 +810,22 @@ def evaluate(run, *, allow_repo_storage=False):
             and manifest["entry_count"] == len(context["catalog"]["entries"])
             and manifest["catalog_sha256"] == digest(encoded(context["catalog"]))
             and manifest["request_bytes"] == len(body) and manifest["schema"] == 1,
-            "La petición cambió después de prepararla")
-    require(request == tessera_batches.plan(context, provider, encoded), "Contrato de petición inesperado")
+            "The request changed after it was prepared")
+    require(request == tessera_batches.plan(context, provider, encoded), "Unexpected request contract")
     require(context["evidence"].get("curation", {}).get("status") != "stale",
-            "Curación obsoleta; revisa los contratos y prepara otro run antes de llamar al proveedor")
-    require(text_field(manifest.get("repo_path")), "Run antiguo sin checkout verificable; prepara otro run")
+            "Stale curation; review the contracts and prepare another run before calling the provider")
+    require(text_field(manifest.get("repo_path")), "Old run without a verifiable checkout; prepare another run")
     latest = build_evidence(context["catalog"], Path(manifest["repo_path"]))
     require(encoded(latest) == encoded(derived),
-            "El proyecto cambió desde prepare; revisa changes y prepara otro run")
+            "The project changed since prepare; review changes and prepare another run")
     if manifest.get("project_status") == "ready":
         status = project_status(Path(manifest["repo_path"]))
         require(status["status"] == "ready" and digest(encoded(load(status["paths"]["catalog"])))
                 == manifest.get("source_catalog_sha256", manifest["catalog_sha256"]),
-                "El catálogo o su cobertura cambió desde prepare; prepara otro run")
+                "The catalog or its coverage changed since prepare; prepare another run")
     for name in ("attempt.json", "response.json", "decision.json", "failure.json", "http-error.bin", "calls"):
         if os.path.lexists(run / name):
-            raise FileExistsError("El run contiene un intento o resultado previo")
+            raise FileExistsError("The run already holds an attempt or result")
     provider.check_credentials()
     require_provider_consent(Path(manifest["repo_path"]), manifest["provider"], manifest["endpoint"])
     # Reserve before invoking the provider. Never retry an uncertain or billable attempt.
@@ -836,12 +839,12 @@ def evaluate(run, *, allow_repo_storage=False):
         repo = Path(manifest["repo_path"])
         snapshot = project_snapshot(repo)
         require(snapshot["revision"] == manifest["revision"] and not snapshot["checkout_changes"],
-                "El checkout cambió durante la evaluación; decisión incompleta")
+                "The checkout changed during the evaluation; incomplete decision")
         if manifest.get("project_status") == "ready":
             status = project_status(repo)
             require(status["status"] == "ready" and digest(encoded(load(status["paths"]["catalog"])))
                     == manifest.get("source_catalog_sha256", manifest["catalog_sha256"]),
-                    "El catálogo cambió durante la evaluación; decisión incompleta")
+                    "The catalog changed during the evaluation; incomplete decision")
 
     def invoke_batch(part, index):
         check_live()
@@ -898,7 +901,8 @@ def evaluate(run, *, allow_repo_storage=False):
               "response_sha256": digest(raw),
               "model": answer["model"], "elapsed_seconds": elapsed,
               "usage": answer["usage"], "answer": answer, **decision,
-              "decided_by": answer.get("decided_by", "provider")}
+              "decided_by": answer.get("decided_by", "provider"),
+              "batch_proposals": answer.get("batch_proposals", [])}
     agent = manifest.get("agent_choice")
     if agent is not None:
         # Blind comparison: the agent committed before the provider answered.
@@ -916,45 +920,45 @@ def evaluate(run, *, allow_repo_storage=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    locate = commands.add_parser("locate", help="Resuelve almacenamiento local por proyecto, sin escribir")
+    locate = commands.add_parser("locate", help="Resolve per-project local storage without writing")
     locate.add_argument("--repo", type=Path, required=True)
     for name in ("status", "init", "scan", "review", "finalize"):
-        command = commands.add_parser(name, help="Estado e inventario de todo el proyecto")
+        command = commands.add_parser(name, help="Status and inventory of the whole project")
         command.add_argument("--repo", type=Path, required=True)
         if name == "scan":
-            command.add_argument("--full", action="store_true", help="Reinicia revisión con respaldo; conserva catálogo")
+            command.add_argument("--full", action="store_true", help="Restart review with a backup; keep the catalog")
         if name == "review":
-            command.add_argument("--batch", type=Path, required=True, help="Tanda JSON externa con revisión y hash del inventario")
-    skeleton = commands.add_parser("skeleton", help="Evidencia de curación: fuentes, exports y usos reales, sin tests")
+            command.add_argument("--batch", type=Path, required=True, help="External JSON batch with revision and inventory hash")
+    skeleton = commands.add_parser("skeleton", help="Curation evidence: sources, exports and real usages, without tests")
     skeleton.add_argument("--repo", type=Path, required=True)
-    skeleton.add_argument("--output", type=Path, help="Por defecto, curation/ en el almacenamiento local externo")
-    index = commands.add_parser("index", help="Índice compacto del catálogo para consulta del agente, sin escribir")
+    skeleton.add_argument("--output", type=Path, help="Default: curation/ in the external local storage")
+    index = commands.add_parser("index", help="Compact catalog index for agent lookup, without writing")
     index.add_argument("--repo", type=Path, required=True)
-    card = commands.add_parser("card", help="Fichas completas por id, sin escribir")
+    card = commands.add_parser("card", help="Complete cards by id, without writing")
     card.add_argument("--repo", type=Path, required=True)
     card.add_argument("--id", action="append", required=True, dest="ids")
-    report = commands.add_parser("report", help="Acuerdo con la decisión ciega del agente y consumo del proveedor")
+    report = commands.add_parser("report", help="Agreement with the agent's blind choices and provider usage")
     report.add_argument("--repo", type=Path, required=True)
-    consent = commands.add_parser("consent", help="Solo el usuario: autoriza o retira el envío de fichas a un proveedor")
+    consent = commands.add_parser("consent", help="User only: grant or revoke sending cards to a provider")
     consent.add_argument("--repo", type=Path, required=True)
     consent.add_argument("--provider", choices=PROVIDERS, required=True)
     consent.add_argument("--revoke", action="store_true")
-    changes = commands.add_parser("changes", help="Detecta cambios que requieren actualizar fichas, sin escribir")
+    changes = commands.add_parser("changes", help="Detect changes that require card updates, without writing")
     changes.add_argument("--repo", type=Path, required=True)
     changes.add_argument("--catalog", type=Path)
-    prep = commands.add_parser("prepare", help="Valida y prepara contexto completo, sin red")
+    prep = commands.add_parser("prepare", help="Validate and prepare the full context, offline")
     prep.add_argument("--provider", choices=PROVIDERS, default="typesafe")
-    prep.add_argument("--catalog", type=Path, help="Por defecto, catálogo local externo del proyecto")
+    prep.add_argument("--catalog", type=Path, help="Default: the project's external local catalog")
     prep.add_argument("--repo", type=Path, required=True)
     prep.add_argument("--task", type=Path, required=True)
-    prep.add_argument("--output", type=Path, help="Por defecto, un run nuevo en almacenamiento local")
+    prep.add_argument("--output", type=Path, help="Default: a new run in local storage")
     prep.add_argument("--allow-repo-storage", action="store_true",
-                      help="Excepción explícita para archivos dentro de Git; no usar en proyectos del trabajo")
-    prep.add_argument("--require-ready", action="store_true", help="Exige cobertura completa y vigente del proyecto")
-    live = commands.add_parser("evaluate", help="Un intento real con el proveedor y contexto revisados")
+                      help="Explicit exception for files inside Git; never for work projects")
+    prep.add_argument("--require-ready", action="store_true", help="Require complete, current project coverage")
+    live = commands.add_parser("evaluate", help="One real attempt with the reviewed provider and context")
     live.add_argument("--run", type=Path, required=True)
     live.add_argument("--allow-repo-storage", action="store_true",
-                      help="Requiere aprobación explícita de compartición también al evaluar")
+                      help="Requires explicit sharing approval when evaluating too")
     args = parser.parse_args()
     try:
         if hasattr(args, "repo"):

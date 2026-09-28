@@ -22,7 +22,7 @@ def endpoint():
                  and not parts.query and not parts.fragment
                  and not any(char.isspace() for char in value)
                  and parts.path.endswith("/v1/systemone"),
-                 "TESSERA_KEV_ENDPOINT debe ser una URL HTTPS explícita o HTTP loopback, sin secretos ni query")
+                 "TESSERA_KEV_ENDPOINT must be an explicit HTTPS URL or loopback HTTP, without secrets or query")
     return value
 
 
@@ -34,7 +34,7 @@ def check_credentials():
     target = urlsplit(endpoint())
     wire.require(target.hostname in {"127.0.0.1", "localhost", "::1"}
                  or bool(os.environ.get("KEV_API_KEY")),
-                 "Falta KEV_API_KEY para el servidor remoto; no se llamó a Kev")
+                 "KEV_API_KEY is missing for the remote server; Kev was not called")
 
 
 def invoke(body):

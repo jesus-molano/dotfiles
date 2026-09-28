@@ -68,8 +68,8 @@ or when reuse is genuinely ambiguous between specific cards.
 3. Inspect the prepared manifest (batches, maximum calls, destination) before
    `evaluate`. Credentials come only from the approved secret mechanism for
    that process. One run has one execution; there are no automatic retries.
-4. Treat the result as evidence. The batch proposals in `calls/` are often more
-   useful than the final verdict. `decided_by: coordinator` marks a result the
+4. Treat the result as evidence. The first-round `batch_proposals` in the
+   decision are often more useful than the final verdict. `decided_by: coordinator` marks a result the
    rule derived without a provider call. Verify any choice against the source;
    never attribute your explanation to the provider.
 5. `tessera.py report --repo PROJECT` shows decisions, agreement with your blind

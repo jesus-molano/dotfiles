@@ -1,6 +1,7 @@
 ---
 name: to-tickets
 description: Decompose an approved specification into independently reviewable implementation tickets with sequencing and acceptance criteria. Use when the user asks to prepare a delivery backlog from a spec.
+disable-model-invocation: true
 ---
 
 # To Tickets

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """PreToolUse guard: turns the hard limits in ai/rules into checks the model cannot skip.
 
-Claude Code sends one JSON event on stdin. Exit 0 allows the call; exit 2 blocks
+Claude Code and Codex send the same JSON event on stdin. Exit 0 allows the call; exit 2 blocks
 it and the stderr reason is shown to the model. Only commands that are never
 part of a normal task are blocked, so the guard stays cheap and quiet:
 
@@ -179,7 +179,7 @@ def decide(event: dict) -> str | None:
     if tool == "Workflow" and os.environ.get("AI_ALLOW_WORKFLOW") != "1":
         return ("multi-agent workflows need an explicit request; ask the user, who can start "
                 "the session with AI_ALLOW_WORKFLOW=1")
-    if tool in {"Write", "Edit", "MultiEdit"} and "provider-consent" in str(data.get("file_path", "")):
+    if tool in {"Write", "Edit", "MultiEdit", "apply_patch"} and "provider-consent" in json.dumps(data):
         return "provider consent is granted by the user in their own terminal"
     if tool in {"Bash", "PowerShell"} and isinstance(data.get("command"), str):
         return check_bash(data["command"])

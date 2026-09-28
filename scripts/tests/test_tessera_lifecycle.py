@@ -179,7 +179,7 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(status["pending_paths"], ["consumer.ts"])
         self.assertEqual(status["status"], "needs_update")
         self.review([self.records()[1]])
-        self.assertIn("Curación", self.call("finalize", ok=False).stderr)
+        self.assertIn("Curation", self.call("finalize", ok=False).stderr)
         self.catalog()
         self.assertEqual(self.call("finalize")["status"], "ready")
 
@@ -305,7 +305,7 @@ class LifecycleTest(unittest.TestCase):
             return original(repo)
 
         with patch.dict(os.environ, self.env), patch.object(tessera, "project_snapshot", side_effect=changing):
-            with self.assertRaisesRegex(ValueError, "proyecto cambió"):
+            with self.assertRaisesRegex(ValueError, "project changed"):
                 tessera.scan_project(self.repo)
         self.assertEqual(target.read_bytes(), before)
 
@@ -318,7 +318,7 @@ class LifecycleTest(unittest.TestCase):
         value["entries"][0]["constraints"] = ["Changed contract"]
         Path(self.paths["catalog"]).write_text(json.dumps(value))
         with patch.dict(os.environ, self.env), patch.object(tessera.tessera_typesafe, "invoke") as invoke:
-            with self.assertRaisesRegex(ValueError, "cobertura cambió"):
+            with self.assertRaisesRegex(ValueError, "[Cc]overage changed"):
                 tessera.evaluate(Path(run))
             invoke.assert_not_called()
         self.assertFalse((Path(run) / "attempt.json").exists())
@@ -437,7 +437,7 @@ class LifecycleTest(unittest.TestCase):
 
         output = self.root / "never-created"
         with patch.dict(os.environ, self.env), patch.object(tessera, "build_evidence", side_effect=capture_with_new_file):
-            with self.assertRaisesRegex(ValueError, "cobertura cambió"):
+            with self.assertRaisesRegex(ValueError, "[Cc]overage changed"):
                 tessera.prepare(Path(self.paths["catalog"]), self.repo, task, output, require_ready=True)
         self.assertFalse(output.exists())
 

@@ -7,19 +7,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 LINUX_SKILLS = {"cachyos-host-audit"}
 RETIRED = {"frontend-task", "reuse-first", "visual-direction"}
-# Invocation policy for every skill. Explicit skills run only when the user or
-# another skill names them: Codex gets allow_implicit_invocation = false and
-# Claude gets skillOverrides "user-invocable-only". Unlisted skills fail checks.
+# Invocation policy for every skill; unlisted skills fail the checks.
+# - IMPLICIT: the model picks them from their description.
+# - NAMED: other skills route to them by name. Claude lists only the name
+#   (skillOverrides "name-only"), so they cost almost no context yet stay invocable.
+# - USER: only the user runs them as /name (disable-model-invocation: true).
+# Codex has no name-only mode: NAMED and USER both get allow_implicit_invocation = false.
 IMPLICIT_SKILLS = frozenset({
     "cachyos-host-audit", "clarify-change", "debug-web-flow", "engineering-flow",
     "handoff", "linear-workflow", "playwright-cli", "research-primary-sources",
     "review-web-pr", "spec-and-standards-review", "systematic-debugging", "tessera",
     "verification-before-completion",
 })
-EXPLICIT_SKILLS = frozenset({
-    "codebase-design", "domain-modeling", "test-driven-development", "to-tickets",
-    "verify-web-change",
-})
+NAMED_SKILLS = frozenset({"test-driven-development", "verify-web-change"})
+USER_SKILLS = frozenset({"codebase-design", "domain-modeling", "to-tickets"})
+EXPLICIT_SKILLS = NAMED_SKILLS | USER_SKILLS
 
 
 def instructions(client: str, platform: str, root: Path = ROOT) -> str:

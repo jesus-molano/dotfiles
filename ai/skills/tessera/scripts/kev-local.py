@@ -44,19 +44,19 @@ def python_path(runtime):
 
 def verify_source(runtime):
     if not (runtime / ".git").is_dir():
-        raise ValueError("Falta el checkout Kev; ejecutar install en un destino nuevo.")
+        raise ValueError("The Kev checkout is missing; run install into a new target.")
     if run("git", "rev-parse", "HEAD", cwd=runtime, capture=True).stdout.strip() != REVISION:
-        raise ValueError("Revisión Kev distinta; no se sustituye un runtime existente.")
+        raise ValueError("Different Kev revision; an existing runtime is never replaced.")
     if hashlib.sha256((runtime / "kev/serve.py").read_bytes()).hexdigest() != SERVE_HASH:
-        raise ValueError("El servidor no conserva el parche verificado contra truncado.")
+        raise ValueError("The server lacks the verified anti-truncation patch.")
     run("git", "diff", "--quiet", "--no-ext-diff", "HEAD", "--", ".", ":!kev/serve.py", cwd=runtime)
     unknown = run("git", "ls-files", "--others", "--exclude-standard", cwd=runtime, capture=True)
     if unknown.stdout:
-        raise ValueError("Hay código Kev no versionado; revisar antes de arrancar.")
+        raise ValueError("Untracked Kev code found; review it before starting.")
     # Git ignores *.pyc, but legacy bytecode outside __pycache__ can shadow
     # source/dependencies. Normal interpreter caches need not be removed.
     if any(runtime.glob("*.pyc")) or any((runtime / "kev").glob("*.pyc")):
-        raise ValueError("Hay bytecode importable ajeno en el checkout; revisar antes de arrancar.")
+        raise ValueError("Foreign importable bytecode in the checkout; review it before starting.")
 
 
 def apply_server_patch(runtime, patch):
@@ -70,13 +70,13 @@ def apply_server_patch(runtime, patch):
 def install(runtime):
     # A failed installation is left for inspection; never remove or overwrite it.
     if runtime.exists() or runtime.is_symlink():
-        raise ValueError("El destino ya existe; usar check. No se sobrescribe ni se borra.")
+        raise ValueError("The target already exists; use check. Nothing is overwritten or deleted.")
     for binary in ("git", "uv"):
         if not shutil.which(binary):
-            raise ValueError(f"Falta {binary}; instalarlo mediante el mecanismo aprobado de este equipo.")
+            raise ValueError(f"{binary} is missing; install it through the approved mechanism of this machine.")
     runtime.parent.mkdir(parents=True, exist_ok=True)
     if shutil.disk_usage(runtime.parent).free < 12 * 1024**3:
-        raise ValueError("Se requieren al menos 12 GiB libres para preparar el piloto.")
+        raise ValueError("At least 12 GiB of free space is required to prepare the pilot.")
     run("git", "clone", "--filter=blob:none", "--no-checkout", UPSTREAM, runtime)
     run("git", "config", "core.autocrlf", "false", cwd=runtime)
     run("git", "sparse-checkout", "set", "kev", "tests", "docs/model-cards", cwd=runtime)
@@ -89,10 +89,10 @@ def install(runtime):
 
 def windows_cuda(runtime):
     if platform.system() != "Windows" or platform.machine().lower() not in {"amd64", "x86_64"}:
-        raise ValueError("windows-cuda requiere Windows x86_64; no modifica este equipo.")
+        raise ValueError("windows-cuda requires Windows x86_64; this machine is not modified.")
     verify_source(runtime)
     if not python_path(runtime).is_file():
-        raise ValueError("Ejecutar install antes de windows-cuda.")
+        raise ValueError("Run install before windows-cuda.")
     # PyPI's Windows wheel is CPU-only. This explicit, hash-pinned platform
     # overlay changes only torch in the isolated environment, never the lockfile.
     run("uv", "pip", "install", "--python", python_path(runtime), "--no-deps",
@@ -103,7 +103,7 @@ def capabilities(runtime):
     verify_source(runtime)
     python = python_path(runtime)
     if not python.is_file():
-        raise ValueError("Falta el entorno .venv; instalación incompleta, consultar la guía de recuperación.")
+        raise ValueError("The .venv environment is missing; incomplete install, see the recovery guide.")
     probe = (
         "import json,torch; cuda=torch.cuda.is_available(); "
         "print(json.dumps({'cuda':cuda,'mps':torch.backends.mps.is_available(),"
@@ -117,12 +117,12 @@ def capabilities(runtime):
 
 def serve(runtime, info, allow_cpu=False):
     if info["mps"] and not info["cuda"]:
-        raise ValueError("Este launcher no ha validado Apple Silicon; adaptar y verificar su backend.")
+        raise ValueError("This launcher has not validated Apple Silicon; adapt and verify its backend.")
     if not info["cuda"] and not allow_cpu:
-        raise ValueError("CUDA no está disponible. CPU requiere --allow-cpu; medir su latencia por separado.")
+        raise ValueError("CUDA is unavailable. CPU needs --allow-cpu; measure its latency separately.")
     min_vram = 4 if info["bf16"] else 6
     if info["cuda"] and info["free_vram"] < min_vram * 1024**3:
-        raise ValueError(f"Menos de {min_vram} GiB VRAM libres; liberar memoria y revisar el contexto antes de arrancar.")
+        raise ValueError(f"Less than {min_vram} GiB of free VRAM; free memory and review the context before starting.")
     env = dict(os.environ)
     env.update(HF_HUB_DISABLE_TELEMETRY="1", KEV_BACKEND="torch",
                KEV_DTYPE="bf16" if info["bf16"] else "fp32", KEV_PREFIX_CACHE="1",
@@ -153,7 +153,7 @@ def main():
         windows_cuda(runtime)
     info = capabilities(runtime)
     if args.command == "windows-cuda" and (info["torch"] != "2.8.0+cu128" or info["cuda_build"] != "12.8"):
-        raise ValueError("El wheel instalado no coincide con PyTorch 2.8.0+cu128; no arrancar.")
+        raise ValueError("The installed wheel does not match PyTorch 2.8.0+cu128; do not start.")
     if args.command == "serve":
         return serve(runtime, info, args.allow_cpu)
     print(json.dumps({"runtime": str(runtime), "platform": platform.platform(),

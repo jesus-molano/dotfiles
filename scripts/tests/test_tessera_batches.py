@@ -71,7 +71,7 @@ class BatchPlanTest(unittest.TestCase):
     def test_oversize_card_fails_without_truncation(self):
         c = context(1, batches.REQUEST_BYTES)
         before = copy.deepcopy(c)
-        with self.assertRaisesRegex(ValueError, 'excede'):
+        with self.assertRaisesRegex(ValueError, 'exceeds'):
             batches.plan(c, tessera.tessera_typesafe, tessera.encoded)
         self.assertEqual(c, before)
 
@@ -132,7 +132,7 @@ class BatchPlanTest(unittest.TestCase):
                 choice = 'create'
             raw = response(request, choice)
             return raw, tessera.tessera_typesafe.validate_response(request, json.loads(raw))
-        with self.assertRaisesRegex(ValueError, 'Creación global'):
+        with self.assertRaisesRegex(ValueError, 'Global create'):
             batches.run(c, plan, tessera.tessera_typesafe, tessera.encoded, invoke)
 
 
@@ -168,6 +168,8 @@ class BatchIntegrationTest(unittest.TestCase):
                 patch.object(tessera.tessera_typesafe, 'invoke', side_effect=invoke) as send:
             result = tessera.evaluate(f.run_dir)
             self.assertEqual(result['decided_by'], 'provider')
+            self.assertTrue(result['batch_proposals'])
+            self.assertTrue(all(set(p) == {'option', 'action', 'primary'} for p in result['batch_proposals']))
             self.assertEqual(len(result['evaluated_entry_ids']), 85)
             self.assertEqual(result['usage']['input_tokens'], send.call_count * 10)
             self.assertEqual(len(result['calls']), send.call_count)
@@ -221,7 +223,7 @@ class BatchIntegrationTest(unittest.TestCase):
             return response(request, 'create')
         with patch.object(tessera.tessera_typesafe, 'check_credentials'), \
                 patch.object(tessera.tessera_typesafe, 'invoke', side_effect=invoke) as send:
-            with self.assertRaisesRegex(ValueError, 'checkout cambió'): tessera.evaluate(f.run_dir)
+            with self.assertRaisesRegex(ValueError, 'checkout changed'): tessera.evaluate(f.run_dir)
         self.assertEqual(send.call_count, 1)
         self.assertEqual(tessera.load(f.run_dir / 'failure.json')['completed_calls'], 1)
         self.assertFalse((f.run_dir / 'decision.json').exists())

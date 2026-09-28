@@ -77,7 +77,7 @@ class SkeletonTest(unittest.TestCase):
 
     def test_output_inside_repository_is_refused(self):
         result = self.call("--output", self.repo / "skeleton.json", ok=False)
-        self.assertIn("repositorio Git", result.stderr)
+        self.assertIn("Git repository", result.stderr)
         self.assertFalse((self.repo / "skeleton.json").exists())
 
     def test_tests_and_protected_paths_are_never_sources_or_consumers(self):

@@ -63,6 +63,13 @@ class TesseraTest(unittest.TestCase):
         return self.call("prepare", "--catalog", self.catalog, "--repo", self.repo,
                          "--task", self.task, "--output", self.run_dir)
 
+    def test_wire_card_keeps_three_usages_and_the_count(self):
+        wire = tessera.tessera_typesafe.wire
+        entry = dict(self.data["entries"][0], usages=[{"path": "src/use.tsx", "start": i, "end": i} for i in range(1, 8)])
+        card = wire.provider_card(entry)
+        self.assertEqual((len(card["usages"]), card["usage_count"]), (3, 7))
+        self.assertEqual(len(entry["usages"]), 7, "The local card must stay complete")
+
     def test_tests_never_opened_or_sent_even_from_legacy_catalog(self):
         original = Path.open
 
@@ -89,7 +96,7 @@ class TesseraTest(unittest.TestCase):
             else:
                 value[role] = ["src/ui/Button.test.tsx"]
             with self.subTest(role=role), patch.object(Path, "open", guarded):
-                with self.assertRaisesRegex(ValueError, "Tests fuera"):
+                with self.assertRaisesRegex(ValueError, "Tests are outside"):
                     tessera.build_evidence(value, self.repo)
 
     def test_test_config_patterns_preserve_similarly_named_production_files(self):
@@ -124,6 +131,7 @@ class TesseraTest(unittest.TestCase):
                          {"reuse:button", "modify:button", "wrap:button", "create", "insufficient_evidence"})
         expected = copy.deepcopy(self.data)
         expected["entries"][0].pop("tests")
+        expected["entries"][0]["usage_count"] = 1
         self.assertEqual(request["state"]["catalog"], expected)
         evidence = request["state"]["evidence"]
         self.assertFalse(evidence["source_text_included"])
@@ -164,6 +172,7 @@ class TesseraTest(unittest.TestCase):
             request = json.loads((run / "request.json").read_text())
             expected = copy.deepcopy(self.data)
             expected["entries"][0].pop("tests")
+            expected["entries"][0]["usage_count"] = 1
             self.assertEqual(request["state"]["catalog"], expected)
             if os.name != "nt":
                 self.assertEqual(run.stat().st_mode & 0o777, 0o700)
@@ -177,11 +186,11 @@ class TesseraTest(unittest.TestCase):
         self.root.chmod(0o755)
         self.catalog.chmod(0o644)
         self.task.chmod(0o644)
-        with self.assertRaisesRegex(ValueError, "accesible por otros"):
+        with self.assertRaisesRegex(ValueError, "readable by other users"):
             tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
         self.assertFalse(self.run_dir.exists())
         self.catalog.chmod(0o600)
-        with self.assertRaisesRegex(ValueError, "accesible por otros"):
+        with self.assertRaisesRegex(ValueError, "readable by other users"):
             tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
         self.task.chmod(0o600)
         tessera.prepare(self.catalog, self.repo, self.task, self.run_dir)
@@ -203,24 +212,24 @@ class TesseraTest(unittest.TestCase):
                     output = target
                 result = self.call("prepare", "--repo", self.repo, "--catalog", catalog,
                                    "--task", task, "--output", output)
-                self.assertIn("Almacenamiento dentro", result.stderr)
+                self.assertIn("Storage inside", result.stderr)
                 self.assertFalse(output.exists())
         result = self.call("prepare", "--repo", self.repo, "--catalog", self.repo / "catalog.json",
                            "--task", self.task, "--output", self.run_dir, "--allow-repo-storage")
         self.assertEqual(result.returncode, 0, result.stderr)
         other = self.root / "personal dotfiles"
         subprocess.run(["git", "init", "-q", str(other)], check=True)
-        with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+        with self.assertRaisesRegex(ValueError, "Storage inside"):
             tessera.require_external(other / "work-catalog.json")
 
     @unittest.skipIf(os.name == "nt", "Requires POSIX symlinks")
     def test_storage_cannot_be_redirected_into_repo(self):
         link = self.root / "external looking"
         link.symlink_to(self.repo, target_is_directory=True)
-        with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+        with self.assertRaisesRegex(ValueError, "Storage inside"):
             tessera.require_external(link / "new-run")
         with patch.dict(os.environ, {"XDG_DATA_HOME": str(self.repo / "data")}):
-            with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+            with self.assertRaisesRegex(ValueError, "Storage inside"):
                 tessera.storage_paths(self.repo)
 
     def commit_all(self):
@@ -291,11 +300,11 @@ class TesseraTest(unittest.TestCase):
         moved = self.repo / "copied-run"
         shutil.move(self.run_dir, moved)
         with patch.object(tessera.tessera_typesafe, "invoke") as invoke:
-            with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+            with self.assertRaisesRegex(ValueError, "Storage inside"):
                 tessera.evaluate(moved)
             if os.name != "nt":
                 self.run_dir.symlink_to(moved, target_is_directory=True)
-                with self.assertRaisesRegex(ValueError, "Almacenamiento dentro"):
+                with self.assertRaisesRegex(ValueError, "Storage inside"):
                     tessera.evaluate(self.run_dir)
             invoke.assert_not_called()
         self.assertFalse((moved / "attempt.json").exists())
@@ -310,7 +319,7 @@ class TesseraTest(unittest.TestCase):
         (self.repo / "src/ui/Button.tsx").write_text("export function Button() { return 'new contract'; }\n")
         self.commit_all()
         with patch.object(tessera.tessera_typesafe, "invoke") as invoke:
-            with self.assertRaisesRegex(ValueError, "proyecto cambió"):
+            with self.assertRaisesRegex(ValueError, "project changed"):
                 tessera.evaluate(self.run_dir)
             invoke.assert_not_called()
         self.assertFalse((self.run_dir / "attempt.json").exists())
@@ -320,7 +329,7 @@ class TesseraTest(unittest.TestCase):
         subprocess.run(["git", "-C", str(self.repo), "add", "."], check=True)
         subprocess.run(["git", "-C", str(self.repo), "-c", "user.name=Test",
                         "-c", "user.email=test@example.invalid", "commit", "-qm", "new"], check=True)
-        self.assertIn("Cobertura incompleta", self.prepare().stderr)
+        self.assertIn("Incomplete coverage", self.prepare().stderr)
         entry = dict(self.data["entries"][0], id="new", source="src/ui/New.tsx")
         self.data["entries"].append(entry)
         self.assertEqual(self.prepare().returncode, 0)
@@ -329,7 +338,7 @@ class TesseraTest(unittest.TestCase):
 
     def test_dirty_snapshot_is_not_claimed_as_revision(self):
         (self.repo / "src/ui/Button.tsx").write_text("changed\n")
-        self.assertIn("Checkout con cambios", self.prepare().stderr)
+        self.assertIn("Checkout has tracked changes", self.prepare().stderr)
         self.assertFalse(self.run_dir.exists())
 
     def test_private_traversal_and_symlink_references_fail(self):
@@ -341,14 +350,14 @@ class TesseraTest(unittest.TestCase):
         if os.name != "nt":
             (self.repo / "src/link").symlink_to(self.repo / "src/ui/Button.tsx")
             self.data["entries"][0]["source"] = "src/link"
-            self.assertIn("Enlaces", self.prepare().stderr)
+            self.assertIn("Links", self.prepare().stderr)
 
     def test_duplicate_ids_and_invalid_usage_ranges_fail(self):
         self.data["entries"].append(copy.deepcopy(self.data["entries"][0]))
-        self.assertIn("ID inválido o duplicado", self.prepare().stderr)
+        self.assertIn("Invalid or duplicate ID", self.prepare().stderr)
         self.data["entries"].pop()
         self.data["entries"][0]["usages"][0]["end"] = 999
-        self.assertIn("Rango de uso inválido", self.prepare().stderr)
+        self.assertIn("Invalid usage range", self.prepare().stderr)
 
     def test_prepare_never_overwrites_and_evaluate_requires_credential(self):
         self.assertEqual(self.prepare().returncode, 0)
@@ -356,20 +365,20 @@ class TesseraTest(unittest.TestCase):
         self.assertNotEqual(self.prepare().returncode, 0)
         self.assertEqual((self.run_dir / "request.json").read_bytes(), before)
         result = self.call("evaluate", "--run", self.run_dir)
-        self.assertIn("no se llamó a Jev", result.stderr)
+        self.assertIn("Jev was not called", result.stderr)
         self.assertFalse((self.run_dir / "attempt.json").exists())
 
     def test_modified_request_is_rejected_before_network(self):
         self.prepare()
         with (self.run_dir / "request.json").open("a") as stream:
             stream.write(" ")
-        self.assertIn("petición cambió", self.call("evaluate", "--run", self.run_dir).stderr)
+        self.assertIn("request changed", self.call("evaluate", "--run", self.run_dir).stderr)
 
     def test_unknown_fields_cannot_leak_into_request(self):
         for target in (self.data, self.data["entries"][0], self.data["entries"][0]["usages"][0]):
             target["expected_action"] = "unexpected-content"
             result = self.prepare()
-            self.assertIn("Campos ausentes o desconocidos", result.stderr)
+            self.assertIn("Missing or unknown fields", result.stderr)
             self.assertNotIn("unexpected-content", result.stderr)
             self.assertFalse(self.run_dir.exists())
             del target["expected_action"]
@@ -380,7 +389,7 @@ class TesseraTest(unittest.TestCase):
         manifest = json.loads(path.read_text())
         manifest["revision"] = "0" * 40
         path.write_text(json.dumps(manifest))
-        self.assertIn("petición cambió", self.call("evaluate", "--run", self.run_dir).stderr)
+        self.assertIn("request changed", self.call("evaluate", "--run", self.run_dir).stderr)
         self.assertFalse((self.run_dir / "attempt.json").exists())
 
     def test_older_curation_is_explicitly_stale(self):
@@ -388,7 +397,7 @@ class TesseraTest(unittest.TestCase):
         self.assertEqual(self.prepare().returncode, 0)
         context = json.loads((self.run_dir / "context.json").read_text())
         self.assertEqual(context["evidence"]["curation"]["status"], "stale")
-        self.assertIn("Curación obsoleta", self.call("evaluate", "--run", self.run_dir).stderr)
+        self.assertIn("Stale curation", self.call("evaluate", "--run", self.run_dir).stderr)
         self.assertFalse((self.run_dir / "attempt.json").exists())
 
     def test_unrelated_commit_does_not_make_curation_stale(self):
@@ -415,7 +424,7 @@ class TesseraTest(unittest.TestCase):
             return real_git(repo, *args)
 
         with patch.object(tessera, "git", side_effect=changing_git):
-            with self.assertRaisesRegex(ValueError, "checkout cambió"):
+            with self.assertRaisesRegex(ValueError, "checkout changed"):
                 tessera.build_evidence(self.data, self.repo)
 
     def test_crlf_checkout_does_not_make_unchanged_git_contract_stale(self):
@@ -434,7 +443,7 @@ class TesseraTest(unittest.TestCase):
         self.prepare()
         with (self.run_dir / "derived.json").open("a") as stream:
             stream.write(" ")
-        self.assertIn("petición cambió", self.call("evaluate", "--run", self.run_dir).stderr)
+        self.assertIn("request changed", self.call("evaluate", "--run", self.run_dir).stderr)
         self.assertFalse((self.run_dir / "attempt.json").exists())
 
     def test_compact_context_keeps_all_cards_and_raw_evidence_local(self):
@@ -520,7 +529,7 @@ class TesseraTest(unittest.TestCase):
             tessera.prepare(self.catalog, self.repo, self.task, self.run_dir, "kev")
         with patch.dict(os.environ, {"TESSERA_KEV_ENDPOINT": "https://different.example/v1/systemone"}), \
                 patch.object(provider, "invoke") as send:
-            with self.assertRaisesRegex(ValueError, "petición cambió"):
+            with self.assertRaisesRegex(ValueError, "request changed"):
                 tessera.evaluate(self.run_dir)
             send.assert_not_called()
         self.assertFalse((self.run_dir / "attempt.json").exists())
@@ -546,7 +555,7 @@ class TesseraTest(unittest.TestCase):
         provider = tessera.PROVIDERS["kev"]
         with patch.dict(os.environ, {"TESSERA_KEV_ENDPOINT": "https://kev.example/v1/systemone",
                                     "TYPESAFE_API_KEY": "test-only-jev", "KEV_API_KEY": ""}):
-            with self.assertRaisesRegex(ValueError, "Falta KEV_API_KEY"):
+            with self.assertRaisesRegex(ValueError, "KEV_API_KEY is missing"):
                 provider.check_credentials()
         with patch.dict(os.environ, {"TESSERA_KEV_ENDPOINT": "http://127.0.0.1:8009/v1/systemone",
                                     "KEV_API_KEY": ""}):

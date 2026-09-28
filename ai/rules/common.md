@@ -16,6 +16,11 @@
 - Keep unrelated local changes. Make small, reversible changes and back up
   configuration before replacing it.
 
+## Skills first
+- Load the matching skill before exploring: implementation → `engineering-flow`;
+  a failure or wrong result → `systematic-debugging` (`debug-web-flow` for web
+  flows); a web review → `review-web-pr`; other reviews → `spec-and-standards-review`.
+
 ## Reuse before creating
 - Before adding or replacing UI or behavior, even in a small change, find the
   project's existing solution, read its contract and one real usage, and reuse,

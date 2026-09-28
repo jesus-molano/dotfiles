@@ -84,6 +84,8 @@ class GuardTest(unittest.TestCase):
         self.assertBlocked("echo {} > ~/.local/share/tessera/projects/x/provider-consent.json", "consent")
         event = {"tool_name": "Write", "tool_input": {"file_path": "/h/.local/share/tessera/projects/k/provider-consent.json"}}
         self.assertEqual(run("ai-guard.py", event).returncode, 2)
+        patch = {"tool_name": "apply_patch", "tool_input": {"command": "*** Add File: /h/tessera/projects/k/provider-consent.json"}}
+        self.assertEqual(run("ai-guard.py", patch).returncode, 2)
         event["tool_input"]["file_path"] = "/h/.local/share/tessera/projects/k/catalog.json"
         self.assertEqual(run("ai-guard.py", event).returncode, 0)
 

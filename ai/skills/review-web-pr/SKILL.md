@@ -1,6 +1,7 @@
 ---
 name: review-web-pr
 description: Own the review of a Next.js, Nuxt or Vue branch or pull request, including checks against its specification. Use when the user asks to review a web branch, compare it with its base or check a web PR; stays read-only unless a fix is requested separately.
+context: fork
 ---
 
 # Review a Web PR

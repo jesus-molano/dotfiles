@@ -39,14 +39,16 @@ kept, including foreign hooks, deny rules, models and projects.
 | Setting | Value | Why |
 |---|---|---|
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
+| `model` | `opus` | The main agent executes and reasons on Opus (Opus 5.5 today). |
 | `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
 | `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, Tessera `provider-consent.json` writes | Deny rules still apply in bypass mode. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
+| `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Inert in bypass mode; makes a switch to `auto` safe from the first session. |
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
 | `pluginConfigs["agents-md@builtin"]` | `claude-md-and-agents-md` | Loads `AGENTS.md` next to `CLAUDE.md`. |
-| `skillOverrides` | `user-invocable-only` for explicit skills | Hidden from the model, still `/name`. |
+| `skillOverrides` | `user-invocable-only` for user skills, `name-only` for named skills | See [Skills](#skills). |
 
 A managed entry that you remove by hand is reported as a conflict instead of
 being silently re-added: put the entry back, or change the source in `ai/` or
@@ -57,7 +59,9 @@ your own `statusLine`); the apply stops and names the key.
 ## Guardrails
 
 `ai/hooks/ai-guard.py` runs before every shell command, every `Workflow` call
-and every file write or edit. It exits 2 (block) with a short reason, and never prints the command,
+and every file write or edit, in Claude Code and in Codex (`~/.codex/hooks.json`,
+same schema and stdin contract). Codex runs a new user hook only after you
+trust it once in its `/hooks` view. It exits 2 (block) with a short reason, and never prints the command,
 file contents or environment. It blocks only what is never part of a normal task:
 
 | Blocked | Rule it enforces |
@@ -82,13 +86,15 @@ are parsed with POSIX quoting rules. The `Read(**/.env.*)` deny rule also hides
 
 ## Token efficiency
 
-- Always-loaded context is small: about 680 words of global rules and about 470
-  words of descriptions for the skills the model can pick (explicit skills are
-  hidden). `scripts/check-skills.py` fails CI above 20 skills or 700
+- Always-loaded context is small: about 740 words of global rules and about
+  470 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
   description words.
-- Explicit skills (`codebase-design`, `domain-modeling`, `to-tickets`,
-  `test-driven-development`, `verify-web-change`) are hidden from the model and
-  cost nothing until you type `/name`.
+- User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
+  from the model until you type `/name`. Named skills
+  (`test-driven-development`, `verify-web-change`) show only their name, so
+  `engineering-flow` can still route to them at almost no context cost.
+- Review and research skills run with `context: fork`, so their reading stays
+  out of the main conversation.
 - Searches go to `reuse-scout` (Haiku, at most 25 turns) or the built-in Explore
   agent, so the main context keeps only the conclusion.
 - Reviews are sized by `engineering-flow`: none for small low-risk changes, one
@@ -116,14 +122,17 @@ are parsed with POSIX quoting rules. The `Read(**/.env.*)` deny rule also hides
 | `cachyos-host-audit` | automatic (Linux) | Read-only host audit. |
 | `playwright-cli` | automatic | Browser checks. |
 | `tessera` | automatic | Project reuse catalog lookup and maintenance. |
-| `test-driven-development` | `/name` | RED-GREEN for isolatable behavior. |
-| `verify-web-change` | `/name` | Focused web verification checklist. |
+| `test-driven-development` | named | RED-GREEN for isolatable behavior. |
+| `verify-web-change` | named | Focused web verification checklist. |
 | `codebase-design` | `/name` | Module boundaries and contracts. |
 | `domain-modeling` | `/name` | Business concepts and invariants. |
 | `to-tickets` | `/name` | Split an approved spec into tickets. |
 
-The invocation policy lives in `scripts/ai_sources.py` and drives both the
-Codex `agents/openai.yaml` check and the Claude `skillOverrides`.
+The invocation policy lives in `scripts/ai_sources.py` and drives the Codex
+`agents/openai.yaml` check, the Claude `skillOverrides` and the
+`disable-model-invocation` frontmatter of user skills. Shared skills may use the
+Claude fields `disable-model-invocation` and `context: fork`; the Codex parser
+ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs`).
 
 ## Roles
 
@@ -137,7 +146,9 @@ Codex `agents/openai.yaml` check and the Claude `skillOverrides`.
 | `reviewer-linux` | Opus, high effort | main model, high effort | CachyOS/Hyprland changes, from evidence the main agent supplies. |
 
 Every role is read-only; the main agent runs tests and passes the results.
-Models are data in each role file, so a model rename is a one-line change.
+Models follow the job: reasoning and execution on Opus (main agent and
+reviewers), reading on Haiku (search) or Sonnet (bulk drafting). Models are data
+in each role file, so a model rename is a one-line change.
 
 ## Linux: install and deploy
 
@@ -202,7 +213,11 @@ utilities outside every repository (see the [skill](../ai/skills/tessera/SKILL.m
 - **Maintenance:** `changes` after pulls or branch switches, then refresh the
   affected cards. `skeleton` gives deterministic starting evidence and
   `catalog-writer` drafts cards on a cheaper model.
-- **Provider decisions (Jev, Kev):** optional and explicit. They need your
+- **Provider decisions (Jev, Kev):** optional and explicit. The wire card keeps
+  every curated field but at most three usage references plus `usage_count`,
+  and option texts no longer repeat the summary (about 8% smaller on the pilot,
+  more on catalogs with many usages). Each decision records the first-round
+  `batch_proposals`, the most useful signal for tasks that compose several pieces. They need your
   per-project consent (`tessera.py consent --repo PROJECT --provider typesafe`,
   in your own terminal) and a blind `agent_choice` in the task. A 250-card
   catalog costs about 175k provider tokens per decision. `tessera.py report`
@@ -254,16 +269,40 @@ copied skill blocks the apply; reconcile it with the source. There is no `--forc
 
 ## Evaluating the workflow
 
-Static checks and a real run answer different questions. CI validates the
-versioned catalog and regressions without a model or network. After changing
-routing, the scout or role deployment, run the reuse evaluation once:
+Static checks and real runs answer different questions. CI validates the
+versioned catalog and regressions without a model or network. Routing is
+measured with real runs of `claude plugin eval`:
 
-1. Open `scripts/fixtures/reuse-eval` in a fresh session (Claude:
-   `claude --permission-mode plan`; Codex: an ephemeral read-only session).
-2. Ask the main agent to delegate `cases.md` to `reuse-scout` by name and wait
-   for the result without repeating the search. Do not show it the expected answers.
-3. Check the delegation event in the transcript, not a claim in the reply, and
-   compare the result:
+```bash
+just ai-eval                                  # all cases, 1 run each, $2 cap
+just ai-eval --runs 3 --model sonnet          # a steadier measurement
+just ai-eval --case generic-bug --runs 3      # one case
+```
+
+`scripts/ai-eval.sh` assembles a temporary plugin from `ai/skills` and the cases
+in `ai/evals/cases/`, runs it and keeps results under
+`~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
+`tool_used: Skill` graders. The evals load only the skills, not your
+`CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
+"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs where noted):
+
+| Case | Expected skill | Result |
+|---|---|---|
+| `implement-ui` | `engineering-flow`, never `codebase-design` | 3/3 |
+| `generic-bug` | `systematic-debugging` | 3/3 (was 1/3 before its description was sharpened) |
+| `web-flow-bug` | `debug-web-flow` | 1/1 |
+| `web-review` | `review-web-pr` | 1/1 |
+| `named-tdd` | `test-driven-development` (name-only) | 1/1 |
+
+Haiku as the main model skipped the skill and searched files directly: another
+reason to keep the main agent on Opus. Run the evals after changing a
+description, a routing rule or the skill set. Turn a real repeated routing
+failure into a new case; do not grow the catalog by intuition.
+
+The reuse-scout fixture in `scripts/fixtures/reuse-eval` checks delegation and
+evidence quality by hand: open it in a fresh read-only session, ask the main
+agent to delegate `cases.md` to `reuse-scout` by name, check the delegation in
+the transcript and compare:
 
 | Case | Required evidence |
 |---|---|
@@ -272,8 +311,14 @@ routing, the scout or role deployment, run the reuse evaluation once:
 | Native alternative on web | Rejects `NativeConfirm` for the browser and finds `SheetDialog`. |
 | Missing CSV importer | No invented candidate; inspected paths and missing capabilities. |
 
-Turn a real repeated workflow failure into a new minimal case here; do not
-grow the catalog by intuition.
+## Switching to auto mode
+
+`bypassPermissions` is the owner's choice. The sync also manages
+`autoMode.soft_deny` rules that restate the authority rules (publishing,
+secrets, deletion, Stow and system changes, tracker writes, sending data out),
+so switching to `auto` (for example on the work PC, if policy disables bypass)
+is safe from the first session: set `permissions.defaultMode` to `auto` locally
+or pick it in `/permissions`. The classifier adds some token cost per action.
 
 ## Backups and recovery
 
@@ -307,3 +352,14 @@ sync is running before removing that exact file.
 [Desktop Extra](https://github.com/patrickjaja/claude-desktop-extra) and
 [Playwright CLI](https://github.com/microsoft/playwright-cli). Settings keys,
 skill overrides and subagent fields were checked against Claude Code 2.1.284.
+
+## Provenance
+
+Ideas adopted and adapted, not installed: small composable skills and
+explicit user skills (`mattpocock/skills`); TDD, systematic debugging and
+verification before completion (`obra/superpowers`); deny rules plus blocking
+guard hooks (`trailofbits/claude-code-config`); Linear from `openai/skills`
+(see its `SOURCE.md`). Playwright CLI is vendored with checksums in
+`ai/skills/playwright-cli/SOURCE.json`. External catalogs are never installed
+globally; an idea is adopted only when it reduces risk or context and is
+versioned, tested and reviewable here.

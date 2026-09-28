@@ -61,9 +61,11 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
         self.assertTrue((self.home / ".claude/hooks/ai-guard.py").is_file())
         self.assertIn("Read(**/.env)", settings["permissions"]["deny"])
+        self.assertEqual(settings["autoMode"]["soft_deny"][0], "$defaults")
+        self.assertEqual(len(settings["autoMode"]["soft_deny"]), len(sync.AUTO_SOFT_DENY))
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
         self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
-        self.assertNotIn("model", settings)
+        self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["permissions"]["defaultMode"], "bypassPermissions")
         self.assertEqual(self.build().operations, [])
         self.assertIsNone(self.build().apply())
@@ -93,14 +95,14 @@ class AISyncTest(unittest.TestCase):
         self.assertIn("__pycache__", sync.snapshot(skill / "scripts")["entries"])
 
     def test_keep_models_connections_corporate_preferences_and_hooks(self):
-        self.json_write(".claude/settings.json", {"model": "local-choice", "effortLevel": "medium",
+        self.json_write(".claude/settings.json", {"effortLevel": "medium",
             "company": {"keep": True}, "hooks": {"Stop": [{"matcher": "corp", "hooks": []}]}})
         self.json_write(".claude.json", {"oauthAccount": {"private": "fixture"},
             "mcpServers": {"company": {"type": "http", "url": "https://example.com"}},
             "projects": {"C:/Work Space": {"allowedTools": []}}})
         self.build().apply()
         settings = sync.read_json(self.home / ".claude/settings.json")
-        self.assertEqual(settings["model"], "local-choice")
+        self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["effortLevel"], "medium")
         self.assertTrue(settings["company"]["keep"])
         self.assertEqual(settings["hooks"]["Stop"][0]["matcher"], "corp")
@@ -113,7 +115,7 @@ class AISyncTest(unittest.TestCase):
         self.build().apply()
         path = self.home / ".claude/settings.json"
         data = sync.read_json(path)
-        data["model"] = "later-choice"
+        data["theme"] = "later-choice"
         path.write_text(json.dumps(data), encoding="utf-8")
         self.assertEqual(self.build().operations, [])
 
@@ -142,7 +144,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(path.read_text(), "personal")
 
     def test_exact_rollback_restores_original_config(self):
-        self.json_write(".claude/settings.json", {"model": "existing"})
+        self.json_write(".claude/settings.json", {"theme": "existing"})
         original = (self.home / ".claude/settings.json").read_bytes()
         obj = self.build()
         backup = obj.apply()
@@ -354,10 +356,27 @@ class AISyncTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "entrada gestionada retirada"):
             self.build()
 
+    def test_codex_gets_the_same_guard_and_keeps_foreign_hooks(self):
+        foreign = {"matcher": "Bash", "hooks": [{"type": "command", "command": "company-audit"}]}
+        self.json_write(".codex/hooks.json", {"hooks": {"PreToolUse": [foreign], "Stop": []}})
+        self.build("linux", "codex").apply()
+        hooks = sync.read_json(self.home / ".codex/hooks.json")["hooks"]
+        self.assertEqual(hooks["PreToolUse"][0], foreign)
+        self.assertEqual(hooks["PreToolUse"][1]["matcher"], "Bash|apply_patch")
+        self.assertIn(".codex/hooks/ai-guard.py", hooks["PreToolUse"][1]["hooks"][0]["command"])
+        self.assertEqual((self.home / ".codex/hooks/ai-guard.py").read_text(),
+                         (sync.ROOT / "ai/hooks/ai-guard.py").read_text())
+        self.assertEqual(self.build("linux", "codex").operations, [])
+
     def test_new_key_never_overwrites_a_different_local_value(self):
         self.json_write(".claude/settings.json", {"statusLine": {"type": "command", "command": "my-status"}})
         with self.assertRaisesRegex(ValueError, "clave nueva"):
             self.build()
+        self.json_write(".claude/settings.json", {"model": "sonnet"})
+        with self.assertRaisesRegex(ValueError, "clave nueva.*model"):
+            self.build()
+        self.json_write(".claude/settings.json", {"model": "opus"})
+        self.build()
         self.json_write(".claude/settings.json", {})
         self.build().apply()
         self.assertEqual(self.build().operations, [])
@@ -385,9 +404,9 @@ class AISyncTest(unittest.TestCase):
         sources = sys.modules["ai_sources"]
         skills = {p.name for p in (sync.ROOT / "ai/skills").iterdir() if p.is_dir()}
         self.assertEqual(skills, sources.IMPLICIT_SKILLS | sources.EXPLICIT_SKILLS)
-        overrides = {route[1] for route, value in sync.CLAUDE_KEYS.items()
-                     if route[0] == "skillOverrides" and value == "user-invocable-only"}
-        self.assertEqual(overrides, set(sources.EXPLICIT_SKILLS))
+        overrides = {route[1]: value for route, value in sync.CLAUDE_KEYS.items() if route[0] == "skillOverrides"}
+        self.assertEqual({k for k, v in overrides.items() if v == "user-invocable-only"}, set(sources.USER_SKILLS))
+        self.assertEqual({k for k, v in overrides.items() if v == "name-only"}, set(sources.NAMED_SKILLS))
         agents = sources.roles("claude", "linux")
         self.assertEqual(set(agents), {p.stem + ".md" for p in (sync.ROOT / "ai/roles").glob("*.json")})
         for text in agents.values():

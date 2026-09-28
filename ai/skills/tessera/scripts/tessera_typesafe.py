@@ -19,7 +19,7 @@ def build_request(context):
 
 def check_credentials():
     wire.require(bool(os.environ.get("TYPESAFE_API_KEY")),
-                 "Falta TYPESAFE_API_KEY en este proceso; no se llamó a Jev")
+                 "TYPESAFE_API_KEY is missing in this process; Jev was not called")
 
 
 def invoke(body):
