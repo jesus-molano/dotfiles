@@ -5,9 +5,17 @@
 Tessera is personal tooling. Each project has its own catalog and history,
 stored outside Git repositories by default:
 
-- Linux: `${XDG_DATA_HOME:-~/.local/share}/tessera/projects/<id>/`.
-- Windows: `%LOCALAPPDATA%\tessera\projects\<id>\` (Claude Desktop installed
-  as an MSIX app may see a virtualized copy of that folder).
+- Every platform: `${XDG_DATA_HOME:-~/.local/share}/tessera/projects/<id>/`, or
+  `$TESSERA_HOME/projects/<id>/` when set. On Windows that is
+  `%USERPROFILE%\.local\share\tessera`, which MSIX does not virtualize.
+- Earlier Windows stores are discovered, never moved: the real
+  `%LOCALAPPDATA%\tessera` and each MSIX app's private copy under
+  `%LOCALAPPDATA%\Packages\<app>\LocalCache\Local\tessera` (Claude Desktop and
+  Codex are MSIX apps, so each saw only its own copy). `status` lists them in
+  `paths.legacy_stores` with `next_action: adopt_store`, and
+  `adopt-store --repo PROJECT --from PATH` copies the chosen one into the
+  current location and keeps the source. Pick the freshest; compare with
+  `status` on each if unsure.
 
 `tessera.py locate --repo PROJECT` resolves those paths without creating files.
 They contain `catalog.json`, `inventory.json`, `history/`, `tasks/`, `runs/`,
@@ -187,7 +195,8 @@ tags, relevance or top-k for a provider decision; see [batches](batching.md).
 
 `evaluate` requires a per-project grant in `provider-consent.json` that names
 the provider and its exact endpoint. The user grants or revokes it in their own
-terminal with `tessera.py consent --repo PROJECT --provider NAME [--revoke]`.
+terminal with `tessera.py consent --repo PROJECT --provider NAME [--revoke]`;
+anyone, including agents, can read it with `tessera.py consent-status --repo PROJECT`.
 The `ai-guard` hook blocks that command for agents, so an agent cannot approve
 itself. The grant records only the endpoint and a timestamp. For work projects,
 grant it only when the company allows sending project material to that provider.
@@ -284,7 +293,9 @@ python3 "$SKILL_DIR/scripts/kev-local.py" serve
 
 In PowerShell use `python` and the skill path. The default runtime is
 `$XDG_DATA_HOME/tessera/kev` (usually `~/.local/share/tessera/kev`) on Linux and
-`%LOCALAPPDATA%\tessera\kev` on Windows; `--runtime PATH` selects another.
+`~\.local\share\tessera\kev` on Windows; `--runtime PATH` or `TESSERA_KEV_DIR`
+selects another. An existing runtime inside an MSIX app copy keeps working: pass
+its path; `check` lists earlier runtimes it finds. Moving a runtime is optional.
 Never copy `.venv`, caches, weights, keys or secret references between PCs.
 Installation rejects existing targets. If uv failed after the checkout, inspect
 that target's revision and patch and recover only the missing dependency with

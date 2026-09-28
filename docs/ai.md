@@ -41,7 +41,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, Tessera `provider-consent.json` writes | Deny rules still apply in bypass mode. |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules still apply in bypass mode; `Edit` rules cover every file write. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
 | `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Inert in bypass mode; makes a switch to `auto` safe from the first session. |
@@ -204,6 +204,18 @@ cd 'C:\Users\you\dotfiles'
 
 The default deploys Claude only; `-Clients both` also keeps an installed Codex.
 Each skill is copied and verified; a later local edit blocks its overwrite.
+Run `ai-setup.ps1` from a normal PowerShell or Windows Terminal, not from a tool
+launched by Claude Desktop or Codex: both are MSIX apps, and Windows redirects
+their writes under `AppData\Local` to a private per-app copy.
+
+If the ownership ledger is missing (lost state, a new machine that already has
+copies, or an earlier run from inside an MSIX app), the plan stops with
+"destino ajeno". Run `.\scripts\ai-setup.ps1 -Mode plan -Adopt`: it adopts only
+destinations it can prove came from this repository (skill files matching a Git
+blob of `ai/` history, CRLF included; files carrying the generation header;
+role files with the role's frontmatter; historical hook versions) and prints an
+`adopt:` line for each. Anything else still stops the plan. Adoption needs the
+full Git history of the checkout, not a shallow clone.
 Hooks and the status line run with the absolute path of the Python that ran
 `ai-setup.ps1`; after moving or upgrading Python, run `-Mode apply` again.
 `cachyos-host-audit` and the Stop notification are Linux-only. In a new session
@@ -233,7 +245,11 @@ utilities outside every repository (see the [skill](../ai/skills/tessera/SKILL.m
   only while it improves decisions.
 - **Studio:** [Tessera Studio](https://github.com/jesus-molano/tessera-studio)
   (`python -m tessera_studio --open`) is a separate read-only viewer bound to
-  `127.0.0.1`. It also finds the store of MSIX-virtualized apps on Windows.
+  `127.0.0.1`.
+- **Windows store:** catalogs live in `%USERPROFILE%\.local\share\tessera`, shared
+  by Claude, Codex and the shell. Stores left in `%LOCALAPPDATA%` or in an MSIX
+  app's private copy show up as `adopt_store` in `status`; adopt the freshest
+  with `tessera.py adopt-store --repo PROJECT --from PATH` (the source is kept).
 
 Catalogs, runs and consent never enter Git, dotfiles or GitHub.
 

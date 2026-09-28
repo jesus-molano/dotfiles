@@ -14,6 +14,10 @@ import subprocess
 import sys
 
 sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import tessera_paths  # noqa: E402
+
+sys.dont_write_bytecode = True
 UPSTREAM = "https://github.com/jaredpalmer/kev.git"
 REVISION = "9c41005b2180347c3c646dfc9e50c4428483ec6b"
 SERVE_HASH = "1780dd9f8355a13a09ebe849ac4093b46b59055f7e5c302ab2283b608513418f"
@@ -26,11 +30,12 @@ WINDOWS_CUDA_WHEEL = (
 
 
 def default_runtime():
-    if os.name == "nt":
-        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
-    else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
-    return Path(os.environ.get("TESSERA_KEV_DIR", base / "tessera/kev"))
+    # Same non-virtualized store as the catalogs; see tessera_paths.
+    return Path(os.environ.get("TESSERA_KEV_DIR", tessera_paths.data_home() / "kev"))
+
+
+def legacy_runtimes():
+    return [home / "kev" for home in tessera_paths.legacy_homes() if (home / "kev").is_dir()]
 
 
 def run(*args, cwd=None, capture=False):
@@ -44,7 +49,9 @@ def python_path(runtime):
 
 def verify_source(runtime):
     if not (runtime / ".git").is_dir():
-        raise ValueError("The Kev checkout is missing; run install into a new target.")
+        found = [str(path) for path in legacy_runtimes()]
+        hint = f" Earlier runtimes found (pass one with --runtime or TESSERA_KEV_DIR): {found}" if found else ""
+        raise ValueError("The Kev checkout is missing; run install into a new target." + hint)
     if run("git", "rev-parse", "HEAD", cwd=runtime, capture=True).stdout.strip() != REVISION:
         raise ValueError("Different Kev revision; an existing runtime is never replaced.")
     if hashlib.sha256((runtime / "kev/serve.py").read_bytes()).hexdigest() != SERVE_HASH:

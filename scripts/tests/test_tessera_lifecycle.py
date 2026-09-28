@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -372,6 +373,28 @@ class LifecycleTest(unittest.TestCase):
         card = self.call("card", "--id", "helper")["entries"][0]
         self.assertIn("contract", card)
         self.call("card", "--id", "unknown", ok=False)
+
+    def test_msix_and_localappdata_stores_are_found_and_adopted_without_deleting(self):
+        self.ready()
+        current = Path(self.paths["root"])
+        msix = self.root / "local/Packages/Claude_x/LocalCache/Local/tessera/projects" / current.name
+        shutil.copytree(current, msix)
+        shutil.rmtree(current)
+        self.env["LOCALAPPDATA"] = str(self.root / "local")
+        status = self.call("status")
+        self.assertEqual((status["status"], status["next_action"]), ("uninitialized", "adopt_store"))
+        self.assertEqual(status["paths"]["legacy_stores"], [str(msix)])
+        self.call("adopt-store", "--from", self.root / "elsewhere", ok=False)
+        adopted = self.call("adopt-store", "--from", msix)
+        self.assertTrue(adopted["source_kept"] and msix.is_dir())
+        self.assertEqual(self.call("status")["status"], "ready")
+        self.call("adopt-store", "--from", msix, ok=False)
+
+    def test_consent_status_is_read_only(self):
+        self.assertEqual(self.call("consent-status")["granted"], {})
+        self.call("consent", "--provider", "typesafe")
+        granted = self.call("consent-status")["granted"]
+        self.assertEqual(granted, {"typesafe": tessera.PROVIDERS["typesafe"].endpoint()})
 
     def test_provider_consent_is_per_project_and_endpoint(self):
         with patch.dict(os.environ, self.env):

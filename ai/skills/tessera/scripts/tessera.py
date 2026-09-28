@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -22,6 +23,7 @@ import tessera_typesafe
 import tessera_kev
 import tessera_batches
 import tessera_skeleton
+import tessera_paths
 
 PROVIDERS = {"typesafe": tessera_typesafe, "kev": tessera_kev}
 ACTIONS = {
@@ -111,14 +113,12 @@ def storage_paths(repo):
     """
     common = Path(git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").decode().strip()).resolve()
     key = digest(os.path.normcase(str(common)).encode("utf-8"))
-    if os.name == "nt":
-        base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local"))
-    else:
-        base = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
-    root = (base / "tessera/projects" / key).resolve()
+    root = (tessera_paths.data_home() / "projects" / key).resolve()
     require_external(root)
+    legacy = [str(home / "projects" / key) for home in tessera_paths.legacy_homes()
+              if (home / "projects" / key).is_dir()]
     return {"project_key": key, "root": str(root), "catalog": str(root / "catalog.json"),
-            "inventory": str(root / "inventory.json"),
+            "inventory": str(root / "inventory.json"), "legacy_stores": legacy,
             **{name: str(root / name) for name in ("tasks", "runs", "decisions", "history")}}
 
 
@@ -261,7 +261,9 @@ def project_status(repo):
     snapshot = project_snapshot(repo)
     path = Path(paths["inventory"])
     protected_paths = {name: item["review"]["reason"] for name, item in snapshot["files"].items() if item["review"]}
-    result = {"status": "uninitialized", "next_action": "init", "paths": paths,
+    result = {"status": "uninitialized",
+              "next_action": "adopt_store" if paths["legacy_stores"] and not Path(paths["root"]).exists() else "init",
+              "paths": paths,
               "revision": snapshot["revision"], "checkout_changes": snapshot["checkout_changes"],
               "inventory_sha256": None, "coverage": {"total": len(snapshot["files"]), "reviewed": 0,
               "protected": len(protected_paths), "pending": len(snapshot["files"]) - len(protected_paths)},
@@ -709,6 +711,27 @@ def set_consent(repo, provider_id, grant):
     return {"consent": data, "path": str(path)}
 
 
+def consent_status(repo):
+    """Read-only view of the grants, so an agent can check them without touching the file."""
+    path = consent_path(repo)
+    data = load(path) if path.is_file() else {}
+    return {"granted": {provider: grant.get("endpoint") for provider, grant in data.items()
+                        if isinstance(grant, dict)}}
+
+
+def adopt_store(repo, source):
+    """Copy an earlier project store into the current location; the source is kept."""
+    paths = storage_paths(repo)
+    source = Path(source).resolve()
+    require(str(source) in {str(Path(p).resolve()) for p in paths["legacy_stores"]},
+            "Not a known earlier store of this project; see status paths.legacy_stores")
+    root = Path(paths["root"])
+    require(not root.exists(), "The current store already exists; nothing was copied")
+    private_parents(root.parent)
+    shutil.copytree(source, root, symlinks=True)
+    return {"adopted_from": str(source), "root": str(root), "source_kept": True}
+
+
 INDEX_FIELDS = ("id", "kind", "name", "tags", "summary", "source")
 
 
@@ -943,6 +966,11 @@ def main():
     consent.add_argument("--repo", type=Path, required=True)
     consent.add_argument("--provider", choices=PROVIDERS, required=True)
     consent.add_argument("--revoke", action="store_true")
+    grants = commands.add_parser("consent-status", help="Read-only: providers this project may send cards to")
+    grants.add_argument("--repo", type=Path, required=True)
+    adopt = commands.add_parser("adopt-store", help="Copy an earlier store (old %%LOCALAPPDATA%% or MSIX app copy) into the current location")
+    adopt.add_argument("--repo", type=Path, required=True)
+    adopt.add_argument("--from", type=Path, required=True, dest="source")
     changes = commands.add_parser("changes", help="Detect changes that require card updates, without writing")
     changes.add_argument("--repo", type=Path, required=True)
     changes.add_argument("--catalog", type=Path)
@@ -981,6 +1009,10 @@ def main():
             result = catalog_cards(args.repo, args.ids)
         elif args.command == "report":
             result = decision_report(args.repo)
+        elif args.command == "consent-status":
+            result = consent_status(args.repo)
+        elif args.command == "adopt-store":
+            result = adopt_store(args.repo, args.source)
         elif args.command == "consent":
             result = set_consent(args.repo, args.provider, not args.revoke)
         elif args.command == "changes":

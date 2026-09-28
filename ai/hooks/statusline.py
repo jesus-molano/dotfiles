@@ -47,6 +47,10 @@ def line(data: dict) -> str:
 
 
 def main() -> int:
+    for stream in (sys.stdin, sys.stdout):
+        # Windows defaults to the ANSI code page (cp1252); Claude Code reads UTF-8.
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         data = json.load(sys.stdin)
     except (json.JSONDecodeError, UnicodeDecodeError):
