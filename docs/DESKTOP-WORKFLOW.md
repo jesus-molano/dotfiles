@@ -54,8 +54,8 @@ de emergencia es `Ctrl + Space + Esc`.
 
 ## Proyectos y acciones avanzadas
 
-`/proj` descubre repositorios dentro de `~/projects`, `~/work`, `~/.dotfiles` y
-`~/orca/workspaces`. Muestra exactamente una fila por repositorio, con su nombre
+`/proj` descubre repositorios dentro de `~/projects`, `~/work` y `~/.dotfiles`.
+Muestra exactamente una fila por repositorio, con su nombre
 y ruta. Al elegir una fila, enfoca o abre ChatGPT
 y abre Ghostty/Zellij en el directorio del proyecto.
 
@@ -309,9 +309,7 @@ Los cambios aparecen al volver a abrir `/wall`; no requieren desplegar Stow.
 
 Noctalia regenera Hyprland, Ghostty, GTK, Qt, btop, Starship, Bat/Delta y las
 demás plantillas activas. Starship se genera fuera del checkout. Neovim lee la
-paleta al abrir una instancia nueva. Al usar Orca como respaldo mediante
-`hypr-orca`, su helper aplica la paleta antes de abrir la ventana y no reescribe
-sus ajustes mientras la interfaz está abierta.
+paleta al abrir una instancia nueva.
 Thunderbird recibe los colores de la paleta activa en tiempo real mediante una
 extensión local. `just apply` vuelve a generar la extensión y su manifiesto. En
 una instalación nueva, aplica una vez la política que prepara el instalador:

@@ -70,7 +70,7 @@ require_text "$audio_compat" 'exec cycle-audio-output "$@"'
 test -x "$audio_compat"
 if grep -Fq 'bind(hyper .. " + O"' "$user_binds" ||
     grep -Fq 'CONTROL + ALT + SUPER + SHIFT + O' "$generated_host"; then
-    printf '%s\n' 'FAIL: Hyper+O queda libre tras migrar Orca.' >&2
+    printf '%s\n' 'FAIL: Hyper+O debe quedar libre.' >&2
     exit 1
 fi
 

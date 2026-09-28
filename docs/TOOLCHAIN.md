@@ -2,7 +2,7 @@
 
 La composición base despliega configuración portable para Node, Python,
 Android y herramientas de terminal. No descarga el SDK de Android, no acepta
-licencias y no instala automáticamente ChatGPT Community ni Orca.
+licencias y no instala automáticamente ChatGPT Community.
 
 ## Node y JavaScript
 
@@ -73,12 +73,6 @@ proceso existente. La regla coloca sus ventanas en `special:chatgpt silent`.
 `Hyper + W` alterna ese escritorio; las capturas y proyectos usan `--focus` para
 revelarlo sin ocultarlo cuando ya está visible. `Hyper + O` queda libre y
 `Hyper + C` conserva el modo cafeína.
-
-Orca queda instalada como reserva, sin arranque automático ni atajo principal.
-Sus helpers manuales, datos y workspaces se conservan. Sus automatizaciones no
-se importan a ChatGPT al cambiar el lanzador: requieren una migración explícita
-de instrucciones, horarios y proyectos. No iniciar ambas apps para duplicar
-el mismo trabajo programado. Para usar Orca manualmente permanece `orca-ide`.
 
 La instalación inicial de ChatGPT Community usa la base oficial Linux, sin
 features comunitarias ni actualizador automático. Las actualizaciones de la

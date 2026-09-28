@@ -1,5 +1,5 @@
 function proj --description "Quick project switcher with fzf"
-    set -l search_dirs "$HOME/projects" "$HOME/work" "$HOME/.dotfiles" "$HOME/orca/workspaces"
+    set -l search_dirs "$HOME/projects" "$HOME/work" "$HOME/.dotfiles"
 
     # Direct match via zoxide
     if test (count $argv) -gt 0

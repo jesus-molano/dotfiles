@@ -30,7 +30,7 @@
 
 ChatGPT Community es la app principal de trabajo. Codex CLI se ejecuta fuera
 de Neovim, en el terminal Ghostty/Zellij del proyecto. `Hyper + W` alterna
-ChatGPT; Orca se conserva como respaldo manual, sin atajo principal.
+ChatGPT.
 
 | Atajo | Acción |
 |-------|--------|

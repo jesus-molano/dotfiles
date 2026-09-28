@@ -65,11 +65,13 @@ grep -Fq 'toggle_special("chatgpt")' "$TEST_LOG"
 "$bin/hypr-chatgpt" --focus 'codex://example?value=a%20b'
 grep -Fq 'codex://example?value=a%20b' "$TEST_LOG"
 grep -Fq 'start-ai-background' "$repo_root/hypr-common/.config/hypr/config/autostart.lua"
-if grep -q 'start-orca' "$repo_root/hypr-common/.config/hypr/config/autostart.lua"; then exit 1; fi
 grep -Fq 'special:chatgpt silent' "$repo_root/hypr-common/.config/hypr/config/windowrules.lua"
-if grep -q 'special:orca' "$repo_root/hypr-common/.config/hypr/config/windowrules.lua"; then exit 1; fi
 grep -Fq 'hyper .. " + W", hl.dsp.exec_cmd("hypr-ai")' "$repo_root/hypr-common/.config/hypr/config/user-binds.lua"
-if grep -q 'hypr-orca' "$repo_root/hypr-common/.config/hypr/config/user-binds.lua"; then exit 1; fi
+# Orca was removed; keep its launchers, autostart and window rules from returning.
+for retired in hypr-orca start-orca-background orca-safe-settings; do
+	[[ ! -e "$repo_root/hypr-common/.local/bin/$retired" ]] || exit 1
+done
+if grep -rq 'orca' "$repo_root/hypr-common/.config/hypr/config/"; then exit 1; fi
 desktop-file-validate "$repo_root/hypr-common/.local/share/applications/codex-desktop.desktop"
 [[ $(grep -c '^Exec=.*CODEX_LINUX_DISABLE_USAGE_REPORTING=1' "$repo_root/hypr-common/.local/share/applications/codex-desktop.desktop") == 2 ]]
-printf '%s\n' 'PASS: ChatGPT inicia oculto; Hyper+W alterna, --focus conserva visible y Orca queda fuera del arranque'
+printf '%s\n' 'PASS: ChatGPT inicia oculto; Hyper+W alterna, --focus conserva visible'
