@@ -25,6 +25,8 @@ jobs:
           python-version: '3.13'
       - name: Portable sync contracts
         run: python -m unittest discover -s scripts/tests -p test_ai_sync.py
+      - name: Project gate under cmd.exe
+        run: python -m unittest discover -s scripts/tests -p test_project_gate.py
       - name: PowerShell deployment with spaces
         shell: pwsh
         run: |
