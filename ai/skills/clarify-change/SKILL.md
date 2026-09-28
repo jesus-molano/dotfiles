@@ -1,6 +1,6 @@
 ---
 name: clarify-change
-description: Resolve material product, security, data, compatibility, rollout, or authority decisions before a software change. Use when repository inspection cannot settle an ambiguity that would change durable behavior or risk.
+description: Resolve material product, security, data, compatibility, rollout or authority decisions before a software change. Use when repository inspection cannot settle an ambiguity that would change durable behavior or risk.
 ---
 
 # Clarify Change

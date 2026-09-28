@@ -1,27 +1,25 @@
 ---
 name: handoff
-description: Prepare precise continuation notes for another engineer or agent so work can resume without rediscovery. Use when pausing or documenting the transfer context of an implementation or investigation; this skill does not move chats, worktrees, terminals, or ownership.
+description: Prepare precise continuation notes so another engineer or agent can resume work without rediscovery. Use when pausing, ending a session or handing over an implementation or investigation; it writes notes only and moves no chats, worktrees or ownership.
 ---
 
 # Handoff Notes
 
-Write a compact, evidence-backed continuation packet.
-If implementation already has a task record, use and link
-that artifact; do not create a competing plan. Preserve the selected reuse
-contracts, candidate paths and any verification still needed on resume.
+Write a compact, evidence-backed continuation packet. If the implementation
+already has a task record, use and link it; do not create a competing plan.
+Keep the selected reuse contracts, candidate paths and any verification still
+needed on resume.
 
-Lead with the objective, scope, authority boundaries, current status, and
-definition of done. Include decisions and rationale; files and relevant paths;
-completed work; exact validation run and outcomes; remaining steps in order;
-blockers and open questions; risks, rollback, and external state changes.
-When Linear is in scope, include only verified issue IDs or links and their
-current status, plus any proposed tracker action that still needs authorization.
-Separate verified facts from assumptions and questions. Point to canonical
-artifacts rather than pasting long logs, and omit all secrets or environment-file
-contents.
+Lead with the objective, scope, authority limits, current status and
+definition of done. Include decisions and rationale; relevant files and paths;
+completed work; the exact checks run and their results; remaining steps in
+order; blockers and open questions; risks, rollback and external state changes.
+When Linear is in scope, include only verified issue IDs or links, their current
+status and any tracker action that still needs authorization. Separate
+verified facts from assumptions. Point to canonical artifacts instead of
+pasting long logs, and omit all secrets and environment-file contents.
 
-The recipient should be able to start at the next safe action. These are notes
-only: do not move an Orca/Codex chat, change worktrees or terminals, claim
-ownership transfer, publish changes, or update external systems. Return the
-packet in the response unless the user requests a specific durable file or
-destination and authorizes that write.
+The reader must be able to start at the next safe action. These are notes only:
+do not move chats, change worktrees or terminals, claim an ownership transfer,
+publish changes or update external systems. Return the packet in the response
+unless the user asks for a specific file and authorizes that write.

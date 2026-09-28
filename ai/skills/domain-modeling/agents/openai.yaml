@@ -1,6 +1,6 @@
 interface:
   display_name: "Domain Modeling"
   short_description: "Model concepts and business rules"
-  default_prompt: "Use $domain-modeling to guide this task."
+  default_prompt: "Use $domain-modeling to model this domain before design."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false

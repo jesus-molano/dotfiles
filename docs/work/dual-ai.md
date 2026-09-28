@@ -1,3 +1,6 @@
+> **Historical record (Spanish).** The current configuration is described in
+> [docs/ai.md](../ai.md).
+
 # Codex y Claude: integración compartida
 
 ## Contrato

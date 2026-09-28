@@ -1,6 +1,6 @@
 ---
 name: test-driven-development
-description: Apply focused RED-GREEN-REFACTOR to an isolatable behavior change, regression, contract, error path, security rule, or accessible interaction. Invoke explicitly or when a parent implementation skill directs it.
+description: Apply focused RED-GREEN-REFACTOR to an isolatable behavior change, regression, contract, error path, security rule or accessible interaction. Use when invoked explicitly or when engineering-flow directs it.
 ---
 
 # Test-Driven Development

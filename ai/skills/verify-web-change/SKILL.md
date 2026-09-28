@@ -1,6 +1,6 @@
 ---
 name: verify-web-change
-description: Verify a completed Next.js, Nuxt, or Vue change with the repository's real scripts and focused browser checks. Invoke explicitly or from verification-before-completion; do not use to implement the change.
+description: Verify a completed Next.js, Nuxt or Vue change with the repository's real scripts and focused browser checks. Use when invoked explicitly or from verification-before-completion; not to implement the change.
 ---
 
 # Verify Web Change

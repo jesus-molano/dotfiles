@@ -14,8 +14,15 @@ import tessera
 SCRIPT = Path(__file__).resolve().parents[2] / "ai/skills/tessera/scripts/tessera.py"
 
 
+REAL_CONSENT = tessera.require_provider_consent
+AGENT = {"action": "create", "primary": None, "reason": "Blind agent decision fixture"}
+
+
 class LifecycleTest(unittest.TestCase):
     def setUp(self):
+        consent = patch.object(tessera, "require_provider_consent")
+        consent.start()
+        self.addCleanup(consent.stop)
         self.tmp = tempfile.TemporaryDirectory(prefix="tessera lifecycle ")
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
@@ -172,7 +179,7 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(status["pending_paths"], ["consumer.ts"])
         self.assertEqual(status["status"], "needs_update")
         self.review([self.records()[1]])
-        self.assertIn("Curación", self.call("finalize", ok=False).stderr)
+        self.assertIn("Curation", self.call("finalize", ok=False).stderr)
         self.catalog()
         self.assertEqual(self.call("finalize")["status"], "ready")
 
@@ -216,7 +223,7 @@ class LifecycleTest(unittest.TestCase):
         catalog.write_text(json.dumps(value))
         self.assertEqual(self.call("status")["status"], "needs_update")
         task = self.root / "task.json"
-        task.write_text(json.dumps({"id": "fixture", "requirement": "Use the constant", "acceptance": ["Returns 1"]}))
+        task.write_text(json.dumps({"id": "fixture", "requirement": "Use the constant", "acceptance": ["Returns 1"], "agent_choice": AGENT}))
         self.call("prepare", "--task", task, "--require-ready", ok=False)
         self.call("finalize")
         self.assertEqual(self.call("prepare", "--task", task, "--require-ready")["project_status"], "ready")
@@ -298,20 +305,20 @@ class LifecycleTest(unittest.TestCase):
             return original(repo)
 
         with patch.dict(os.environ, self.env), patch.object(tessera, "project_snapshot", side_effect=changing):
-            with self.assertRaisesRegex(ValueError, "proyecto cambió"):
+            with self.assertRaisesRegex(ValueError, "project changed"):
                 tessera.scan_project(self.repo)
         self.assertEqual(target.read_bytes(), before)
 
     def test_ready_run_rechecks_live_catalog_before_network(self):
         self.ready()
         task = self.root / "task.json"
-        task.write_text(json.dumps({"id": "fixture", "requirement": "Use the constant", "acceptance": ["Returns 1"]}))
+        task.write_text(json.dumps({"id": "fixture", "requirement": "Use the constant", "acceptance": ["Returns 1"], "agent_choice": AGENT}))
         run = self.call("prepare", "--task", task, "--require-ready")["run"]
         value = self.catalog()
         value["entries"][0]["constraints"] = ["Changed contract"]
         Path(self.paths["catalog"]).write_text(json.dumps(value))
         with patch.dict(os.environ, self.env), patch.object(tessera.tessera_typesafe, "invoke") as invoke:
-            with self.assertRaisesRegex(ValueError, "cobertura cambió"):
+            with self.assertRaisesRegex(ValueError, "[Cc]overage changed"):
                 tessera.evaluate(Path(run))
             invoke.assert_not_called()
         self.assertFalse((Path(run) / "attempt.json").exists())
@@ -323,7 +330,7 @@ class LifecycleTest(unittest.TestCase):
         Path(self.paths["catalog"]).write_text(json.dumps(value))
         self.call("finalize")
         task = self.root / "task.json"
-        task.write_text(json.dumps({"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"]}))
+        task.write_text(json.dumps({"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"], "agent_choice": AGENT}))
         run = Path(self.call("prepare", "--task", task, "--require-ready")["run"])
         context = json.loads((run / "context.json").read_text())
         self.assertNotIn("tests", context["catalog"]["entries"][0])
@@ -338,6 +345,48 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(result["action"], "reuse")
         invoke.assert_called_once()
         self.assertNotIn(b"never-opened", invoke.call_args.args[0])
+        # The blind agent choice (create) is kept and compared, never sent to the provider.
+        self.assertEqual((result["agent_choice"], result["agreement"]), (AGENT, False))
+        self.assertNotIn("agent_choice", json.dumps(context))
+        report = self.call("report")
+        self.assertEqual((report["decisions"], report["compared"], report["agreements"]), (1, 1, 0))
+
+    def test_prepare_requires_a_valid_blind_agent_choice(self):
+        self.ready()
+        task = self.root / "task.json"
+        base = {"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"]}
+        for choice in (None, {"action": "reuse", "primary": "missing", "reason": "x"},
+                       {"action": "create", "primary": "helper", "reason": "x"}):
+            task.write_text(json.dumps({**base, **({} if choice is None else {"agent_choice": choice})}))
+            self.call("prepare", "--task", task, "--require-ready", ok=False)
+        task.write_text(json.dumps({**base, "agent_choice": {"action": "reuse", "primary": "helper", "reason": "Fits"}}))
+        self.assertEqual(self.call("prepare", "--task", task, "--require-ready")["agent_choice"]["primary"], "helper")
+
+    def test_index_is_compact_and_cards_are_read_on_demand(self):
+        self.assertEqual(self.call("index")["entries"], [])
+        self.ready()
+        index = self.call("index")
+        self.assertEqual(index["status"], "ready")
+        self.assertEqual([entry["id"] for entry in index["entries"]], ["helper"])
+        self.assertNotIn("contract", index["entries"][0])
+        card = self.call("card", "--id", "helper")["entries"][0]
+        self.assertIn("contract", card)
+        self.call("card", "--id", "unknown", ok=False)
+
+    def test_provider_consent_is_per_project_and_endpoint(self):
+        with patch.dict(os.environ, self.env):
+            endpoint = tessera.PROVIDERS["typesafe"].endpoint()
+            with self.assertRaisesRegex(ValueError, "consent"):
+                REAL_CONSENT(self.repo, "typesafe", endpoint)
+            self.call("consent", "--provider", "typesafe")
+            REAL_CONSENT(self.repo, "typesafe", endpoint)
+            with self.assertRaisesRegex(ValueError, "consent"):
+                REAL_CONSENT(self.repo, "typesafe", "https://other.invalid")
+            with self.assertRaisesRegex(ValueError, "consent"):
+                REAL_CONSENT(self.repo, "kev", endpoint)
+            self.call("consent", "--provider", "typesafe", "--revoke")
+            with self.assertRaisesRegex(ValueError, "consent"):
+                REAL_CONSENT(self.repo, "typesafe", endpoint)
 
     def test_empty_catalog_still_requires_review_of_every_file(self):
         self.call("init")
@@ -378,7 +427,7 @@ class LifecycleTest(unittest.TestCase):
     def test_prepare_rejects_concurrent_changes_outside_catalog(self):
         self.ready()
         task = self.root / "task.json"
-        task.write_text(json.dumps({"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"]}))
+        task.write_text(json.dumps({"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"], "agent_choice": AGENT}))
         original = tessera.build_evidence
 
         def capture_with_new_file(catalog, repo):
@@ -388,7 +437,7 @@ class LifecycleTest(unittest.TestCase):
 
         output = self.root / "never-created"
         with patch.dict(os.environ, self.env), patch.object(tessera, "build_evidence", side_effect=capture_with_new_file):
-            with self.assertRaisesRegex(ValueError, "cobertura cambió"):
+            with self.assertRaisesRegex(ValueError, "[Cc]overage changed"):
                 tessera.prepare(Path(self.paths["catalog"]), self.repo, task, output, require_ready=True)
         self.assertFalse(output.exists())
 

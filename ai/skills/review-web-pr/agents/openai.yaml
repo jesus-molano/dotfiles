@@ -1,6 +1,6 @@
 interface:
-  display_name: "Revisar PR web"
-  short_description: "Revisa PRs web por riesgo y cobertura"
-  default_prompt: "Usa $review-web-pr para revisar esta rama frente a su base y priorizar riesgos reales."
+  display_name: "Review Web PR"
+  short_description: "Review web PRs by risk and coverage"
+  default_prompt: "Use $review-web-pr to review this branch against its base and rank real risks."
 policy:
   allow_implicit_invocation: true

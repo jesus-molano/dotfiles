@@ -1,62 +1,54 @@
 # Repository reuse
 
 Apply before adding or replacing UI or behavior, regardless of task size. The
-goal is to use the repository's supported solution, not merely make new code
-look similar. Reuse inspected earlier in the same task remains valid unless
-requirements, contracts, or the relevant code changed.
+goal is to use the repository's supported solution, not to make new code look
+similar. Reuse evidence gathered earlier in the task stays valid unless the
+requirements, contracts or relevant code changed.
 
-Use `tessera.py status --repo PROJECT` from the Tessera skill to find the local
-external catalog and its coverage/freshness. Follow its lifecycle to initialize,
-resume, update or fully review the project. Finalize reviewed coverage before
-`prepare --require-ready`, then consult the full catalog for the implementation choice.
-Personal tool data stays outside work repositories and personal dotfiles. Do
-not create `.tessera` or change a work project's `.gitignore` for this workflow.
-Use the scout to fill evidence gaps or expand coverage, not to shortlist or
-filter the catalog before the decision provider sees it. Without Tessera, use
-the existing discovery workflow below. Neither route depends on Atlas.
+## Find candidates
 
-Delegate candidate discovery to the configured `reuse-scout` (light model,
-read-only). Give it the repository, requested behavior, relevant platform and
-known owner paths, not the whole conversation. One bounded search returns
-candidate paths, contracts, real consumers and evidence gaps. The implementing
-agent owns the compatibility decision. Existing current evidence needs no new
-scout. If delegation is unavailable, disclose it and perform the minimum local
-inspection; never claim a model switch that did not happen.
+- **Tessera catalog, when the project has one.** Run
+  `tessera.py status --repo PROJECT` (read-only, no network). If the status is
+  `ready` or `needs_update`, run `tessera.py index --repo PROJECT` for the
+  compact list and `tessera.py card --repo PROJECT --id ID` for the few cards
+  that matter. Refresh stale cards as the `tessera` skill describes. Never read
+  the whole catalog into context, and never start initialization (`init`)
+  unless the user asks for it: an uninitialized project uses the search below.
+- **Search.** Otherwise, or to fill a gap, delegate one bounded search to
+  `reuse-scout` (light model, read-only). Give it the repository, the requested
+  behavior, the platform and known owner paths, not the whole conversation. It
+  returns candidate paths, contracts, real consumers and evidence gaps. If
+  delegation is unavailable, say so and do the minimum local inspection; never
+  claim a model switch that did not happen.
 
-1. Locate the owning feature and its nearest working equivalent. Use `rg` and
-   the repository's indexes, exports, aliases, component docs or stories to find
-   candidates by behavior as well as name. Inspect shared packages and the
-   project's wrapper around a library, not only the current folder or the
-   dependency list. Keep the search bounded to plausible owners and consumers.
-2. Read the best candidate's implementation or public contract and a real call
-   site. Check supported props, variants, slots, state, accessibility, and
-   platform/runtime compatibility. For functionality, inspect existing hooks,
-   services, helpers, validation and generated clients before adding equivalent
-   logic. A search hit or matching name alone does not establish suitability.
-3. When using Tessera, retain its `reuse`, `modify`, `wrap`, `create` or
-   `insufficient_evidence` vocabulary in the decision record. Without Tessera,
-   choose `reuse`, `extend`, `compose`, `extract-and-reuse`, `create`, or
-   `not-applicable`. Briefly name the candidate path and the reason. For `create`,
-   give the nearest rejected candidate and concrete missing capability, or the
-   searched locations when no candidate exists. An incomplete search is an
-   evidence gap, not proof of absence. For `not-applicable`, explain why the
-   change adds or replaces no reusable behavior or UI.
+## Decide
+
+1. Locate the owning feature and its nearest working equivalent. Search by
+   behavior as well as name: indexes, exports, aliases, component docs or
+   stories, shared packages and the project's wrappers around libraries, not
+   only the current folder or the dependency list.
+2. Read the best candidate's implementation or public contract and one real
+   call site. Check supported props, variants, slots, state, accessibility and
+   platform compatibility. For functionality, check existing hooks, services,
+   helpers, validation and generated clients. A name match alone proves nothing.
+3. Record one decision: `reuse`, `extend`, `compose`, `extract-and-reuse`,
+   `create` or `not-applicable` (Tessera uses `reuse`, `modify`, `wrap`,
+   `create`, `insufficient_evidence`). Name the candidate path and the reason.
+   For `create`, give the nearest rejected candidate and the missing capability,
+   or the searched locations. An incomplete search is an evidence gap, not
+   proof of absence.
 4. Implement through the supported interface. Prefer existing props, slots and
-   tokens over overrides, copies, or a new wrapper that only renames the API.
-   Extend a shared contract only when necessary and inspect affected consumers;
-   do not spread a task-local requirement to every caller. Do not force an
-   incompatible or deprecated abstraction just to claim reuse.
-5. Recheck the final diff for duplicate behavior, bypassed wrappers, copied CSS,
-   hardcoded design values, and unexplained new primitives. Verify the selected
-   component's behavior in the changed flow, not only the import or appearance.
+   tokens over overrides, copies or a wrapper that only renames the API. Extend
+   a shared contract only when necessary and check its consumers. Do not force
+   an incompatible or deprecated abstraction just to claim reuse.
+5. Recheck the final diff for duplicate behavior, bypassed wrappers, copied
+   CSS, hardcoded design values and unexplained new primitives.
 
-For UI, explicitly look for the repository's modal/dialog, typography/text,
-buttons, fields, notifications, layout and token conventions relevant to the
-request. A styled `div` is not an equivalent replacement for a supported dialog
-with focus management. A styled paragraph must not bypass a suitable typography
-component. Native HTML is appropriate when it is the established pattern or no
-compatible abstraction exists; preserve semantics and explain the decision.
+For UI, explicitly look for the project's dialog, typography, button, field,
+notification, layout and token conventions. A styled `div` is not a
+replacement for a supported dialog with focus management, and a styled
+paragraph must not bypass a suitable typography component. Native HTML is right
+when it is the established pattern or no compatible abstraction exists.
 
-Include one concise reuse line with paths in the final handoff. Delegated writers
-receive the chosen contract and evidence, or this inspection as part of their
-scope.
+Put one reuse line with paths in the final handoff. Delegated writers receive
+the chosen contract and evidence.

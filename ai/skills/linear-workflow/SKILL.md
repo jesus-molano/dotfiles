@@ -1,6 +1,6 @@
 ---
 name: linear-workflow
-description: Read Linear context and, with explicit authorization, create or update issues, comments, and workflow fields through the official Linear MCP. Use when work must be associated with Linear through the local safety workflow rather than another Linear integration.
+description: Read Linear context and, with explicit authorization, create or update issues, comments and workflow fields through the official Linear MCP. Use when work must be read from or written to Linear through the local safety workflow.
 ---
 
 # Linear Workflow
@@ -57,29 +57,27 @@ silently edit client configuration.
 
 ## Engineering integration
 
-- `$to-tickets` owns decomposition and produces local drafts first. Publish an
+- `to-tickets` owns decomposition and produces local drafts first. Publish an
   approved batch only through this skill after its Linear mapping is explicit.
-- `$engineering-flow` may use a Linear key or URL as read-only input. Code being
+- `engineering-flow` may use a Linear key or URL as read-only input. Code being
   implemented, validated, committed, pushed, or merged never implies permission
   to change the issue status or add a comment.
-- `$handoff` may include verified Linear IDs, links, status, and pending tracker
+- `handoff` may include verified Linear IDs, links, status, and pending tracker
   actions. It remains notes-only unless a separate Linear write is authorized.
 - Use an issue key in a branch name or PR title only when the repository
   workflow calls for it. Creating the branch or PR remains a separate action.
 
-In Codex, enable the preconfigured write server for one new session only with:
+## Client setup for a write session
+
+In Codex, enable the preconfigured write server for one new session only:
 
 ```bash
 codex -c 'mcp_servers.linear-write.enabled=true'
 ```
 
 The override does not persist. The opening prompt must explicitly invoke
-`$linear-workflow` and carry the draft preview, but not claim that a prior
-session's authorization remains valid.
-
-This local adaptation is based on an official OpenAI skill. See
-[source and modification notice](SOURCE.md) and the bundled
-[Apache-2.0 license](LICENSE.txt).
+`$linear-workflow` and carry the draft preview, but must not claim that a prior
+session's authorization is still valid.
 
 In Claude Code, create a temporary, private JSON file outside the repository:
 
@@ -88,7 +86,13 @@ In Claude Code, create a temporary, private JSON file outside the repository:
 ```
 
 Launch a fresh `claude --mcp-config /absolute/path/to/temporary-linear.json`
-session (quote paths with spaces in PowerShell). Do not add this server to user
-or project settings. Follow the same fresh preview and confirmation contract.
-Delete only that exact temporary file after the authorized session ends.
-Skill invocation uses `/linear-workflow` in Claude and `$linear-workflow` in Codex.
+session (quote paths with spaces in PowerShell) and invoke `/linear-workflow`.
+Do not add this server to user or project settings. Follow the same fresh
+preview and confirmation contract. Delete only that exact temporary file after
+the authorized session ends.
+
+## Provenance
+
+This local adaptation is based on an official OpenAI skill. See the
+[source and modification notice](SOURCE.md) and the bundled
+[Apache-2.0 license](LICENSE.txt).

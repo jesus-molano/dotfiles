@@ -45,12 +45,12 @@ def pack(context, groups, provider, encoded, *, reduction=False, uncertain=False
                 requests.append(request(pending))
                 pending = []
             if len(group) + 2 > 255 or len(encoded(request(group))) > REQUEST_BYTES:
-                raise ValueError("Una ficha/propuesta excede el presupuesto de petición; no se ha truncado")
+                raise ValueError("A card/proposal exceeds the request budget; nothing was truncated")
         pending += group
     if pending or not requests:
         value = request(pending)
         if len(encoded(value)) > REQUEST_BYTES:
-            raise ValueError("Tarea o instrucciones exceden el presupuesto de petición")
+            raise ValueError("Task or instructions exceed the request budget")
         requests.append(value)
     return requests
 
@@ -68,7 +68,7 @@ def plan(context, provider, encoded):
         remaining = (remaining + 1) // 2
         bound += remaining
     if bound > MAX_CALLS:
-        raise ValueError("Plan excede el máximo de 128 llamadas; no se ha omitido ninguna ficha")
+        raise ValueError("Plan exceeds the 128-call maximum; no card was omitted")
     # Any two finalists must fit together, otherwise a later round could stall.
     # Check the two largest complete proposals with the longest action description.
     def size(key):
@@ -78,20 +78,28 @@ def plan(context, provider, encoded):
                      key=size, reverse=True)[:2]
     if len(largest) == 2 and len(pack(context, [[key] for key in largest], provider, encoded,
                                      reduction=True, uncertain=True)) != 1:
-        raise ValueError("Dos finalistas no caben juntos; no se puede reducir sin truncar contratos")
+        raise ValueError("Two finalists do not fit together; cannot reduce without truncating contracts")
     return {"schema": 1, "mode": "exhaustive-batches-v1", "request_byte_limit": REQUEST_BYTES,
             "max_calls": bound, "entry_ids": sorted(entry["id"] for entry in context["catalog"]["entries"]),
             "requests": requests}
 
 
+def coordinator(choice, last):
+    """A rule-derived result, recorded as such; never attributed to the provider."""
+    rule = ("every partition answered create" if choice == "create"
+            else "no partition proposed a card and at least one lacked evidence")
+    return {"choice": choice, "decided_by": "coordinator", "rule": rule,
+            "model": last["model"], "usage": {"input_tokens": 0, "output_tokens": 0}}
+
+
 def run(context, plan, provider, encoded, invoke):
     requests = plan["requests"]
-    winners, uncertain, count = [], False, 0
+    winners, uncertain, count, first_round = [], False, 0, None
     while True:
         winners = []
         for request in requests:
             if count >= plan["max_calls"]:
-                raise ValueError("Plan agotado; decisión incompleta")
+                raise ValueError("Plan exhausted; incomplete decision")
             raw, answer = invoke(request, count)
             count += 1
             choice = answer["choice"]
@@ -99,9 +107,21 @@ def run(context, plan, provider, encoded, invoke):
                 uncertain = True
             elif choice != "create":
                 winners.append(choice)
+        if first_round is None:
+            # Every card was seen once here: the partition winners are the most
+            # useful signal for tasks that compose several existing pieces.
+            first_round = [context["options"][key] | {"option": key} for key in winners]
+            first_round = [{"option": o["option"], "action": o["action"], "primary": o["primary"]}
+                           for o in first_round]
         if len(requests) == 1:
             if uncertain and answer["choice"] == "create":
-                raise ValueError("Creación global sin evidencia suficiente en todos los lotes")
-            return raw, answer, count
+                raise ValueError("Global create without sufficient evidence in every batch")
+            return raw, {**answer, "batch_proposals": first_round}, count
+        if not winners:
+            # No partition proposed a card. Asking the provider to compare an empty
+            # set adds a call and no information, so the documented rule decides:
+            # unanimous create means no card fits; any uncertainty means abstention.
+            return None, {**coordinator("insufficient_evidence" if uncertain else "create", answer),
+                          "batch_proposals": first_round}, count
         requests = pack(context, [[key] for key in winners], provider, encoded,
                         reduction=True, uncertain=uncertain)

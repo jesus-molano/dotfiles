@@ -1,5 +1,5 @@
-# Preferencias reproducibles. No sustituir config.toml: conserva hooks de
-# integraciones (incluido Orca como respaldo) y datos específicos de la máquina.
+# Reproducible preferences. Never replace config.toml: keep integration hooks
+# and machine-specific data.
 model = "gpt-5.6-sol"
 model_reasoning_effort = "medium"
 approval_policy = "never"
@@ -13,9 +13,6 @@ memories = true
 
 [memories]
 disable_on_external_context = true
-
-[sandbox_workspace_write]
-network_access = true
 
 [agents]
 enabled = true

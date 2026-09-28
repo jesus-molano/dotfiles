@@ -71,7 +71,7 @@ class BatchPlanTest(unittest.TestCase):
     def test_oversize_card_fails_without_truncation(self):
         c = context(1, batches.REQUEST_BYTES)
         before = copy.deepcopy(c)
-        with self.assertRaisesRegex(ValueError, 'excede'):
+        with self.assertRaisesRegex(ValueError, 'exceeds'):
             batches.plan(c, tessera.tessera_typesafe, tessera.encoded)
         self.assertEqual(c, before)
 
@@ -91,18 +91,56 @@ class BatchPlanTest(unittest.TestCase):
         self.assertGreater(count, len(plan['requests']))
         self.assertTrue(all(len(tessera.encoded(r)) <= batches.REQUEST_BYTES for r in seen))
 
-    def test_unknown_partition_cannot_turn_into_global_create(self):
+    def test_unknown_partition_without_proposals_abstains_without_empty_call(self):
+        c = context()
+        plan = batches.plan(c, tessera.tessera_typesafe, tessera.encoded)
+        seen = []
+        def invoke(request, index):
+            seen.append(len(request['state']['catalog']['entries']))
+            raw = response(request, 'insufficient_evidence' if index == 0 else 'create')
+            return raw, tessera.tessera_typesafe.validate_response(request, json.loads(raw))
+        raw, answer, count = batches.run(c, plan, tessera.tessera_typesafe, tessera.encoded, invoke)
+        self.assertIsNone(raw)
+        self.assertEqual((answer['choice'], answer['decided_by']), ('insufficient_evidence', 'coordinator'))
+        self.assertEqual(count, len(plan['requests']))
+        self.assertNotIn(0, seen, 'The provider must never receive an empty comparison')
+
+    def test_unanimous_create_is_resolved_by_rule_not_by_an_empty_call(self):
         c = context()
         plan = batches.plan(c, tessera.tessera_typesafe, tessera.encoded)
         def invoke(request, index):
-            raw = response(request, 'insufficient_evidence' if index == 0 else 'create')
+            self.assertTrue(request['state']['catalog']['entries'], 'Empty comparison sent to the provider')
+            # A real provider shown no cards tends to abstain; this mock would expose that call.
+            raw = response(request, 'create')
             return raw, tessera.tessera_typesafe.validate_response(request, json.loads(raw))
-        with self.assertRaisesRegex(ValueError, 'Creación global'):
+        raw, answer, count = batches.run(c, plan, tessera.tessera_typesafe, tessera.encoded, invoke)
+        self.assertIsNone(raw)
+        self.assertEqual((answer['choice'], answer['decided_by'], answer['usage']['input_tokens']),
+                         ('create', 'coordinator', 0))
+        self.assertEqual(count, len(plan['requests']))
+
+    def test_uncertain_final_create_still_fails(self):
+        c = context()
+        plan = batches.plan(c, tessera.tessera_typesafe, tessera.encoded)
+        def invoke(request, index):
+            options = [key for key in request['questions']['decision']['criteria'] if key not in batches.GLOBAL]
+            if index == 0:
+                choice = 'insufficient_evidence'
+            elif index == 1:
+                choice = options[0]
+            else:
+                choice = 'create'
+            raw = response(request, choice)
+            return raw, tessera.tessera_typesafe.validate_response(request, json.loads(raw))
+        with self.assertRaisesRegex(ValueError, 'Global create'):
             batches.run(c, plan, tessera.tessera_typesafe, tessera.encoded, invoke)
 
 
 class BatchIntegrationTest(unittest.TestCase):
     def setUp(self):
+        consent = patch.object(tessera, "require_provider_consent")
+        consent.start()
+        self.addCleanup(consent.stop)
         self.fixture = fixtures.TesseraTest()
         self.fixture.setUp()
         self.addCleanup(self.fixture.doCleanups)
@@ -129,6 +167,9 @@ class BatchIntegrationTest(unittest.TestCase):
         with patch.object(tessera.tessera_typesafe, 'check_credentials'), \
                 patch.object(tessera.tessera_typesafe, 'invoke', side_effect=invoke) as send:
             result = tessera.evaluate(f.run_dir)
+            self.assertEqual(result['decided_by'], 'provider')
+            self.assertTrue(result['batch_proposals'])
+            self.assertTrue(all(set(p) == {'option', 'action', 'primary'} for p in result['batch_proposals']))
             self.assertEqual(len(result['evaluated_entry_ids']), 85)
             self.assertEqual(result['usage']['input_tokens'], send.call_count * 10)
             self.assertEqual(len(result['calls']), send.call_count)
@@ -182,7 +223,7 @@ class BatchIntegrationTest(unittest.TestCase):
             return response(request, 'create')
         with patch.object(tessera.tessera_typesafe, 'check_credentials'), \
                 patch.object(tessera.tessera_typesafe, 'invoke', side_effect=invoke) as send:
-            with self.assertRaisesRegex(ValueError, 'checkout cambió'): tessera.evaluate(f.run_dir)
+            with self.assertRaisesRegex(ValueError, 'checkout changed'): tessera.evaluate(f.run_dir)
         self.assertEqual(send.call_count, 1)
         self.assertEqual(tessera.load(f.run_dir / 'failure.json')['completed_calls'], 1)
         self.assertFalse((f.run_dir / 'decision.json').exists())

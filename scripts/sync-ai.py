@@ -18,7 +18,7 @@ import uuid
 from pathlib import Path
 
 import tomllib
-from ai_sources import ROOT, LINUX_SKILLS, RETIRED, instructions, roles
+from ai_sources import NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
 
 MISSING = {"$absent": True}
 MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
@@ -31,9 +31,41 @@ CLAUDE_KEYS = {
     ("attribution", "pr"): "",
     ("attribution", "sessionUrl"): False,
     ("pluginConfigs", "agents-md@builtin", "options", "instructionFiles"): "claude-md-and-agents-md",
-    ("skillOverrides", "test-driven-development"): "user-invocable-only",
-    ("skillOverrides", "verify-web-change"): "user-invocable-only",
 }
+# User skills are hidden from the model; named skills show only their name.
+CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in sorted(USER_SKILLS)})
+CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAMED_SKILLS)})
+# Defaults set only when the key is absent and never owned afterwards, so a later
+# /model or local choice is kept. Main agent: Opus (the alias follows the latest
+# Opus, Opus 5.5 today); reading roles set Haiku/Sonnet in their own files.
+CLAUDE_DEFAULTS = {("model",): "opus"}
+# Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
+DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
+        "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
+        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)",
+        "Write(~/.local/share/tessera/projects/*/provider-consent.json)",
+        "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
+        "Write(~/AppData/Local/tessera/projects/*/provider-consent.json)",
+        "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)"]
+
+# Rules for the auto-mode classifier. Inert under bypassPermissions; they make a
+# switch to `auto` safe from the first session. "$defaults" keeps the built-ins.
+AUTO_SOFT_DENY = [
+    "$defaults",
+    "Pushing to a remote unless the user authorized that exact repository, branch and commit in this conversation",
+    "Reading, printing or copying secret files such as .env or credential stores, or revealing secret values",
+    "Deleting, overwriting or formatting data outside the current task, or without confirming the exact target",
+    "Running GNU Stow over every package, or changing /etc, boot, Btrfs, GPU drivers or system services without an explicit request",
+    "Creating, editing or commenting on issues or pull requests in Linear or GitHub without explicit authorization",
+    "Sending project source or catalog data to an external service the task has not already been authorized to use",
+]
+
+
+def hook_command(home: Path, platform: str, script: str, folder: str = ".claude/hooks") -> str:
+    # Windows has no reliable `python` on PATH (py launcher, Store alias), and a hook
+    # that fails to start is ignored, so pin the interpreter that runs this sync.
+    python = f'"{Path(sys.executable).as_posix()}"' if platform == "windows" else "python3"
+    return f'{python} "{(home / folder / script).as_posix()}"'
 
 
 def encode(data: bytes) -> str:
@@ -244,6 +276,11 @@ class Sync:
             # Unrelated JSON/TOML fields may change freely; managed fields may not.
             if get(original, route) != item["value"] and get(original, route) != get(desired, route):
                 raise ValueError(f"Conflicto: clave gestionada modificada: {path} ({'.'.join(route)})")
+        owned = {tuple(item["path"]) for item in previous}
+        for route in keys:
+            # Adopting a key the user already set to something else would erase their choice.
+            if route not in owned and get(desired, route) != MISSING and get(original, route) not in (MISSING, get(desired, route)):
+                raise ValueError(f"Conflicto: valor local distinto en clave nueva: {path} ({'.'.join(map(str, route))})")
         projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
         self.next_state[key] = {"keys": projection}
         if original != desired:
@@ -251,6 +288,34 @@ class Sync:
             if current["kind"] == "file":
                 after["mode"] = current["mode"]
             self.operations.append({"path": str(path), "before": current, "after": after})
+
+    def managed_entries(self, path: Path, original: dict, desired: dict, wanted: list) -> list:
+        """Own single list items (deny rules, hook groups), never the whole list.
+
+        Foreign entries stay untouched. A managed entry that the user removed is a
+        conflict; one that the source no longer wants is removed.
+        """
+        previous = self.state.get(str(path.relative_to(self.home)), {})
+        owned = [(tuple(route), entry) for route, entry in previous.get("entries", [])]
+        if previous.get("notify"):
+            owned.append((("hooks", "Stop"), NOTIFY))
+        for route, entry in owned:
+            current = get(original, route)
+            present = isinstance(current, list) and entry in current
+            if (route, entry) in wanted and not present:
+                raise ValueError(f"Conflicto: entrada gestionada retirada: {path} ({'.'.join(route)})")
+            if (route, entry) not in wanted and present:
+                get(desired, route).remove(entry)
+        for route, entry in wanted:
+            items = get(desired, route)
+            if items == MISSING:
+                put(desired, route, [])
+                items = get(desired, route)
+            if not isinstance(items, list):
+                raise ValueError(f"Se esperaba una lista: {path} ({'.'.join(route)})")
+            if entry not in items:
+                items.append(copy.deepcopy(entry))
+        return [[list(route), entry] for route, entry in wanted]
 
     def known_legacy_file(self, path, source):
         if path.is_symlink():
@@ -288,21 +353,28 @@ class Sync:
         self.asset(base / "CLAUDE.md", file_value(instructions("claude", self.platform, self.root)))
         for name, text in roles("claude", self.platform, self.root).items():
             self.asset(base / "agents" / name, file_value(text))
+        for name, text in hook_scripts(self.root).items():
+            self.asset(base / "hooks" / name, file_value(text))
         path = base / "settings.json"
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
-        for keys, value in CLAUDE_KEYS.items():
-            put(desired, keys, value)
+        keys = dict(CLAUDE_KEYS)
+        keys[("statusLine",)] = {"type": "command", "padding": 0,
+                                 "command": hook_command(self.home, self.platform, "statusline.py")}
+        for route, value in keys.items():
+            put(desired, route, value)
+        for route, value in CLAUDE_DEFAULTS.items():
+            if get(original, route) == MISSING:
+                put(desired, route, value)
+        guard = {"matcher": "Bash|PowerShell|Workflow|Write|Edit|MultiEdit", "hooks": [
+            {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
+        wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
+        wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
         if self.platform == "linux":
-            previous = self.state.get(str(path.relative_to(self.home)), {})
-            if previous.get("notify") and NOTIFY not in original.get("hooks", {}).get("Stop", []):
-                raise ValueError(f"Conflicto: hook gestionado modificado: {path}")
-            entries = desired.setdefault("hooks", {}).setdefault("Stop", [])
-            if NOTIFY not in entries:
-                entries.append(copy.deepcopy(NOTIFY))
-        self.merged(path, original, desired, CLAUDE_KEYS, json_text(desired))
-        if self.platform == "linux":
-            self.next_state[str(path.relative_to(self.home))]["notify"] = True
+            wanted.append((("hooks", "Stop"), NOTIFY))
+        entries = self.managed_entries(path, original, desired, wanted)
+        self.merged(path, original, desired, keys, json_text(desired))
+        self.next_state[str(path.relative_to(self.home))]["entries"] = entries
         path = self.home / ".claude.json"
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
@@ -348,6 +420,18 @@ class Sync:
                 metadata_keys[route] = hashlib.sha256(content.encode()).hexdigest()
                 put(desired_meta, route, metadata_keys[route])
             self.merged(path, original_meta, desired_meta, metadata_keys, json_text(desired_meta))
+        # Same guard as Claude: Codex hooks.json uses the same schema and stdin
+        # contract. Codex runs a new user hook only after it is trusted in /hooks.
+        guard_script = hook_scripts(self.root)["ai-guard.py"]
+        self.asset(base / "hooks/ai-guard.py", file_value(guard_script))
+        path = base / "hooks.json"
+        _, original = self.read_config(path)
+        desired = copy.deepcopy(original)
+        guard = {"matcher": "Bash|apply_patch", "hooks": [{"type": "command", "timeout": 10,
+                 "command": hook_command(self.home, self.platform, "ai-guard.py", ".codex/hooks")}]}
+        entries = self.managed_entries(path, original, desired, [(("hooks", "PreToolUse"), guard)])
+        self.merged(path, original, desired, {}, json_text(desired))
+        self.next_state[str(path.relative_to(self.home))]["entries"] = entries
         mod = runpy.run_path(str(self.root / "scripts/sync-codex-config.py"))
         path = base / "config.toml"
         raw, original = self.read_config(path, "toml")

@@ -1,265 +1,280 @@
-# Contrato Tessera v1
+# Tessera contract v1
 
-## Propiedad y separación
+## Ownership and separation
 
-Tessera es tooling personal. Cada proyecto tiene un catálogo e historial
-independientes, guardados fuera de los repositorios Git por defecto:
+Tessera is personal tooling. Each project has its own catalog and history,
+stored outside Git repositories by default:
 
 - Linux: `${XDG_DATA_HOME:-~/.local/share}/tessera/projects/<id>/`.
-- Windows: `%LOCALAPPDATA%\tessera\projects\<id>\`.
+- Windows: `%LOCALAPPDATA%\tessera\projects\<id>\` (Claude Desktop installed
+  as an MSIX app may see a virtualized copy of that folder).
 
-`tessera.py locate --repo PROJECT` resuelve esas rutas sin crear archivos.
-Contienen `catalog.json`, `inventory.json`, `history/`, `tasks/`, `runs/` y `decisions/`. El ID es
-un hash de la ruta local real de `git-common-dir`: worktrees enlazados comparten
-conocimiento; clones independientes tienen almacenes separados. No usa remotos,
-credenciales ni un archivo de identificación dentro del proyecto. Mover o
-reclonar el checkout cambia el ID: recuperar/revisar el catálogo de forma
-explícita, sin copiarlo automáticamente entre equipos o empresas.
+`tessera.py locate --repo PROJECT` resolves those paths without creating files.
+They contain `catalog.json`, `inventory.json`, `history/`, `tasks/`, `runs/`,
+`decisions/`, optional `curation/` and `provider-consent.json`. The ID is a hash
+of the real local path of `git-common-dir`: linked worktrees share knowledge;
+independent clones have separate stores. It uses no remotes, credentials or
+identification file inside the project. Moving or recloning the checkout
+changes the ID: recover or review the catalog explicitly, never copy it
+automatically between machines or companies.
 
-En proyectos del trabajo no se crea `.tessera`, no se modifica `.gitignore` y
-no se versionan fichas ni decisiones. Tampoco se copian a dotfiles/GitHub
-personal. Dotfiles distribuye scripts y skills; los datos permanecen en el PC
-del trabajo. No hay sincronización de catálogos entre ordenadores. Un traslado
-requiere petición explícita y un destino autorizado. Compartir un catálogo en
-un repo es una excepción explícita, no el valor predeterminado.
+Work projects never get a `.tessera` folder, a `.gitignore` change or
+versioned cards or decisions, and their data is never copied to personal
+dotfiles or GitHub. Dotfiles ship scripts and skills; the data stays on the
+work PC. Catalogs are not synchronized between computers. A transfer needs an
+explicit request and an authorized destination. Sharing a catalog in a
+repository is an explicit exception, not the default.
 
-`prepare` rechaza catálogo, tarea o salida dentro de cualquier checkout Git;
-`evaluate` vuelve a comprobar la ubicación del run antes de escribir o llamar
-al proveedor, incluso si se llega mediante un enlace. `--allow-repo-storage`
-se exige en cada invocación afectada y permite únicamente
-un flujo de compartición expresamente autorizado. La detección usa los marcadores
-de checkout `.git`; no es un sandbox ni un sistema de clasificación de datos.
-No usar la excepción para proyectos del trabajo.
+`prepare` rejects a catalog, task or output inside any Git checkout; `evaluate`
+checks the run location again before writing or calling the provider, even
+through a link. `--allow-repo-storage` is required on every affected call and
+allows only an expressly authorized sharing flow. Detection uses the `.git`
+checkout markers; it is not a sandbox or a data classification system. Never
+use the exception for work projects.
 
-`ai/tessera/pilots/expenses-log-app` es el piloto personal previamente publicado,
-no un patrón para almacenar información de empresa ni un despliegue en la app.
+`ai/tessera/pilots/expenses-log-app` is the previously published personal
+pilot, not a pattern for storing company information or a deployment in the app.
 
-| Capa | Contenido | Propietario |
+| Layer | Content | Owner |
 |---|---|---|
-| Catálogo curado | Responsabilidad, contrato, restricciones, fuentes y usos | Proyecto y sus agentes |
-| Evidencia derivada | Inventario, contenido de fuentes, hashes, revisión | `prepare`, regenerable |
-| Contexto neutral | Tarea, fichas completas, procedencia y opciones; sin archivos completos | Tessera |
-| Intercambio externo | Petición/respuesta específica, autenticación | Adaptador de proveedor |
-| Decisión | Acción, identidad, procedencia, explicación atribuida y resultado | Proyecto |
+| Curated catalog | Responsibility, contract, constraints, sources and usages | Project and its agents |
+| Derived evidence | Inventory, source content, hashes, revision | `prepare`, regenerable |
+| Neutral context | Task, complete cards, provenance and options; no full files | Tessera |
+| External exchange | Provider-specific request and response, authentication | Provider adapter |
+| Decision | Action, identity, provenance, attributed explanation, blind agent choice and outcome | Project |
 
-No guarda memoria conversacional, planes de trabajo ni referencias de inspiración.
-No usa Atlas, una base vectorial, Figma ni un servidor.
+Tessera stores no conversational memory, work plans or inspiration references.
+It uses no Atlas, vector database, Figma or server.
 
-El [ciclo de vida](lifecycle.md) define `status`, `init`, `scan`, `review` y
-`finalize`: cobertura del árbol Git sin tests, revisión reanudable y vigencia.
-`current` en `changes` describe las fichas del ámbito; solo `ready` en `status`
-acredita inventario revisado y catálogo finalizado. El flujo habitual prepara
-con `--require-ready`. Un piloto antiguo sin inventario requiere revisión completa.
+The [lifecycle](lifecycle.md) defines `status`, `init`, `scan`, `review`,
+`skeleton` and `finalize`: coverage of the Git tree without tests, resumable
+review and freshness. `current` in `changes` describes the scoped cards; only
+`ready` in `status` proves a reviewed inventory and a finalized catalog.
 
-## Catálogo y crecimiento
+## Agent lookup
 
-JSON UTF-8 con `schema: 1`, `project`, `scope` y `entries`. `scope` enumera rutas
-relativas de archivos o directorios del proyecto. En directorios se inventarían
-los archivos salvo tests y artefactos de pruebas, excluidos por ruta antes de
-leer contenido según [lifecycle](lifecycle.md).
-No hay lista de lenguajes admitidos ni filtro de relevancia. Usar ámbitos de
-fuentes concretos; no incluir HOME, dependencias, datos de usuarios o secretos.
+`index` returns `status`, `next_action` and one compact entry per card (`id`,
+`kind`, `name`, `tags`, `summary`, `source`), about 170 bytes per card instead
+of the full card. `card --id ID` (repeatable) returns complete cards without
+legacy `tests` fields. Both are read-only and offline. The agent may shortlist
+from the index: the "no preselection" rule applies only to provider decisions.
 
-Cada ficha contiene:
+## Catalog and growth
 
-- `id`: estable, minúsculas y guiones; independiente del proveedor y del checkout.
-- `name`, `tags`: opcionales; nombre de exports y conceptos que ayudan a descubrir.
-- `kind`, `summary`, `contract`: naturaleza, responsabilidad y API/comportamiento.
-  Explicitar entradas, salidas, efectos y dependencias relevantes al contrato.
-- `constraints`: restricciones y garantías ausentes; lista explícita.
-- `source`: archivo que implementa el contrato. Una ficha puede describir varios
-  exports de ese archivo. El piloto usa una ficha por archivo de implementación.
-- `usages`: objetos `path`, `start`, `end`, con líneas inclusivas de un uso real.
-  Si no se encuentran consumidores, admite `[]` con `usage_gap` textual que
-  explique la búsqueda o uso implícito del framework. No inventar un consumidor.
-- `tests`: campo antiguo opcional; se ignora sin abrir ni resolver sus rutas y
-  no se envía al proveedor. Omitirlo en fichas nuevas. Las pruebas quedan fuera
-  de fuentes, usos, soporte y decisiones de Tessera.
+UTF-8 JSON with `schema: 1`, `project`, `scope` and `entries`. `scope` lists
+project-relative file or directory paths. Directories inventory their files
+except tests and test artifacts, excluded by path before content is read as
+[lifecycle](lifecycle.md) describes. There is no language list or relevance
+filter. Use concrete source scopes; never include HOME, dependencies, user data
+or secrets.
 
-`supporting_files` opcional enumera rutas de tokens, estilos o manifiestos para
-la inspección local. `derived.json` conserva los archivos completos y hashes.
-El proveedor recibe fichas, referencias y estado de curación, no los archivos.
-Las rutas no conceden acceso: ni Jev ni otro motor remoto puede abrirlas.
-Si falta un dato para decidir, el agente inspecciona la fuente y enriquece el
-contrato o las restricciones antes de preparar otro run. No se recortan fichas
-ni se sube el código completo automáticamente.
-`coverage` y `reviewed_revision` documentan alcance y revisión humana/agente.
-Un proyecto sin piezas catalogables puede tener `scope: []` y `entries: []`;
-la revisión de todos sus archivos y exclusiones sigue siendo necesaria para
-finalizarlo. `kind` es una clasificación semántica extensible, asignada por el
-agente leyendo código y consumidores, no por un detector de nombres de archivo.
-Todas las rutas son relativas al proyecto. El helper rechaza escapes, enlaces,
-`.env*`, campos desconocidos, evidencia no versionada, IDs repetidos y diferencias entre ámbito y fichas.
-La evidencia local registra archivos completos, no solo rangos de uso; deduplica
-por ruta. La petición compacta no contiene esos textos.
-`evidence.curation.status` distingue `current` si las fuentes coinciden con la
-revisión curada, `stale` si cambian o no se puede resolver esa revisión, y
-`unverified` si falta. Un commit ajeno al ámbito no invalida las fichas: se
-comparan los árboles Git de las rutas de evidencia. `evaluate` rechaza `stale` antes del envío.
-Revisar también la semántica y actualizar `reviewed_revision` tras curar cambios.
+Each card contains:
 
-Para incorporar un componente/utilidad: inspeccionar contrato y consumidor,
-añadir ficha, ampliar ámbito si corresponde, registrar usos reales o gaps, ejecutar
-`prepare` y revisar el diff. Un candidato nuevo en un ámbito ya declarado causa
-error de cobertura hasta curarlo. No queda oculto por ranking. La primera versión
-prepara evidencia de un checkout limpio; después de implementar, verificar y
-crear el commit local coherente antes de regenerar el snapshot.
+- `id`: stable, lowercase with hyphens; independent of provider and checkout.
+- `name`, `tags`: optional; export names and concepts that help discovery.
+- `kind`, `summary`, `contract`: nature, responsibility and API or behavior.
+  State inputs, outputs, effects and dependencies relevant to the contract.
+- `constraints`: limits and missing guarantees, as an explicit list.
+- `source`: the file that implements the contract. A card may describe several
+  exports of that file.
+- `usages`: objects with `path`, `start`, `end` (inclusive lines of a real
+  use). Without consumers, `[]` needs a textual `usage_gap` that explains the
+  search or the framework's implicit use. Never invent a consumer.
+- `tests`: old optional field; ignored without opening or resolving its paths
+  and never sent to the provider. Omit it in new cards.
 
-### Cambios de compañeros y actualización
+Optional `supporting_files` lists token, style or manifest paths for local
+inspection. `derived.json` keeps the full files and hashes. The provider gets
+cards, references and curation state, not files. On the wire each card keeps
+every curated field but at most three usage references plus `usage_count`; the
+local context keeps the complete card. Paths grant no access: no
+remote engine can open them. If a fact needed to decide is missing, the agent
+inspects the source and enriches the contract or constraints before preparing
+another run. Cards are never trimmed and source is never uploaded automatically.
+`coverage` and `reviewed_revision` document scope and human or agent review.
+A project without catalogable pieces may have `scope: []` and `entries: []`;
+reviewing all its files and exclusions is still required to finalize. `kind` is
+an extensible semantic class assigned by reading code and consumers, not by a
+filename detector. All paths are project-relative. The helper rejects escapes,
+links, `.env*`, unknown fields, untracked evidence, duplicate IDs and mismatches
+between scope and cards. Local evidence records whole files, deduplicated by
+path; the compact request does not contain those texts.
+`evidence.curation.status` is `current` when sources match the curated
+revision, `stale` when they changed or the revision cannot be resolved, and
+`unverified` when it is missing. A commit outside the scope does not invalidate
+cards: the Git trees of the evidence paths are compared. `evaluate` rejects
+`stale` before sending. Review the meaning as well and update
+`reviewed_revision` after curating changes. Keep cards short: an exact contract
+and constraints, a one-sentence summary. Card size drives provider cost.
 
-Antes de cada decisión, `tessera.py changes --repo PROJECT` compara el checkout
-con `reviewed_revision`. Informa de fuentes nuevas/eliminadas, rutas cambiadas,
-referencias desaparecidas, fichas afectadas y cambios sin commit. Los renombrados
-aparecen como baja y alta, que el agente debe reconciliar conservando identidad
-si corresponde. También devuelve cambios fuera del catálogo, sin decidir por
-nombre cuáles son relevantes, para inspeccionar posibles ampliaciones.
+To add a component or utility: inspect its contract and consumer, add the card,
+extend the scope if needed, record real usages or gaps, run `prepare` and review
+the diff. A new candidate inside a declared scope is a coverage error until it
+is curated; ranking never hides it. Prepare evidence from a clean checkout;
+after implementing and verifying, create the coherent local commit before
+regenerating the snapshot.
 
-El agente lee los cambios, actualiza el significado de las fichas y guarda una
-copia previa bajo `history/`; solo después actualiza `reviewed_revision` y
-`reviewed_on`. Añadir un componente en el ámbito exige curar su ficha. Una
-revisión ausente/desconocida exige revisar el catálogo completo. Cambios ajenos
-a sus fuentes no invalidan automáticamente las fichas existentes.
+### Colleagues' changes and updates
 
-Esto sucede al trabajar y consultar el catálogo, incluidos cambios incorporados
-con pull o cambio de rama. No hay watcher ni consulta automática a GitHub.
-Los compañeros no necesitan instalar Tessera. `prepare` sigue exigiendo fuentes
-versionadas y checkout limpio; `evaluate` vuelve a capturar la evidencia antes
-de la red y rechaza un snapshot que haya cambiado. Un run antiguo sin referencia
-local al checkout debe prepararse de nuevo. Las rutas locales del manifiesto
-no se envían al proveedor.
+Before each decision, `tessera.py changes --repo PROJECT` compares the
+checkout with `reviewed_revision`. It reports new or deleted sources, changed
+paths, vanished references, affected cards and uncommitted changes. Renames
+appear as a deletion plus an addition that the agent reconciles, keeping the
+identity when appropriate. It also returns changes outside the catalog, without
+judging their relevance by name, so possible extensions can be inspected.
 
-## Contrato neutral de decisión
+The agent reads the changes, updates the meaning of the cards and keeps a prior
+copy under `history/`; only then does it update `reviewed_revision` and
+`reviewed_on`. Adding a component inside the scope requires curating its card.
+A missing or unknown revision requires reviewing the whole catalog. Changes
+outside a card's sources do not invalidate it automatically.
 
-`context.json` contiene `schema`, `task`, `catalog`, `evidence`, `options` e
-`instructions`. Tarea: `id`, `requirement` y lista no vacía `acceptance`.
-Todas las fichas se evalúan en cada decisión; pueden distribuirse entre peticiones.
-El contexto completo se conserva localmente y los lotes enviados quedan trazados. `evidence`
-solo comunica revisión, estado de curación y `source_text_included: false`.
-Los textos completos permanecen en `derived.json`, separado del contexto neutral.
-Se verifica su hash y se reconstruye el contexto antes de enviar la petición.
+This happens while working and consulting the catalog, including changes that
+arrive with a pull or branch switch. There is no watcher or automatic GitHub
+query, and colleagues do not need Tessera installed. `prepare` still requires
+versioned sources and a clean checkout; `evaluate` captures the evidence again
+before the network and rejects a changed snapshot. An old run without a local
+checkout reference must be prepared again. Local manifest paths are never sent
+to the provider.
 
-Opciones comunes, independientes del modelo:
+## Neutral decision contract
 
-| Acción | Significado |
+`context.json` contains `schema`, `task`, `catalog`, `evidence`, `options` and
+`instructions`. The task has `id`, `requirement` and a non-empty `acceptance`
+list. With `--require-ready` the task file must also carry the agent's blind
+`agent_choice` (`action`, `primary` card id or null, `reason`); `prepare`
+validates it, stores it in the local manifest and removes it from the context,
+so the provider never sees it. Every card is evaluated in each decision; cards
+may be spread across requests. The full context stays local and the sent
+batches are traced. `evidence` only communicates revision, curation state and
+`source_text_included: false`. Full texts stay in `derived.json`, separate from
+the neutral context; its hash is checked and the context rebuilt before sending.
+
+Common, model-independent options:
+
+| Action | Meaning |
 |---|---|
-| `reuse:<id>` | Consumir el contrato existente sin cambiarlo |
-| `modify:<id>` | Cambiar implementación o contrato y verificar sus consumidores |
-| `wrap:<id>` | Componer una envoltura para la tarea conservando la base |
-| `create` | Nueva implementación principal; puede reutilizar primitivas auxiliares |
-| `insufficient_evidence` | Falta contexto para elegir con fundamento |
+| `reuse:<id>` | Consume the existing contract without changing it |
+| `modify:<id>` | Change implementation or contract and verify its consumers |
+| `wrap:<id>` | Compose a task-specific wrapper that keeps the base |
+| `create` | New primary implementation; supporting primitives may be reused |
+| `insufficient_evidence` | Not enough context to choose on solid ground |
 
-El primer piloto decide una responsabilidad principal por tarea. Una tarea con
-varias responsabilidades necesita explicitar esas decisiones; no se presume
-que este piloto valide planes completos o selección de múltiples objetivos.
+A decision covers one primary responsibility per task. A task with several
+responsibilities needs those decisions made explicit; the verdict does not
+validate complete plans or multi-target selection.
 
-La salida normalizada conserva `action`, `primary`, procedencia, hashes de
-contexto/petición y revisión. La distribución y confianza, si el proveedor las
-ofrece, son evidencia; no se convierten en un umbral de acción arbitrario.
-`agent_explanation: null` y `review_status: pending` hacen visible la revisión
-pendiente. La explicación posterior y referencias son del agente que las escribe.
-Una decisión no ejecuta código, publica cambios ni concede permisos.
+The normalized output keeps `action`, `primary`, `decided_by` (`provider` or
+`coordinator`), provenance, context and request hashes and the revision, the
+first-round `batch_proposals`, plus `agent_choice` and `agreement` when present. Distribution and confidence, when
+the provider offers them, are evidence, never an arbitrary action threshold.
+`agent_explanation: null` and `review_status: pending` keep the pending review
+visible. Later explanations and references belong to the agent that writes
+them. A decision runs no code, publishes nothing and grants no permission.
 
-El núcleo registra destinos y hashes sin conocer secretos ni tipos de pregunta. Registro explícito
-`PROVIDERS` en `scripts/tessera.py`. Cada adaptador implementa `build_request`,
-`check_credentials`, `invoke`, `parse_response` y `validate_response`, y ofrece `endpoint()`.
-Recibe el mismo contexto; devuelve opción normalizada, modelo, uso y, cuando
-existen, probabilidades/confianza. Para añadir otro motor: implementar ese
-adaptador real, registrarlo y probarlo con el mismo catálogo/casos. No cambiar
-fichas ni reinterpretar decisiones antiguas. No hay adaptadores ficticios de
-Claude/Codex ni fallback automático. Cada decisión evalúa todas las fichas.
-Tessera no preselecciona por etiquetas, relevancia ni top-k. El proveedor evalúa
-lotes completos y compara después sus propuestas, sin combinar probabilidades
-de preguntas distintas. Véase [protocolo de lotes](batching.md).
+The core records destinations and hashes without knowing secrets or question
+types. Providers are registered explicitly in `PROVIDERS` in
+`scripts/tessera.py`. Each adapter implements `build_request`,
+`check_credentials`, `invoke`, `parse_response`, `validate_response` and
+`endpoint()`. It receives the same context and returns the normalized option,
+model, usage and, when available, probabilities and confidence. To add another
+engine, implement a real adapter, register it and test it with the same catalog
+and cases. Do not change cards or reinterpret old decisions. There are no fake
+Claude or Codex adapters and no automatic fallback. Tessera never preselects by
+tags, relevance or top-k for a provider decision; see [batches](batching.md).
 
-## Primer adaptador: TypeSafe Jev
+## Provider consent
 
-Contrato consultado el 2026-09-27 en la [API oficial](https://docs.typesafe.ai/api):
-`POST https://api.typesafe.ai/v1/systemone`, Bearer `TYPESAFE_API_KEY`. Traduce el
-contexto a `state`, `model`, `questions.decision` de tipo `choice`. La respuesta
-incluye modelo, `answers.decision` y `usage`. Se comprueban opción conocida,
-distribución completa/finita, suma aproximada, confianza válida y contadores de uso.
-El [SDK oficial](https://docs.typesafe.ai/sdk/python/api/types/responses) especifica
-suma aproximada. El cliente admite error menor de 0.02, coherente con la
-serialización documentada por Kev, y registra `probability_sum` sin normalizar.
-Esta tolerancia numérica no es un umbral de decisión. El piloto detectó y
-corrigió un rechazo inicial demasiado estricto de una respuesta con suma 0.99.
+`evaluate` requires a per-project grant in `provider-consent.json` that names
+the provider and its exact endpoint. The user grants or revokes it in their own
+terminal with `tessera.py consent --repo PROJECT --provider NAME [--revoke]`.
+The `ai-guard` hook blocks that command for agents, so an agent cannot approve
+itself. The grant records only the endpoint and a timestamp. For work projects,
+grant it only when the company allows sending project material to that provider.
 
-No es un agente que abra rutas locales. El adaptador envía el texto preparado.
-No genera prosa; [Choice](https://docs.typesafe.ai/primitives/choice) selecciona
-una opción declarada. La identidad conjunta acción/objetivo evita combinar dos
-respuestas independientes incompatibles.
+## First adapter: TypeSafe Jev
 
-[Modelo y límites oficiales](https://docs.typesafe.ai/models): `jev-1.13.0`,
-entrada textual, 64k tokens por petición y 32k para estado más pregunta mayor.
-Choice admite 255 opciones por pregunta. El planificador reparte catálogos
-grandes entre peticiones completas; cada adaptador sigue rechazando una petición
-individual que exceda ese límite.
-Los bytes se miden localmente; no se presentan como tokens. No hay tokenizer
-verificado localmente: los tokens reales se obtienen de la respuesta. Con una
-sola pregunta, el límite efectivo de contexto es 32k, no 64k. El catálogo en
-disco no tiene ese límite. Este primer adaptador admite hasta 84 fichas por
-Choice conjunta (3 acciones por ficha más create/insufficient_evidence).
-No es un límite del catálogo neutral. Ante exceso, se comunica el límite sin
-recortar, agrupar o elegir fichas por cuenta de Tessera.
+Contract checked on 2026-09-27 in the [official API](https://docs.typesafe.ai/api):
+`POST https://api.typesafe.ai/v1/systemone`, Bearer `TYPESAFE_API_KEY`. The
+adapter maps the context to `state`, `model` and a `choice` question named
+`decision`. The response includes the model, `answers.decision` and `usage`.
+Checks cover a known option, a complete and finite distribution, an approximate
+sum, a valid confidence and usage counters. The
+[official SDK](https://docs.typesafe.ai/sdk/python/api/types/responses)
+specifies an approximate sum; the client accepts an error below 0.02,
+consistent with Kev's documented serialization, and records `probability_sum`
+without normalizing. This numeric tolerance is not a decision threshold.
 
-El ensayo con todo el código recibió `max_tokens_exceeded` con 132 KB. La
-estrategia final envía fichas: unos 22 KB y 5.500 tokens en la primera llamada.
-El tamaño no garantiza calidad. Los resultados medidos y fallos de validación
-se conservan por separado en el piloto; no se reescriben como aciertos.
-La documentación reconoce [limitaciones](https://docs.typesafe.ai/model-jaggedness/jev-1.13);
-salida tipada no garantiza una decisión correcta.
+Jev is not an agent that opens local paths; the adapter sends the prepared text.
+It produces no prose: [Choice](https://docs.typesafe.ai/primitives/choice)
+selects a declared option. The joint action/target identity avoids combining
+two independent, incompatible answers.
 
-## Alternativa: Kev de Jared Palmer
+[Model and official limits](https://docs.typesafe.ai/models): `jev-1.13.0`,
+text input, 64k tokens per request and 32k for state plus the largest question.
+Choice allows 255 options per question. The planner spreads large catalogs over
+complete requests; each adapter still rejects a single request over the limit.
+Bytes are measured locally and never presented as tokens; real tokens come from
+the response. With one question the effective context limit is 32k. One joint
+Choice holds up to 84 cards (3 actions per card plus create and
+insufficient_evidence); that is not a limit of the neutral catalog. When
+exceeded, the limit is reported without trimming, grouping or choosing cards.
 
-Usuario confirma [jaredpalmer/kev](https://github.com/jaredpalmer/kev). API y
-servidor inspeccionados en revisión `9c41005b2180347c3c646dfc9e50c4428483ec6b`:
+Measured cost: a 245-card catalog produced about 730 KB per decision, 31 calls,
+about 175k input and 17k output tokens. In the first three real decisions the
+final verdict was right once; one miss was the empty final round now resolved by
+rule, the other a composition the single-card verdict cannot express, while the
+batch proposals pointed at the pieces that were actually reused. The provider's
+[limitations](https://docs.typesafe.ai/model-jaggedness/jev-1.13) apply: typed
+output does not guarantee a correct decision.
+
+## Alternative: Kev by Jared Palmer
+
+The user confirmed [jaredpalmer/kev](https://github.com/jaredpalmer/kev). API and
+server inspected at revision `9c41005b2180347c3c646dfc9e50c4428483ec6b`:
 [`kev/api.py`](https://github.com/jaredpalmer/kev/blob/9c41005b2180347c3c646dfc9e50c4428483ec6b/kev/api.py),
 [`kev/serve.py`](https://github.com/jaredpalmer/kev/blob/9c41005b2180347c3c646dfc9e50c4428483ec6b/kev/serve.py).
-Mismo POST System One, mismas fichas y preguntas; solo cambian proveedor,
-destino, credencial y modelo. Transporte y validación compartidos en
-`tessera_systemone.py`; no dependencia del catálogo con Qwen ni con TypeSafe.
+Same System One POST, cards and questions; only provider, destination,
+credential and model change. Transport and validation are shared in
+`tessera_systemone.py`; the catalog depends on neither Qwen nor TypeSafe.
 
-`--provider kev` requiere `TESSERA_KEV_ENDPOINT` explícito, terminado en
-`/v1/systemone`. Ejemplo para un servidor ya disponible:
+`--provider kev` requires an explicit `TESSERA_KEV_ENDPOINT` ending in
+`/v1/systemone`. Example for a running server:
 
 ```bash
 export TESSERA_KEV_ENDPOINT=http://127.0.0.1:8009/v1/systemone
 python3 "$SKILL_DIR/scripts/tessera.py" prepare --provider kev \
-  --repo "$PROJECT" --task /ruta/local/externa/tarea.json
-python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /ruta/run-kev-nuevo
+  --repo "$PROJECT" --task /external/local/path/task.json --require-ready
+python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /path/new-kev-run
 ```
 
-Mantener el mismo destino al evaluar: se compara con el manifiesto antes de
-invocar. Solo HTTPS fuera de loopback, sin credenciales en URL; el servidor
-remoto requiere `KEV_API_KEY` en el proceso. Loopback admite el servidor local
-sin autenticación documentado por upstream. Nunca se reutiliza la clave de
-TypeSafe. El helper no descarga pesos ni instala o inicia servidores.
+Keep the same destination when evaluating; it is compared with the manifest
+before invoking. Only HTTPS outside loopback and no credentials in the URL; a
+remote server requires `KEV_API_KEY` in the process. Loopback allows the
+unauthenticated local server documented upstream. The TypeSafe key is never
+reused. The helper does not download weights or install or start servers.
 
-La respuesta usa `kev-latest`: upstream refleja el alias pedido, no prueba el
-checkpoint. Registrar además la revisión/configuración del servidor y los
-metadatos de `GET /v1/models` antes de comparar resultados reales. No se ha
-deducido el checkpoint a partir de ese alias: el piloto verificó el servidor
-Kev-0.8B fijado y ejecutó cuatro inferencias reales con contextos idénticos a Jev.
-Respondió `insufficient_evidence` en los cuatro casos (0.60–1.18 segundos).
-El protocolo funciona; este modelo no ha demostrado utilidad como selector en
-el catálogo del piloto. Se conserva como alternativa experimental. No atribuir
-la causa al español, tamaño o formato sin una evaluación específica.
+The response reports `kev-latest`: upstream echoes the requested alias, which
+does not prove the checkpoint. Record the server revision and configuration and
+the `GET /v1/models` metadata before comparing real results. The pilot verified
+the pinned Kev-0.8B server and ran four real inferences with contexts identical
+to Jev's; it answered `insufficient_evidence` in all four (0.60–1.18 seconds).
+The protocol works; this model has not shown value as a selector on the pilot
+catalog. It stays an experimental alternative.
 
-Límite adicional que verificar al desplegar: la revisión inspeccionada de
-`kev/model.py` permite truncar el estado si no se usa `strict=True`, y
-`kev/serve.py` no activa ese parámetro. Para cumplir la política de catálogo
-completo, el servidor elegido debe rechazar exceso de contexto sin truncarlo;
-no basta con que el cliente envíe todas las fichas. La cifra de contexto del
-README indexado y la del código actual difieren; validar la versión desplegada,
-no asumir límites por el nombre Kev.
+The inspected `kev/model.py` can truncate the state unless `strict=True`, and
+`kev/serve.py` does not enable it. To honor the complete-catalog policy the
+chosen server must reject excess context instead of truncating it; the client
+sending every card is not enough. Validate the deployed version's limits.
 
-### Instalar Kev en cada equipo
+### Install Kev on each machine
 
-El runtime y los pesos son locales a cada ordenador; no van a dotfiles/GitHub.
-Requiere Git, Python 3.11+ para el instalador y [uv](https://docs.astral.sh/uv/getting-started/installation/)
-por el mecanismo aprobado en ese equipo. uv prepara Python 3.13 y dependencias
-aisladas usando el lockfile upstream; no cambia el Python del sistema.
-Inspeccionar SO, RAM, GPU/controlador y espacio libre antes de instalar.
+Runtime and weights are local to each computer; they never go to dotfiles or
+GitHub. Requires Git, Python 3.11+ for the installer and
+[uv](https://docs.astral.sh/uv/getting-started/installation/) through the
+mechanism approved on that machine. uv prepares Python 3.13 and isolated
+dependencies from the upstream lockfile without changing the system Python.
+Inspect OS, RAM, GPU and driver and free space before installing.
 
 ```bash
 python3 "$SKILL_DIR/scripts/kev-local.py" install
@@ -267,121 +282,116 @@ python3 "$SKILL_DIR/scripts/kev-local.py" check
 python3 "$SKILL_DIR/scripts/kev-local.py" serve
 ```
 
-En PowerShell usar `python` y la ruta de la skill. El runtime predeterminado es
-`$XDG_DATA_HOME/tessera/kev` (normalmente `~/.local/share/tessera/kev`) en Linux y
-`%LOCALAPPDATA%\tessera\kev` en Windows. `--runtime RUTA` permite otro destino.
-No copiar `.venv`, caches, pesos, claves o referencias de secretos entre PCs.
-La instalación rechaza destinos existentes. Si uv falló después del checkout,
-inspeccionar la revisión y parche de ese destino y recuperar únicamente la
-dependencia pendiente con `uv sync --locked --no-dev --extra serve --python 3.13`
-desde el runtime; después repetir `check`. No borrar para resolver un conflicto.
+In PowerShell use `python` and the skill path. The default runtime is
+`$XDG_DATA_HOME/tessera/kev` (usually `~/.local/share/tessera/kev`) on Linux and
+`%LOCALAPPDATA%\tessera\kev` on Windows; `--runtime PATH` selects another.
+Never copy `.venv`, caches, weights, keys or secret references between PCs.
+Installation rejects existing targets. If uv failed after the checkout, inspect
+that target's revision and patch and recover only the missing dependency with
+`uv sync --locked --no-dev --extra serve --python 3.13` from the runtime, then
+repeat `check`. Never delete to resolve a conflict.
 
-En Windows, el wheel PyPI del lock es CPU, incluso con GPU NVIDIA. Tras comprobar
-GPU/controlador compatibles, ejecutar explícitamente
-`python "$SKILL_DIR/scripts/kev-local.py" windows-cuda` para instalar únicamente
-PyTorch 2.8.0+cu128 desde su distribución oficial, con URL y SHA256 fijados para
-Python 3.13/Windows x86_64. Es una adaptación declarada del entorno, no del
-lockfile upstream. `check` debe mostrar `cuda_build: 12.8` y `cuda: true` antes
-de afirmar aceleración. Si se repite `uv sync`, reaplicar `windows-cuda` porque
-la sincronización restaura el wheel CPU. No cambiar el controlador para hacer
-encajar este runtime sin investigar y obtener la autoridad necesaria.
-Fuente: [uv y PyTorch](https://docs.astral.sh/uv/guides/integration/pytorch/).
+On Windows the locked PyPI wheel is CPU-only, even with an NVIDIA GPU. After
+confirming a compatible GPU and driver, run
+`python "$SKILL_DIR/scripts/kev-local.py" windows-cuda` explicitly to install
+only PyTorch 2.8.0+cu128 from its official distribution, with pinned URL and
+SHA256 for Python 3.13/Windows x86_64. It is a declared environment adaptation,
+not a change to the upstream lockfile. `check` must show `cuda_build: 12.8` and
+`cuda: true` before claiming acceleration. After another `uv sync`, apply
+`windows-cuda` again. Never change the driver to fit this runtime without
+investigation and authority. Source:
+[uv and PyTorch](https://docs.astral.sh/uv/guides/integration/pytorch/).
 
-Se fijan upstream `9c41005b2180347c3c646dfc9e50c4428483ec6b` y modelo
-`jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e`.
-El parche [kev-strict-context.patch](kev-strict-context.patch) activa rechazo
-explícito; prueba real: HTTP 422 para 70.005 tokens de estado, límite 65.536.
-El launcher verifica revisión, hash del servidor y ausencia de otro código
-modificado. CUDA usa bf16 si el hardware lo admite, de lo contrario fp32.
-Sin CUDA, CPU requiere `--allow-cpu`; su latencia debe medirse en el equipo.
-Apple Silicon necesita adaptación/verificación específica, no se supone válida.
-Los umbrales de 4 GiB libres en bf16 y 6 GiB en fp32 son preflight, no garantizan que
-cualquier catálogo quepa. No instala drivers ni reduce fichas por falta de memoria.
+Pinned: upstream `9c41005b2180347c3c646dfc9e50c4428483ec6b` and model
+`jaredpalmer/kev-0.8b@9a45d25eb2ab761841196625383fa1dff0e56c1e`. The patch
+[kev-strict-context.patch](kev-strict-context.patch) enables explicit rejection;
+real test: HTTP 422 for 70,005 state tokens against a 65,536 limit. The launcher
+checks revision, server hash and that no other code changed. CUDA uses bf16 when
+the hardware supports it, otherwise fp32. Without CUDA, CPU needs `--allow-cpu`;
+measure its latency on the machine. Apple Silicon needs its own verification.
+The 4 GiB (bf16) and 6 GiB (fp32) free-memory thresholds are a preflight, not a
+guarantee that any catalog fits. No drivers are installed and no cards trimmed.
 
-El servidor escucha solo en `127.0.0.1:8009`, bajo demanda, sin autostart.
-El primer arranque descarga pesos desde Hugging Face; detener con Ctrl+C libera
-la GPU. `GET /v1/models` debe mostrar checkpoint, dispositivo y precisión
-esperados. El piloto verificó Linux/CUDA; la inferencia en Windows y CPU está
-pendiente en el PC del trabajo. No confundir tests portables con esa prueba.
+The server listens only on `127.0.0.1:8009`, on demand, without autostart. The
+first start downloads weights from Hugging Face; Ctrl+C frees the GPU.
+`GET /v1/models` must show the expected checkpoint, device and precision. The
+pilot verified Linux/CUDA; Windows and CPU inference remain to be verified on
+the work PC.
 
-## Criterios de contexto y preguntas
+## Context and question criteria
 
-Fuentes oficiales consultadas el 2026-09-27; las recetas con Jev 1.12 no son
-resultados medidos de este piloto con Jev 1.13.0.
+Official sources checked on 2026-09-27; recipes for Jev 1.12 are not measured
+results of Jev 1.13.0.
 
-- [Guía de construcción](https://docs.typesafe.ai/concepts/how-to-build-with-system-one):
-  contexto relevante y estructurado, preguntas concretas, lógica determinista
-  fuera del modelo. Mantener campos comparables entre fichas y criterios que
-  distingan lo admitido de lo no admitido. Una consulta no decide toda la
-  arquitectura ni reemplaza inspección y pruebas del agente.
-- [Choice](https://docs.typesafe.ai/primitives/choice): incluir todas las opciones
-  cuando caben y una salida cuando ninguna encaja. La opción mejor situada es
-  relativa a las demás; no demuestra que cumpla la tarea.
-- [Skill suggestion](https://docs.typesafe.ai/cookbooks/skill_suggestion): ejemplo
-  de 182 skills con comparación general y revisión posterior más detallada.
-  Es referencia de investigación, no la política adoptada: el usuario exige
-  enviar todas las fichas al motor. Sus tres candidatos y umbrales no se copian.
-- [Limitaciones 1.13](https://docs.typesafe.ai/model-jaggedness/jev-1.13): evitar
-  ruido, indirección, instrucciones contradictorias y razonamiento encadenado.
-  Tratar el catálogo como datos, probar casos ambiguos, ninguno válido e
-  instrucciones maliciosas; una advertencia textual no inmuniza al modelo.
-- [Confianza](https://docs.typesafe.ai/confidence): medir en casos propios antes
-  de automatizar. `confidence` resume la distribución; no equivale a la
-  probabilidad de que la implementación funcione. No copiar umbrales de demos.
-- [Modelos](https://docs.typesafe.ai/models): inglés es el idioma con mejor
-  rendimiento declarado. El piloto conserva requisitos/fichas en español;
-  una comparación bilingüe es evaluación pendiente, no una garantía asumida.
+- [Build guide](https://docs.typesafe.ai/concepts/how-to-build-with-system-one):
+  relevant, structured context, concrete questions and deterministic logic
+  outside the model. Keep card fields comparable and criteria that separate what
+  is supported from what is not. One query neither decides a whole architecture
+  nor replaces the agent's inspection and tests.
+- [Choice](https://docs.typesafe.ai/primitives/choice): include every option
+  that fits and an exit when none does. The best-ranked option is relative to
+  the others; it does not prove it meets the task.
+- [Skill suggestion](https://docs.typesafe.ai/cookbooks/skill_suggestion): a
+  182-skill example with a general comparison followed by a detailed review.
+  Research reference only; its three candidates and thresholds are not copied.
+- [Limitations 1.13](https://docs.typesafe.ai/model-jaggedness/jev-1.13): avoid
+  noise, indirection, contradictory instructions and chained reasoning. Treat
+  the catalog as data and test ambiguous, no-valid-option and malicious cases.
+- [Confidence](https://docs.typesafe.ai/confidence): measure on your own cases
+  before automating. `confidence` summarizes the distribution; it is not the
+  probability that the implementation works.
+- [Models](https://docs.typesafe.ai/models): English is the best-performing
+  language. Write new cards and requirements in English.
 
-## Ejecución reproducible
+## Reproducible execution
 
-Resolver `SKILL_DIR` a la carpeta de esta skill y `PROJECT` al checkout del
-proyecto, tanto en Claude como en Codex. Ejemplo Bash:
+Resolve `SKILL_DIR` to this skill's folder and `PROJECT` to the project
+checkout, in Claude and in Codex:
 
 ```bash
 python3 "$SKILL_DIR/scripts/tessera.py" status --repo "$PROJECT"
-# Resolver next_action con el flujo lifecycle.md antes de preparar.
+python3 "$SKILL_DIR/scripts/tessera.py" index --repo "$PROJECT"
+python3 "$SKILL_DIR/scripts/tessera.py" card --repo "$PROJECT" --id button
+# Provider decision, only when requested and consented:
 python3 "$SKILL_DIR/scripts/tessera.py" changes --repo "$PROJECT"
 python3 "$SKILL_DIR/scripts/tessera.py" prepare \
-  --repo "$PROJECT" --task /ruta/local/externa/tarea.json --provider typesafe --require-ready
+  --repo "$PROJECT" --task /external/local/path/task.json --provider typesafe --require-ready
 ```
 
-Tras `locate`, el agente crea/actualiza el catálogo en la ruta devuelta, con
-carpeta privada y archivo 0600 en POSIX. `prepare` usa ese catálogo y elige una
-carpeta nueva bajo `runs/`; devuelve su ruta `run` para `evaluate`. `--catalog`
-y `--output` permiten rutas externas explícitas. Los padres que crea el helper
-tienen modo 0700. En POSIX, `prepare` exige que catálogo y tarea sean privados
-por sus permisos o los de una carpeta antecesora; no cambia permisos existentes.
-Windows hereda ACL del almacenamiento privado del usuario.
+After `locate`, the agent creates or updates the catalog at the returned path,
+in a private folder with a 0600 file on POSIX. `prepare` uses that catalog and
+picks a new folder under `runs/`; it returns the `run` path for `evaluate`.
+`--catalog` and `--output` allow explicit external paths. Parents the helper
+creates are 0700. On POSIX, `prepare` requires catalog and task to be private by
+their own permissions or those of an ancestor; it does not change existing
+permissions. Windows inherits the ACLs of the user's private storage.
 
-`prepare` no llama a red. Crea un directorio nuevo (0700 y archivos 0600 en POSIX;
-en Windows se heredan las ACL del directorio privado elegido) con `context.json`,
-`derived.json`, `request.json` y `manifest.json`. Revisar el contenido que se
-enviará, los hashes, proveedor/destino y tamaño. La tarea no debe incluir la
-respuesta esperada de una evaluación.
+`prepare` never calls the network. It creates a new directory with
+`context.json`, `derived.json`, `request.json` and `manifest.json`. Review the
+content to be sent, the hashes, provider and destination and the size. The task
+must not include the expected answer of an evaluation.
 
-Con autorización vigente para ese envío y una credencial disponible únicamente
-para ese proceso mediante el mecanismo de secretos del proyecto:
+With consent, a valid authorization and a credential available only to that
+process through the project's secret mechanism:
 
 ```bash
-python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /ruta/run-nuevo
+with-secrets python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /path/new-run
 ```
 
-Se reserva `attempt.json` antes de ejecutar: un run no se repite. En modo directo
-hay un POST; en lotes, cada llamada tiene además su propia reserva y como máximo
-un intento. Un fallo parcial impide la decisión global y no se reintenta. Sin clave,
-no hay intento. HTTP 401/422/429/529, timeout o redirección fallan explícitamente.
-Un error de transporte deja resultado desconocido; no reintentar automáticamente.
-Revisar la causa/consumo y preparar otro run si se decide reintentar.
-No se imprimen credenciales ni cuerpos de error HTTP.
+`attempt.json` is reserved before executing: a run never repeats. In direct
+mode there is one POST; in batches each call has its own reservation and at most
+one attempt. A partial failure prevents the global decision and is not retried.
+Without a key there is no attempt. HTTP 401/422/429/529, timeouts or redirects
+fail explicitly. A transport error leaves the result unknown; never retry
+automatically. Review cause and usage and prepare another run if you decide to retry.
+Credentials and HTTP error bodies are never printed.
 
-Una respuesta real queda en `response.json`; solo si valida se escribe
-`decision.json`. El cuerpo original se conserva antes de parsear, con hash en
-la decisión. `failure.json` registra fase y error sin credenciales ni cuerpo de
-error HTTP. Un error HTTP conserva su cuerpo en `http-error.bin`, privado y sin
-imprimir; inspeccionarlo con cuidado porque el proveedor puede reflejar datos.
-Se comprueban destinos antes de invocar; no se sustituyen archivos
-existentes. Conservar la respuesta
-original y registrar explicación, desacuerdo, resultado y pruebas en un archivo
-separado del historial local externo. Verificar de nuevo las fuentes antes de
-implementar una decisión antigua. No versionar automáticamente catálogos,
-historiales ni runs; contienen conocimiento y contexto del proyecto.
+A real response is stored in `response.json`; `decision.json` is written only
+when it validates. The original body is kept before parsing, with its hash in
+the decision. `failure.json` records phase and error without credentials or
+HTTP error body. An HTTP error keeps its body in `http-error.bin`, private and
+unprinted; inspect it carefully because the provider may echo data. Keep the
+original response and record explanation, disagreement, outcome and tests in a
+separate file of the local history. Verify the sources again before
+implementing an old decision. Never version catalogs, histories or runs
+automatically; they hold project knowledge and context.

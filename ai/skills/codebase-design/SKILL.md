@@ -1,6 +1,7 @@
 ---
 name: codebase-design
-description: Produce an architecture plan for module boundaries, dependency direction, and public contracts. Use when the user asks for software design or an implementation is blocked by a cross-cutting boundary decision; do not invoke for routine feature work.
+description: Produce an architecture plan for module boundaries, dependency direction and public contracts. Use when the user asks for software design or an implementation is blocked by a cross-cutting boundary decision; not for routine feature work.
+disable-model-invocation: true
 ---
 
 # Codebase Design

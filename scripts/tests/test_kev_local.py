@@ -39,7 +39,7 @@ class KevLocalTest(unittest.TestCase):
             sentinel = root / "keep.txt"
             sentinel.write_text("existing")
             with patch.object(kev, "run") as command:
-                with self.assertRaisesRegex(ValueError, "ya existe"):
+                with self.assertRaisesRegex(ValueError, "already exists"):
                     kev.install(root)
                 command.assert_not_called()
             self.assertEqual(sentinel.read_text(), "existing")
@@ -61,12 +61,12 @@ class KevLocalTest(unittest.TestCase):
                 kev.verify_source(root)
                 extra = root / "kev/shadow.py"
                 extra.write_text("unexpected = True\n")
-                with self.assertRaisesRegex(ValueError, "no versionado"):
+                with self.assertRaisesRegex(ValueError, "Untracked Kev code"):
                     kev.verify_source(root)
                 extra.unlink()
                 shadow = root / "torch.py"
                 shadow.write_text("unexpected = True\n")
-                with self.assertRaisesRegex(ValueError, "no versionado"):
+                with self.assertRaisesRegex(ValueError, "Untracked Kev code"):
                     kev.verify_source(root)
                 shadow.unlink()
                 bytecode = root / "torch.pyc"
@@ -79,7 +79,7 @@ class KevLocalTest(unittest.TestCase):
                     kev.verify_source(root)
                 other.write_text("original = True\n")
                 serve.write_text("strict = False\n")
-                with self.assertRaisesRegex(ValueError, "truncado"):
+                with self.assertRaisesRegex(ValueError, "anti-truncation"):
                     kev.verify_source(root)
 
     def test_cpu_and_memory_require_explicit_handling(self):

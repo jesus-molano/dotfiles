@@ -1,6 +1,6 @@
 interface:
   display_name: "Spec and Standards Review"
   short_description: "Review against specs and standards"
-  default_prompt: "Use $spec-and-standards-review to guide this task."
+  default_prompt: "Use $spec-and-standards-review to review this change."
 policy:
   allow_implicit_invocation: true

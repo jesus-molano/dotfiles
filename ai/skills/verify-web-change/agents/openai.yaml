@@ -1,6 +1,6 @@
 interface:
-  display_name: "Verificar cambio web"
-  short_description: "Valida cambios Next y Nuxt con evidencia"
-  default_prompt: "Usa $verify-web-change para validar este cambio web con los comandos reales del repositorio."
+  display_name: "Verify Web Change"
+  short_description: "Validate Next and Nuxt changes with evidence"
+  default_prompt: "Use $verify-web-change to validate this web change with the repository's real commands."
 policy:
   allow_implicit_invocation: false

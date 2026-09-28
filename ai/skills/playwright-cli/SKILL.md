@@ -1,6 +1,6 @@
 ---
 name: playwright-cli
-description: Automate browser interactions, test web pages and work with Playwright tests.
+description: Automate a real browser from the shell (open pages, click, type, snapshot, screenshot, inspect console and network) or work with Playwright tests. Use when a web change or flow needs verification in a browser.
 ---
 
 # Browser Automation with playwright-cli

@@ -238,6 +238,6 @@ Arch. CI no demuestra compatibilidad con hardware físico.
 
 Este repositorio personal no declara una licencia de software.
 
-## Codex y Claude
+## AI: Claude Code and Codex
 
-Configuración compartida, Windows nativo y cambio de proveedor: [guía de IA](docs/ai.md).
+Shared rules, skills, roles, guardrails, native Windows and provider switching: [AI guide](docs/ai.md).

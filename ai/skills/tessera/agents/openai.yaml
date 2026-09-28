@@ -1,6 +1,6 @@
 interface:
   display_name: "Tessera"
-  short_description: "Catálogo y decisiones de reutilización por proyecto"
-  default_prompt: "Usa $tessera para elegir y mantener la implementación reutilizable de esta tarea."
+  short_description: "Per-project reuse catalog and decisions"
+  default_prompt: "Use $tessera to look up reusable implementations for this task."
 policy:
   allow_implicit_invocation: true

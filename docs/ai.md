@@ -1,123 +1,255 @@
-# Claude y Codex: configuración compartida
+# AI clients: Claude Code and Codex
 
-La fuente común vive en `ai/`. Codex y Claude conservan cuenta, memoria, historial,
-conexiones ajenas y selección de modelo/esfuerzo por equipo. `AGENTS.md` es el
-contrato de cada proyecto. Esta configuración afecta a Claude Code (CLI y pestaña
-Code de Desktop); no convierte el chat normal ni Cowork en un agente de código.
+One neutral source in `ai/` configures Claude Code (CLI and the Code tab in
+Desktop) and Codex. Each client keeps its own account, memory, history,
+foreign connections and model/effort choice. `AGENTS.md` is each project's
+contract. This setup does not turn normal chat or Cowork into a coding agent.
 
-## Equivalencias verificables
+Design goals, in order:
 
-| Capacidad | Fuente | Codex | Claude Code |
+1. **Safe by construction.** Hard limits are enforced by a hook and deny
+   rules, not only by prose.
+2. **No duplicated code.** Every UI or behavior change looks for the project's
+   existing component, wrapper or utility first.
+3. **Token-efficient.** Small always-loaded rules, compact skill descriptions,
+   a light model for searches and reviews sized to the change.
+4. **Reversible.** Every deployment is a transaction with a private backup,
+   conflict detection and rollback.
+
+## What is deployed
+
+| Piece | Source | Claude Code | Codex |
 |---|---|---|---|
-| Reglas comunes | `ai/rules/common.md` | `~/.codex/AGENTS.md` generado | `~/.claude/CLAUDE.md` generado |
-| Reglas locales | Proyecto | `AGENTS.md` | `CLAUDE.md` y `AGENTS.md` con `agents-md@builtin` |
-| Skills propias | `ai/skills/` | `~/.agents/skills/` | `~/.claude/skills/` |
-| Roles | `ai/roles/*.json` | TOML regulares; Luna/Sol | Markdown regulares; Haiku/Opus high |
-| Autonomía técnica | Adaptador | `never`, `danger-full-access` | `bypassPermissions` y ajuste de Desktop |
-| Modelo principal | Preferencia local | Se conserva modelo/esfuerzo | Predeterminado de suscripción; después se conserva la elección |
-| MCP | Fusión por claves | TOML | `.claude.json` del usuario |
-| Continuidad | Repositorio | Un documento de tarea | El mismo documento de tarea |
-| Escritorio | `host.toml` local | `special:chatgpt` | `special:claude` |
+| Global rules | `ai/rules/common.md` + `ai/adapters/<client>.md` + `ai/adapters/<platform>.md` | `~/.claude/CLAUDE.md` (generated) | `~/.codex/AGENTS.md` (generated, versioned) |
+| Project rules | Each repository | `CLAUDE.md` and `AGENTS.md` (`claude-md-and-agents-md`) | `AGENTS.md` |
+| Skills | `ai/skills/` (17 own + vendored `playwright-cli`) | `~/.claude/skills/` | `~/.agents/skills/` |
+| Roles | `ai/roles/*.json` | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` |
+| Hooks | `ai/hooks/*.py` | `~/.claude/hooks/` + `settings.json` | — |
+| Settings | `scripts/sync-ai.py` | managed keys in `~/.claude/settings.json` | managed keys in `~/.codex/config.toml` |
+| MCP | `scripts/sync-ai.py` | `~/.claude.json` | `config.toml` |
 
-La fuente incluye 17 skills propias y la skill oficial `playwright-cli`.
-`tessera` se añade en esta fase; su despliegue y prueba con ambos clientes siguen
-pendientes. En Windows se excluye
-`cachyos-host-audit`; los cinco roles siguen disponibles para revisar código,
-incluido código Linux sin ejecutarlo. Los revisores Claude solo tienen Read,
-Glob, Grep, WebFetch y WebSearch. El principal ejecuta las pruebas. Codex mantiene
-sus roles con sandbox de lectura y la misma restricción en sus instrucciones.
+Linux links skills to the checkout; Windows copies them. Rules, roles and hooks
+are regular files. Generated files carry a header: edit the source, never the copy.
 
-Las instrucciones y skills orientan el comportamiento. Los modos de autonomía no
-imponen técnicamente las aprobaciones humanas para publicar o borrar: esas reglas
-siguen siendo parte del contrato. Las políticas administradas tienen prioridad.
+### Claude settings managed by the sync
 
-## Linux: instalar y desplegar
+Only these keys and list entries are owned; everything else in the file is
+kept, including foreign hooks, deny rules, models and projects.
 
-Paquetes declarados: `claude-code` (CachyOS), `claude-desktop-extra` (AUR) y Codex
-existente. Desktop Extra se construye con Shelly a partir de la receta revisada;
-Pacman verifica el paquete nativo y gestiona ambas instalaciones. La procedencia
-de esta entrega está en `ai/runtime-sources.json`. No se añade un repositorio de
-terceros, no se instala Cowork ni se configura control del ordenador.
+| Setting | Value | Why |
+|---|---|---|
+| `language` | `spanish` | Replies in Spanish; config and skills are English. |
+| `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
+| `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, Tessera `provider-consent.json` writes | Deny rules still apply in bypass mode. |
+| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
+| `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
+| `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Inert in bypass mode; makes a switch to `auto` safe from the first session. |
+| `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
+| `attribution.*` | empty / `false` | No co-author trailers or session links. |
+| `pluginConfigs["agents-md@builtin"]` | `claude-md-and-agents-md` | Loads `AGENTS.md` next to `CLAUDE.md`. |
+| `skillOverrides` | `user-invocable-only` for user skills, `name-only` for named skills | See [Skills](#skills). |
+
+A managed entry that you remove by hand is reported as a conflict instead of
+being silently re-added: put the entry back, or change the source in `ai/` or
+`scripts/sync-ai.py` if you no longer want it. A key the sync adopts for the
+first time never overwrites a different value you set yourself (for example
+your own `statusLine`); the apply stops and names the key.
+
+## Guardrails
+
+`ai/hooks/ai-guard.py` runs before every shell command, every `Workflow` call
+and every file write or edit, in Claude Code and in Codex (`~/.codex/hooks.json`,
+same schema and stdin contract). Codex runs a new user hook only after you
+trust it once in its `/hooks` view. It exits 2 (block) with a short reason, and never prints the command,
+file contents or environment. It blocks only what is never part of a normal task:
+
+| Blocked | Rule it enforces |
+|---|---|
+| `git push` with force, `--force-with-lease`, delete, mirror, `--tags`, `--all`, `+ref`, `:ref` or several refspecs | Publish one verified ref, never rewrite or delete remote history. |
+| `stow` with a glob of packages | Never run Stow over every directory. |
+| `rm -r` of `/`, `~`, `$HOME` or the dotfiles checkout | No catastrophic deletion. |
+| Commands that read a `.env` file (templates `*.example`, `*.template`, `*.sample`, `echo`, `git check-ignore` and copying a template to `.env` are allowed); `op read`, `op inject`, `op item`, `op document` | Secrets only through `with-secrets`. |
+| `tessera.py consent` and any write to `provider-consent.json` | Only the user grants provider consent. |
+| `Workflow` tool | Multi-agent workflows only on request. Start a session with `AI_ALLOW_WORKFLOW=1 claude` to allow them. |
+
+The guard looks through wrappers (`sudo`, `env`, `timeout`, `nohup`, `xargs`),
+nested shells (`bash -c`, `eval`), command substitutions and chained commands,
+and ignores redirections and heredoc bodies, so `git push -u origin feat 2>&1`
+works. A normal `git push origin <branch>` is allowed: showing the exact OID and
+asking for authorization before publishing stays in the global rules.
+
+Known limits: the guard is a safety net against mistakes, not a sandbox, and
+code running as your user can still reach anything you can. PowerShell has its
+own parser (quoting, `${...}` and `%USERPROFILE%` paths, cmdlet aliases such as
+`ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested `cmd /c`, `pwsh -Command`
+and `Invoke-Expression`). On Windows a command reported as Bash is checked with
+both parsers. The `Read(**/.env.*)` deny rule also hides
+`.env.example` templates from the Read tool; read them through the shell.
+
+## Token efficiency
+
+- Always-loaded context is small: about 740 words of global rules and about
+  470 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
+  description words.
+- User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
+  from the model until you type `/name`. Named skills
+  (`test-driven-development`, `verify-web-change`) show only their name, so
+  `engineering-flow` can still route to them at almost no context cost.
+- Review and research skills run with `context: fork`, so their reading stays
+  out of the main conversation.
+- Searches go to `reuse-scout` (Haiku, at most 25 turns) or the built-in Explore
+  agent, so the main context keeps only the conclusion.
+- Reviews are sized by `engineering-flow`: none for small low-risk changes, one
+  reviewer for medium ones, specialists only when the domain justifies them,
+  at most two passes.
+- Tessera lookups read a compact index and a few cards, never a whole catalog.
+- The status line shows context and plan use. Use `/clear` between unrelated
+  tasks, `/compact <focus>` in long ones, and `/skill-doctor` to see the cost
+  and use of each skill.
+
+## Skills
+
+| Skill | Invocation | Use |
+|---|---|---|
+| `engineering-flow` | automatic | Any implementation: inspect, reuse, change, verify, review, commit. |
+| `clarify-change` | automatic | Only material decisions that inspection cannot settle. |
+| `verification-before-completion` | automatic | Fresh proof before claiming done. |
+| `systematic-debugging` | automatic | Generic failures: reproduce, isolate, fix. |
+| `debug-web-flow` | automatic | Next, Nuxt or Vue flows across browser and server. |
+| `review-web-pr` | automatic | Own review of a web branch or PR. |
+| `spec-and-standards-review` | automatic | Spec traceability and non-web standards review. |
+| `research-primary-sources` | automatic | Decisions that depend on current official sources. |
+| `handoff` | automatic | Continuation notes when pausing. |
+| `linear-workflow` | automatic | Linear reads; writes only in an authorized session. |
+| `cachyos-host-audit` | automatic (Linux) | Read-only host audit. |
+| `playwright-cli` | automatic | Browser checks. |
+| `tessera` | automatic | Project reuse catalog lookup and maintenance. |
+| `test-driven-development` | named | RED-GREEN for isolatable behavior. |
+| `verify-web-change` | named | Focused web verification checklist. |
+| `codebase-design` | `/name` | Module boundaries and contracts. |
+| `domain-modeling` | `/name` | Business concepts and invariants. |
+| `to-tickets` | `/name` | Split an approved spec into tickets. |
+
+The invocation policy lives in `scripts/ai_sources.py` and drives the Codex
+`agents/openai.yaml` check, the Claude `skillOverrides` and the
+`disable-model-invocation` frontmatter of user skills. Shared skills may use the
+Claude fields `disable-model-invocation` and `context: fork`; the Codex parser
+ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs`).
+
+## Roles
+
+| Role | Claude | Codex | Job |
+|---|---|---|---|
+| `reuse-scout` | Haiku, 25 turns, Read/Glob/Grep | light model, low effort | Find reusable candidates with contracts and consumers. |
+| `catalog-writer` | Sonnet, 40 turns, Read/Glob/Grep | medium model | Draft Tessera cards; the main agent validates and writes. |
+| `reviewer-web` | Opus, high effort | main model, high effort | Web correctness, security, accessibility, reuse. |
+| `reviewer-standards` | Opus, high effort | main model, high effort | Requirements, contracts, security, verifiability. |
+| `reviewer-spec` | Opus, high effort | main model, high effort | Spec coverage and acceptance criteria. |
+| `reviewer-linux` | Opus, high effort | main model, high effort | CachyOS/Hyprland changes, from evidence the main agent supplies. |
+
+Every role is read-only; the main agent runs tests and passes the results.
+Models follow the job: reasoning and execution on Opus (main agent and
+reviewers), reading on Haiku (search) or Sonnet (bulk drafting). Models are data
+in each role file, so a model rename is a one-line change.
+
+## Linux: install and deploy
+
+Packages: `claude-code` (CachyOS), `claude-desktop-extra` (AUR, built with
+Shelly from the reviewed recipe and installed with Pacman) and Codex. Provenance
+is in `ai/runtime-sources.json`. No third-party repository, Cowork or computer
+use is configured.
 
 ```bash
-python3 scripts/render-ai.py
-just lint
-just check
-just plan
-just apply
-just ai-plan
-just ai-sync
-just ai-check
+python3 scripts/render-ai.py   # regenerate versioned Codex files after editing ai/
+just ai-plan                   # preview; prints paths and kinds, never values
+just ai-sync                   # apply with a private backup
+just ai-check                  # deployed state, generated files, skills, tests, claude plugin validate
 ```
 
-Revisa las operaciones antes de aplicar. `just apply` gestiona la composición
-Linux existente; `ai-sync` gestiona los dos clientes en su propia transacción.
-No ejecutes Stow contra `ai/` ni desde un worktree secundario.
+`just apply` manages the Stow composition; `ai-sync` manages both AI clients in
+its own transaction. Never run Stow against `ai/` or from a secondary worktree.
+When the `codex` module is selected, the Stow transaction also deploys the
+generated Codex role files through `scripts/manage-codex-agent-files.py`, so it
+can migrate agent links left by older deployments and roll them back with the
+rest of the transaction. `ai-sync` writes the same files and keeps the same
+ownership ledger, so the two never disagree.
 
-El CLI oficial de navegador está fijado a la versión de la skill vendorizada:
+The browser CLI is pinned to the vendored skill version:
 
 ```bash
 npm install --global @playwright/cli@0.1.21
-playwright-cli --version
 ```
 
-Usa el prefijo npm de usuario. No ejecutes `playwright-cli install --skills` encima
-de las skills gestionadas: cambiaría su propiedad. La versión, commit, licencia y
-checksums de la fuente están en `ai/skills/playwright-cli/SOURCE.json`.
+Do not run `playwright-cli install --skills` over the managed skills.
 
-Desktop Extra y el CLI del sistema pueden usar versiones distintas del motor.
-No fuerces `CLAUDE_CODE_LOCAL_BINARY`: Desktop gestiona su versión compatible.
-Abre Claude, inicia sesión Pro/Max y, en **Settings → Claude Code**, activa
-**Allow bypass permissions mode**. Después selecciona **Bypass permissions**
-en una sesión nueva. El ajuste de Desktop no se sustituye manipulando archivos
-internos sin contrato. Comprueba el modo visible y las políticas del equipo.
+In Desktop open **Settings → Claude Code**, enable **Allow bypass permissions
+mode** and pick **Bypass permissions** in a new session. `claude auth login`
+authenticates the CLI separately. Never copy tokens between clients or machines.
 
-`claude auth login` autentica el CLI por separado si `claude auth status` indica
-que falta la sesión. No copies tokens entre clientes o equipos.
+## Windows (work PC)
 
-## Windows del trabajo
-
-Usa el [instalador oficial de Claude Desktop](https://claude.com/download),
-Windows nativo, Git para Windows y Python 3.11 o posterior. Reinicia Desktop
-tras instalar herramientas o cambiar PATH: no lee el perfil de PowerShell.
-Respeta las políticas de la empresa; no hace falta Stow, WSL, administrador ni
-crear enlaces simbólicos para desplegar la configuración.
-
-Clona estos dotfiles en una carpeta local real. No uses una junction, un enlace
-ni un directorio redirigido para el HOME o las carpetas gestionadas.
+Use the [official Claude Desktop installer](https://claude.com/download),
+native Windows, Git for Windows and Python 3.11 or later. Restart Desktop after
+changing PATH. Respect company policies; no Stow, WSL, administrator rights or
+symlinks are needed. Clone the dotfiles into a real local folder (no junction or
+redirected folder).
 
 ```powershell
-cd 'C:\Users\tu-usuario\dotfiles'
+cd 'C:\Users\you\dotfiles'
 .\scripts\ai-setup.ps1 -Mode plan
 .\scripts\ai-setup.ps1 -Mode apply
 .\scripts\ai-setup.ps1 -Mode check
 ```
 
-El valor predeterminado despliega solo Claude. `-Clients both` conserva también
-un Codex instalado. `-TargetHome 'C:\Users\Nombre Con Espacios'` permite un HOME
-explícito para una prueba. Cada skill se copia y se verifica; una edición local
-posterior bloquea su sobrescritura. Revisa/aprueba la ejecución del script según
-la política corporativa, sin cambiar ni eludir la política de PowerShell.
-Las exportaciones de skills excluyen `__pycache__`, `.pyc` y `.pyo` generados
-durante pruebas. Los respaldos conservan snapshots completos para el rollback.
+The default deploys Claude only; `-Clients both` also keeps an installed Codex.
+Each skill is copied and verified; a later local edit blocks its overwrite.
+Hooks and the status line run with the absolute path of the Python that ran
+`ai-setup.ps1`; after moving or upgrading Python, run `-Mode apply` again.
+`cachyos-host-audit` and the Stop notification are Linux-only. In a new session
+check `/memory`, `/skills`, `/agents`, `/hooks`, `/permissions` and `/mcp`.
+This GUI check must happen on the work PC; Linux tests do not replace it.
 
-Para Playwright instala Node LTS y ejecuta `npm.cmd install --global
-@playwright/cli@0.1.21`. Usa `playwright-cli.cmd` si la política impide los wrappers
-PowerShell. El instalador de configuración no instala paquetes corporativos ni
-altera modelos, esfuerzo, credenciales, plugins ni archivos administrados.
+## Tessera
 
-En Code de Desktop activa el ajuste de bypass descrito arriba si la política lo
-permite. Comprueba `/memory`, `/skills`, `/agents`, `/mcp` y `/permissions` en una
-sesión nueva. Esta comprobación GUI debe hacerse en el equipo del trabajo; las
-pruebas portables ejecutadas desde Linux no la sustituyen. CI incluye un job
-Windows que prueba copias, rutas con espacios, PowerShell y junctions.
+Tessera keeps a local, per-project catalog of reusable components and
+utilities outside every repository (see the [skill](../ai/skills/tessera/SKILL.md)).
 
-Claude Code reciente admite ambas instrucciones con la opción builtin
-`instructionFiles=claude-md-and-agents-md`. Si un proyecto usa una versión antigua,
-su `CLAUDE.md` puede importar `@AGENTS.md`; no dupliques el contenido. No se crean
-ni sobrescriben instrucciones en proyectos ajenos automáticamente.
+- **Normal path:** `status` → `index` → `card` for a few plausible cards, then
+  read the code. Uninitialized projects use the ordinary reuse search; the agent
+  initializes a catalog only when you ask.
+- **Maintenance:** `changes` after pulls or branch switches, then refresh the
+  affected cards. `skeleton` gives deterministic starting evidence and
+  `catalog-writer` drafts cards on a cheaper model.
+- **Provider decisions (Jev, Kev):** optional and explicit. The wire card keeps
+  every curated field but at most three usage references plus `usage_count`,
+  and option texts no longer repeat the summary (about 8% smaller on the pilot,
+  more on catalogs with many usages). Each decision records the first-round
+  `batch_proposals`, the most useful signal for tasks that compose several pieces. They need your
+  per-project consent (`tessera.py consent --repo PROJECT --provider typesafe`,
+  in your own terminal) and a blind `agent_choice` in the task. A 250-card
+  catalog costs about 175k provider tokens per decision. `tessera.py report`
+  shows agreement with the blind choices and total tokens; keep the provider
+  only while it improves decisions.
+- **Studio:** [Tessera Studio](https://github.com/jesus-molano/tessera-studio)
+  (`python -m tessera_studio --open`) is a separate read-only viewer bound to
+  `127.0.0.1`. It also finds the store of MSIX-virtualized apps on Windows.
 
-## Cambiar de proveedor
+Catalogs, runs and consent never enter Git, dotfiles or GitHub.
+
+## MCP and permissions
+
+- `linear`: `https://mcp.linear.app/mcp/readonly`, OAuth per client.
+- `openaiDeveloperDocs`: `https://developers.openai.com/mcp`.
+- GitHub: `gh` with its local authentication.
+- Linear writes: Codex keeps `linear-write` disabled; Claude refuses a
+  persistent `linear-write` and loads it only from a temporary JSON through
+  `claude --mcp-config PATH`, following `linear-workflow`.
+
+An existing connection with the same name and another endpoint blocks the apply
+instead of being replaced. Accounts, tokens and company connections are never migrated.
+
+## Switching provider
 
 ```bash
 ai-provider get
@@ -125,158 +257,124 @@ ai-provider set claude
 ai-provider set codex
 ```
 
-En el lanzador `/cmd`, usa **IA predeterminada — Claude** o **IA predeterminada —
-Codex**. La preferencia se guarda como `[ai] provider = "claude" | "codex"` en
-`~/.config/dotfiles/host.toml`. No se versiona ni se comparte con Windows.
+The preference lives in `~/.config/dotfiles/host.toml` as `[ai] provider`.
+Hyper+W, startup, Hyper+P captures and `/proj` use the same resolver. Switching
+never closes or starts sessions. If Desktop is missing, the CLI of the same
+provider opens in Ghostty/Zellij. End-of-turn notifications are generic.
 
-Hyper+W, el arranque, Hyper+P/capturas y `/proj` usan el mismo resolvedor. Cambiar
-la preferencia no cierra ni lanza sesiones. `/proj-actions` y `/cmd` conservan
-accesos explícitos a ambos clientes. Los espacios de ventanas están separados.
-Una captura se copia al portapapeles y enfoca la app; no envía una conversación.
+## Updating without drift
 
-Los escritorios no ofrecen aquí un contrato verificado para abrir un repositorio
-por argumento. Las acciones de proyectos enfocan la app y abren el terminal en
-el repositorio. Selecciona la carpeta dentro de Desktop. Si falta Desktop, se
-abre el CLI del mismo proveedor en Ghostty/Zellij. Un fallo de inicio de Desktop
-se muestra como error; no cambia de proveedor silenciosamente.
+1. Update packages (Shelly/Pacman on Linux, the official installer on Windows).
+2. Read the release notes for settings, instructions, skills, hooks and roles.
+3. Edit `ai/`, run `python3 scripts/render-ai.py`, the tests, `just lint`,
+   `just check`, `just plan` and `just ai-plan`.
+4. Apply, run `just ai-check` and open a new session of both clients.
+5. Once a month run `/skill-doctor` and `/context` in Claude to spot skills or
+   rules that cost context without being used.
 
-Solo se arranca automáticamente el proveedor seleccionado. Si necesitas que
-una automatización local del otro cliente se ejecute, mantén ese cliente abierto.
-Las notificaciones de fin de turno son genéricas y no incluyen conversaciones,
-rutas, identificadores ni respuestas.
+Never edit generated copies. A later edit of a managed key, entry, role, hook or
+copied skill blocks the apply; reconcile it with the source. There is no `--force`.
 
-## MCP y permisos
+## Evaluating the workflow
 
-- `linear`: `https://mcp.linear.app/mcp/readonly`; necesita OAuth por cliente.
-- `openaiDeveloperDocs`: `https://developers.openai.com/mcp`.
-- GitHub: `gh`, con su autenticación local.
-- Codex mantiene `linear-write` desactivado. Claude rechaza una conexión persistente
-  con ese nombre; la escritura se carga solo con un JSON temporal mediante
-  `claude --mcp-config RUTA`. Sigue `linear-workflow` y la confirmación fresca del
-  destino/campos; no habilites escritura global por comodidad.
-
-No se migran cuentas, tokens ni conexiones corporativas. Una conexión con el
-mismo nombre y otro endpoint bloquea la aplicación para evitar sustituirla.
-`component-atlas` se retira con respaldo; si reaparece después, se detecta como
-conflicto. También se retiran únicamente sus enlaces exactos conocidos.
-
-## Actualizar sin divergencias
-
-1. Actualiza paquetes con Shelly/Pacman en Linux y el instalador oficial en Windows.
-2. Revisa las novedades oficiales que afecten a settings, instrucciones, skills,
-   hooks o roles. La configuración se revisa bajo demanda, no por una tarea automática.
-3. Edita `ai/`, adapta el formato específico si cambió y ejecuta
-   `python3 scripts/render-ai.py` para regenerar los archivos Codex versionados.
-4. Ejecuta pruebas, `just lint`, `just check`, `just plan`, `just ai-plan`.
-5. Aplica y ejecuta `just ai-check`; abre una sesión nueva de ambos clientes.
-6. Antes del cambio mensual deja una continuidad breve en `docs/work/<tarea>.md`:
-   objetivo, decisiones, estado Git, comprobaciones fechadas y siguiente paso.
-   El siguiente cliente lee ese documento y verifica el estado actual.
-
-No edites las copias generadas. Se fusionan solo claves gestionadas; modelos,
-esfuerzo, hooks ajenos, proyectos y preferencias locales sobreviven a la fusión.
-Una modificación posterior de una clave gestionada, role o skill copiada bloquea
-la aplicación. Revisa el cambio y concílialo con su fuente; no hay `--force`.
-
-## Backups y recuperación
-
-`ai-sync` imprime solo rutas/tipos y la ubicación del respaldo, nunca los valores
-de configuración. Linux guarda transacciones privadas en
-`~/.local/state/dotfiles/ai/backups/`; Windows en
-`%USERPROFILE%\AppData\Local\dotfiles\ai\backups\`.
-Los backups contienen configuración privada: no los copies al repositorio.
+Static checks and real runs answer different questions. CI validates the
+versioned catalog and regressions without a model or network. Routing is
+measured with real runs of `claude plugin eval`:
 
 ```bash
-python3 scripts/sync-ai.py rollback --backup /ruta/exacta/al/backup
+just ai-eval                                  # all cases, 1 run each, $2 cap
+just ai-eval --runs 3 --model sonnet          # a steadier measurement
+just ai-eval --case generic-bug --runs 3      # one case
+```
+
+`scripts/ai-eval.sh` assembles a temporary plugin from `ai/skills` and the cases
+in `ai/evals/cases/`, runs it and keeps results under
+`~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
+`tool_used: Skill` graders. The evals load only the skills, not your
+`CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
+"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs per case):
+
+| Case | Expected | Result |
+|---|---|---|
+| `implement-ui` | `engineering-flow`, never `codebase-design` | 3/3 |
+| `generic-bug` | `systematic-debugging` | 3/3 (1/3 before its trigger was sharpened) |
+| `web-flow-bug` | `debug-web-flow` | 3/3 |
+| `web-review` | `review-web-pr` | 3/3 |
+| `spec-review` | `spec-and-standards-review` | 3/3 |
+| `research` | `research-primary-sources`, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
+| `handoff` | `handoff` | 3/3 |
+| `named-tdd` | `test-driven-development` (name-only) | 3/3 |
+| `explain-only` | no skill at all | 3/3 |
+
+A full run of all cases at 3 runs costs about $1.50 with Sonnet. With Opus,
+the main model, one run per case also scored 9/9 (about $0.90).
+
+Haiku as the main model skipped the skill and searched files directly: another
+reason to keep the main agent on Opus. Run the evals after changing a
+description, a routing rule or the skill set. Turn a real repeated routing
+failure into a new case; do not grow the catalog by intuition.
+
+The reuse-scout fixture in `scripts/fixtures/reuse-eval` checks delegation and
+evidence quality by hand: open it in a fresh read-only session, ask the main
+agent to delegate `cases.md` to `reuse-scout` by name, check the delegation in
+the transcript and compare:
+
+| Case | Required evidence |
+|---|---|
+| Confirmation with secondary text | `SheetDialog`, `Text`, `ActionButton`, public export and the `CloseAccount` consumer. |
+| Decimal amount | `parseAmount`, the `SavePayment` consumer; no second parser. |
+| Native alternative on web | Rejects `NativeConfirm` for the browser and finds `SheetDialog`. |
+| Missing CSV importer | No invented candidate; inspected paths and missing capabilities. |
+
+## Switching to auto mode
+
+`bypassPermissions` is the owner's choice. The sync also manages
+`autoMode.soft_deny` rules that restate the authority rules (publishing,
+secrets, deletion, Stow and system changes, tracker writes, sending data out),
+so switching to `auto` (for example on the work PC, if policy disables bypass)
+is safe from the first session: set `permissions.defaultMode` to `auto` locally
+or pick it in `/permissions`. The classifier adds some token cost per action.
+
+## Backups and recovery
+
+`ai-sync` prints only paths, kinds and the backup location. Linux keeps private
+transactions in `~/.local/state/dotfiles/ai/backups/`; Windows in
+`%USERPROFILE%\AppData\Local\dotfiles\ai\backups\`. Backups contain private
+configuration: never copy them into a repository.
+
+```bash
+python3 scripts/sync-ai.py rollback --backup /exact/path/to/backup
 ```
 
 ```powershell
-.\scripts\ai-setup.ps1 -Mode rollback -Backup 'C:\ruta exacta\al backup'
+.\scripts\ai-setup.ps1 -Mode rollback -Backup 'C:\exact path\to\backup'
 ```
 
-Rollback comprueba que cada destino conserva el contenido posterior o ya
-restaurado. Si hubo modificaciones ajenas, se detiene. También puede recuperar
-un diario interrumpido o una restauración automática fallida. No borres backups
-ni el manifiesto para resolver un conflicto. Si una interrupción dejó `sync.lock`,
-comprueba que no hay otra sincronización activa antes de retirar ese archivo exacto.
-La transacción de Stow tiene su propio rollback y respaldo, independientes.
+Rollback checks that every target still holds the applied or restored content
+and stops on foreign changes. If an interruption left `sync.lock`, confirm no
+sync is running before removing that exact file.
 
-## Tessera, proveedor de decisión y dirección visual
+## Sources
 
-Los planes aportados en `planes-tessera-jev-claude-codex.zip` quedan como contexto
-para esta fase, confirmada por el usuario el 27 de septiembre de 2026.
-Tessera sustituye la responsabilidad de catálogo de Atlas dentro del workflow
-existente. Es la base de conocimiento local por proyecto de componentes y
-utilidades, ampliable conforme se implementa. Catálogos, tareas e historial se
-guardan fuera de Git, separados por proyecto bajo XDG/LOCALAPPDATA. En el trabajo
-no se crea `.tessera` ni se llevan fichas al repositorio corporativo o a dotfiles
-personal. `locate` resuelve el almacén y `changes` detecta cambios de compañeros
-ya presentes en el checkout para que el agente actualice las fichas antes de
-consultar al motor. Memoria, continuidad y workflow
-conservan sus propietarios. La retirada de la skill Atlas `visual-direction`
-no elimina el checkout, datos, referencias ni temas visuales de Atlas.
-
-`status` distingue sin inicializar, inicializando, actualización pendiente,
-revisión completa necesaria, listo y bloqueado. `init`/`scan` inventarían
-el árbol Git excluyendo tests por ruta antes de leerlos; `skeleton` deja en el
-almacén externo fuentes candidatas, exports y primeros usos reales como punto de
-partida; el agente revisa por tandas y `finalize` valida esa cobertura. No analizar tests ni citarlos como evidencia.
-El flujo normal usa `prepare --require-ready`. Un catálogo piloto actualizado
-no se presenta como proyecto completo. Procedimiento y límites de cobertura en
-[lifecycle.md](../ai/skills/tessera/references/lifecycle.md).
-
-Para consultar catálogos, inventario y decisiones de forma visual existe
-[Tessera Studio](https://github.com/jesus-molano/tessera-studio), un repositorio
-aparte: `python -m tessera_studio --open`. Solo lee el almacén local, escucha en
-`127.0.0.1`, no escribe y no sirve texto de fuentes. Detecta también el almacén
-virtualizado de apps MSIX como Claude Desktop en Windows. Contiene la herramienta,
-nunca catálogos; dotfiles tampoco versiona datos de proyectos.
-
-La [skill neutral Tessera](../ai/skills/tessera/SKILL.md) enruta las decisiones de
-reutilizar, modificar, envolver o crear. Jev de TypeSafe es su primer adaptador
-real; catálogo, contexto e historial no dependen de ese proveedor. Cambiarlo
-requiere otro adaptador verificado, no rehacer Tessera ni simular una futura API
-de Claude o Codex. El código no está integrado como servicio permanente.
-
-Primer piloto: `Expenses-Log-App`, 14 fichas de UI compartida y utilidad `cn`.
-Se prepara en `ai/tessera/pilots/expenses-log-app`; no se ha escrito en la app.
-Cuatro escenarios se ejecutaron contra Jev con todas las fichas: reutilizar,
-modificar, envolver y crear. Consumo compacto: unos 5.500 tokens por caso.
-El caso de botón mostró ambigüedad; no es una prueba general de calidad.
-Kev tiene adaptador con la misma entrada y runtime local probado en Linux/CUDA.
-Kev-0.8B se abstuvo en los cuatro casos: sigue siendo experimental, sin
-equivalencia de calidad demostrada. Código y estilos completos quedan como evidencia
-local; los motores reciben fichas, contratos y restricciones sin top-k.
-Contrato, comandos y límites en la
-[referencia de la skill](../ai/skills/tessera/references/contract.md).
-Estado verificable y continuación en [docs/work/tessera-jev.md](work/tessera-jev.md).
-La instalación de Kev se repite por equipo; el runtime, pesos y claves no se
-versionan. El [prompt para el PC del trabajo](work/tessera-work-pc.md) coordina
-actualización, despliegue de skills e instalación según su propio hardware.
-
-Secuencia de continuación:
-
-1. Usar Jev como motor habitual y conservar Kev-0.8B como alternativa local.
-   Las pruebas comparadas están registradas; no repetirlas automáticamente.
-   En el PC del trabajo elegir Kev según su hardware mediante el prompt.
-   Cada motor recibe todas las fichas; no hay filtros ni top-k en Tessera.
-2. Revisar las decisiones contra contratos y consumidores fuera de tests. Completar
-   cobertura del proyecto cuando la tarea la requiera; separar curación,
-   evidencia derivada y explicación atribuida al agente.
-3. Incorporar el catálogo al almacenamiento local externo del proyecto y
-   desplegar la skill desde la fuente canónica después de validar.
-4. Recuperar `visual-direction` como capacidad independiente, con referencias
-   compartidas y sin dependencia de Atlas; no fusionarla con Tessera.
-5. Probar reutilización, modificación, wrappers y creación con ambos clientes. Añadir Figma
-   y automatización solo cuando el piloto demuestre una necesidad concreta.
-
-## Fuentes de compatibilidad
-
-Consultadas para esta entrega: [Desktop](https://code.claude.com/docs/en/desktop),
-[Linux](https://code.claude.com/docs/en/desktop-linux),
-[instrucciones](https://code.claude.com/docs/en/memory),
-[skills](https://code.claude.com/docs/en/skills),
-[subagentes](https://code.claude.com/docs/en/sub-agents),
+[Memory and AGENTS.md](https://code.claude.com/docs/en/memory),
+[settings](https://code.claude.com/docs/en/settings),
+[permissions](https://code.claude.com/docs/en/permissions),
 [hooks](https://code.claude.com/docs/en/hooks),
-[Desktop Extra](https://github.com/patrickjaja/claude-desktop-extra) y
-[Playwright CLI](https://github.com/microsoft/playwright-cli).
+[skills](https://code.claude.com/docs/en/skills),
+[subagents](https://code.claude.com/docs/en/sub-agents),
+[status line](https://code.claude.com/docs/en/statusline),
+[Desktop on Linux](https://code.claude.com/docs/en/desktop-linux),
+[Desktop Extra](https://github.com/patrickjaja/claude-desktop-extra) and
+[Playwright CLI](https://github.com/microsoft/playwright-cli). Settings keys,
+skill overrides and subagent fields were checked against Claude Code 2.1.284.
+
+## Provenance
+
+Ideas adopted and adapted, not installed: small composable skills and
+explicit user skills (`mattpocock/skills`); TDD, systematic debugging and
+verification before completion (`obra/superpowers`); deny rules plus blocking
+guard hooks (`trailofbits/claude-code-config`); Linear from `openai/skills`
+(see its `SOURCE.md`). Playwright CLI is vendored with checksums in
+`ai/skills/playwright-cli/SOURCE.json`. External catalogs are never installed
+globally; an idea is adopted only when it reduces risk or context and is
+versioned, tested and reviewable here.

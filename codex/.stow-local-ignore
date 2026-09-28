@@ -1,7 +1,6 @@
 # Estado y credenciales de Codex: solo se despliegan los ficheros duraderos
 # versionados de este paquete.
 ^/\.agents/skills(?:/|$)
-^/\.agents/retired-skills\.txt$
 ^/\.codex/agents(?:/|$)
 ^/\.codex/(?:auth\.json|config\.toml(?:\.bak\..+)?|history\.jsonl|hooks\.json|installation_id|models_cache\.json|version\.json)$
 ^/\.codex/(?:goals_.+|logs_.+|memories_.+|state_.+|thread_history_.+)\.sqlite(?:-.+)?$

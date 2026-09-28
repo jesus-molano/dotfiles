@@ -1,6 +1,6 @@
 interface:
-  display_name: "Depurar flujo web"
-  short_description: "Reproduce y aísla fallos web completos"
-  default_prompt: "Usa $debug-web-flow para reproducir este fallo web, localizar su causa y verificar la corrección."
+  display_name: "Debug Web Flow"
+  short_description: "Reproduce and isolate full web failures"
+  default_prompt: "Use $debug-web-flow to reproduce this web failure, find its cause and verify the fix."
 policy:
   allow_implicit_invocation: true

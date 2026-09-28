@@ -18,7 +18,7 @@
     "references/video-recording.md": "1c800b897824cb54394c34265d8ebffdbb530adfc8d612c5d798b667a1799f48"
   },
   "modifications": [
-    "Frontmatter normalized to name/description; local Codex routing metadata added.",
+    "Frontmatter normalized to name/description; description rewritten with a 'Use when' trigger for local routing; local Codex routing metadata added.",
     "LICENSE line endings normalized from CRLF to LF; license text unchanged."
   ]
 }
