@@ -390,6 +390,15 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(self.call("status")["status"], "ready")
         self.call("adopt-store", "--from", msix, ok=False)
 
+    def test_repo_that_is_not_a_git_checkout_gets_a_clear_error(self):
+        missing = self.root / "ruta" / "a" / "HeuristikFront"
+        result = subprocess.run([sys.executable, str(SCRIPT), "consent-status", "--repo", str(missing)],
+                                env=self.env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("--repo is not a Git checkout", result.stderr)
+        self.assertIn(str(missing), result.stderr)
+        self.assertNotIn("CalledProcessError", result.stderr)
+
     def test_consent_status_is_read_only(self):
         self.assertEqual(self.call("consent-status")["granted"], {})
         self.call("consent", "--provider", "typesafe")

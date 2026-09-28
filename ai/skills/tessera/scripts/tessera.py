@@ -990,7 +990,10 @@ def main():
     args = parser.parse_args()
     try:
         if hasattr(args, "repo"):
-            args.repo = Path(git(args.repo, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+            try:
+                args.repo = Path(git(args.repo, "rev-parse", "--show-toplevel").decode().strip()).resolve()
+            except (subprocess.CalledProcessError, OSError):
+                raise ValueError(f"--repo is not a Git checkout (or Git is not on PATH): {args.repo}") from None
         if args.command == "locate":
             result = storage_paths(args.repo)
         elif args.command == "status":
