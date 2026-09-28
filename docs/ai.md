@@ -217,8 +217,9 @@ conservan sus propietarios. La retirada de la skill Atlas `visual-direction`
 no elimina el checkout, datos, referencias ni temas visuales de Atlas.
 
 `status` distingue sin inicializar, inicializando, actualización pendiente,
-revisión completa necesaria, listo y bloqueado. `init`/`scan` inventarían todo
-el árbol Git; el agente revisa por tandas y `finalize` valida su cobertura.
+revisión completa necesaria, listo y bloqueado. `init`/`scan` inventarían
+el árbol Git excluyendo tests por ruta antes de leerlos; el agente revisa por
+tandas y `finalize` valida esa cobertura. No analizar tests ni citarlos como evidencia.
 El flujo normal usa `prepare --require-ready`. Un catálogo piloto actualizado
 no se presenta como proyecto completo. Procedimiento y límites de cobertura en
 [lifecycle.md](../ai/skills/tessera/references/lifecycle.md).
@@ -236,7 +237,7 @@ modificar, envolver y crear. Consumo compacto: unos 5.500 tokens por caso.
 El caso de botón mostró ambigüedad; no es una prueba general de calidad.
 Kev tiene adaptador con la misma entrada y runtime local probado en Linux/CUDA.
 Kev-0.8B se abstuvo en los cuatro casos: sigue siendo experimental, sin
-equivalencia de calidad demostrada. Código/pruebas/estilos completos quedan como evidencia
+equivalencia de calidad demostrada. Código y estilos completos quedan como evidencia
 local; los motores reciben fichas, contratos y restricciones sin top-k.
 Contrato, comandos y límites en la
 [referencia de la skill](../ai/skills/tessera/references/contract.md).
@@ -251,7 +252,7 @@ Secuencia de continuación:
    Las pruebas comparadas están registradas; no repetirlas automáticamente.
    En el PC del trabajo elegir Kev según su hardware mediante el prompt.
    Cada motor recibe todas las fichas; no hay filtros ni top-k en Tessera.
-2. Revisar las decisiones contra contratos, consumidores y pruebas. Completar
+2. Revisar las decisiones contra contratos y consumidores fuera de tests. Completar
    cobertura del proyecto cuando la tarea la requiera; separar curación,
    evidencia derivada y explicación atribuida al agente.
 3. Incorporar el catálogo al almacenamiento local externo del proyecto y

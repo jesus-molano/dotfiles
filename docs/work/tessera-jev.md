@@ -53,7 +53,7 @@ por etiquetas/relevancia ni hace top-k. El proveedor decide reuse, modify,
 wrap, create o insufficient_evidence. El agente verifica la decisión contra
 código y consumidores antes de implementar. Se envían fichas completas con
 nombres, etiquetas, contratos, restricciones y referencias; los archivos
-completos de código, usos, pruebas y estilos permanecen como evidencia local.
+completos de código, usos y estilos permanecen como evidencia local.
 
 Corrección posterior del usuario: al ser tooling personal, no introducir sus
 catálogos ni historial en repos del trabajo ni en GitHub/dotfiles personales.
@@ -61,7 +61,7 @@ El valor por defecto pasa a almacenamiento externo bajo XDG/LOCALAPPDATA,
 separado por proyecto. Compartir en un repo requiere una excepción explícita.
 También exige detectar cambios de compañeros y actualizar las fichas al usar
 Tessera. `locate` resuelve el almacén; `changes` informa del delta; el agente
-inspecciona y actualiza contratos, usos, pruebas, altas, bajas y renombrados.
+inspecciona y actualiza contratos, usos, altas, bajas y renombrados.
 Esto detecta cambios presentes en el checkout, no consulta remotos en segundo
 plano. El proveedor sigue recibiendo todas las fichas una vez actualizadas.
 
@@ -116,7 +116,7 @@ El nombre ODD no se ha localizado en los archivos; no se redefine.
 - Almacén local por hash del git-common-dir real: worktrees del mismo checkout
   comparten catálogo, clones independientes no. No emplea URLs ni credenciales
   para identificar el proyecto. No hay sincronización de datos entre PCs.
-- `changes` detecta cambios de fuente/consumidores/tests, altas y bajas, archivos
+- `changes` detecta cambios de fuente/consumidores fuera de tests, altas y bajas, archivos
   fuera del catálogo y línea base ausente. El agente conserva copia previa en
   `history`, actualiza significado y después marca la revisión inspeccionada.
 - `evaluate` verifica de nuevo la evidencia local antes de hacer una petición.

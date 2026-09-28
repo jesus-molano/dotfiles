@@ -40,12 +40,12 @@ de una evaluación futura, no se deben modificar para reutilizarlos.
 Antes de decidir, ejecuta changes: inspecciona cambios de compañeros presentes
 en el checkout, actualiza las fichas afectadas, incorpora piezas nuevas y
 reconcilia bajas/renombrados. Conserva una copia previa local; actualiza la
-revisión del catálogo después de inspeccionar código, usos y pruebas. No hace
+revisión del catálogo después de inspeccionar código y usos fuera de tests. No hace
 pull ni consulta GitHub automáticamente. El código debe estar actualizado en
 este checkout; los compañeros no necesitan Tessera.
 Usa ahora status como punto de entrada: distingue inicialización, actualización,
 revisión completa y listo. Sigue references/lifecycle.md de la skill para
-init/scan, revisar todos los archivos por tandas y finalize. Un catálogo previo
+init/scan, revisar los archivos incluidos por tandas (tests excluidos sin abrirlos) y finalize. Un catálogo previo
 de dos fichas no acredita cobertura completa. Usa prepare --require-ready en
 las tareas normales; no cambies fechas/revisiones para saltarte la revisión.
 Envía TODAS las fichas al motor elegido: nombres, etiquetas, contratos,

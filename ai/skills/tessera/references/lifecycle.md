@@ -25,8 +25,8 @@ puede estar completo; la petición falla explícitamente, sin recortar fichas.
    `locate`. Conserva el catálogo existente y es idempotente. Trabajar sobre un
    checkout limpio; no hacer commits de cambios ajenos, reset ni pull para
    despejar el estado. No editar `.gitignore` del proyecto para instalar Tessera.
-2. El inventario incluye **todos los archivos del árbol Git**, sin filtrar por
-   lenguaje, carpeta de UI o relevancia para la tarea. Los archivos sin seguimiento
+2. El inventario incluye **los archivos del árbol Git salvo tests y sus artefactos**, sin filtrar por
+   lenguaje, carpeta de UI o relevancia para la tarea entre las implementaciones. Los archivos sin seguimiento
    no ignorados bloquean la captura; los ignorados no forman parte de la cobertura.
    Secretos reconocibles por ruta, enlaces y submódulos aparecen como `protected`:
    no se abre su contenido. Un submódulo se cataloga separadamente como proyecto;
@@ -42,10 +42,10 @@ puede estar completo; la petición falla explícitamente, sin recortar fichas.
    concreta. Excluir documentación, dependencias o código generado por su
    naturaleza comprobada, nunca por irrelevancia para la tarea del momento.
 4. Crear/ampliar `catalog.json`, con respaldo previo en `history/`. Leer contratos,
-   exports, consumidores y pruebas; agrupar los exports reutilizables de un archivo
+   exports y consumidores que no sean tests; agrupar los exports reutilizables de un archivo
    en su ficha. No inventar usos: si no se encuentran, `usages: []` necesita
-   `usage_gap` explicando la búsqueda o el uso implícito del framework. Los tests
-   ausentes se registran como `tests: []`. Mantener `scope` coherente con todas
+   `usage_gap` explicando la búsqueda o el uso implícito del framework. Omitir el campo
+   `tests`; no buscar ni leer pruebas. Mantener `scope` coherente con todas
    las fuentes catalogadas; puede enumerar archivos concretos de todo el repo.
 5. Registrar cada tanda con `review --repo PROJECT --batch EXTERNAL_BATCH.json`.
    Usar `revision` e `inventory_sha256` de un `status` reciente. La tanda no escribe
@@ -63,11 +63,38 @@ Ejemplo de tanda (las revisiones y rutas deben proceder del proyecto real):
   "inventory_sha256": "HASH_DE_STATUS",
   "files": [
     {"path": "src/format.ts", "kind": "catalogued", "reason": "Contrato y consumidores revisados"},
-    {"path": "src/format.test.ts", "kind": "supporting", "reason": "Pruebas del contrato inspeccionadas"},
     {"path": "README.md", "kind": "excluded", "reason": "Documentación sin implementación reutilizable"}
   ]
 }
 ```
+
+## Exclusión de tests antes de leer
+
+El helper aplica `is_test_path` al nombre, antes de abrir contenido. Omite
+carpetas `test`, `tests`, `spec`, `specs`, `__tests__`, `e2e`, `cypress`,
+`__fixtures__`, `__mocks__`, `__snapshots__`, `test-results`, `playwright-report`,
+`coverage`, `.pytest_cache` y `.nyc_output`; nombres `test_...`, `test-...`,
+`*.test.*`, `*.spec.*`, `*_test.*` y equivalentes con guion/punto, además de
+`*Test.java`, `*Tests.java`, Kotlin y C#. También omite `conftest.py` y
+`vitest`/`jest`/`playwright`/`cypress` con sufijos `.config.*` o `.setup.*`.
+No analiza contenido para descubrir
+si un archivo es un test. Si el proyecto declara otra convención, identificarla
+por su ruta y ampliar el predicado antes de inspeccionar esos archivos.
+
+No aparecen en pendientes, fuentes, consumidores ni evidencia de soporte. No
+leerlos manualmente ni delegar su análisis. `ready` acredita únicamente el árbol
+incluido por esta política. Los cambios confirmados solo en tests no invalidan
+el catálogo; sigue siendo obligatorio trabajar con un checkout limpio.
+
+La política 2 migra inventarios de política 1 con `scan`: guarda copia en
+`history`, retira tests por ruta y conserva clasificaciones de los otros archivos
+solo si su objeto Git y modo no cambiaron. Requiere finalizar de nuevo, sin
+repetir la revisión válida. No usar `scan --full` para esta migración compatible.
+Los campos antiguos `tests` se aceptan pero se ignoran sin resolver sus rutas y
+se eliminan del contexto del proveedor. Al curar el catálogo, retirarlos con
+copia previa. Una referencia test en `source`, `usages` o `supporting_files`
+se rechaza; retirarla y revisar el contrato/consumidor real. Conservar los runs
+históricos y preparar uno nuevo; nunca reescribir evidencia antigua.
 
 ## Tipo de pieza y responsabilidad del agente
 

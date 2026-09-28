@@ -22,7 +22,7 @@ Claude and Codex consume the same catalog, protocol and decision history.
   choice do not require a provider call. Do not turn this skill into a universal
   gate or call the service on every tool action.
 - If initialization, full review or an update is needed, follow
-  [project lifecycle](references/lifecycle.md). Inventory the whole repository
+  [project lifecycle](references/lifecycle.md). Inventory the repository excluding tests
   and resume pending files in batches; use reuse-scout to fill actual evidence
   gaps. A current scoped catalog is not proof of complete project coverage.
   Never create `.tessera`, edit `.gitignore`, or commit personal tool data in a
@@ -36,6 +36,13 @@ Claude and Codex consume the same catalog, protocol and decision history.
 - Keep project memory, ODD and task continuity in their existing owners. This
   skill neither replaces nor duplicates the project's workflow.
 
+Tests are completely outside Tessera: do not open or analyze them, search them
+for consumers, catalog them, classify them as supporting evidence, or send their
+paths/content to a provider. Apply the path exclusions in
+[lifecycle](references/lifecycle.md) before any content inspection, including
+when delegating to scouts. Running tests to verify an implementation remains the
+responsibility of the engineering workflow, independent of catalog curation.
+
 ## Decide and implement
 
 Read [the neutral contract and adapter protocol](references/contract.md) before
@@ -48,8 +55,8 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    `tessera.py changes --repo PROJECT` additionally compares
    the current checkout with the catalog's reviewed revision, including changes
    from colleagues after a pull or branch switch. For affected entries, read the
-   changed implementation, consumers and tests; refresh contracts, constraints,
-   usages and test references. Curate added sources and reconcile deleted or
+   changed implementation and non-test consumers; refresh contracts, constraints
+   and usages. Curate added sources and reconcile deleted or
    renamed ones. Inspect `outside_catalog_changes` for reusable additions that
    need broader coverage. With a missing baseline, review the whole catalog.
    Preserve the previous catalog in local `history`, update the external catalog
@@ -62,7 +69,7 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    `prepare --require-ready`; it checks full project coverage and assembles
    every catalog entry into a compact neutral decision context. Keep names,
    tags, contracts and constraints useful; tags alone do not prove a fit. Source,
-   consumers, tests and styles stay in a separate local evidence snapshot; the
+   consumers and styles stay in a separate local evidence snapshot; the
    provider receives their references, not full files. Do not preselect top-k
    candidates, filter entries by tags/relevance, or silently discard candidates
    to fit a provider limit. Keep task files and runs in the external directories
@@ -82,14 +89,14 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    can continue. One run permits one network attempt.
    If the cards lack a fact needed to decide, inspect the source and enrich the
    relevant contract or constraint, then prepare a fresh run. Never infer that
-   the provider inspected a referenced file or that a listed test passed. Do not
+   the provider inspected a referenced file. Do not
    silently fall back to uploading all source when a compact query is unclear.
-5. Explain the decision with source, consumer and test references. Label this as
+5. Explain the decision with source and consumer references. Label this as
    the implementing agent's explanation. Jev does not generate free text. Keep
    the raw provider decision immutable and record any disagreement separately.
 6. Implement through the established engineering workflow, then test and review.
    Update the affected curated entries or add reusable components/utilities with
-   stable IDs, actual usage and explicit test gaps. Regenerate derived evidence;
+   stable IDs and actual non-test usage. Regenerate derived evidence;
    do not overwrite curated knowledge with extracted data. Scan/review/finalize
    the new clean revision so the next task can distinguish ready from stale.
 

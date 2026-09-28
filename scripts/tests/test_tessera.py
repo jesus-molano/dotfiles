@@ -60,6 +60,57 @@ class TesseraTest(unittest.TestCase):
         return self.call("prepare", "--catalog", self.catalog, "--repo", self.repo,
                          "--task", self.task, "--output", self.run_dir)
 
+    def test_tests_never_opened_or_sent_even_from_legacy_catalog(self):
+        original = Path.open
+
+        def guarded(path, *args, **kwargs):
+            if path.is_relative_to(self.repo) and tessera.is_test_path(path.relative_to(self.repo).as_posix()):
+                raise AssertionError("Tessera opened a test")
+            return original(path, *args, **kwargs)
+
+        # A legacy test reference need not even exist: it is never resolved.
+        self.data["entries"][0]["tests"].append("tests/missing.py")
+        with patch.object(Path, "open", guarded):
+            evidence = tessera.build_evidence(self.data, self.repo)
+            context = tessera.build_context(self.data, evidence, json.loads(self.task.read_text()))
+        self.assertEqual(set(evidence["files"]), {"src/ui/Button.tsx", "src/use.tsx"})
+        self.assertNotIn("tests", context["catalog"]["entries"][0])
+        self.assertNotIn("Button.test.tsx", json.dumps(context))
+        self.assertIn("tests", self.data["entries"][0], "Do not mutate the original catalog")
+        for role in ("source", "usages", "supporting_files"):
+            value = copy.deepcopy(self.data)
+            if role == "source":
+                value["entries"][0]["source"] = "src/ui/Button.test.tsx"
+            elif role == "usages":
+                value["entries"][0]["usages"][0]["path"] = "src/ui/Button.test.tsx"
+            else:
+                value[role] = ["src/ui/Button.test.tsx"]
+            with self.subTest(role=role), patch.object(Path, "open", guarded):
+                with self.assertRaisesRegex(ValueError, "Tests fuera"):
+                    tessera.build_evidence(value, self.repo)
+
+    def test_test_config_patterns_preserve_similarly_named_production_files(self):
+        for name in ("test.ts", "spec.ts", "conftest.py", "vitest.config.ts", "vitest.setup.ts",
+                     "jest.config.js", "playwright.config.ts", "cypress.config.ts"):
+            with self.subTest(name=name):
+                self.assertTrue(tessera.is_test_path(name))
+        for name in ("app/types/testimonial.ts", "Testimonial.vue", "contest.ts"):
+            with self.subTest(name=name):
+                self.assertFalse(tessera.is_test_path(name))
+
+    def test_test_only_commits_do_not_stale_catalog_or_changes(self):
+        self.data["reviewed_revision"] = tessera.git(self.repo, "rev-parse", "HEAD").decode().strip()
+        (self.repo / "src/ui/Button.test.tsx").write_text("changed test\n")
+        tessera.git(self.repo, "add", ".")
+        tessera.git(self.repo, "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                    "commit", "-qm", "tests only")
+        self.catalog.write_text(json.dumps(self.data))
+        report = tessera.catalog_changes(self.catalog, self.repo)
+        self.assertEqual(report["status"], "current")
+        self.assertEqual(report["changed_paths"], [])
+        self.assertEqual(report["outside_catalog_changes"], [])
+        self.assertEqual(tessera.build_evidence(self.data, self.repo)["curation"]["status"], "current")
+
     def test_prepare_full_catalog_with_local_code_and_provenance(self):
         result = self.prepare()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -68,7 +119,9 @@ class TesseraTest(unittest.TestCase):
         self.assertEqual(request["model"], "jev-1.13.0")
         self.assertEqual(set(request["questions"]["decision"]["criteria"]),
                          {"reuse:button", "modify:button", "wrap:button", "create", "insufficient_evidence"})
-        self.assertEqual(request["state"]["catalog"], self.data)
+        expected = copy.deepcopy(self.data)
+        expected["entries"][0].pop("tests")
+        self.assertEqual(request["state"]["catalog"], expected)
         evidence = request["state"]["evidence"]
         self.assertFalse(evidence["source_text_included"])
         derived = json.loads((self.run_dir / "derived.json").read_text())
@@ -106,7 +159,9 @@ class TesseraTest(unittest.TestCase):
             run = Path(json.loads(result.stdout)["run"])
             self.assertEqual(run.parent, Path(paths["runs"]))
             request = json.loads((run / "request.json").read_text())
-            self.assertEqual(request["state"]["catalog"], self.data)
+            expected = copy.deepcopy(self.data)
+            expected["entries"][0].pop("tests")
+            self.assertEqual(request["state"]["catalog"], expected)
             if os.name != "nt":
                 self.assertEqual(run.stat().st_mode & 0o777, 0o700)
                 self.assertEqual(run.parent.stat().st_mode & 0o777, 0o700)
@@ -391,7 +446,9 @@ class TesseraTest(unittest.TestCase):
         context = json.loads((self.run_dir / "context.json").read_text())
         derived = json.loads((self.run_dir / "derived.json").read_text())
         self.assertEqual(len(context["options"]), 5)
-        self.assertEqual(context["catalog"], self.data)
+        expected = copy.deepcopy(self.data)
+        expected["entries"][0].pop("tests")
+        self.assertEqual(context["catalog"], expected)
         self.assertIn("private-code-marker", derived["files"]["theme.css"]["text"])
         self.assertNotIn("private-code-marker", (self.run_dir / "request.json").read_text())
         self.assertNotIn("export function", (self.run_dir / "context.json").read_text())

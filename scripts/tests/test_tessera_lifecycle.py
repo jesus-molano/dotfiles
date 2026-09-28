@@ -59,6 +59,44 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(self.git("status", "--porcelain"), "")
         self.assertFalse((self.repo / ".tessera").exists())
 
+    def test_excluded_tests_never_pending_and_legacy_scan_preserves_work(self):
+        tests = ["helper.test.ts", "helper.spec.ts", "tests/helper.py", "__tests__/helper.ts",
+                 "test_helper.py", "scripts/test-blog.cjs", "helper_test.go", "e2e/login.ts",
+                 "__snapshots__/helper.snap", "coverage/report.json"]
+        for name in tests:
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("test content must not be opened\n")
+        self.commit()
+        self.ready()
+        target = Path(self.paths["inventory"])
+        legacy = json.loads(target.read_text())
+        legacy["policy"] = 1
+        for name in tests:
+            legacy["files"][name] = {"oid": self.git("rev-parse", "HEAD:" + name), "mode": "100644",
+                                      "review": {"kind": "supporting", "reason": "Old policy"}}
+        before = json.dumps(legacy).encode()
+        target.write_bytes(before)
+        self.assertEqual(self.call("status")["next_action"], "scan")
+        original = Path.open
+
+        def guarded(path, *args, **kwargs):
+            if path.is_relative_to(self.repo) and path.relative_to(self.repo).as_posix() in tests:
+                raise AssertionError("Tessera opened test content")
+            return original(path, *args, **kwargs)
+
+        with patch.dict(os.environ, self.env), patch.object(Path, "open", guarded):
+            report = tessera.scan_project(self.repo)
+            self.assertEqual(report["coverage"], {"total": 3, "reviewed": 3, "pending": 0, "protected": 0})
+            self.assertEqual(report["next_action"], "finalize")
+            self.assertEqual(tessera.finalize_project(self.repo)["status"], "ready")
+        current = json.loads(target.read_text())
+        self.assertTrue(set(tests).isdisjoint(current["files"]))
+        self.assertTrue(any(p.read_bytes() == before for p in Path(self.paths["history"]).glob("inventory-*.json")))
+        (self.repo / tests[0]).write_text("modified test\n")
+        self.commit()
+        self.assertEqual(self.call("status")["status"], "ready")
+
     def catalog(self, unused=False):
         entry = {"id": "helper", "kind": "utility", "summary": "Constant factory",
                  "contract": "No arguments; returns 1", "constraints": [], "source": "helper.ts",
@@ -277,6 +315,29 @@ class LifecycleTest(unittest.TestCase):
                 tessera.evaluate(Path(run))
             invoke.assert_not_called()
         self.assertFalse((Path(run) / "attempt.json").exists())
+
+    def test_ready_legacy_catalog_evaluates_without_test_references(self):
+        self.ready()
+        value = self.catalog()
+        value["entries"][0]["tests"] = ["tests/never-opened.py"]
+        Path(self.paths["catalog"]).write_text(json.dumps(value))
+        self.call("finalize")
+        task = self.root / "task.json"
+        task.write_text(json.dumps({"id": "fixture", "requirement": "Use constant", "acceptance": ["Returns 1"]}))
+        run = Path(self.call("prepare", "--task", task, "--require-ready")["run"])
+        context = json.loads((run / "context.json").read_text())
+        self.assertNotIn("tests", context["catalog"]["entries"][0])
+        response = {"model": "jev-1.13.0", "answers": {"decision": {
+            "type": "choice", "choice": "reuse:helper", "confidence": 1.0,
+            "probabilities": {key: float(key == "reuse:helper") for key in context["options"]}}},
+            "usage": {"input_tokens": 1, "output_tokens": 1}}
+        provider = tessera.PROVIDERS["typesafe"]
+        with patch.dict(os.environ, self.env), patch.object(provider, "check_credentials"), \
+                patch.object(provider, "invoke", return_value=json.dumps(response).encode()) as invoke:
+            result = tessera.evaluate(run)
+        self.assertEqual(result["action"], "reuse")
+        invoke.assert_called_once()
+        self.assertNotIn(b"never-opened", invoke.call_args.args[0])
 
     def test_empty_catalog_still_requires_review_of_every_file(self):
         self.call("init")

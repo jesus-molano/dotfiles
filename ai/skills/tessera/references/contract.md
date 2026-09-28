@@ -36,7 +36,7 @@ no un patrón para almacenar información de empresa ni un despliegue en la app.
 
 | Capa | Contenido | Propietario |
 |---|---|---|
-| Catálogo curado | Responsabilidad, contrato, restricciones, fuentes, usos, pruebas | Proyecto y sus agentes |
+| Catálogo curado | Responsabilidad, contrato, restricciones, fuentes y usos | Proyecto y sus agentes |
 | Evidencia derivada | Inventario, contenido de fuentes, hashes, revisión | `prepare`, regenerable |
 | Contexto neutral | Tarea, fichas completas, procedencia y opciones; sin archivos completos | Tessera |
 | Intercambio externo | Petición/respuesta específica, autenticación | Adaptador de proveedor |
@@ -46,7 +46,7 @@ No guarda memoria conversacional, planes de trabajo ni referencias de inspiraci�
 No usa Atlas, una base vectorial, Figma ni un servidor.
 
 El [ciclo de vida](lifecycle.md) define `status`, `init`, `scan`, `review` y
-`finalize`: cobertura del árbol Git completo, revisión reanudable y vigencia.
+`finalize`: cobertura del árbol Git sin tests, revisión reanudable y vigencia.
 `current` en `changes` describe las fichas del ámbito; solo `ready` en `status`
 acredita inventario revisado y catálogo finalizado. El flujo habitual prepara
 con `--require-ready`. Un piloto antiguo sin inventario requiere revisión completa.
@@ -55,7 +55,8 @@ con `--require-ready`. Un piloto antiguo sin inventario requiere revisión compl
 
 JSON UTF-8 con `schema: 1`, `project`, `scope` y `entries`. `scope` enumera rutas
 relativas de archivos o directorios del proyecto. En directorios se inventarían
-todos los archivos salvo nombres `.test.`/`.spec.`; estos se citan como pruebas.
+los archivos salvo tests y artefactos de pruebas, excluidos por ruta antes de
+leer contenido según [lifecycle](lifecycle.md).
 No hay lista de lenguajes admitidos ni filtro de relevancia. Usar ámbitos de
 fuentes concretos; no incluir HOME, dependencias, datos de usuarios o secretos.
 
@@ -71,7 +72,9 @@ Cada ficha contiene:
 - `usages`: objetos `path`, `start`, `end`, con líneas inclusivas de un uso real.
   Si no se encuentran consumidores, admite `[]` con `usage_gap` textual que
   explique la búsqueda o uso implícito del framework. No inventar un consumidor.
-- `tests`: rutas a pruebas, o `[]` cuando faltan; no significa que pasan.
+- `tests`: campo antiguo opcional; se ignora sin abrir ni resolver sus rutas y
+  no se envía al proveedor. Omitirlo en fichas nuevas. Las pruebas quedan fuera
+  de fuentes, usos, soporte y decisiones de Tessera.
 
 `supporting_files` opcional enumera rutas de tokens, estilos o manifiestos para
 la inspección local. `derived.json` conserva los archivos completos y hashes.
@@ -96,7 +99,7 @@ comparan los árboles Git de las rutas de evidencia. `evaluate` rechaza `stale` 
 Revisar también la semántica y actualizar `reviewed_revision` tras curar cambios.
 
 Para incorporar un componente/utilidad: inspeccionar contrato y consumidor,
-añadir ficha, ampliar ámbito si corresponde, registrar pruebas/gaps, ejecutar
+añadir ficha, ampliar ámbito si corresponde, registrar usos reales o gaps, ejecutar
 `prepare` y revisar el diff. Un candidato nuevo en un ámbito ya declarado causa
 error de cobertura hasta curarlo. No queda oculto por ranking. La primera versión
 prepara evidencia de un checkout limpio; después de implementar, verificar y
