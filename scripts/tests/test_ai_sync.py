@@ -314,7 +314,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(self.build().operations, [])
 
     def test_lock_not_deleted_by_second_invocation(self):
-        state = self.home / "AppData/Local/dotfiles/ai"
+        state = self.home / ".local/state/dotfiles/ai"
         state.mkdir(parents=True)
         lock = state / "sync.lock"
         lock.write_text("owner", encoding="utf-8")
@@ -445,6 +445,35 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(sync.read_json(self.home / ".claude/settings.json")["skillOverrides"]["test-driven-development"],
                          "name-only")
         self.assertEqual(self.build(clients="claude").operations, [])
+
+    def test_windows_ledger_moves_out_of_appdata_and_old_backups_still_roll_back(self):
+        self.build().apply()
+        new = self.home / ".local/state/dotfiles/ai"
+        old = self.home / "AppData/Local/dotfiles/ai"
+        old.parent.mkdir(parents=True)
+        new.rename(old)
+        # A later user edit of a managed key must still be caught from the old ledger.
+        carried = self.build()
+        self.assertEqual(carried.state_source, old / "managed.json")
+        self.assertEqual([op["path"] for op in carried.operations], [str(new / "managed.json")])
+        carried.apply()
+        self.assertTrue((new / "managed.json").is_file() and (old / "managed.json").is_file())
+        self.assertEqual(self.build().operations, [])
+        settings = sync.read_json(self.home / ".claude/settings.json")
+        settings["language"] = "french"
+        self.json_write(".claude/settings.json", settings)
+        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+            self.build()
+
+    def test_msix_virtualized_ledger_is_found(self):
+        self.build().apply()
+        new = self.home / ".local/state/dotfiles/ai"
+        msix = self.home / "AppData/Local/Packages/Claude_x/LocalCache/Local/dotfiles/ai"
+        msix.parent.mkdir(parents=True)
+        new.rename(msix)
+        carried = self.build()
+        self.assertEqual(carried.state_source, msix / "managed.json")
+        self.assertEqual(len(carried.operations), 1)
 
     def test_adopt_never_takes_foreign_content(self):
         path = self.home / ".claude/skills/handoff/SKILL.md"

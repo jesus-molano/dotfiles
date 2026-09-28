@@ -9,7 +9,7 @@ part of a normal task are blocked, so the guard stays cheap and quiet:
 - Stow over a glob of packages;
 - recursive deletion of HOME, the dotfiles checkout or the filesystem root;
 - reading secret files (.env*) or 1Password items directly;
-- `tessera.py consent` or touching `provider-consent.json`, which only the user may do;
+- `tessera.py consent` or writing `provider-consent.json`, which only the user may do;
 - the Workflow tool, unless the user started the session with AI_ALLOW_WORKFLOW=1.
 
 The guard never prints the command, file contents or environment values. It is
@@ -121,8 +121,8 @@ def git_push(words: list[str]) -> str | None:
 
 
 def check_bash(command: str, depth: int = 0) -> str | None:
-    if "provider-consent" in command:
-        return "provider consent is granted by the user in their own terminal"
+    if reason := consent_write(command):
+        return reason
     try:
         parts = segments(command)
     except ValueError:
@@ -131,6 +131,23 @@ def check_bash(command: str, depth: int = 0) -> str | None:
     for raw in parts:
         if reason := check_segment(strip_prefix(raw), depth):
             return reason
+    return None
+
+
+CONSENT_WRITERS = re.compile(
+    r"(>\|?|>>)\s*\S*provider-consent"                     # shell or PowerShell redirection into it
+    r"|\b(cp|mv|tee|rm|install|ln|truncate|dd|touch|rsync|copy|move|del|ren)\b[^;&|]*provider-consent"
+    r"|\bsed\b[^;&|]*\s-i[^;&|]*provider-consent"
+    r"|\b(python3?|py|node|perl|ruby|bash|sh|zsh|pwsh|powershell)\b[^;&|]*\s(-c|-e|-Command)\b[^;&|]*provider-consent"
+    r"|\b(set-content|add-content|out-file|new-item|copy-item|move-item|remove-item|rename-item"
+    r"|clear-content|ni|cpi|mi|ri|rni|sc|ac)\b[^;&|]*provider-consent",
+    re.I)
+
+
+def consent_write(command: str) -> str | None:
+    """Only writes to the consent file are the user's; reading or searching it is fine."""
+    if "provider-consent" in command and CONSENT_WRITERS.search(command):
+        return "provider consent is granted by the user in their own terminal"
     return None
 
 
@@ -185,8 +202,8 @@ def ps_word(token: str) -> str:
 
 
 def check_powershell(command: str, depth: int = 0) -> str | None:
-    if "provider-consent" in command:
-        return "provider consent is granted by the user in their own terminal"
+    if reason := consent_write(command):
+        return reason
     segments_ps, current, skip = [], [], False
     for token in PS_TOKEN.findall(command):
         if skip:

@@ -225,10 +225,21 @@ class Sync:
         self.root = root.resolve()
         self.platform = platform
         self.clients = {"codex", "claude"} if clients == "both" else {clients}
-        self.state_dir = self.home / ("AppData/Local/dotfiles/ai" if platform == "windows" else ".local/state/dotfiles/ai")
+        # Same place on every platform: %USERPROFILE%\.local\state is not virtualized
+        # by MSIX, unlike AppData\Local (Claude Desktop and Codex are MSIX apps).
+        self.state_dir = self.home / ".local/state/dotfiles/ai"
+        self.legacy_state_dirs = ([self.home / "AppData/Local/dotfiles/ai",
+                                   *sorted(self.home.glob("AppData/Local/Packages/*/LocalCache/Local/dotfiles/ai"))]
+                                  if platform == "windows" else [])
         self.state_path = self.state_dir / "managed.json"
         safe_path(self.state_path, self.home)
-        self.state = read_json(self.state_path)
+        self.state_source = self.state_path
+        if not self.state_path.exists():
+            # Carry the ledger over from the old Windows location; the next apply
+            # writes it to the new one and leaves the old file untouched.
+            self.state_source = next((d / "managed.json" for d in self.legacy_state_dirs
+                                      if (d / "managed.json").is_file()), self.state_path)
+        self.state = read_json(self.state_source)
         self.next_state = copy.deepcopy(self.state)
         self.operations = []
         self.asset_expected = {}
@@ -594,9 +605,9 @@ class Sync:
         return backup
 
     def rollback(self, backup: Path):
-        expected = self.state_dir / "backups"
+        expected = {self.state_dir / "backups", *(d / "backups" for d in self.legacy_state_dirs)}
         backup = backup.absolute()
-        if backup.parent != expected or backup.is_symlink():
+        if backup.parent not in expected or backup.is_symlink():
             raise ValueError("El backup debe pertenecer al HOME seleccionado")
         journal_path = backup / "transaction.json"
         safe_path(journal_path, self.home)
@@ -655,6 +666,8 @@ def main():
             print("OK: rollback verificado")
             return 0
         operations = sync.plan()
+        if sync.state_source != sync.state_path:
+            print(f"state: ledger carried over from {sync.state_source}")
         for adopted in sync.adopted:
             print(f"adopt: {adopted}")
         for operation in operations:
