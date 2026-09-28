@@ -80,8 +80,9 @@ works. A normal `git push origin <branch>` is allowed: showing the exact OID and
 asking for authorization before publishing stays in the global rules.
 
 Known limits: the guard is a safety net against mistakes, not a sandbox, and
-code running as your user can still reach anything you can. PowerShell commands
-are parsed with POSIX quoting rules. The `Read(**/.env.*)` deny rule also hides
+code running as your user can still reach anything you can. PowerShell has its
+own parser (quoting, cmdlet aliases such as `ri`, `gc`, `rd /s`, `cmd /c` and
+`pwsh -Command`). The `Read(**/.env.*)` deny rule also hides
 `.env.example` templates from the Read tool; read them through the shell.
 
 ## Token efficiency
@@ -166,6 +167,11 @@ just ai-check                  # deployed state, generated files, skills, tests,
 
 `just apply` manages the Stow composition; `ai-sync` manages both AI clients in
 its own transaction. Never run Stow against `ai/` or from a secondary worktree.
+When the `codex` module is selected, the Stow transaction also deploys the
+generated Codex role files through `scripts/manage-codex-agent-files.py`, so it
+can migrate agent links left by older deployments and roll them back with the
+rest of the transaction. `ai-sync` writes the same files and keeps the same
+ownership ledger, so the two never disagree.
 
 The browser CLI is pinned to the vendored skill version:
 

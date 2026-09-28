@@ -40,8 +40,9 @@ HEREDOC = re.compile(r"<<-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1[^\n]*\n.*?\n
 def home_variants() -> set[str]:
     home = os.path.expanduser("~").rstrip("/")
     dotfiles = os.environ.get("DOTFILES_DIR", f"{home}/.dotfiles").rstrip("/")
+    home, dotfiles = home.replace("\\", "/"), dotfiles.replace("\\", "/")
     return {"/", "/*", "~", "~/*", "$HOME", "$HOME/*", "${HOME}", "${HOME}/*", home, home + "/*",
-            "~/.dotfiles", "$HOME/.dotfiles", "${HOME}/.dotfiles", dotfiles}
+            "~/.dotfiles", "$HOME/.dotfiles", "${HOME}/.dotfiles", dotfiles, "C:", "C:/"}
 
 
 def normalized(word: str) -> str:
@@ -128,33 +129,98 @@ def check_bash(command: str, depth: int = 0) -> str | None:
         return "command could not be parsed safely; simplify the quoting" if re.search(
             r"\b(push|stow|rm|\.env|consent)\b", command) else None
     for raw in parts:
-        words = strip_prefix(raw)
+        if reason := check_segment(strip_prefix(raw), depth):
+            return reason
+    return None
+
+
+def check_segment(words: list[str], depth: int) -> str | None:
+    """Check one simple command, already split into POSIX-style words."""
+    if not words:
+        return None
+    program = os.path.basename(words[0])
+    if program in SHELLS and depth < 3:
+        if program == "eval":
+            inner = " ".join(words[1:])
+        elif "-c" in words[1:-1]:
+            inner = words[words.index("-c") + 1]
+        else:
+            return None
+        return check_bash(inner, depth + 1)
+    if program == "git" and (reason := git_push(words)):
+        return reason
+    if program == "stow" and any(ch in arg for arg in words[1:] for ch in "*?["):
+        return "never run Stow over a glob of packages; name each package"
+    if program == "rm" and any(re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*", a) or a == "--recursive"
+                               for a in words[1:]):
+        if {normalized(w) for w in words[1:]} & home_variants():
+            return "recursive deletion of HOME, the dotfiles checkout or / is never allowed"
+    if program == "op" and len(words) > 1 and words[1] in OP_READS:
+        return "read secrets only through with-secrets for the process that needs them"
+    if "consent" in words and any(os.path.basename(w) == "tessera.py" for w in words):
+        return "provider consent is granted by the user in their own terminal"
+    return secret_use(program, words)
+
+
+# PowerShell: its own quoting and cmdlet names, mapped onto the POSIX checks.
+PS_TOKEN = re.compile(r"""'(?:[^']|'')*'|"(?:[^"`]|`.)*"|\|\||&&|[;|(){}\n]|[^\s;|(){}]+""")
+PS_SEPARATORS = {";", "|", "||", "&&", "(", ")", "{", "}", "\n"}
+PS_PROGRAMS = {
+    "rm": {"remove-item", "ri", "rm", "del", "erase", "rd", "rmdir"},
+    "cat": {"get-content", "gc", "cat", "type"},
+    "cp": {"copy-item", "cpi", "cp", "copy"},
+    "mv": {"move-item", "mi", "mv", "move"},
+}
+PS_HOME = re.compile(r"^(\$env:(userprofile|home)|\$home|\$\{home\}|~)(?=$|[\\/])", re.I)
+
+
+def ps_word(token: str) -> str:
+    if len(token) > 1 and token[0] == token[-1] == "'":
+        token = token[1:-1].replace("''", "'")
+    elif len(token) > 1 and token[0] == token[-1] == '"':
+        token = re.sub(r"`(.)", r"\1", token[1:-1])
+    token = PS_HOME.sub("~", token.replace("\\", "/"))
+    return token
+
+
+def check_powershell(command: str, depth: int = 0) -> str | None:
+    if "provider-consent" in command:
+        return "provider consent is granted by the user in their own terminal"
+    segments_ps, current, skip = [], [], False
+    for token in PS_TOKEN.findall(command):
+        if skip:
+            skip = False
+        elif re.fullmatch(r"[0-9*]?>>?(&[0-9])?", token):
+            skip = not token.endswith(("&1", "&2"))
+        elif token in PS_SEPARATORS:
+            if current:
+                segments_ps.append(current)
+            current = []
+        else:
+            current.append(ps_word(token))
+    if current:
+        segments_ps.append(current)
+    for words in segments_ps:
+        while words and words[0] in {"&", "."}:
+            words = words[1:]
         if not words:
             continue
-        program = os.path.basename(words[0])
-        if program in SHELLS and depth < 3:
-            if program == "eval":
-                inner = " ".join(words[1:])
-            elif "-c" in words[1:-1]:
-                inner = words[words.index("-c") + 1]
-            else:
-                continue
-            if reason := check_bash(inner, depth + 1):
+        name = os.path.basename(words[0]).lower().removesuffix(".exe")
+        if name in {"powershell", "pwsh"} and depth < 3:
+            flags = [i for i, w in enumerate(words) if w.lower() in {"-command", "-c"}]
+            if flags and flags[0] + 1 < len(words):
+                if reason := check_powershell(" ".join(words[flags[0] + 1:]), depth + 1):
+                    return reason
+            continue
+        program = next((posix for posix, names in PS_PROGRAMS.items() if name in names), name)
+        if name == "cmd" and depth < 3:
+            flags = [i for i, w in enumerate(words) if w.lower() in {"/c", "/k"}]
+            if flags and (reason := check_powershell(" ".join(words[flags[0] + 1:]), depth + 1)):
                 return reason
             continue
-        if program == "git" and (reason := git_push(words)):
-            return reason
-        if program == "stow" and any(ch in arg for arg in words[1:] for ch in "*?["):
-            return "never run Stow over a glob of packages; name each package"
-        if program == "rm" and any(re.fullmatch(r"-[a-zA-Z]*[rR][a-zA-Z]*", a) or a == "--recursive"
-                                   for a in words[1:]):
-            if {normalized(w) for w in words[1:]} & home_variants():
-                return "recursive deletion of HOME, the dotfiles checkout or / is never allowed"
-        if program == "op" and len(words) > 1 and words[1] in OP_READS:
-            return "read secrets only through with-secrets for the process that needs them"
-        if ("consent" in words and any(os.path.basename(w) == "tessera.py" for w in words)):
-            return "provider consent is granted by the user in their own terminal"
-        if reason := secret_use(program, words):
+        recursive = re.compile(r"-r(e(c(u(r(s(e)?)?)?)?)?)?|/s", re.I)
+        args = ["-r" if program == "rm" and recursive.fullmatch(w) else w for w in words[1:]]
+        if reason := check_segment([program, *args], depth):
             return reason
     return None
 
@@ -181,8 +247,10 @@ def decide(event: dict) -> str | None:
                 "the session with AI_ALLOW_WORKFLOW=1")
     if tool in {"Write", "Edit", "MultiEdit", "apply_patch"} and "provider-consent" in json.dumps(data):
         return "provider consent is granted by the user in their own terminal"
-    if tool in {"Bash", "PowerShell"} and isinstance(data.get("command"), str):
+    if tool == "Bash" and isinstance(data.get("command"), str):
         return check_bash(data["command"])
+    if tool == "PowerShell" and isinstance(data.get("command"), str):
+        return check_powershell(data["command"])
     return None
 
 

@@ -104,6 +104,26 @@ class GuardTest(unittest.TestCase):
         self.assertBlocked("git push 'unterminated", "parsed")
 
 
+def powershell(command):
+    return run("ai-guard.py", {"tool_name": "PowerShell", "tool_input": {"command": command}})
+
+
+class PowerShellGuardTest(unittest.TestCase):
+    def test_blocks_the_same_limits_with_powershell_syntax(self):
+        for command in ("git push --force origin main", "& git push -f", 'pwsh -Command "git push --tags"',
+                        "Remove-Item -Recurse -Force $env:USERPROFILE", "rd /s /q C:\\", "ri -rec ~",
+                        "Get-Content .env", "gc .\\app\\.env.local", 'cmd /c "type .env"',
+                        "python tessera.py consent --repo . --provider typesafe"):
+            self.assertEqual(powershell(command).returncode, 2, command)
+
+    def test_allows_ordinary_powershell_work(self):
+        for command in ("git push origin main", "git push origin feat 2>&1 | Out-Null",
+                        "Remove-Item -Recurse .\\build", "Copy-Item .env.example .env",
+                        "Write-Host 'it''s fine'; git status", "Get-ChildItem -Recurse src"):
+            result = powershell(command)
+            self.assertEqual((result.returncode, result.stderr), (0, ""), command)
+
+
 class StatusLineTest(unittest.TestCase):
     def test_line_shows_model_project_context_and_limits(self):
         repo = Path(__file__).resolve().parents[2]
