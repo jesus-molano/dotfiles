@@ -357,16 +357,18 @@ class AISyncTest(unittest.TestCase):
             self.build()
 
     def test_codex_gets_the_same_guard_and_keeps_foreign_hooks(self):
+        # Native platform: Linux mode needs symlinks, which Windows runners lack.
+        platform = "windows" if os.name == "nt" else "linux"
         foreign = {"matcher": "Bash", "hooks": [{"type": "command", "command": "company-audit"}]}
         self.json_write(".codex/hooks.json", {"hooks": {"PreToolUse": [foreign], "Stop": []}})
-        self.build("linux", "codex").apply()
+        self.build(platform, "codex").apply()
         hooks = sync.read_json(self.home / ".codex/hooks.json")["hooks"]
         self.assertEqual(hooks["PreToolUse"][0], foreign)
         self.assertEqual(hooks["PreToolUse"][1]["matcher"], "Bash|apply_patch")
         self.assertIn(".codex/hooks/ai-guard.py", hooks["PreToolUse"][1]["hooks"][0]["command"])
         self.assertEqual((self.home / ".codex/hooks/ai-guard.py").read_text(),
                          (sync.ROOT / "ai/hooks/ai-guard.py").read_text())
-        self.assertEqual(self.build("linux", "codex").operations, [])
+        self.assertEqual(self.build(platform, "codex").operations, [])
 
     def test_new_key_never_overwrites_a_different_local_value(self):
         self.json_write(".claude/settings.json", {"statusLine": {"type": "command", "command": "my-status"}})
@@ -381,6 +383,7 @@ class AISyncTest(unittest.TestCase):
         self.build().apply()
         self.assertEqual(self.build().operations, [])
 
+    @unittest.skipIf(os.name == "nt", "Linux mode links skills; no symlink privilege on Windows")
     def test_entries_no_longer_wanted_are_removed_and_legacy_notify_state_migrates(self):
         self.build("linux").apply()
         state_path = self.home / ".local/state/dotfiles/ai/managed.json"

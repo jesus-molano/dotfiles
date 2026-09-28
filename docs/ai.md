@@ -290,15 +290,21 @@ in `ai/evals/cases/`, runs it and keeps results under
 `~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
 `tool_used: Skill` graders. The evals load only the skills, not your
 `CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
-"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs where noted):
+"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs per case):
 
-| Case | Expected skill | Result |
+| Case | Expected | Result |
 |---|---|---|
 | `implement-ui` | `engineering-flow`, never `codebase-design` | 3/3 |
-| `generic-bug` | `systematic-debugging` | 3/3 (was 1/3 before its description was sharpened) |
-| `web-flow-bug` | `debug-web-flow` | 1/1 |
-| `web-review` | `review-web-pr` | 1/1 |
-| `named-tdd` | `test-driven-development` (name-only) | 1/1 |
+| `generic-bug` | `systematic-debugging` | 3/3 (1/3 before its trigger was sharpened) |
+| `web-flow-bug` | `debug-web-flow` | 3/3 |
+| `web-review` | `review-web-pr` | 3/3 |
+| `spec-review` | `spec-and-standards-review` | 3/3 |
+| `research` | `research-primary-sources`, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
+| `handoff` | `handoff` | 3/3 |
+| `named-tdd` | `test-driven-development` (name-only) | 3/3 |
+| `explain-only` | no skill at all | 3/3 |
+
+A full run of all cases at 3 runs costs about $1.50 with Sonnet.
 
 Haiku as the main model skipped the skill and searched files directly: another
 reason to keep the main agent on Opus. Run the evals after changing a

@@ -1,6 +1,6 @@
 ---
 name: research-primary-sources
-description: Research technical or product questions with current primary sources and report evidence, limits and uncertainty. Use when a decision depends on APIs, standards, releases, policies or compatibility claims.
+description: Load first for any question about current versions, releases, support dates, API behavior, standards, pricing or policies, before answering from memory. Answers from official primary sources with evidence, dates and uncertainty.
 context: fork
 ---
 

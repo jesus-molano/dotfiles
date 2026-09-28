@@ -19,7 +19,8 @@
 ## Skills first
 - Load the matching skill before exploring: implementation → `engineering-flow`;
   a failure or wrong result → `systematic-debugging` (`debug-web-flow` for web
-  flows); a web review → `review-web-pr`; other reviews → `spec-and-standards-review`.
+  flows); a web review → `review-web-pr`; other reviews → `spec-and-standards-review`;
+  facts that change over time (versions, dates, APIs) → `research-primary-sources`.
 
 ## Reuse before creating
 - Before adding or replacing UI or behavior, even in a small change, find the
