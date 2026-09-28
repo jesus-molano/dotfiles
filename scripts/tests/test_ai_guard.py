@@ -83,6 +83,19 @@ class GuardTest(unittest.TestCase):
     def test_consent_file_cannot_be_written_by_the_agent(self):
         self.assertBlocked("python3 -X utf8 t/tessera.py consent --repo .", "consent")
         self.assertBlocked("echo {} > ~/.local/share/tessera/projects/x/provider-consent.json", "consent")
+        for command in ("cp /tmp/x ~/.local/share/tessera/projects/k/provider-consent.json",
+                        "rm ~/.local/share/tessera/projects/k/provider-consent.json",
+                        "sed -i s/a/b/ provider-consent.json",
+                        "python3 -c \"open('provider-consent.json','w').write('{}')\"",
+                        "echo {} | tee provider-consent.json"):
+            self.assertBlocked(command, "consent")
+
+    def test_reading_or_searching_the_consent_file_is_allowed(self):
+        for command in ("grep -rn provider-consent docs ai",
+                        "cat ~/.local/share/tessera/projects/k/provider-consent.json",
+                        "rg -l provider-consent.json scripts",
+                        "git log -S provider-consent --oneline"):
+            self.assertAllowed(command)
         event = {"tool_name": "Write", "tool_input": {"file_path": "/h/.local/share/tessera/projects/k/provider-consent.json"}}
         self.assertEqual(run("ai-guard.py", event).returncode, 2)
         patch = {"tool_name": "apply_patch", "tool_input": {"command": "*** Add File: /h/tessera/projects/k/provider-consent.json"}}
@@ -122,7 +135,9 @@ class PowerShellGuardTest(unittest.TestCase):
                         "Get-Content .env", "gc .\\app\\.env.local", 'cmd /c "type .env"',
                         "python tessera.py consent --repo . --provider typesafe",
                         "Remove-Item -Recurse -Force ${HOME}", "Remove-Item -Recurse:$true ${env:USERPROFILE}",
-                        "rd /s /q %USERPROFILE%", 'iex "git push -f"', "Invoke-Expression 'git push --tags'"):
+                        "rd /s /q %USERPROFILE%", 'iex "git push -f"', "Invoke-Expression 'git push --tags'",
+                        "Set-Content provider-consent.json '{}'", "'{}' | Out-File provider-consent.json",
+                        "Remove-Item C:/x/tessera/projects/k/provider-consent.json"):
             self.assertEqual(powershell(command).returncode, 2, command)
 
     def test_allows_ordinary_powershell_work(self):
@@ -130,7 +145,9 @@ class PowerShellGuardTest(unittest.TestCase):
                         "Remove-Item -Recurse .\\build", "Copy-Item .env.example .env",
                         "Write-Host 'it''s fine'; git status", "Get-ChildItem -Recurse src",
                         "git push origin main >push.log", "Test-Path .env", "Set-Content .env 'A=1'",
-                        "git push origin feat &>/dev/null"):
+                        "git push origin feat &>/dev/null",
+                        "Select-String -Path docs/ai.md -Pattern provider-consent",
+                        "Get-Content ~/.local/share/tessera/projects/k/provider-consent.json"):
             result = powershell(command)
             self.assertEqual((result.returncode, result.stderr), (0, ""), command)
 

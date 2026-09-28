@@ -70,7 +70,7 @@ file contents or environment. It blocks only what is never part of a normal task
 | `stow` with a glob of packages | Never run Stow over every directory. |
 | `rm -r` of `/`, `~`, `$HOME` or the dotfiles checkout | No catastrophic deletion. |
 | Commands that read a `.env` file (templates `*.example`, `*.template`, `*.sample`, `echo`, `git check-ignore` and copying a template to `.env` are allowed); `op read`, `op inject`, `op item`, `op document` | Secrets only through `with-secrets`. |
-| `tessera.py consent` and any write to `provider-consent.json` | Only the user grants provider consent. |
+| `tessera.py consent` and any write to `provider-consent.json` (redirections, copies, deletes, `sed -i`, inline scripts, PowerShell write cmdlets); reading or searching it is allowed | Only the user grants provider consent. |
 | `Workflow` tool | Multi-agent workflows only on request. Start a session with `AI_ALLOW_WORKFLOW=1 claude` to allow them. |
 
 The guard looks through wrappers (`sudo`, `env`, `timeout`, `nohup`, `xargs`),
@@ -353,10 +353,14 @@ or pick it in `/permissions`. The classifier adds some token cost per action.
 
 ## Backups and recovery
 
-`ai-sync` prints only paths, kinds and the backup location. Linux keeps private
-transactions in `~/.local/state/dotfiles/ai/backups/`; Windows in
-`%USERPROFILE%\AppData\Local\dotfiles\ai\backups\`. Backups contain private
-configuration: never copy them into a repository.
+`ai-sync` prints only paths, kinds and the backup location. Both platforms keep
+the ownership ledger and private transactions in `~/.local/state/dotfiles/ai/`
+(on Windows `%USERPROFILE%\.local\state\dotfiles\ai`, which MSIX does not
+virtualize). A ledger left in the old Windows location
+(`AppData\Local\dotfiles\ai`, or an MSIX app's private copy of it) is carried
+over automatically on the next apply (`state: ledger carried over from ...`), and
+backups there can still be rolled back. Backups contain private configuration:
+never copy them into a repository.
 
 ```bash
 python3 scripts/sync-ai.py rollback --backup /exact/path/to/backup
