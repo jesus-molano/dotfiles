@@ -16,8 +16,9 @@ rutas, hash del inventario, recuentos y archivos pendientes/protegidos/eliminado
 `curate_catalog` y `resolve_checkout_changes` son acciones del agente, no comandos.
 `ready` acredita cobertura del árbol Git revisado, no calidad de una decisión,
 pruebas superadas ni capacidad suficiente del proveedor. Los motores mantienen
-sus límites: el adaptador Choice actual admite 84 fichas. Un catálogo mayor
-puede estar completo; la petición falla explícitamente, sin recortar fichas.
+sus límites por petición. El helper evalúa catálogos grandes mediante
+[lotes exhaustivos](batching.md); cada ficha se conserva completa. Una ficha
+indivisible demasiado grande sigue provocando error explícito.
 
 ## Primera pasada y reanudación
 

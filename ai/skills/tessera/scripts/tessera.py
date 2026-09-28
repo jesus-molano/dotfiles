@@ -20,6 +20,7 @@ import uuid
 sys.dont_write_bytecode = True
 import tessera_typesafe
 import tessera_kev
+import tessera_batches
 
 PROVIDERS = {"typesafe": tessera_typesafe, "kev": tessera_kev}
 ACTIONS = {
@@ -136,6 +137,16 @@ def private_parents(path):
         path = path.parent
     for directory in reversed(missing):
         directory.mkdir(mode=0o700, exist_ok=True)
+
+
+def storage_io_path(path):
+    """Win32 extended paths avoid MAX_PATH without changing host policy."""
+    if os.name != "nt":
+        return path
+    value = os.path.abspath(path)
+    if value.startswith("\\\\?\\"):
+        return Path(value)
+    return Path("\\\\?\\UNC\\" + value[2:] if value.startswith("\\\\") else "\\\\?\\" + value)
 
 
 def require_private_input(path):
@@ -639,7 +650,7 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 and digest(encoded(load(after["paths"]["catalog"]))) == digest(encoded(catalog)),
                 "La cobertura cambió durante prepare; repite status y la preparación")
     context = build_context(catalog, evidence, task)
-    request = provider.build_request(context)
+    request = tessera_batches.plan(context, provider, encoded)
     body = encoded(request)
     manifest = {"schema": 1, "created_at": datetime.now(timezone.utc).isoformat(),
                 "repo_path": str(repo.resolve()),
@@ -651,6 +662,9 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
                 "revision": evidence["revision"], "entry_count": len(catalog["entries"]),
                 "project_status": "ready" if require_ready else "not_checked",
                 "token_count": None, "status": "prepared"}
+    if request.get("mode") == "exhaustive-batches-v1":
+        manifest.update(strategy=request["mode"], initial_batches=len(request["requests"]),
+                        max_calls=request["max_calls"])
     private_parents(output.parent)
     output.mkdir(exist_ok=False, mode=0o700)
     for name, value in (("context.json", context), ("request.json", request), ("derived.json", evidence), ("manifest.json", manifest)):
@@ -659,6 +673,7 @@ def prepare(catalog_path, repo, task_path, output, provider_id="typesafe", *, al
 def evaluate(run, *, allow_repo_storage=False):
     if not allow_repo_storage:
         require_external(run)
+    run = storage_io_path(run)
     manifest, request = load(run / "manifest.json"), load(run / "request.json")
     provider = PROVIDERS[manifest["provider"]]
     context = load(run / "context.json")
@@ -673,7 +688,7 @@ def evaluate(run, *, allow_repo_storage=False):
             and manifest["catalog_sha256"] == digest(encoded(context["catalog"]))
             and manifest["request_bytes"] == len(body) and manifest["schema"] == 1,
             "La petición cambió después de prepararla")
-    require(request == provider.build_request(context), "Contrato de petición inesperado")
+    require(request == tessera_batches.plan(context, provider, encoded), "Contrato de petición inesperado")
     require(context["evidence"].get("curation", {}).get("status") != "stale",
             "Curación obsoleta; revisa los contratos y prepara otro run antes de llamar al proveedor")
     require(text_field(manifest.get("repo_path")), "Run antiguo sin checkout verificable; prepara otro run")
@@ -685,7 +700,7 @@ def evaluate(run, *, allow_repo_storage=False):
         require(status["status"] == "ready" and digest(encoded(load(status["paths"]["catalog"])))
                 == manifest.get("source_catalog_sha256", manifest["catalog_sha256"]),
                 "El catálogo o su cobertura cambió desde prepare; prepara otro run")
-    for name in ("attempt.json", "response.json", "decision.json", "failure.json", "http-error.bin"):
+    for name in ("attempt.json", "response.json", "decision.json", "failure.json", "http-error.bin", "calls"):
         if os.path.lexists(run / name):
             raise FileExistsError("El run contiene un intento o resultado previo")
     provider.check_credentials()
@@ -694,16 +709,55 @@ def evaluate(run, *, allow_repo_storage=False):
                                          "request_sha256": digest(body)})
     started = time.monotonic()
     phase = "provider"
+    calls = []
+
+    def check_live():
+        repo = Path(manifest["repo_path"])
+        snapshot = project_snapshot(repo)
+        require(snapshot["revision"] == manifest["revision"] and not snapshot["checkout_changes"],
+                "El checkout cambió durante la evaluación; decisión incompleta")
+        if manifest.get("project_status") == "ready":
+            status = project_status(repo)
+            require(status["status"] == "ready" and digest(encoded(load(status["paths"]["catalog"])))
+                    == manifest.get("source_catalog_sha256", manifest["catalog_sha256"]),
+                    "El catálogo cambió durante la evaluación; decisión incompleta")
+
+    def invoke_batch(part, index):
+        check_live()
+        directory = run / "calls" / f"{index:04d}"
+        private_parents(directory.parent)
+        directory.mkdir(mode=0o700)
+        payload = encoded(part)
+        write_private(directory / "request.json", part)
+        write_private(directory / "attempt.json", {"request_sha256": digest(payload),
+                      "provider": manifest["provider"], "endpoint": manifest["endpoint"]})
+        data = provider.invoke(payload)
+        write_bytes_private(directory / "response.json", data)
+        answer = provider.validate_response(part, provider.parse_response(data))
+        record = {"index": index, "request_sha256": digest(payload), "response_sha256": digest(data),
+                  "entry_ids": [entry["id"] for entry in part["state"]["catalog"]["entries"]],
+                  "answer": answer}
+        write_private(directory / "result.json", record)
+        calls.append(record)
+        return data, answer
+
     try:
-        raw = provider.invoke(body)
+        if request.get("mode") == "exhaustive-batches-v1":
+            phase = "batch-evaluation"
+            (run / "calls").mkdir(mode=0o700)
+            raw, answer, count = tessera_batches.run(context, request, provider, encoded, invoke_batch)
+            check_live()
+        else:
+            raw = provider.invoke(body)
         phase = "persist-response"
         write_bytes_private(run / "response.json", raw)
         phase = "parse-response"
         response = provider.parse_response(raw)
         phase = "validate-response"
-        answer = provider.validate_response(request, response)
+        if request.get("mode") != "exhaustive-batches-v1":
+            answer = provider.validate_response(request, response)
         decision = normalize_decision(context, answer)
-    except (ValueError, OSError, KeyError, TypeError) as error:
+    except (ValueError, OSError, KeyError, TypeError, subprocess.CalledProcessError) as error:
         message = str(error) if isinstance(error, ValueError) and not isinstance(error, json.JSONDecodeError) else type(error).__name__
         raw_error = getattr(error, "response_bytes", None)
         if isinstance(raw_error, bytes):
@@ -711,6 +765,7 @@ def evaluate(run, *, allow_repo_storage=False):
         write_private(run / "failure.json", {"phase": phase, "error": message,
                                             "http_status": getattr(error, "http_status", None),
                                             "request_sha256": digest(body),
+                                            "completed_calls": len(calls),
                                             "elapsed_seconds": time.monotonic() - started})
         raise
     elapsed = time.monotonic() - started
@@ -719,6 +774,11 @@ def evaluate(run, *, allow_repo_storage=False):
               "response_sha256": digest(raw),
               "model": answer["model"], "elapsed_seconds": elapsed,
               "usage": answer["usage"], "answer": answer, **decision}
+    if calls:
+        record.update(strategy="exhaustive-batches-v1", calls=calls,
+                      evaluated_entry_ids=request["entry_ids"],
+                      usage={key: sum(call["answer"]["usage"][key] for call in calls)
+                             for key in ("input_tokens", "output_tokens")})
     write_private(run / "decision.json", record)
     return record
 

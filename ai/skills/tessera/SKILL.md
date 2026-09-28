@@ -74,8 +74,10 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    candidates, filter entries by tags/relevance, or silently discard candidates
    to fit a provider limit. Keep task files and runs in the external directories
    returned by `locate`; `prepare` defaults to that catalog and a new local run.
-   The chosen engine receives every curated card and
-   decides; an exceeded limit is an explicit error. Do not introduce confidence
+   The chosen engine evaluates every curated card in each decision. Large catalogs
+   use exhaustive bounded batches followed by provider-selected proposal rounds;
+   follow [batch decisions](references/batching.md). No agent prefiltering. A
+   card that cannot fit whole is an explicit error, never truncated. Do not introduce confidence
    gates without evaluation on the actual project.
 3. Inspect the exact prepared context and destination before using `evaluate`.
    Credentials must be supplied through the project's approved secret mechanism
@@ -86,7 +88,9 @@ this skill. Python 3.11+ and Git suffice; no global installation or server.
    `reuse`, `modify`, `wrap` and `create` distinct. Insufficient evidence, service
    errors or absent credentials remain explicit; never impersonate the provider
    or silently switch to a different model. Work independent of that decision
-   can continue. One run permits one network attempt.
+   can continue. A run has one execution: one attempt per planned/provider-derived
+   call, no automatic retries or replay after a partial failure. Inspect the
+   prepared maximum call count before evaluation.
    If the cards lack a fact needed to decide, inspect the source and enrich the
    relevant contract or constraint, then prepare a fresh run. Never infer that
    the provider inspected a referenced file. Do not

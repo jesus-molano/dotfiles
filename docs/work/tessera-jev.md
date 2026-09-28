@@ -18,7 +18,7 @@ actualizar cambios o revisar el proyecto completo. Base `755588b`.
 - Reutilización: helper Git, rutas externas, permisos y captura de Tessera;
   patrón de lock O_EXCL, backup y reemplazo atómico de sync-ai/sync-codex-config.
   Scout no encontró un inventario integral ya implementado.
-- Mantener todas las fichas en cada petición al motor. No nuevas llamadas a
+- Mantener todas las fichas en cada decisión; pueden repartirse en lotes exhaustivos. No nuevas llamadas a
   Jev/Kev, no cambios de modelos ni servicio automático.
 
 Aceptación: transiciones probadas sobre repos Git reales temporales; tandas
@@ -38,6 +38,16 @@ Verificación: 59 pruebas Tessera correctas; suite completa de 195 (194 correcta
 una omitida), quick_validate, render y 18 skills/cinco roles válidos. No hubo
 peticiones a Jev/Kev. La catalogación semántica completa de Expenses sigue
 pendiente: esta entrega implementa y prueba el flujo, no inventa fichas.
+
+## Lotes exhaustivos
+
+La ampliación posterior conserva el catálogo entero por decisión y reemplaza el
+error de 84 fichas por un plan acotado. Cada lote recibe contratos completos y
+las tres estrategias de cada ficha. El proveedor compara después las propuestas
+ganadoras hasta una decisión final; nunca se comparan probabilidades entre lotes.
+Tests siguen fuera, y no se alteran motores, runtimes ni catálogos.
+Protocolo, artefactos, límites y verificación en
+[batching.md](../../ai/skills/tessera/references/batching.md).
 
 ## Objetivo y decisiones del usuario
 

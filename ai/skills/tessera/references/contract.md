@@ -132,7 +132,8 @@ no se envían al proveedor.
 
 `context.json` contiene `schema`, `task`, `catalog`, `evidence`, `options` e
 `instructions`. Tarea: `id`, `requirement` y lista no vacía `acceptance`.
-El catálogo completo declarado está disponible en cada evaluación. `evidence`
+Todas las fichas se evalúan en cada decisión; pueden distribuirse entre peticiones.
+El contexto completo se conserva localmente y los lotes enviados quedan trazados. `evidence`
 solo comunica revisión, estado de curación y `source_text_included: false`.
 Los textos completos permanecen en `derived.json`, separado del contexto neutral.
 Se verifica su hash y se reconstruye el contexto antes de enviar la petición.
@@ -165,9 +166,10 @@ Recibe el mismo contexto; devuelve opción normalizada, modelo, uso y, cuando
 existen, probabilidades/confianza. Para añadir otro motor: implementar ese
 adaptador real, registrarlo y probarlo con el mismo catálogo/casos. No cambiar
 fichas ni reinterpretar decisiones antiguas. No hay adaptadores ficticios de
-Claude/Codex ni fallback automático. El usuario exige todas las fichas en cada
-consulta: Tessera no hace ranking, top-k, filtros por etiquetas/relevancia ni
-partición que descarte candidatos. Si excede el proveedor, falla explícitamente.
+Claude/Codex ni fallback automático. Cada decisión evalúa todas las fichas.
+Tessera no preselecciona por etiquetas, relevancia ni top-k. El proveedor evalúa
+lotes completos y compara después sus propuestas, sin combinar probabilidades
+de preguntas distintas. Véase [protocolo de lotes](batching.md).
 
 ## Primer adaptador: TypeSafe Jev
 
@@ -189,7 +191,9 @@ respuestas independientes incompatibles.
 
 [Modelo y límites oficiales](https://docs.typesafe.ai/models): `jev-1.13.0`,
 entrada textual, 64k tokens por petición y 32k para estado más pregunta mayor.
-Choice admite 255 opciones: este adaptador falla al superarlas, sin recortar.
+Choice admite 255 opciones por pregunta. El planificador reparte catálogos
+grandes entre peticiones completas; cada adaptador sigue rechazando una petición
+individual que exceda ese límite.
 Los bytes se miden localmente; no se presentan como tokens. No hay tokenizer
 verificado localmente: los tokens reales se obtienen de la respuesta. Con una
 sola pregunta, el límite efectivo de contexto es 32k, no 64k. El catálogo en
@@ -362,7 +366,9 @@ para ese proceso mediante el mecanismo de secretos del proyecto:
 python3 "$SKILL_DIR/scripts/tessera.py" evaluate --run /ruta/run-nuevo
 ```
 
-Se reserva `attempt.json` antes del POST: máximo un intento por run. Sin clave,
+Se reserva `attempt.json` antes de ejecutar: un run no se repite. En modo directo
+hay un POST; en lotes, cada llamada tiene además su propia reserva y como máximo
+un intento. Un fallo parcial impide la decisión global y no se reintenta. Sin clave,
 no hay intento. HTTP 401/422/429/529, timeout o redirección fallan explícitamente.
 Un error de transporte deja resultado desconocido; no reintentar automáticamente.
 Revisar la causa/consumo y preparar otro run si se decide reintentar.
