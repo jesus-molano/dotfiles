@@ -297,7 +297,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
             )
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("gpt-5.6-sol", checked.stderr)
+            self.assertIn("gpt-6-sol", checked.stderr)
 
     def test_reuse_scout_accepts_its_lightweight_read_only_configuration(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -307,7 +307,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
                 'name = "reuse-scout"\n'
                 'description = "Fixture"\n'
                 'developer_instructions = "Read only."\n'
-                'model = "gpt-5.6-luna"\n'
+                'model = "gpt-6-luna"\n'
                 'model_reasoning_effort = "low"\n'
                 'sandbox_mode = "read-only"\n',
                 encoding="utf-8",
@@ -335,20 +335,20 @@ class CheckCodexSkillsTest(unittest.TestCase):
                 'name = "reuse-scout"\n'
                 'description = "Fixture"\n'
                 'developer_instructions = "Read only."\n'
-                'model = "gpt-5.6-sol"\n'
+                'model = "gpt-6-sol"\n'
                 'model_reasoning_effort = "low"\n'
                 'sandbox_mode = "read-only"\n',
                 encoding="utf-8",
             )
             checked = run_checker(skills, agents)
             self.assertNotEqual(checked.returncode, 0)
-            self.assertIn("modelo ligero gpt-5.6-luna", checked.stderr)
+            self.assertIn("modelo ligero gpt-6-luna", checked.stderr)
 
             agent.write_text(
                 'name = "reuse-scout"\n'
                 'description = "Fixture"\n'
                 'developer_instructions = "Read only."\n'
-                'model = "gpt-5.6-luna"\n'
+                'model = "gpt-6-luna"\n'
                 'model_reasoning_effort = "low"\n'
                 'sandbox_mode = "workspace-write"\n',
                 encoding="utf-8",
@@ -361,7 +361,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
                 'name = "reuse-scout"\n'
                 'description = "Fixture"\n'
                 'developer_instructions = "Read only."\n'
-                'model = "gpt-5.6-luna"\n'
+                'model = "gpt-6-luna"\n'
                 'model_reasoning_effort = "medium"\n'
                 'sandbox_mode = "read-only"\n',
                 encoding="utf-8",

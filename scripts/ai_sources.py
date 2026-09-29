@@ -41,8 +41,6 @@ def roles(client: str, platform: str, root: Path = ROOT) -> dict[str, str]:
     for path in sorted((root / "ai/roles").glob("*.json")):
         role = json.loads(path.read_text(encoding="utf-8"))
         body = role["instructions"].strip() + ROLE_FOOTER
-        if client not in role:
-            continue  # Client-specific role, e.g. the Claude override of the built-in Explore agent.
         settings = role[client]
         if client == "codex":
             fields = dict(name=role["name"], description=role["description"], model=settings["model"],

@@ -7,8 +7,9 @@
   (Opus, high effort, read-only).
 - Models by job: the main agent runs on Opus for execution and reasoning;
   reviewers use Opus with high effort; reading, search and drafting
-  (`Explore`, `reuse-scout`, `catalog-writer`) use Sonnet. Do not switch the
-  main model to save tokens; delegate reading instead.
+  (`reuse-scout`, `catalog-writer`) use Sonnet; the built-in Explore agent
+  inherits the main model. Do not switch the main model to save tokens;
+  delegate reading instead.
 - Auto mode approves routine actions. The `ai-guard` hook and the
   `permissions.deny` rules block the hard limits; every other human limit above
   still applies.
