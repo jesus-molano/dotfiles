@@ -182,7 +182,10 @@ another of your sessions or for a scheduled task prompt, and that text starts
 with `ultracode`, the hook grants the opt-in. Both come from your own
 account, and a workflow still runs under the same permission mode, deny
 rules, guard and sandbox as any other tool call. To close this path, set
-`crossSessionInbound` to `hold` in `~/.claude/settings.json`.
+`crossSessionInbound` to `hold` in `~/.claude/settings.json`. The guard reads
+command text only: a script that builds the marker path at run time passes it.
+On Linux the sandbox still refuses that write; an unsandboxed retry and every
+command on Windows depend on the auto-mode classifier.
 
 ## Token efficiency
 
