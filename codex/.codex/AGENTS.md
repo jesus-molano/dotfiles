@@ -50,6 +50,11 @@
 - An implementation request authorizes one coherent local commit when checks
   are fresh and the staging is unambiguous. Do not commit during analysis,
   diagnosis or review, or when the user forbids it.
+- When the current branch name contains a tracker key (letters, a hyphen and
+  digits, such as `feat/HH-707-phone` or `fix/hh-739-title`), put the key in
+  uppercase in every commit subject. Follow the repository's existing
+  convention and commit linter; without one, end the subject with `(HH-707)`.
+  If the branch has no key, add none and never invent one.
 - Before publishing, rerun checks, revalidate the state and show repository,
   remote, branch and exact OID. Ask for human authorization for that
   destination and push that OID. Never force, delete, mirror, or push tags or
