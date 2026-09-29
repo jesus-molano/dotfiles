@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import runpy
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,7 +22,9 @@ def run_checker(
     required_agents: tuple[str, ...] = (),
     installed_skills_roots: tuple[Path, ...] = (),
 ) -> subprocess.CompletedProcess[str]:
+    # Windows cannot run a script through its shebang line.
     command = [
+        sys.executable,
         str(CHECKER),
         "--skills-root",
         str(skills),
@@ -35,9 +38,18 @@ def run_checker(
     return subprocess.run(
         command,
         text=True,
+        encoding="utf-8",
         capture_output=True,
         check=False,
     )
+
+
+def link_dir(test: unittest.TestCase, link: Path, target: Path) -> None:
+    # Unprivileged Windows cannot create symlinks (WinError 1314).
+    try:
+        link.symlink_to(target, target_is_directory=True)
+    except OSError as error:
+        test.skipTest(f"symlinks unavailable: {error}")
 
 
 def roots(root: Path, name: str = "example") -> tuple[Path, Path, Path]:
@@ -117,7 +129,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
             installed = root / "installed"
             source = write_installed_skill(root / "sources", "active", "test-driven-development")
             installed.mkdir()
-            (installed / "test-driven-development").symlink_to(source, target_is_directory=True)
+            link_dir(self, installed / "test-driven-development", source)
             write_installed_skill(installed, "test-driven-development.backup", "test-driven-development")
             checked = run_checker(
                 skills, agents, installed_skills_roots=(installed,)
@@ -145,8 +157,8 @@ class CheckCodexSkillsTest(unittest.TestCase):
             write_metadata(skill, implicit=True)
             installed = root / "installed"
             active = write_installed_skill(installed, "active", "external-skill")
-            (active / "cycle").symlink_to(installed, target_is_directory=True)
-            (installed / "broken").symlink_to(root / "missing", target_is_directory=True)
+            link_dir(self, active / "cycle", installed)
+            link_dir(self, installed / "broken", root / "missing")
             checked = run_checker(
                 skills, agents, installed_skills_roots=(installed,)
             )
@@ -161,7 +173,7 @@ class CheckCodexSkillsTest(unittest.TestCase):
             installed.mkdir()
             outside = root / "unrelated-home"
             write_installed_skill(outside, "private-subtree", "must-not-be-read")
-            (installed / "escape").symlink_to(outside, target_is_directory=True)
+            link_dir(self, installed / "escape", outside)
 
             checked = run_checker(
                 skills, agents, installed_skills_roots=(installed,)
