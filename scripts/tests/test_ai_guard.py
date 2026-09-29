@@ -11,7 +11,8 @@ HOOKS = Path(__file__).resolve().parents[2] / "ai/hooks"
 
 def run(script, payload, env=None):
     return subprocess.run([sys.executable, str(HOOKS / script)], input=json.dumps(payload),
-                          capture_output=True, text=True, env={**os.environ, **(env or {})})
+                          capture_output=True, text=True, encoding="utf-8",  # the hooks write UTF-8
+                          env={**os.environ, **(env or {})})
 
 
 def bash(command, env=None):
