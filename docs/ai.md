@@ -313,7 +313,8 @@ copied skill blocks the apply; reconcile it with the source. There is no `--forc
 ## Evaluating the workflow
 
 Static checks and real runs answer different questions. CI validates the
-versioned catalog and regressions without a model or network. Routing is
+versioned catalog, the generated Codex files (`render-ai.py --check`) and the
+regressions without a model or network. Routing is
 measured with real runs of `claude plugin eval`:
 
 ```bash
