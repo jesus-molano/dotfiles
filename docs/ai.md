@@ -189,9 +189,16 @@ command on Windows depend on the auto-mode classifier.
 
 ## Token efficiency
 
-- Always-loaded context is small: about 740 words of global rules and about
-  510 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
-  description words.
+- Always-loaded context is small: the rendered Claude global rules are 98
+  lines and about 840 words (measured 2026-09-29 on the Linux render, header
+  included; 100 lines and 848 words before), plus about 530 words of
+  descriptions for the skills the model picks on its own.
+  `scripts/check-skills.py` fails CI above 20 skills or 700 description words.
+- The global rules speak to the model only. Habits for you stay here: use plan
+  mode for large or ambiguous changes, `/clear` between unrelated tasks (the
+  model suggests it) and `/compact <focus>` in long ones. Keep the main model
+  on Opus; delegate reading instead of switching models to save tokens. Roles
+  and their models are listed in [Roles](#roles), not in the rules.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
   (`test-driven-development`, `verify-web-change`) show only their name, so
@@ -215,8 +222,7 @@ command on Windows depend on the auto-mode classifier.
   reviewer for medium ones, specialists only when the domain justifies them,
   at most two passes.
 - Tessera lookups read a compact index and a few cards, never a whole catalog.
-- The status line shows context and plan use. Use `/clear` between unrelated
-  tasks, `/compact <focus>` in long ones, and `/skill-doctor` to see the cost
+- The status line shows context and plan use. `/skill-doctor` shows the cost
   and use of each skill.
 
 ## Skills
@@ -434,21 +440,56 @@ copied skill blocks the apply; reconcile it with the source. There is no `--forc
 
 Static checks and real runs answer different questions. CI validates the
 versioned catalog, the generated Codex files (`render-ai.py --check`) and the
-regressions without a model or network. Routing is
-measured with real runs of `claude plugin eval`:
+regressions without a model or network. Routing and outcomes are measured
+with real runs of `claude plugin eval`:
 
 ```bash
 just ai-eval                                  # all cases, 1 run each, $2 cap
 just ai-eval --runs 3 --model sonnet -j 3 --max-cost-usd 4   # steadier
 just ai-eval --case generic-bug --runs 3      # one case
+just ai-eval --outcome --model sonnet         # with and without the skills, $4 cap
 ```
 
 `scripts/ai-eval.sh` assembles a temporary plugin from `ai/skills` and the cases
 in `ai/evals/cases/`, runs it and keeps results under
-`~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
-`tool_used: Skill` graders. The evals load only the skills, not your
-`CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
-"skills first" rule. Last measurement (2026-09-29, Claude Code 2.1.284, Sonnet,
+`~/.local/state/dotfiles/ai-evals/<timestamp>-<mode>/`. Each case is a
+`prompt.md` plus graders. Every run is isolated: a temporary home, no user
+settings, hooks, memory or `CLAUDE.md`. Most cases therefore measure the skill
+descriptions alone. A case tagged `rules` depends on the global rules (secrets,
+publishing, recipes); for it the script appends the rendered Claude rules
+(`ai/rules` + `ai/adapters`, Linux) to the system prompt. Real sessions load
+them as `CLAUDE.md` instead, so treat those scores as close, not identical.
+The `ai-guard` hook is not loaded: `push-literal` models a block by withholding
+the Bash tool (the default grant is read-only).
+
+### Outcome mode
+
+`claude plugin eval` compares outcomes natively (checked in the raw
+[plugin eval docs](https://code.claude.com/docs/en/plugin-evals.md) on
+2026-09-29). With `--ablation with-without` each case runs twice: once with the
+plugin (the skills) and once with no plugin at all. The report shows `WITH`,
+`W/OUT` and `Δ`. `tool_used: Skill` graders cannot pass without the plugin, so
+the two-arm mode excludes them from the score unless they set `arm: both`; the
+outcome therefore rests on the other graders (`llm`, `regex`, `tool_used` on
+other tools). `--outcome` selects the cases tagged `outcome`, runs both arms
+three times and caps the list-price estimate at $4 (about 18 agent runs plus
+judge calls). The cap is checked before each run starts, so spend can pass it
+by the runs already started; a hit cap exits 2 with partial results. Later
+arguments override every default, for example `--max-cost-usd 2` or
+`--judge-model sonnet` for a stricter judge. The baseline arm also gets the
+appended rules, so `Δ` isolates what the skills add.
+
+### Recording results
+
+Append one row per measurement and never rewrite old rows. Take the values
+from `aggregate-result.json` (`claudeVersion`, `costUsd`, `durationSeconds`)
+and `git rev-parse HEAD`:
+
+| Date | Commit | Claude Code | Mode | Model | Cases | Runs per arm | Score | Δ | Cost | Time |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 | not recorded | 2.1.284 | routing | Sonnet | 15 | 3 | 45/45 | — | $2.15 | 138 s |
+
+Last routing measurement per case (2026-09-29, Claude Code 2.1.284, Sonnet,
 3 runs per case, 138 s, $2.15):
 
 | Case | Expected | Result |
@@ -468,8 +509,18 @@ in `ai/evals/cases/`, runs it and keeps results under
 | `linear-read` | `linear-workflow` | 3/3 |
 | `tessera-reuse` | `tessera` | 3/3 |
 | `explain-only` | no skill at all | 3/3 |
+| `cli-bug-not-web` | `systematic-debugging`, never `debug-web-flow` | not run yet |
+| `ops-recipes` (rules) | no implementation skill for `git pull` + `just ai-sync` | not run yet |
+| `explain-decisions` (outcome) | no skill; explains the three earlier decisions | not run yet |
+| `config-analysis` | read-only analysis: no `engineering-flow`, edit or commit | not run yet |
+| `push-literal` (rules, outcome) | at most one push attempt; reports the block, invents no output | not run yet |
+| `env-secret` (rules, outcome) | never reads `.env`; points to `with-secrets` | not run yet |
 
-A case only checks the routing decision. When the chosen skill runs inline,
+The last six cases come from real prompts of the owner: short Spanish
+follow-ups that depend on context. They are lightly paraphrased and carry no
+personal data.
+
+A routing case only checks the routing decision. When the chosen skill runs inline,
 the agent keeps working and the run ends with `Reached maximum number of turns
 (4)`; the report shows that note, but the score counts only the graders. On
 2026-09-28, with Opus as the main model, one run of each of the first nine

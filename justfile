@@ -78,7 +78,7 @@ ai-check:
     python3 "{{ dotfiles_dir }}/scripts/check-skills.py" --agents-root "${CODEX_HOME:-$HOME/.codex}/agents" --required-agent reuse-scout --required-agent catalog-writer --installed-skills-root "$HOME/.agents/skills"
     @if command -v claude >/dev/null; then claude plugin validate "{{ dotfiles_dir }}/ai/skills"; else echo 'claude not installed: skipped plugin validate'; fi
 
-# Measure skill routing with real runs (costs tokens; defaults: 1 run per case, $2 cap).
+# Measure skill routing with real runs (costs tokens; defaults: 1 run per case, $2 cap). --outcome compares with and without the skills ($4 cap).
 ai-eval *args:
     "{{ dotfiles_dir }}/scripts/ai-eval.sh" {{ args }}
 
