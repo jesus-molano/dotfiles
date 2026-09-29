@@ -40,10 +40,14 @@ CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAM
 # /model or local choice is kept. Main agent: Opus (the alias follows the latest
 # Opus, Opus 5.5 today); reading roles set Haiku/Sonnet in their own files.
 CLAUDE_DEFAULTS = {("model",): "opus"}
-# Deny rules apply before the auto-mode classifier. The ai-guard hook covers shell reads.
+# Deny rules apply before the auto-mode classifier. Read and Edit rules cover Claude's
+# file tools and only the shell commands Claude Code recognizes (cat, head, sed, tee,
+# redirections); indirect reads such as `grep -r`, interpreters or scripts pass them.
+# The ai-guard hook blocks shell commands that name these same stores.
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
-        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)",
+        "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)", "Read(~/.claude/.credentials.json)",
+        "Read(~/.codex/auth.json)",
         # Claude applies Edit rules to every file write; Write deny rules are ignored.
         "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
@@ -433,7 +437,7 @@ class Sync:
         for route, value in CLAUDE_DEFAULTS.items():
             if get(original, route) == MISSING:
                 put(desired, route, value)
-        guard = {"matcher": "Bash|PowerShell|Workflow|Write|Edit|MultiEdit", "hooks": [
+        guard = {"matcher": "Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]

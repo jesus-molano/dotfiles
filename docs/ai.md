@@ -41,8 +41,8 @@ kept, including foreign hooks, deny rules, models and projects.
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. |
-| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
+| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
@@ -60,34 +60,76 @@ your own `statusLine`); the apply stops and names the key.
 
 ## Guardrails
 
-`ai/hooks/ai-guard.py` runs before every shell command, every `Workflow` call
-and every file write or edit, in Claude Code and in Codex (`~/.codex/hooks.json`,
-same schema and stdin contract). Codex runs a new user hook only after you
-trust it once in its `/hooks` view. It exits 2 (block) with a short reason, and never prints the command,
-file contents or environment. It blocks only what is never part of a normal task:
+`ai/hooks/ai-guard.py` runs before every shell command (`Bash`, `PowerShell` and
+the background `Monitor` tool), every `Workflow` call and every file write or
+edit, in Claude Code and in Codex (`~/.codex/hooks.json`, same schema and stdin
+contract). Codex runs a new user hook only after you trust it once in its
+`/hooks` view. It exits 2 (block) with a short reason, and never prints the
+command, file contents or environment. It blocks only what is never part of a
+normal task:
 
 | Blocked | Rule it enforces |
 |---|---|
-| `git push` with force, `--force-with-lease`, delete, mirror, `--tags`, `--all`, `+ref`, `:ref` or several refspecs | Publish one verified ref, never rewrite or delete remote history. |
+| Every `git push` except the plain form `git push [-u \| --set-upstream] [remote] [branch \| HEAD:branch \| sha:refs/heads/branch]` as its own command (`git -C dir` and `--no-pager` are allowed). Blocked: other flags, `+ref`, `:ref`, several refspecs, `*` refspecs, tags (`refs/tags/`, version names such as `v1.0`, existing local tags, or any push in a command that also runs `git tag`), variables or `$(...)` in the push, pushes behind env assignments, wrappers, nested shells, substitutions or interpreter code, `GIT_CONFIG*`, `GIT_DIR`, `GIT_WORK_TREE` or `GIT_NAMESPACE` in the command, `git -c alias.*`, `git config alias.*` that pushes or runs `!` shell code, `git config` of `remote.*.mirror`, `remote.*.push`, `remote.*.pushurl`, `remote.*.receivepack`, `url.*.pushInsteadOf` or `push.*`, `git remote add --mirror`, `git remote set-url --push`, `git subtree push`, `git send-pack`, `git-push` binaries and `$var push` | Publish one verified ref, never rewrite or delete remote history. |
+| The oh-my-zsh git aliases that push or wipe work (`gp`, `gpf`, `gpf!`, `gpod`, `gpoat`, `gpristine`, `ggpush`, `ggf`...) as commands; their names as arguments (`grep gpu`) or in here-doc text are allowed | The Claude Bash tool loads your zsh aliases; they hide the real command. |
+| `gh repo delete`, `gh pr merge --admin`, `gh api -X DELETE`, `gh api` writes to `git/refs` or `git/tags`, and GraphQL `deleteRef`, `updateRef(s)` or `createRef` | Destructive publication is the user's. |
 | `stow` with a glob of packages | Never run Stow over every directory. |
-| `rm -r` of `/`, `~`, `$HOME` or the dotfiles checkout | No catastrophic deletion. |
-| Commands that read a `.env` file (templates `*.example`, `*.template`, `*.sample`, `echo`, `git check-ignore` and copying a template to `.env` are allowed); `op read`, `op inject`, `op item`, `op document` | Secrets only through `with-secrets`. |
+| `rm -r` of `/`, `~`, `$HOME`, `${HOME:?}` or the dotfiles checkout | No catastrophic deletion. |
+| A command that names a secret file or credential store, except the harmless uses listed below the table: `.env*` in any form (globs such as `.env*`, `.en?` or `*.env` for `find -name` and `grep --include`, braces such as `.en{v,}`, `HEAD:.env`, `@.env`, `< .env`, inside strings or scripts), `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json`, gh `hosts.yml`, `~/.git-credentials`, `~/.ssh` (except `*.pub`), `~/.gnupg`, `~/.aws`; also `op read`, `op inject`, `op item`, `op document`, `op run --no-masking`, `gh auth token`, `git credential fill` | Secrets only through `with-secrets`. |
 | `tessera.py consent` and any write to `provider-consent.json` (redirections, copies, deletes, `sed -i`, inline scripts, PowerShell write cmdlets); reading or searching it is allowed | Only the user grants provider consent. |
 | `Workflow` tool | Multi-agent workflows only on request. Start a session with `AI_ALLOW_WORKFLOW=1 claude` to allow them. |
 
-The guard looks through wrappers (`sudo`, `env`, `timeout`, `nohup`, `xargs`),
-nested shells (`bash -c`, `eval`), command substitutions and chained commands,
-and ignores redirections and heredoc bodies, so `git push -u origin feat 2>&1`
-works. A normal `git push origin <branch>` is allowed: showing the exact OID and
+Secrets and publication fail closed. The guard scans the raw command text for
+them, independently of the parser, and every mention must lie inside a part of
+the text that the parser understood as harmless:
+
+- a plain push, as above;
+- a file named in `echo`, `printf`, `touch`, `ls`, `stat`, `du`, `test`,
+  `chmod` or `mkdir`, `git check-ignore` or `git rm --cached`, and here-doc
+  text given to `cat` or `tee` (`cat >> .gitignore <<'EOF'`). This holds only
+  when the output ends on the screen or in a file: piped on (`| python3`) or
+  substituted (`$(echo ...)`), the text may become code, so it is not credited;
+- a dotenv file written by a redirection, by a PowerShell write cmdlet or as
+  the destination of `cp .env.example .env`. Credential stores are never
+  written. Claude Code's own `Edit(**/.env)` deny rule still refuses recognized
+  redirections into `.env`;
+- an alias name used as an argument;
+- comments, which never run;
+- nested code (`bash -c`, `eval`, a here-doc read by a shell) that passed its
+  own check and does not run a substitution's output.
+
+Anything else blocks, including plain text: a commit message or PR body that
+mentions `.env`, a credential store or `git push` must come from a file
+(`git commit -F <file>`, `gh pr create --body-file <file>`). Templates (`*.example`, `*.template`, `*.sample`) and `*.pub`
+keys are not secrets. An unparseable command that contains any of these
+mentions, `push`, `rm`, `stow` or `consent` is blocked.
+
+The other limits rely on the parser. It reads the command like the shell:
+quotes, `$'...'` escapes, backslash-newline continuations, comments, `{ }`
+groups, `if`/`then`/`do`, `case`, `!`, arithmetic, command and process
+substitutions (also inside double quotes), here-docs (the body is data unless
+the delimiter is unquoted or a shell reads it), here-strings, and text piped
+from `echo` into a shell. It looks through env assignments, wrappers (`sudo`,
+`env`, `nice`, `timeout`, `nohup`, `xargs`, `watch`, `with-secrets`...),
+`find -exec`, `op run --` and nested shells (`bash -lc`, `sh -ec`, `eval`, up
+to 8 levels). Because wrapper options are not all known, every later word after
+a wrapper is also checked as a possible command. Redirections such as `2>&1` are
+ignored, so `git push -u origin feat 2>&1` works. Showing the exact OID and
 asking for authorization before publishing stays in the global rules.
 
 Known limits: the guard is a safety net against mistakes, not a sandbox, and
-code running as your user can still reach anything you can. PowerShell has its
-own parser (quoting, `${...}` and `%USERPROFILE%` paths, cmdlet aliases such as
-`ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested `cmd /c`, `pwsh -Command`
-and `Invoke-Expression`). On Windows a command reported as Bash is checked with
-both parsers. The `Read(**/.env.*)` deny rule also hides
-`.env.example` templates from the Read tool; read them through the shell.
+code running as your user can still reach anything you can. It does not expand
+variables, brace-expanded command words or `xargs` input, and it does not read
+files: `grep -r KEY .`, a script that opens `.env` without naming it on the
+command line, and a script written in one command and run in the next all pass.
+PowerShell has its own parser (quoting, `${...}` and `%USERPROFILE%` paths,
+cmdlet aliases such as `ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested
+`cmd /c`, `pwsh -Command` and `Invoke-Expression`); there `gp` and `gpv` are
+`Get-ItemProperty`. On Windows a command reported as Bash is checked with both
+parsers, so Bash-only forms that mention a secret or a push (`if ... then`,
+here-docs such as `cat >> .gitignore <<'EOF'`) are blocked there. The
+`Read(**/.env.*)` deny rule also blocks `.env.example` templates,
+in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
 
 ## Token efficiency
 
