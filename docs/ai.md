@@ -41,6 +41,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
+| `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
 | `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
@@ -373,6 +374,16 @@ action. If an organization policy disables auto mode, Claude falls back to
 prompting; pick another mode in `/permissions` for one session, or change
 `permissions.defaultMode` in `scripts/sync-ai.py` (it is a managed key, so a
 local edit is reported as a conflict).
+
+`bypassPermissions` is disabled (`permissions.disableBypassPermissionsMode`).
+In that mode the classifier and the `soft_deny` rules do not run, and the mode
+offers no protection against prompt injection
+([permission modes](https://code.claude.com/docs/en/permission-modes)). The
+key also works in user settings for Claude Desktop
+([Desktop](https://code.claude.com/docs/en/desktop)). On Pro and Max plans,
+also turn off **Settings → Claude Code → Allow bypass permissions mode** in
+Claude Desktop. On Team and Enterprise plans, organization policy controls
+that toggle.
 
 ## Project gate
 
