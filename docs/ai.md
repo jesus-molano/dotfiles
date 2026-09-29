@@ -100,8 +100,8 @@ both parsers. The `Read(**/.env.*)` deny rule also hides
   `engineering-flow` can still route to them at almost no context cost.
 - Review and research skills run with `context: fork`, so their reading stays
   out of the main conversation.
-- Searches go to `reuse-scout` (Haiku, at most 25 turns) or the built-in Explore
-  agent, so the main context keeps only the conclusion.
+- Searches go to `reuse-scout` (Sonnet, at most 25 turns) or the built-in
+  Explore agent, so the main context keeps only the conclusion.
 - Reviews are sized by `engineering-flow`: none for small low-risk changes, one
   reviewer for medium ones, specialists only when the domain justifies them,
   at most two passes.
@@ -143,17 +143,33 @@ ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs
 
 | Role | Claude | Codex | Job |
 |---|---|---|---|
-| `reuse-scout` | Haiku, 25 turns, Read/Glob/Grep | light model, low effort | Find reusable candidates with contracts and consumers. |
-| `catalog-writer` | Sonnet, 40 turns, Read/Glob/Grep | medium model | Draft Tessera cards; the main agent validates and writes. |
-| `reviewer-web` | Opus, high effort | main model, high effort | Web correctness, security, accessibility, reuse. |
-| `reviewer-standards` | Opus, high effort | main model, high effort | Requirements, contracts, security, verifiability. |
-| `reviewer-spec` | Opus, high effort | main model, high effort | Spec coverage and acceptance criteria. |
-| `reviewer-linux` | Opus, high effort | main model, high effort | CachyOS/Hyprland changes, from evidence the main agent supplies. |
+| `reuse-scout` | Sonnet, 25 turns, Read/Glob/Grep | `gpt-6-luna`, low effort | Find reusable candidates with contracts and consumers. |
+| `catalog-writer` | Sonnet, 40 turns, Read/Glob/Grep | `gpt-6-sol`, medium effort | Draft Tessera cards; the main agent validates and writes. |
+| `reviewer-web` | Opus, high effort | `gpt-6-sol`, high effort | Web correctness, security, accessibility, reuse. |
+| `reviewer-standards` | Opus, high effort | `gpt-6-sol`, high effort | Requirements, contracts, security, verifiability. |
+| `reviewer-spec` | Opus, high effort | `gpt-6-sol`, high effort | Spec coverage and acceptance criteria. |
+| `reviewer-linux` | Opus, high effort | `gpt-6-sol`, high effort | CachyOS/Hyprland changes, from evidence the main agent supplies. |
 
 Every role is read-only; the main agent runs tests and passes the results.
 Models follow the job: reasoning and execution on Opus (main agent and
-reviewers), reading on Haiku (search) or Sonnet (bulk drafting). Models are data
-in each role file, so a model rename is a one-line change.
+reviewers), reading, search and drafting on Sonnet. Haiku is not used: in
+practice it stalled on multi-step reading. Models are data in each role file,
+so a model rename is a one-line change.
+
+Claude roles use model aliases (`opus`, `sonnet`), which always resolve to
+the latest version, so a new Claude release needs no change. The built-in
+Explore agent inherits the main model (Opus) and is not overridden: a user agent
+with its name would lose Anthropic's tuned prompt and its updates.
+
+Codex needs exact model IDs. They follow the official upgrade table in
+`codex-rs/models-manager/models.json` of openai/codex: `gpt-5.6-sol` and
+`gpt-5.6-terra` became `gpt-6-sol`, and `gpt-5.6-luna` became `gpt-6-luna`.
+The `fast` profile uses `gpt-6-luna`. The sync replaces a top-level `model`
+only when it still holds an earlier default of this repository; any other value
+is your choice and is kept. To move to a new generation, change the IDs in
+`ai/roles/*.json`, `scripts/sync-codex-config.py` (and add the old default to
+`RETIRED_DEFAULTS`), `scripts/check-skills.py` and the `codex/.codex` profiles,
+then run `python3 scripts/render-ai.py`.
 
 ## Linux: install and deploy
 

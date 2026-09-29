@@ -517,7 +517,7 @@ class Sync:
             lines[-1] += "\n"
         keys = {}
         for key, value in mod["DEFAULT_TOP"].items():
-            if key not in original:
+            if key not in original or f'"{original[key]}"' in mod["RETIRED_DEFAULTS"].get(key, ()):
                 mod["set_key"](lines, None, key, value)
         for key, value in mod["DESIRED_TOP"].items():
             # A foreign notifier is a local integration, not ours to replace.

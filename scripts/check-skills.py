@@ -318,9 +318,9 @@ def check_agent(path: Path) -> str:
         raise ValueError("todo reviewer debe declarar sandbox_mode = read-only")
     if (
         document["name"].startswith("reviewer-")
-        and document.get("model") != "gpt-5.6-sol"
+        and document.get("model") != "gpt-6-sol"
     ):
-        raise ValueError("todo reviewer debe usar el modelo comprobado gpt-5.6-sol")
+        raise ValueError("todo reviewer debe usar el modelo comprobado gpt-6-sol")
     if (
         document["name"].startswith("reviewer-")
         and document.get("model_reasoning_effort") != "high"
@@ -329,8 +329,8 @@ def check_agent(path: Path) -> str:
     if document["name"] == "reuse-scout":
         if document.get("sandbox_mode") != "read-only":
             raise ValueError("reuse-scout debe declarar sandbox_mode = read-only")
-        if document.get("model") != "gpt-5.6-luna":
-            raise ValueError("reuse-scout debe usar el modelo ligero gpt-5.6-luna")
+        if document.get("model") != "gpt-6-luna":
+            raise ValueError("reuse-scout debe usar el modelo ligero gpt-6-luna")
         if document.get("model_reasoning_effort") != "low":
             raise ValueError("reuse-scout debe declarar model_reasoning_effort = low")
     return document["name"]

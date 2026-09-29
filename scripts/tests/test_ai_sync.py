@@ -421,6 +421,10 @@ class AISyncTest(unittest.TestCase):
             self.assertIn("tools: Read, Glob, Grep", header)
             self.assertNotIn("Bash", header, "Roles are read-only")
         self.assertIn("maxTurns: 25", agents["reuse-scout.md"])
+        # Reading roles run on Sonnet; Haiku stalled on multi-step reading.
+        for name in ("reuse-scout.md", "catalog-writer.md"):
+            self.assertIn("model: sonnet", agents[name])
+        self.assertNotIn("haiku", "".join(agents.values()))
         self.assertEqual(set(sources.hook_scripts()), {"ai-guard.py", "project-gate.py", "statusline.py"})
 
     def test_adopt_takes_over_an_earlier_deployment_without_a_ledger(self):

@@ -23,14 +23,14 @@ class SyncCodexConfigTest(unittest.TestCase):
     def test_render_sets_model_defaults_when_missing(self) -> None:
         document = tomllib.loads(SYNC["render"](""))
 
-        self.assertEqual(document["model"], "gpt-5.6-sol")
+        self.assertEqual(document["model"], "gpt-6-sol")
         self.assertEqual(document["model_reasoning_effort"], "medium")
 
     def test_render_sets_policy_without_overwriting_interactive_reasoning(self) -> None:
         rendered = SYNC["render"]('model_reasoning_effort = "xhigh"\n')
         document = tomllib.loads(rendered)
 
-        self.assertEqual(document["model"], "gpt-5.6-sol")
+        self.assertEqual(document["model"], "gpt-6-sol")
         self.assertEqual(document["model_reasoning_effort"], "xhigh")
         self.assertEqual(document["approval_policy"], "never")
         self.assertEqual(document["approvals_reviewer"], "user")
@@ -42,7 +42,7 @@ class SyncCodexConfigTest(unittest.TestCase):
         self.assertTrue(document["features"]["memories"])
         self.assertTrue(document["memories"]["disable_on_external_context"])
         self.assertEqual(document["agents"]["max_concurrent_threads_per_session"], 3)
-        self.assertEqual(document["agents"]["default_subagent_model"], "gpt-5.6-terra")
+        self.assertEqual(document["agents"]["default_subagent_model"], "gpt-6-sol")
         self.assertEqual(
             document["agents"]["default_subagent_reasoning_effort"], "medium"
         )
@@ -61,6 +61,13 @@ class SyncCodexConfigTest(unittest.TestCase):
             document["tui"]["terminal_title"],
             ["spinner", "project", "task-progress"],
         )
+
+    def test_render_upgrades_only_a_retired_repository_default(self) -> None:
+        upgraded = tomllib.loads(SYNC["render"]('model = "gpt-5.6-sol"\n'))
+        kept = tomllib.loads(SYNC["render"]('model = "gpt-6-astra"\n'))
+
+        self.assertEqual(upgraded["model"], "gpt-6-sol")
+        self.assertEqual(kept["model"], "gpt-6-astra")
 
     def test_render_preserves_personal_mcp_sections(self) -> None:
         original = """\

@@ -15,9 +15,12 @@ from pathlib import Path
 import tomllib
 
 DEFAULT_TOP = {
-    "model": '"gpt-5.6-sol"',
+    "model": '"gpt-6-sol"',
     "model_reasoning_effort": '"medium"',
 }
+# Earlier defaults of this repository, replaced by the current one. Any other
+# value is a local choice and is kept.
+RETIRED_DEFAULTS = {"model": ('"gpt-5.6-sol"',)}
 DESIRED_TOP = {
     "approval_policy": '"never"',
     "approvals_reviewer": '"user"',
@@ -35,7 +38,7 @@ DESIRED_SECTIONS = {
     "agents": {
         "enabled": "true",
         "max_concurrent_threads_per_session": "3",
-        "default_subagent_model": '"gpt-5.6-terra"',
+        "default_subagent_model": '"gpt-6-sol"',
         "default_subagent_reasoning_effort": '"medium"',
     },
     "tui": {
@@ -108,7 +111,7 @@ def render(original: str) -> str:
         lines[-1] += "\n"
     current = tomllib.loads(original) if original else {}
     for key, value in DEFAULT_TOP.items():
-        if key not in current:
+        if key not in current or f'"{current[key]}"' in RETIRED_DEFAULTS.get(key, ()):
             set_key(lines, None, key, value)
     for key, value in DESIRED_TOP.items():
         if key == "notify" and key in current and current[key] != ["codex-notify"]:
@@ -139,7 +142,7 @@ def desired_state(document: dict) -> bool:
         and document.get("memories", {}).get("disable_on_external_context") is True
         and document.get("agents", {}).get("enabled") is True
         and document.get("agents", {}).get("max_concurrent_threads_per_session") == 3
-        and document.get("agents", {}).get("default_subagent_model") == "gpt-5.6-terra"
+        and document.get("agents", {}).get("default_subagent_model") == "gpt-6-sol"
         and document.get("agents", {}).get("default_subagent_reasoning_effort")
         == "medium"
         and document.get("tui", {}).get("notifications")
