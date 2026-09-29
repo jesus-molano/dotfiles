@@ -47,3 +47,8 @@ a browser API.
 List findings by severity with file/line, observable behavior, evidence and the
 minimal fix. If there are no findings, say so and name residual risks or checks
 that could not run.
+
+## Gotchas
+
+- A reviewer subagent does not see the conversation. Pass the branch, the
+  base, the spec path and the test results in its prompt.

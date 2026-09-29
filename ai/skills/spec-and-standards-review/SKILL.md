@@ -24,3 +24,8 @@ Review without modifying the target.
    file/location, violated requirement or standard, and remediation direction.
 
 Report no finding when the evidence supports conformance. Avoid style-only comments and avoid reproducing sensitive data.
+
+## Gotchas
+
+- A reviewer subagent does not see the conversation. Pass the branch, the
+  base, the spec path and the test results in its prompt.

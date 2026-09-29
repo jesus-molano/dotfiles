@@ -1,6 +1,6 @@
 ---
 name: research-primary-sources
-description: Load first for any question about current versions, releases, support dates, API behavior, standards, pricing or policies, before answering from memory. Pass the exact question and the decision it supports as arguments. Answers from official primary sources with evidence, dates and uncertainty.
+description: Use for questions about current versions, releases, support dates, API behavior, standards, pricing or policies, instead of answering from memory. Pass the exact question and the decision it supports as arguments. Answers from official primary sources with evidence, dates and uncertainty.
 context: fork
 agent: Explore
 background: false
@@ -29,3 +29,12 @@ claim it supports, and only the minimum quotes. Stay read-only: do not modify
 the repository or an external system. One exception: when this skill runs
 inline and the request names an output file, write only that file. Never
 collect or disclose credentials, private configuration or personal data.
+
+## Gotchas
+
+- The WebFetch summarizer can contradict its source. Observed: it reported
+  `permissions.disableBypassPermissionsMode` as the Boolean `true`; the docs
+  say the string `"disable"`. For a claim that decides a setting, read the raw
+  text and quote it exactly.
+- For code.claude.com docs, fetch the raw Markdown page (`<page>.md`, for
+  example `https://code.claude.com/docs/en/settings.md`) with `curl`.

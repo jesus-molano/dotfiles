@@ -136,7 +136,7 @@ in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
 
 - Always-loaded context is small: the rendered Claude global rules are 98
   lines and about 840 words (measured 2026-09-29 on the Linux render, header
-  included; 100 lines and 848 words before), plus about 510 words of
+  included; 100 lines and 848 words before), plus about 530 words of
   descriptions for the skills the model picks on its own.
   `scripts/check-skills.py` fails CI above 20 skills or 700 description words.
 - The global rules speak to the model only. Habits for you stay here: use plan

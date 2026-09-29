@@ -1,6 +1,6 @@
 ---
 name: engineering-flow
-description: Load first for any request to implement, add, build, change, refactor or fix code or configuration, from inspection through verification and handoff. Not for research-only, review-only or diagnosis-only requests.
+description: Guides a request to implement, add, build, change, refactor or fix code or configuration, from inspection through verification and handoff. Use before the first file edit. Not for research, review or diagnosis only, or for running an existing recipe.
 ---
 
 # Engineering Flow

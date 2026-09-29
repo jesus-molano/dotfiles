@@ -1,6 +1,6 @@
 ---
 name: verification-before-completion
-description: Select and run fresh, proportionate verification before claiming a change is complete, fixed or ready to commit. Use after every implementation or fix, including when no automated test exists.
+description: Select and run fresh, proportionate verification before claiming a change is complete, fixed or ready to commit, including when no automated test exists. Scale the checks to the risk of the change.
 ---
 
 # Verification Before Completion
@@ -14,10 +14,12 @@ description: Select and run fresh, proportionate verification before claiming a 
 2. Run the smallest fresh command or observation that proves each changed
    behavior, then repository-mandated checks. Read exit status and relevant
    output; never claim a pass from an earlier run.
+   Keep verification proportionate. Do not re-run a check that a hook or
+   gate already ran on the same state of the tree; cite its result instead.
 3. For web changes, invoke `verify-web-change` for the focused web checklist.
 4. Run `git diff --check` and confirm unrelated files were not changed.
-5. Report commands, results, exclusions, and remaining uncertainty. If a check
-   cannot run, say why and do not imply success.
+5. Report exactly what ran: commands, results, exclusions, and remaining
+   uncertainty. If a check cannot run, say why and do not imply success.
    Include the reused/adapted paths or the concrete reason new code was needed.
 
 Fresh verification supports a local commit only when repository instructions
