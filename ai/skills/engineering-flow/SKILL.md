@@ -38,3 +38,6 @@ description: Load first for any request to implement, add, build, change, refact
 8. Commit a coherent verified change when the governing instructions allow it.
    Keep the configured Git identity; never add `Co-authored-by`. Tracker
    writes, deployment and push need their own explicit authority.
+9. Retro: if the task exposed a repeated failure or a user correction, propose
+   one durable fix in the handoff: an `AGENTS.md` line, a hook, a test or a
+   skill Gotcha. Never change global rules without the user's approval.
