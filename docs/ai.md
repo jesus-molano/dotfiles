@@ -48,6 +48,8 @@ kept, including foreign hooks, deny rules, models and projects.
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
+| `sandbox.enabled`, `sandbox.autoAllowBashIfSandboxed`, `sandbox.allowUnsandboxedCommands` (Linux) | `true`, `false`, `true` | OS-level containment of every shell command. See [Sandbox](#sandbox). |
+| `sandbox.filesystem.denyRead`, `sandbox.filesystem.denyWrite`, `sandbox.excludedCommands` (entries, Linux) | secret and credential paths; `~/.local/state/dotfiles/ai`; four `just` recipes | See [Sandbox](#sandbox). |
 | `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Teaches the classifier the authority rules. |
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
@@ -121,7 +123,8 @@ ignored, so `git push -u origin feat 2>&1` works. Showing the exact OID and
 asking for authorization before publishing stays in the global rules.
 
 Known limits: the guard is a safety net against mistakes, not a sandbox, and
-code running as your user can still reach anything you can. It does not expand
+code running as your user can still reach anything you can. On Linux the
+[sandbox](#sandbox) closes the indirect reads for sandboxed commands. It does not expand
 variables, brace-expanded command words or `xargs` input, and it does not read
 files: `grep -r KEY .`, a script that opens `.env` without naming it on the
 command line, and a script written in one command and run in the next all pass.
@@ -152,7 +155,8 @@ markers. On the prompt events the hook always exits 0, so it never erases a
 prompt; if the marker cannot be written, Claude is told that workflows stay
 blocked. `AI_ALLOW_WORKFLOW=1 claude` still allows workflows for a whole CLI
 session. The model cannot grant itself the opt-in: `ai-guard` blocks every
-tool call that names `workflow-grants`.
+tool call that names `workflow-grants`, and on Linux the sandbox denies
+sandboxed writes to `~/.local/state/dotfiles/ai` (see [Sandbox](#sandbox)).
 
 Why only the start of the prompt: the hooks reference lists the
 `UserPromptSubmit` input as the common fields (`session_id`, `prompt_id`,
@@ -494,7 +498,8 @@ The default mode is `auto`: a classifier model reviews each action, approves
 routine work without prompts and stops what the `autoMode.soft_deny` rules
 describe (publishing, secrets, deletion, Stow and system changes, tracker
 writes, sending data out). `permissions.deny` and the `ai-guard` hook run first
-and stay deterministic. The classifier adds a small token cost per checked
+and stay deterministic. On Linux the [sandbox](#sandbox) then limits what an
+approved shell command can read, write and reach. The classifier adds a small token cost per checked
 action. If an organization policy disables auto mode, Claude falls back to
 prompting; pick another mode in `/permissions` for one session, or change
 `permissions.defaultMode` in `scripts/sync-ai.py` (it is a managed key, so a
@@ -509,6 +514,91 @@ key also works in user settings for Claude Desktop
 also turn off **Settings → Claude Code → Allow bypass permissions mode** in
 Claude Desktop. On Team and Enterprise plans, organization policy controls
 that toggle.
+
+## Sandbox
+
+Deny rules and `ai-guard` read the command text. The permissions reference
+says Read and Edit deny rules do not apply "to arbitrary subprocesses that read
+or write files indirectly, like a Python or Node script that opens files
+itself. For OS-level enforcement that blocks all processes from accessing a
+path, enable the sandbox"
+([permissions](https://code.claude.com/docs/en/permissions)). So on Linux the
+sync turns on the Claude Code sandbox (bubblewrap and socat must be
+installed). It applies to "every Bash, PowerShell, or Monitor command and its
+child processes" ([sandboxing](https://code.claude.com/docs/en/sandboxing)).
+Native Windows is not supported ("Native Windows is not supported"), so the
+work PC gets none of these keys.
+
+| Key | Value | Reason |
+|---|---|---|
+| `sandbox.enabled` | `true` | Turns the sandbox on for every project. |
+| `sandbox.autoAllowBashIfSandboxed` | `false` | The default `true` runs sandboxed commands "without a permission prompt". With `false`, "sandboxed commands go through the regular permission flow, so your allow rules and permission mode decide": the auto-mode classifier and its `soft_deny` rules keep reviewing every command, as before. The sandbox adds containment; it does not replace the review. |
+| `sandbox.allowUnsandboxedCommands` | `true` | See below. |
+| `sandbox.filesystem.denyRead` (entries) | `~/**/.env`, `~/**/.env.*`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json` | The default read policy "still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`". These are the same stores as the `permissions.deny` rules, now enforced for every sandboxed process. Wildcards work in read lists on Linux: Claude Code "expands a read entry to the concrete paths it matches". |
+| `sandbox.filesystem.denyWrite` (entry) | `~/.local/state/dotfiles/ai` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; this entry also holds when a session starts in `~` or adds it with `/add-dir`. |
+| `sandbox.excludedCommands` (entries) | `just ai-plan`, `just ai-sync`, `just ai-check`, `just apply` | These recipes read the Claude config and write to `~/.claude`, `~/.codex`, `~/.agents`, `~/.local/state` or HOME (Stow) by design. `~/.claude` is a sandbox protected path that no `allowWrite` can open. "Excluded commands still go through the regular permission flow", so the classifier and `ai-guard` still review them. An entry applies only when it covers the whole call: `cd x && just apply` stays sandboxed. |
+
+**Unsandboxed retries.** With `allowUnsandboxedCommands: true` (also the
+default), a command that the sandbox blocks may be retried with
+`dangerouslyDisableSandbox`: "The retried command runs outside the sandbox,
+so it goes through the regular permission flow. [...] In auto mode, the
+classifier evaluates the underlying command". `ai-guard` runs on that call
+too. `false` ("strict sandbox mode") would make other work outside the
+working directory impossible from a session: `gh` needs `hosts.yml`,
+`git push` over SSH needs `~/.ssh`, `with-secrets` needs 1Password. Those
+commands fail in the sandbox, name the denied path, and then run unsandboxed
+only when the classifier approves. For a prompt on every retry, even in auto
+mode, add the ask rule `Bash(dangerouslyDisableSandbox:true)` yourself.
+
+**Network.** The sync sets no network key. By default "Claude Code pre-allows
+no domains"; in auto mode "Claude instead names the hosts a command needs on
+the command itself", the classifier reviews them with the command, and "an
+approved list opens those hosts for that one command alone". The proxy
+filters by host name and "does not terminate or inspect TLS", so an allowed
+broad domain such as `github.com` can still carry data out. `strictAllowlist`
+is not set: with it, "Claude Code refuses per-command lists", so every new
+host would need a settings change.
+
+**Not set.** `failIfUnavailable` stays `false`: if bubblewrap or socat is
+missing, Claude Code "shows a warning and runs commands unsandboxed" instead
+of refusing to start every session, Desktop included. Check for that warning
+after a CachyOS update. `sandbox.credentials` (masking) and
+`blockReadsOutsideWorkingDirectories` are not used.
+
+**Desktop.** The Desktop docs say "Desktop and CLI read the same
+configuration files" and "Permission rules, allowed tools, and other settings
+in `settings.json` apply to Desktop sessions"
+([Desktop](https://code.claude.com/docs/en/desktop#shared-configuration)).
+They do not mention the sandbox for the Code tab. Treat Desktop support as not
+documented and verify it on the host (test in a Desktop session below).
+
+**Host test** (CachyOS, before relying on it): run `just ai-plan`, review,
+`just ai-sync`, then open a new CLI session and a new Desktop Code session in
+a scratch repository. In your own terminal, create a `.env` file there. The
+probe must read files indirectly, because `ai-guard` blocks any command that
+names them. Ask Claude to write `probe.py` with this content and run
+`python3 probe.py` (sandboxed, no retry):
+
+```python
+import os
+home = os.path.expanduser("~")
+for path in (".e" + "nv", home + "/.s" + "sh", home + "/.claude" + ".json", home + "/.gitconfig"):
+    try:
+        os.listdir(path) if os.path.isdir(path) else open(path).read(1)
+        print("READ  ", path)
+    except OSError as error:
+        print("DENIED", path, type(error).__name__)
+```
+
+| Check | Expected |
+|---|---|
+| `/sandbox` (CLI) | No Dependencies-only tab; Config lists the `denyRead` paths. |
+| `python3 probe.py` | `DENIED` for the dotenv file, `~/.ssh` and `~/.claude.json`; `READ` for `~/.gitconfig`. The same in the Desktop session. |
+| `touch ~/sandbox-probe` | Fails in the sandbox (`Read-only file system`); an unsandboxed retry goes to the classifier. |
+| `touch ~/.local/state/dotfiles/ai/probe` | Fails in the sandbox. |
+| `curl -sI https://example.com` | Claude names `example.com` on the command and the classifier reviews it. |
+| `just ai-plan` | Runs outside the sandbox and prints the plan. |
+| First prompt `ultracode: say hi`, then ask for a workflow | The Workflow tool runs in that session; in a new session without the keyword it is blocked. |
 
 ## Project gate
 

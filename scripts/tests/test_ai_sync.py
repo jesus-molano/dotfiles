@@ -69,6 +69,7 @@ class AISyncTest(unittest.TestCase):
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
         self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
         self.assertIn("Monitor", settings["hooks"]["PreToolUse"][0]["matcher"].split("|"))
+        self.assertNotIn("sandbox", settings, "native Windows has no Claude Code sandbox")
         # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
         guard = settings["hooks"]["PreToolUse"][0]["hooks"]
         self.assertEqual(settings["hooks"]["UserPromptSubmit"], [{"hooks": guard}])
@@ -351,6 +352,36 @@ class AISyncTest(unittest.TestCase):
             env=dict(os.environ, HOME=str(self.home), CODEX_HOME=str(self.home / ".codex"),
                      XDG_STATE_HOME=str(self.home / ".local/state")), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_sandbox_keys_and_entries(self):
+        self.json_write(".claude/settings.json", {"sandbox": {"filesystem": {"denyRead": ["~/private"]},
+                                                              "network": {"allowedDomains": ["github.com"]}}})
+        self.build("linux", "claude").apply()
+        sandbox = sync.read_json(self.home / ".claude/settings.json")["sandbox"]
+        self.assertIs(sandbox["enabled"], True)
+        self.assertIs(sandbox["autoAllowBashIfSandboxed"], False)
+        self.assertIs(sandbox["allowUnsandboxedCommands"], True)
+        self.assertEqual(sandbox["network"], {"allowedDomains": ["github.com"]}, "network stays the user's")
+        self.assertEqual(sandbox["filesystem"]["denyRead"], ["~/private", *sync.SANDBOX_DENY_READ])
+        for path in ("~/**/.env", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials", "~/.config/gh/hosts.yml",
+                     "~/.claude.json", "~/.claude/.credentials.json", "~/.codex/auth.json"):
+            self.assertIn(path, sandbox["filesystem"]["denyRead"])
+        self.assertEqual(sandbox["filesystem"]["denyWrite"], ["~/.local/state/dotfiles/ai"])
+        self.assertEqual(sandbox["excludedCommands"], ["just ai-plan", "just ai-sync", "just ai-check", "just apply"])
+        self.assertEqual(self.build("linux", "claude").operations, [])
+        path = self.home / ".claude/settings.json"
+        data = sync.read_json(path)
+        data["sandbox"]["enabled"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "managed key modified"):
+            self.build("linux", "claude")
+
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_sandbox_never_overrides_a_local_choice(self):
+        self.json_write(".claude/settings.json", {"sandbox": {"enabled": False}})
+        with self.assertRaisesRegex(ValueError, "different local value.*sandbox.enabled"):
+            self.build("linux", "claude")
 
     def test_list_entries_keep_foreign_items_and_conflict_when_removed(self):
         self.json_write(".claude/settings.json", {"permissions": {"deny": ["Bash(curl *)"]},

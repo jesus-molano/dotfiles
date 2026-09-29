@@ -56,6 +56,24 @@ DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)"]
 
+# Claude Code sandbox, Linux only (native Windows is not supported). Deny rules stop only
+# the reads Claude Code recognizes; the sandbox stops every sandboxed process at the OS level.
+SANDBOX_KEYS = {
+    ("sandbox", "enabled"): True,
+    # Sandboxed commands still go to the auto-mode classifier and its soft_deny rules.
+    ("sandbox", "autoAllowBashIfSandboxed"): False,
+    # A blocked command may be retried unsandboxed, through the permission flow and ai-guard.
+    ("sandbox", "allowUnsandboxedCommands"): True,
+}
+SANDBOX_DENY_READ = ["~/**/.env", "~/**/.env.*", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
+                     "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json",
+                     "~/.codex/auth.json"]
+# The sync ledger, its backups and the workflow opt-in markers.
+SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai"]
+# Dotfiles deployment writes to HOME by design; these exact recipes run outside the
+# sandbox and still go through the permission flow.
+SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply"]
+
 # Rules for the auto-mode classifier (the default mode). "$defaults" keeps the built-ins.
 AUTO_SOFT_DENY = [
     "$defaults",
@@ -433,6 +451,8 @@ class Sync:
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
         keys = dict(CLAUDE_KEYS)
+        if self.platform == "linux":
+            keys.update(SANDBOX_KEYS)
         keys[("statusLine",)] = {"type": "command", "padding": 0,
                                  "command": hook_command(self.home, self.platform, "statusline.py")}
         for route, value in keys.items():
@@ -455,6 +475,9 @@ class Sync:
             {"type": "command", "command": f"{gate} check", "timeout": 300}]}))
         if self.platform == "linux":
             wanted.append((("hooks", "Stop"), NOTIFY))
+            wanted += [(("sandbox", "filesystem", "denyRead"), path) for path in SANDBOX_DENY_READ]
+            wanted += [(("sandbox", "filesystem", "denyWrite"), path) for path in SANDBOX_DENY_WRITE]
+            wanted += [(("sandbox", "excludedCommands"), command) for command in SANDBOX_EXCLUDED]
         entries = self.managed_entries(path, original, desired, wanted)
         self.merged(path, original, desired, keys, json_text(desired))
         self.next_state[str(path.relative_to(self.home))]["entries"] = entries
