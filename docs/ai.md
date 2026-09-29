@@ -134,9 +134,16 @@ in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
 
 ## Token efficiency
 
-- Always-loaded context is small: about 740 words of global rules and about
-  510 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
-  description words.
+- Always-loaded context is small: the rendered Claude global rules are 98
+  lines and about 840 words (measured 2026-09-29 on the Linux render, header
+  included; 100 lines and 848 words before), plus about 510 words of
+  descriptions for the skills the model picks on its own.
+  `scripts/check-skills.py` fails CI above 20 skills or 700 description words.
+- The global rules speak to the model only. Habits for you stay here: use plan
+  mode for large or ambiguous changes, `/clear` between unrelated tasks (the
+  model suggests it) and `/compact <focus>` in long ones. Keep the main model
+  on Opus; delegate reading instead of switching models to save tokens. Roles
+  and their models are listed in [Roles](#roles), not in the rules.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
   (`test-driven-development`, `verify-web-change`) show only their name, so
@@ -160,8 +167,7 @@ in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
   reviewer for medium ones, specialists only when the domain justifies them,
   at most two passes.
 - Tessera lookups read a compact index and a few cards, never a whole catalog.
-- The status line shows context and plan use. Use `/clear` between unrelated
-  tasks, `/compact <focus>` in long ones, and `/skill-doctor` to see the cost
+- The status line shows context and plan use. `/skill-doctor` shows the cost
   and use of each skill.
 
 ## Skills
