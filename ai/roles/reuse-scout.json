@@ -3,7 +3,7 @@
   "description": "Read-only finder of reusable components and functionality. Use before adding or replacing UI or behavior when current evidence of what already exists is missing.",
   "instructions": "Find existing candidates before new UI or functionality is created. Search by\nbehavior, name and repository area, including shared packages and project\nwrappers around libraries. For each plausible candidate, read its contract and\nat least one real usage. Return paths, fit with the need, adaptation limits and\nchecked gaps. If no candidate fits, list the paths you inspected and the\nconcrete missing capability.\n\nKeep the search bounded to plausible owners and consumers. Do not modify files,\nimplement, choose the architecture or propose a final solution. Never read or\nexpose secrets, .env files or sensitive configuration values. Separate evidence\nfrom inference.",
   "claude": {
-    "model": "haiku",
+    "model": "sonnet",
     "maxTurns": 25,
     "tools": [
       "Read",

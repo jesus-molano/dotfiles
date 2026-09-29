@@ -2,14 +2,13 @@
 
 - `AGENTS.md` loads next to `CLAUDE.md` in every project. Global rules never
   replace a repository contract. Do not create divergent parallel instructions.
-- Invoke skills as `/name`. Roles: `reuse-scout` (Haiku, bounded search),
+- Invoke skills as `/name`. Roles: `reuse-scout` (Sonnet, bounded search),
   `catalog-writer` (Sonnet, read-only Tessera card drafts) and four reviewers
   (Opus, high effort, read-only).
 - Models by job: the main agent runs on Opus for execution and reasoning;
-  reviewers use Opus with high effort; read-only search (`reuse-scout`, the
-  built-in Explore agent) uses Haiku; bulk reading and drafting
-  (`catalog-writer`) uses Sonnet. Do not switch the main model to save tokens;
-  delegate reading instead.
+  reviewers use Opus with high effort; reading, search and drafting
+  (`Explore`, `reuse-scout`, `catalog-writer`) use Sonnet. Do not switch the
+  main model to save tokens; delegate reading instead.
 - Auto mode approves routine actions. The `ai-guard` hook and the
   `permissions.deny` rules block the hard limits; every other human limit above
   still applies.

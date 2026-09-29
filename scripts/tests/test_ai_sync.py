@@ -421,6 +421,12 @@ class AISyncTest(unittest.TestCase):
             self.assertIn("tools: Read, Glob, Grep", header)
             self.assertNotIn("Bash", header, "Roles are read-only")
         self.assertIn("maxTurns: 25", agents["reuse-scout.md"])
+        # Reading roles run on Sonnet; Explore overrides the built-in agent for Claude only.
+        for name in ("Explore.md", "reuse-scout.md", "catalog-writer.md"):
+            self.assertIn("model: sonnet", agents[name])
+        self.assertIn("name: Explore\n", agents["Explore.md"])
+        self.assertNotIn("haiku", "".join(agents.values()))
+        self.assertNotIn("Explore.toml", sources.roles("codex", "linux"))
         self.assertEqual(set(sources.hook_scripts()), {"ai-guard.py", "project-gate.py", "statusline.py"})
 
     def test_adopt_takes_over_an_earlier_deployment_without_a_ledger(self):

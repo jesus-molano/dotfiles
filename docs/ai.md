@@ -100,8 +100,8 @@ both parsers. The `Read(**/.env.*)` deny rule also hides
   `engineering-flow` can still route to them at almost no context cost.
 - Review and research skills run with `context: fork`, so their reading stays
   out of the main conversation.
-- Searches go to `reuse-scout` (Haiku, at most 25 turns) or the built-in Explore
-  agent, so the main context keeps only the conclusion.
+- Searches go to `reuse-scout` (Sonnet, at most 25 turns) or `Explore` (Sonnet,
+  at most 30 turns), so the main context keeps only the conclusion.
 - Reviews are sized by `engineering-flow`: none for small low-risk changes, one
   reviewer for medium ones, specialists only when the domain justifies them,
   at most two passes.
@@ -143,7 +143,8 @@ ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs
 
 | Role | Claude | Codex | Job |
 |---|---|---|---|
-| `reuse-scout` | Haiku, 25 turns, Read/Glob/Grep | light model, low effort | Find reusable candidates with contracts and consumers. |
+| `Explore` | Sonnet, 30 turns, Read/Glob/Grep | (Claude only) | Replaces the built-in Haiku Explore agent: general read-only search with cited evidence. |
+| `reuse-scout` | Sonnet, 25 turns, Read/Glob/Grep | light model, low effort | Find reusable candidates with contracts and consumers. |
 | `catalog-writer` | Sonnet, 40 turns, Read/Glob/Grep | medium model | Draft Tessera cards; the main agent validates and writes. |
 | `reviewer-web` | Opus, high effort | main model, high effort | Web correctness, security, accessibility, reuse. |
 | `reviewer-standards` | Opus, high effort | main model, high effort | Requirements, contracts, security, verifiability. |
@@ -152,8 +153,13 @@ ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs
 
 Every role is read-only; the main agent runs tests and passes the results.
 Models follow the job: reasoning and execution on Opus (main agent and
-reviewers), reading on Haiku (search) or Sonnet (bulk drafting). Models are data
-in each role file, so a model rename is a one-line change.
+reviewers), reading, search and drafting on Sonnet. Haiku is not used: in
+practice it stalled on multi-step reading. Models are data in each role file,
+so a model rename is a one-line change.
+
+`Explore` is a user agent with the name of the built-in one, so Claude Code
+uses it instead of the Haiku default. A role without a `codex` block, like this
+one, is rendered only for Claude.
 
 ## Linux: install and deploy
 
