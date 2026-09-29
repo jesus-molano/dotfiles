@@ -1,5 +1,6 @@
 > **Historical record (Spanish).** The current configuration is described in
-> [docs/ai.md](../ai.md).
+> [docs/ai.md](../ai.md). Since then the default permission mode changed from
+> `bypassPermissions` to `auto`.
 
 # Codex y Claude: integración compartida
 
