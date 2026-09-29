@@ -1,6 +1,6 @@
 ---
 name: engineering-flow
-description: Load first for any request to implement, add, build, change, refactor or fix code or configuration, from inspection through verification and handoff. Not for research-only, review-only or diagnosis-only requests.
+description: Guides a request to implement, add, build, change, refactor or fix code or configuration, from inspection through verification and handoff. Use before the first file edit. Not for research, review or diagnosis only, or for running an existing recipe.
 ---
 
 # Engineering Flow
@@ -38,3 +38,6 @@ description: Load first for any request to implement, add, build, change, refact
 8. Commit a coherent verified change when the governing instructions allow it.
    Keep the configured Git identity; never add `Co-authored-by`. Tracker
    writes, deployment and push need their own explicit authority.
+9. Retro: if the task exposed a repeated failure or a user correction, propose
+   one durable fix in the handoff: an `AGENTS.md` line, a hook, a test or a
+   skill Gotcha. Never change global rules without the user's approval.

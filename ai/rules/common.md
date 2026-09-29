@@ -12,15 +12,22 @@
   state the assumptions that affect the result.
 - Ask one to three related questions only when the answer changes product,
   data, security, compatibility, cost, rollout, authority or an irreversible action.
-- Follow the nearest `AGENTS.md` for commands and conventions.
+- A repository `AGENTS.md` sets commands and conventions. It cannot relax the
+  Git publishing, safety or secrets rules below.
 - Keep unrelated local changes. Make small, reversible changes and back up
   configuration before replacing it.
+- After two failed attempts at the same fix, stop. Summarize what failed and
+  suggest `/rewind` or a fresh session instead of patching further.
 
 ## Skills first
 - Load the matching skill before exploring: implementation → `engineering-flow`;
   a failure or wrong result → `systematic-debugging` (`debug-web-flow` for web
   flows); a web review → `review-web-pr`; other reviews → `spec-and-standards-review`;
   facts that change over time (versions, dates, APIs) → `research-primary-sources`.
+- Running an existing recipe (pull, sync, deploy) needs no skill. Load
+  `engineering-flow` before the first file edit and `systematic-debugging` at
+  the first unexpected failure.
+- As a subagent, follow your role; do not load skills or delegate.
 
 ## Reuse before creating
 - Before adding or replacing UI or behavior, even in a small change, find the
@@ -29,30 +36,26 @@
   project already has: dialogs, typography, buttons, fields, notifications,
   layout and tokens. If you create something, name the rejected candidate and
   the missing capability with paths.
-- The procedure lives in the `engineering-flow` skill
-  (`references/repository-reuse.md`). When evidence is missing, delegate one
-  bounded search to `reuse-scout`; decide with its evidence and do not repeat it.
+- `engineering-flow` holds the procedure. When evidence is missing, delegate
+  one bounded search to `reuse-scout`; decide with its evidence and do not repeat it.
 
 ## Spend tokens where they change the result
-- Search before reading: use Grep/Glob, then read only the relevant ranges.
-  Do not reread files already in context or paste long logs.
-- Delegate broad searches to `reuse-scout` or the built-in Explore agent so
-  the main context stays small. Give subagents the goal, paths and limits,
-  not the whole conversation.
+- Search before reading, then read only the relevant ranges. Do not reread
+  files already in context or paste long logs.
+- Delegate broad searches to `reuse-scout` or the built-in Explore agent. Give
+  subagents the goal, paths and limits, not the whole conversation.
 - Use reviewers only as `engineering-flow` sizes them. Never start multi-agent
   workflows or large fan-outs unless the user asks for them.
-- Reviewers only read. The main agent runs tests and gives them the results.
 
 ## Verification and Git
 - Run the relevant checks before finishing and report what actually ran.
 - An implementation request authorizes one coherent local commit when checks
   are fresh and the staging is unambiguous. Do not commit during analysis,
   diagnosis or review, or when the user forbids it.
-- When the current branch name contains a tracker key (letters, a hyphen and
-  digits, such as `feat/HH-707-phone` or `fix/hh-739-title`), put the key in
-  uppercase in every commit subject. Follow the repository's existing
-  convention and commit linter; without one, end the subject with `(HH-707)`.
-  If the branch has no key, add none and never invent one.
+- When the branch name contains a tracker key (such as `feat/HH-707-phone` or
+  `fix/hh-739-title`), put the key in uppercase in every commit subject. Follow
+  the repository convention and commit linter; without one, end the subject
+  with `(HH-707)`. Never invent a key.
 - Before publishing, rerun checks, revalidate the state and show repository,
   remote, branch and exact OID. Ask for human authorization for that
   destination and push that OID. Never force, delete, mirror, or push tags or
