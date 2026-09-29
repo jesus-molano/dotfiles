@@ -28,6 +28,9 @@ NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5
 CLAUDE_KEYS = {
     ("language",): "spanish",
     ("permissions", "defaultMode"): "auto",
+    # bypassPermissions skips the auto-mode classifier and its soft_deny rules.
+    # Claude Desktop honors this key in user settings too (docs: desktop, admin settings).
+    ("permissions", "disableBypassPermissionsMode"): "disable",
     ("attribution", "commit"): "",
     ("attribution", "pr"): "",
     ("attribution", "sessionUrl"): False,

@@ -69,6 +69,7 @@ class AISyncTest(unittest.TestCase):
         self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["permissions"]["defaultMode"], "auto")
+        self.assertEqual(settings["permissions"]["disableBypassPermissionsMode"], "disable")
         self.assertEqual(self.build().operations, [])
         self.assertIsNone(self.build().apply())
 
