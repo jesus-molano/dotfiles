@@ -20,6 +20,9 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
+        with:
+          # The adoption test in test_ai_sync.py reads an earlier deployment from Git history.
+          fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
@@ -27,6 +30,10 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p test_ai_sync.py
       - name: Project gate under cmd.exe
         run: python -m unittest discover -s scripts/tests -p test_project_gate.py
+      - name: Guard hook with the Bash and PowerShell parsers
+        run: python -m unittest discover -s scripts/tests -p test_ai_guard.py
+      - name: Skill catalog checks
+        run: python -m unittest discover -s scripts/tests -p test_check_skills.py
       - name: PowerShell deployment with spaces
         shell: pwsh
         run: |
@@ -48,6 +55,9 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # The adoption test in test_ai_sync.py reads an earlier deployment from Git history.
+          fetch-depth: 0
 
       - name: Install test dependencies
         run: >-

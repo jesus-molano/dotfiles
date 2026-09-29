@@ -141,6 +141,13 @@ class PowerShellGuardTest(unittest.TestCase):
                         "Remove-Item C:/x/tessera/projects/k/provider-consent.json"):
             self.assertEqual(powershell(command).returncode, 2, command)
 
+    @unittest.skipUnless(os.name == "nt", "the guard parses Bash input as PowerShell only on Windows")
+    def test_windows_checks_bash_input_as_powershell_too(self):
+        # Codex on Windows may report PowerShell commands as Bash; the Bash parser alone allows these.
+        for command in ("Remove-Item -Recurse -Force $env:USERPROFILE", 'iex "git push -f"',
+                        "gc .\\app\\.env.local"):
+            self.assertEqual(bash(command).returncode, 2, command)
+
     def test_allows_ordinary_powershell_work(self):
         for command in ("git push origin main", "git push origin feat 2>&1 | Out-Null",
                         "Remove-Item -Recurse .\\build", "Copy-Item .env.example .env",
