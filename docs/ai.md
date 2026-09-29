@@ -389,7 +389,7 @@ regressions without a model or network. Routing and outcomes are measured
 with real runs of `claude plugin eval`:
 
 ```bash
-just ai-eval                                  # all cases, 1 run each, $2 cap
+just ai-eval                                  # all cases, 1 run each, $4 cap
 just ai-eval --runs 3 --model sonnet -j 3 --max-cost-usd 4   # steadier
 just ai-eval --case generic-bug --runs 3      # one case
 just ai-eval --outcome --model sonnet         # with and without the skills, $4 cap
@@ -397,7 +397,9 @@ just ai-eval --outcome --model sonnet         # with and without the skills, $4 
 
 `scripts/ai-eval.sh` assembles a temporary plugin from `ai/skills` and the cases
 in `ai/evals/cases/`, runs it and keeps results under
-`~/.local/state/dotfiles/ai-evals/<timestamp>-<mode>/`. Each case is a
+`~/.local/state/dotfiles/ai-evals/<timestamp>-<mode>/`. It always prints that
+path and exits with the status of `claude plugin eval`: 1 when a case scores
+below the threshold, 2 when the cost cap stops the run. Each case is a
 `prompt.md` plus graders. Every run is isolated: a temporary home, no user
 settings, hooks, memory or `CLAUDE.md`. Most cases therefore measure the skill
 descriptions alone. A case tagged `rules` depends on the global rules (secrets,

@@ -5,7 +5,7 @@
 # `claude plugin eval` (for example --case NAME, --runs 3, --model sonnet).
 #
 # Modes:
-#   (default)  routing: one arm (skills loaded), one run per case, $2 cap.
+#   (default)  routing: one arm (skills loaded), one run per case, $4 cap.
 #   --outcome  outcome: cases tagged `outcome`, with and without the skills
 #              (the no-plugin baseline), three runs per arm, $4 cap.
 #
@@ -66,8 +66,12 @@ mkdir -p -- "$results"
 if [[ $mode == outcome ]]; then
 	defaults=(--ablation with-without --runs 3 --max-cost-usd 4 --tag outcome)
 else
-	defaults=(--ablation none --runs 1 --max-cost-usd 2)
+	defaults=(--ablation none --runs 1 --max-cost-usd 4)
 fi
+# Exit 1 (a case below the threshold) and exit 2 (cost cap, partial results)
+# still write results, so print their path before the status goes back.
+status=0
 claude plugin eval "$plugin" --trust-plugin --no-publish "${defaults[@]}" \
-	--output-dir "$results" ${passthrough[@]+"${passthrough[@]}"}
+	--output-dir "$results" ${passthrough[@]+"${passthrough[@]}"} || status=$?
 printf 'Results: %s\n' "$results"
+exit "$status"
