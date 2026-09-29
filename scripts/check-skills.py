@@ -352,6 +352,10 @@ def check_links(skill: Path, document: Path) -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        # Windows pipes default to the ANSI code page (cp1252); report in UTF-8.
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
     failures: list[str] = []
     names: dict[str, Path] = {}
