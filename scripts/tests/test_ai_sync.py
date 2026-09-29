@@ -69,6 +69,10 @@ class AISyncTest(unittest.TestCase):
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
         self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
         self.assertIn("Monitor", settings["hooks"]["PreToolUse"][0]["matcher"].split("|"))
+        # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
+        guard = settings["hooks"]["PreToolUse"][0]["hooks"]
+        self.assertEqual(settings["hooks"]["UserPromptSubmit"], [{"hooks": guard}])
+        self.assertEqual(settings["hooks"]["UserPromptExpansion"], [{"matcher": "workflow-authoring", "hooks": guard}])
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["permissions"]["defaultMode"], "auto")
         self.assertEqual(settings["permissions"]["disableBypassPermissionsMode"], "disable")
@@ -371,6 +375,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(hooks["PreToolUse"][0], foreign)
         self.assertEqual(hooks["PreToolUse"][1]["matcher"], "Bash|apply_patch")
         self.assertIn(".codex/hooks/ai-guard.py", hooks["PreToolUse"][1]["hooks"][0]["command"])
+        self.assertNotIn("UserPromptSubmit", hooks, "Codex has no Workflow tool to opt in to")
         self.assertEqual((self.home / ".codex/hooks/ai-guard.py").read_text(),
                          (sync.ROOT / "ai/hooks/ai-guard.py").read_text())
         self.assertEqual(self.build(platform, "codex").operations, [])

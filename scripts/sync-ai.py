@@ -440,9 +440,12 @@ class Sync:
         for route, value in CLAUDE_DEFAULTS.items():
             if get(original, route) == MISSING:
                 put(desired, route, value)
-        guard = {"matcher": "Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit", "hooks": [
-            {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
+        guard_hook = {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}
+        guard = {"matcher": "Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit", "hooks": [guard_hook]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
+        # The same guard records the user's workflow opt-in from a typed prompt or /workflow-authoring.
+        wanted.append((("hooks", "UserPromptSubmit"), {"hooks": [guard_hook]}))
+        wanted.append((("hooks", "UserPromptExpansion"), {"matcher": "workflow-authoring", "hooks": [guard_hook]}))
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
         # Per-project gate: inert until a repository sets ai.format / ai.check in its Git config.
         gate = hook_command(self.home, self.platform, "project-gate.py")

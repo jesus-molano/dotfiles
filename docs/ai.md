@@ -44,6 +44,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
 | `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
+| `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
@@ -78,7 +79,8 @@ normal task:
 | `rm -r` of `/`, `~`, `$HOME`, `${HOME:?}` or the dotfiles checkout | No catastrophic deletion. |
 | A command that names a secret file or credential store, except the harmless uses listed below the table: `.env*` in any form (globs such as `.env*`, `.en?` or `*.env` for `find -name` and `grep --include`, braces such as `.en{v,}`, `HEAD:.env`, `@.env`, `< .env`, inside strings or scripts), `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json`, gh `hosts.yml`, `~/.git-credentials`, `~/.ssh` (except `*.pub`), `~/.gnupg`, `~/.aws`; also `op read`, `op inject`, `op item`, `op document`, `op run --no-masking`, `gh auth token`, `git credential fill` | Secrets only through `with-secrets`. |
 | `tessera.py consent` and any write to `provider-consent.json` (redirections, copies, deletes, `sed -i`, inline scripts, PowerShell write cmdlets); reading or searching it is allowed | Only the user grants provider consent. |
-| `Workflow` tool | Multi-agent workflows only on request. Start a session with `AI_ALLOW_WORKFLOW=1 claude` to allow them. |
+| `Workflow` tool, unless the user opted in for this session | Multi-agent workflows only on request. See [Workflow opt-in](#workflow-opt-in). |
+| Any shell command, `Write`, `Edit`, `MultiEdit` or `apply_patch` that names `workflow-grants` (reads too: interpreter code cannot be told apart from a write) | Only the user grants the workflow opt-in. |
 
 Secrets and publication fail closed. The guard scans the raw command text for
 them, independently of the parser, and every mention must lie inside a part of
@@ -131,6 +133,52 @@ parsers, so Bash-only forms that mention a secret or a push (`if ... then`,
 here-docs such as `cat >> .gitignore <<'EOF'`) are blocked there. The
 `Read(**/.env.*)` deny rule also blocks `.env.example` templates,
 in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
+
+### Workflow opt-in
+
+The `Workflow` tool runs only after the user asks for it in the same session.
+`ai-guard.py` also runs on `UserPromptSubmit` and `UserPromptExpansion` and
+records an opt-in when:
+
+- the prompt starts with the word `ultracode` (case and leading spaces do not
+  matter), or with `/workflow-authoring`; or
+- the user types the `/workflow-authoring` command (`UserPromptExpansion`).
+
+The opt-in is a marker file for that `session_id` in
+`$XDG_STATE_HOME/dotfiles/ai/workflow-grants/` (default
+`~/.local/state/...`; on Windows `%USERPROFILE%\.local\state\...`). It is
+valid for 6 hours and only for that session. A new opt-in removes expired
+markers. On the prompt events the hook always exits 0, so it never erases a
+prompt; if the marker cannot be written, Claude is told that workflows stay
+blocked. `AI_ALLOW_WORKFLOW=1 claude` still allows workflows for a whole CLI
+session. The model cannot grant itself the opt-in: `ai-guard` blocks every
+tool call that names `workflow-grants`.
+
+Why only the start of the prompt: the hooks reference lists the
+`UserPromptSubmit` input as the common fields (`session_id`, `prompt_id`,
+`transcript_path`, `cwd`, `permission_mode`, `hook_event_name`, `agent_id` in
+subagents) plus `prompt`. There is no field that says who wrote the prompt.
+The docs do not say whether a message from another session, a channel event
+or a scheduled task fires `UserPromptSubmit`. Claude Code itself accepts the
+keyword "only in a prompt you type yourself"
+([workflows](https://code.claude.com/docs/en/workflows#where-the-keyword-works)),
+but a hook cannot see that decision. So the hook:
+
+- ignores the keyword anywhere except as the first word, which excludes
+  mentions in text, pasted content (it arrives inside `<pasted_content>`
+  lines) and channel events (Claude receives them inside `<channel>` tags);
+- ignores events that carry `agent_id` (subagents);
+- trusts `UserPromptExpansion` for `/workflow-authoring`, because that event
+  fires only when the user types the command; a command inside a message from
+  another session "arrives as plain text. Claude Code never executes it"
+  ([cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging)).
+
+Residual risk: if Claude Code fires `UserPromptSubmit` for a message from
+another of your sessions or for a scheduled task prompt, and that text starts
+with `ultracode`, the hook grants the opt-in. Both come from your own
+account, and a workflow still runs under the same permission mode, deny
+rules, guard and sandbox as any other tool call. To close this path, set
+`crossSessionInbound` to `hold` in `~/.claude/settings.json`.
 
 ## Token efficiency
 
