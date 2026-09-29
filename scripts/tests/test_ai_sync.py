@@ -127,21 +127,21 @@ class AISyncTest(unittest.TestCase):
         data = sync.read_json(path)
         data["language"] = "french"
         path.write_text(json.dumps(data), encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+        with self.assertRaisesRegex(ValueError, "managed key modified"):
             self.build()
 
     def test_modified_role_conflicts(self):
         self.build().apply()
         path = self.home / ".claude/agents/reuse-scout.md"
         path.write_text("foreign", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "archivo gestionado"):
+        with self.assertRaisesRegex(ValueError, "managed file modified"):
             self.build()
 
     def test_foreign_skill_conflicts_without_overwrite(self):
         path = self.home / ".claude/skills/handoff/SKILL.md"
         path.parent.mkdir(parents=True)
         path.write_text("personal", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "destino ajeno"):
+        with self.assertRaisesRegex(ValueError, "foreign target"):
             self.build()
         self.assertEqual(path.read_text(), "personal")
 
@@ -154,7 +154,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual((self.home / ".claude/settings.json").read_bytes(), original)
         self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
         self.assertFalse(obj.state_path.exists())
-        with self.assertRaisesRegex(ValueError, "ya restaurado"):
+        with self.assertRaisesRegex(ValueError, "already restored"):
             obj.rollback(backup)
         # Per-file rollback retains empty folders; a fresh deployment can adopt
         # these without treating them as foreign user content.
@@ -166,14 +166,14 @@ class AISyncTest(unittest.TestCase):
         backup = obj.apply()
         path = self.home / ".claude/settings.json"
         path.write_text(path.read_text() + " ", encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "cambio posterior"):
+        with self.assertRaisesRegex(ValueError, "later change"):
             obj.rollback(backup)
         self.assertTrue((self.home / ".claude/CLAUDE.md").exists())
 
     def test_toctou_stops_before_write(self):
         obj = self.build()
         self.json_write(".claude/settings.json", {"company": True})
-        with self.assertRaisesRegex(ValueError, "concurrente"):
+        with self.assertRaisesRegex(ValueError, "Concurrent change"):
             obj.apply()
         self.assertFalse((self.home / ".claude/CLAUDE.md").exists())
 
@@ -209,12 +209,12 @@ class AISyncTest(unittest.TestCase):
 
     def test_mcp_collision_fails_closed(self):
         self.json_write(".claude.json", {"mcpServers": {"linear": {"url": "https://company"}}})
-        with self.assertRaisesRegex(ValueError, "Conexión local diferente"):
+        with self.assertRaisesRegex(ValueError, "Different local connection"):
             self.build()
 
     def test_persistent_linear_write_is_rejected(self):
         self.json_write(".claude.json", {"mcpServers": {"linear-write": {"type": "http", "url": "https://mcp.linear.app/mcp"}}})
-        with self.assertRaisesRegex(ValueError, "linear-write persistente"):
+        with self.assertRaisesRegex(ValueError, "persistent linear-write"):
             self.build()
 
     def test_atlas_reintroduction_is_conflict(self):
@@ -223,21 +223,21 @@ class AISyncTest(unittest.TestCase):
         document = sync.read_json(path)
         document["mcpServers"]["component-atlas"] = {"command": "changed"}
         self.json_write(".claude.json", document)
-        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+        with self.assertRaisesRegex(ValueError, "managed key modified"):
             self.build()
 
     def test_scalar_codex_connection_is_controlled_error(self):
         path = self.home / ".codex/config.toml"
         path.parent.mkdir()
         path.write_text('[mcp_servers]\nlinear = "custom"\n', encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "Conexión local diferente"):
+        with self.assertRaisesRegex(ValueError, "Different local connection"):
             self.build()
 
     def test_scalar_codex_mcp_container_is_controlled_error(self):
         path = self.home / ".codex/config.toml"
         path.parent.mkdir()
         path.write_text('mcp_servers = "corporate"\n', encoding="utf-8")
-        with self.assertRaisesRegex(ValueError, "debe ser una tabla"):
+        with self.assertRaisesRegex(ValueError, "must be a table"):
             self.build()
 
     def test_windows_update_copies_files_without_displacing_directory(self):
@@ -304,7 +304,7 @@ class AISyncTest(unittest.TestCase):
         outside = Path(self.tmp.name) / "Outside"
         outside.mkdir()
         subprocess.run(["cmd", "/c", "mklink", "/J", str(self.home / ".claude"), str(outside)], check=True, capture_output=True)
-        with self.assertRaisesRegex(ValueError, "Directorio enlazado"):
+        with self.assertRaisesRegex(ValueError, "Linked directory"):
             self.build()
         self.assertEqual(list(outside.iterdir()), [])
 
@@ -355,7 +355,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(len(settings["hooks"]["PreToolUse"]), 2)
         settings["permissions"]["deny"].remove("Read(**/.env)")
         self.json_write(".claude/settings.json", settings)
-        with self.assertRaisesRegex(ValueError, "entrada gestionada retirada"):
+        with self.assertRaisesRegex(ValueError, "managed entry removed"):
             self.build()
 
     def test_codex_gets_the_same_guard_and_keeps_foreign_hooks(self):
@@ -374,7 +374,7 @@ class AISyncTest(unittest.TestCase):
 
     def test_new_key_never_overwrites_a_different_local_value(self):
         self.json_write(".claude/settings.json", {"statusLine": {"type": "command", "command": "my-status"}})
-        with self.assertRaisesRegex(ValueError, "clave nueva"):
+        with self.assertRaisesRegex(ValueError, "new key already has"):
             self.build()
         self.json_write(".claude/settings.json", {})
         self.build().apply()
@@ -438,7 +438,7 @@ class AISyncTest(unittest.TestCase):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_bytes(b"<!-- Generated by scripts/render-ai.py from ai/. Edit the source. -->\n\nold rules\n")
         self.json_write(".claude/settings.json", {"skillOverrides": {"test-driven-development": "user-invocable-only"}})
-        with self.assertRaisesRegex(ValueError, "destino ajeno"):
+        with self.assertRaisesRegex(ValueError, "foreign target"):
             self.build(clients="claude")
         adopted = sync.Sync(self.home, "windows", "claude", adopt=True)
         adopted.plan()
@@ -465,7 +465,7 @@ class AISyncTest(unittest.TestCase):
         settings = sync.read_json(self.home / ".claude/settings.json")
         settings["language"] = "french"
         self.json_write(".claude/settings.json", settings)
-        with self.assertRaisesRegex(ValueError, "clave gestionada"):
+        with self.assertRaisesRegex(ValueError, "managed key modified"):
             self.build()
 
     def test_msix_virtualized_ledger_is_found(self):
@@ -483,7 +483,7 @@ class AISyncTest(unittest.TestCase):
         path.parent.mkdir(parents=True)
         path.write_text("my own handoff skill", encoding="utf-8")
         adopted = sync.Sync(self.home, "windows", "claude", adopt=True)
-        with self.assertRaisesRegex(ValueError, "destino ajeno"):
+        with self.assertRaisesRegex(ValueError, "foreign target"):
             adopted.plan()
         self.assertEqual(path.read_text(encoding="utf-8"), "my own handoff skill")
 
@@ -492,7 +492,7 @@ class AISyncTest(unittest.TestCase):
         other = self.home / "elsewhere"
         other.mkdir()
         (self.home / ".claude").symlink_to(other)
-        with self.assertRaisesRegex(ValueError, "Directorio enlazado"):
+        with self.assertRaisesRegex(ValueError, "Linked directory"):
             self.build()
 
 

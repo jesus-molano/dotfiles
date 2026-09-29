@@ -22,8 +22,9 @@ credentials or installed clients match the home computer.
 Deploy with the existing tooling. On native Windows review and run
 scripts/ai-setup.ps1 in plan, apply and check modes from a normal PowerShell
 (not a tool launched by an MSIX app); choose Claude or both clients depending
-on what is installed. If the plan stops with "destino ajeno" because the
-ownership ledger is missing, rerun the plan with -Adopt and review the adopt:
+on what is installed. If the plan stops with "Conflict: foreign target" (older
+versions: "destino ajeno") because the ownership ledger is missing, rerun the
+plan with -Adopt and review the adopt:
 lines before applying. Keep models, effort, memory, accounts,
 plugins and local preferences. If the sync reports a conflict, inspect it and
 keep its backup; never delete other copies to get past it.

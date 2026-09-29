@@ -212,7 +212,8 @@ their writes under `AppData\Local` to a private per-app copy.
 
 If the ownership ledger is missing (lost state, a new machine that already has
 copies, or an earlier run from inside an MSIX app), the plan stops with
-"destino ajeno". Run `.\scripts\ai-setup.ps1 -Mode plan -Adopt`: it adopts only
+"Conflict: foreign target" (older versions: "destino ajeno"). Run
+`.\scripts\ai-setup.ps1 -Mode plan -Adopt`: it adopts only
 destinations it can prove came from this repository (skill files matching a Git
 blob of `ai/` history, CRLF included; files carrying the generation header;
 role files with the role's frontmatter; historical hook versions) and prints an
