@@ -1,6 +1,6 @@
 ---
 name: spec-and-standards-review
-description: Review a specification, proposal, compliance question or non-web change against explicit requirements and engineering standards. Use for traceability or standards reviews; route Next.js, Nuxt and Vue branch reviews to review-web-pr.
+description: Review a non-web branch or pull request, a specification, a proposal or a compliance question against explicit requirements and engineering standards. Use when the user asks to review code that is not Next.js, Nuxt or Vue, compare a branch with its base or trace a change to its spec; route web branch reviews to review-web-pr.
 ---
 
 # Spec and Standards Review

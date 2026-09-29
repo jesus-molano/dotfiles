@@ -93,7 +93,7 @@ both parsers. The `Read(**/.env.*)` deny rule also hides
 ## Token efficiency
 
 - Always-loaded context is small: about 740 words of global rules and about
-  490 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
+  510 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
   description words.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
@@ -342,7 +342,7 @@ measured with real runs of `claude plugin eval`:
 
 ```bash
 just ai-eval                                  # all cases, 1 run each, $2 cap
-just ai-eval --runs 3 --model sonnet          # a steadier measurement
+just ai-eval --runs 3 --model sonnet -j 3 --max-cost-usd 4   # steadier
 just ai-eval --case generic-bug --runs 3      # one case
 ```
 
@@ -351,7 +351,8 @@ in `ai/evals/cases/`, runs it and keeps results under
 `~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
 `tool_used: Skill` graders. The evals load only the skills, not your
 `CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
-"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs per case):
+"skills first" rule. Last measurement (2026-09-29, Claude Code 2.1.284, Sonnet,
+3 runs per case, 138 s, $2.15):
 
 | Case | Expected | Result |
 |---|---|---|
@@ -360,18 +361,30 @@ in `ai/evals/cases/`, runs it and keeps results under
 | `web-flow-bug` | `debug-web-flow` | 3/3 |
 | `web-review` | `review-web-pr` | 3/3 |
 | `spec-review` | `spec-and-standards-review` | 3/3 |
-| `research` | `research-primary-sources`, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
+| `non-web-review` | `spec-and-standards-review`, never `review-web-pr` | 3/3 (0/3 before its trigger was sharpened) |
+| `research` | `research-primary-sources` with the question as argument, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
 | `handoff` | `handoff` | 3/3 |
 | `named-tdd` | `test-driven-development` (name-only) | 3/3 |
+| `verify-before-commit` | `verification-before-completion` | 3/3 |
+| `browser-check` | `playwright-cli` | 3/3 |
+| `host-audit` | `cachyos-host-audit` | 3/3 |
+| `linear-read` | `linear-workflow` | 3/3 |
+| `tessera-reuse` | `tessera` | 3/3 |
 | `explain-only` | no skill at all | 3/3 |
 
-A full run of all cases at 3 runs costs about $1.50 with Sonnet. With Opus,
-the main model, one run per case also scored 9/9 (about $0.90).
+A case only checks the routing decision. When the chosen skill runs inline,
+the agent keeps working and the run ends with `Reached maximum number of turns
+(4)`; the report shows that note, but the score counts only the graders. On
+2026-09-28, with Opus as the main model, one run of each of the first nine
+cases also scored 9/9 (about $0.90).
 
 Haiku as the main model skipped the skill and searched files directly: another
 reason to keep the main agent on Opus. Run the evals after changing a
-description, a routing rule or the skill set. Turn a real repeated routing
-failure into a new case; do not grow the catalog by intuition.
+description, a routing rule or the skill set. Every implicit skill keeps at
+least one routing case, except `clarify-change`: its trigger depends on what
+inspection finds, which a one-prompt case cannot reproduce. Beyond that floor,
+turn a real repeated routing failure into a new case; do not grow the catalog
+by intuition.
 
 The reuse-scout fixture in `scripts/fixtures/reuse-eval` checks delegation and
 evidence quality by hand: open it in a fresh read-only session, ask the main
