@@ -71,6 +71,7 @@ class AISyncTest(unittest.TestCase):
         self.assertIn("Monitor", settings["hooks"]["PreToolUse"][0]["matcher"].split("|"))
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["permissions"]["defaultMode"], "auto")
+        self.assertEqual(settings["permissions"]["disableBypassPermissionsMode"], "disable")
         self.assertEqual(self.build().operations, [])
         self.assertIsNone(self.build().apply())
 
@@ -433,6 +434,9 @@ class AISyncTest(unittest.TestCase):
         revision = "ffd31373936d8ef55ba5f95db5ca9bd12ed326ab"
         if subprocess.run(["git", "-C", str(sync.ROOT), "cat-file", "-e", revision],
                           capture_output=True).returncode:
+            # A skip must not hide a shallow checkout in CI (validate.yml uses fetch-depth: 0).
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                self.fail(f"CI checkout lacks {revision}: set fetch-depth: 0")
             self.skipTest("history not available in this checkout")
         def old(path):
             return subprocess.run(["git", "-C", str(sync.ROOT), "show", f"{revision}:{path}"],

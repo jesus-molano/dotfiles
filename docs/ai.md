@@ -41,6 +41,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
+| `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
 | `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
@@ -134,14 +135,25 @@ in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
 ## Token efficiency
 
 - Always-loaded context is small: about 740 words of global rules and about
-  470 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
+  510 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
   description words.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
   (`test-driven-development`, `verify-web-change`) show only their name, so
   `engineering-flow` can still route to them at almost no context cost.
-- Review and research skills run with `context: fork`, so their reading stays
-  out of the main conversation.
+- `review-web-pr` and `spec-and-standards-review` run inline, so they keep the
+  scope and requirements from the conversation. `spec-and-standards-review`
+  sends the reading to `reviewer-spec` and `reviewer-standards` when custom
+  agents are available. `review-web-pr` reads the diff in the main conversation
+  and delegates to `reviewer-web` only when the diff justifies it; that reading
+  is the accepted cost of keeping the review context. The main agent waits for
+  every report before it merges them.
+- `research-primary-sources` runs with `context: fork` in the built-in Explore
+  agent and `background: false`: the turn waits for the answer, and the fetched
+  pages stay out of the main conversation. Explore has no Edit, Write or Agent
+  tool and skips CLAUDE.md, but it keeps Bash and MCP tools, so the skill body
+  carries its own read-only and untrusted-content rules. The fork does not see
+  the conversation, so pass the question and the decision as arguments.
 - Searches go to `reuse-scout` (Sonnet, at most 25 turns) or the built-in
   Explore agent, so the main context keeps only the conclusion.
 - Reviews are sized by `engineering-flow`: none for small low-risk changes, one
@@ -178,8 +190,19 @@ in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
 The invocation policy lives in `scripts/ai_sources.py` and drives the Codex
 `agents/openai.yaml` check, the Claude `skillOverrides` and the
 `disable-model-invocation` frontmatter of user skills. Shared skills may use the
-Claude fields `disable-model-invocation` and `context: fork`; the Codex parser
-ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs`).
+Claude fields `disable-model-invocation`, `context: fork`, `agent: Explore` and
+`background: false`; the Codex parser ignores unknown frontmatter keys (verified
+in openai/codex `skills/src/parser.rs`), so Codex loads every skill inline.
+`scripts/check-skills.py` accepts the three fork fields only together. Reason: a
+fork does not see the conversation and, by default, returns in a later turn
+(`background: false` makes the turn wait). In `-p` mode and the Agent SDK,
+background subagents that a fork starts can outlive it and report to the main
+conversation without a synthesis; Explore has no Agent tool, so it cannot start
+them. A fork body must state a task; a guidelines-only body returns no useful
+output. Sources:
+<https://code.claude.com/docs/en/skills#run-skills-in-a-subagent> and
+<https://code.claude.com/docs/en/sub-agents> (checked 2026-09-29, Claude Code
+2.1.284).
 
 ## Roles
 
@@ -355,12 +378,13 @@ copied skill blocks the apply; reconcile it with the source. There is no `--forc
 ## Evaluating the workflow
 
 Static checks and real runs answer different questions. CI validates the
-versioned catalog and regressions without a model or network. Routing is
+versioned catalog, the generated Codex files (`render-ai.py --check`) and the
+regressions without a model or network. Routing is
 measured with real runs of `claude plugin eval`:
 
 ```bash
 just ai-eval                                  # all cases, 1 run each, $2 cap
-just ai-eval --runs 3 --model sonnet          # a steadier measurement
+just ai-eval --runs 3 --model sonnet -j 3 --max-cost-usd 4   # steadier
 just ai-eval --case generic-bug --runs 3      # one case
 ```
 
@@ -369,7 +393,8 @@ in `ai/evals/cases/`, runs it and keeps results under
 `~/.local/state/dotfiles/ai-evals/`. Each case is a `prompt.md` plus
 `tool_used: Skill` graders. The evals load only the skills, not your
 `CLAUDE.md`, so they measure the descriptions alone; real sessions also get the
-"skills first" rule. Last measurement (2026-09-28, Sonnet, 3 runs per case):
+"skills first" rule. Last measurement (2026-09-29, Claude Code 2.1.284, Sonnet,
+3 runs per case, 138 s, $2.15):
 
 | Case | Expected | Result |
 |---|---|---|
@@ -378,18 +403,30 @@ in `ai/evals/cases/`, runs it and keeps results under
 | `web-flow-bug` | `debug-web-flow` | 3/3 |
 | `web-review` | `review-web-pr` | 3/3 |
 | `spec-review` | `spec-and-standards-review` | 3/3 |
-| `research` | `research-primary-sources`, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
+| `non-web-review` | `spec-and-standards-review`, never `review-web-pr` | 3/3 (0/3 before its trigger was sharpened) |
+| `research` | `research-primary-sources` with the question as argument, never `engineering-flow` | 3/3 (0/3 before its trigger was sharpened) |
 | `handoff` | `handoff` | 3/3 |
 | `named-tdd` | `test-driven-development` (name-only) | 3/3 |
+| `verify-before-commit` | `verification-before-completion` | 3/3 |
+| `browser-check` | `playwright-cli` | 3/3 |
+| `host-audit` | `cachyos-host-audit` | 3/3 |
+| `linear-read` | `linear-workflow` | 3/3 |
+| `tessera-reuse` | `tessera` | 3/3 |
 | `explain-only` | no skill at all | 3/3 |
 
-A full run of all cases at 3 runs costs about $1.50 with Sonnet. With Opus,
-the main model, one run per case also scored 9/9 (about $0.90).
+A case only checks the routing decision. When the chosen skill runs inline,
+the agent keeps working and the run ends with `Reached maximum number of turns
+(4)`; the report shows that note, but the score counts only the graders. On
+2026-09-28, with Opus as the main model, one run of each of the first nine
+cases also scored 9/9 (about $0.90).
 
 Haiku as the main model skipped the skill and searched files directly: another
 reason to keep the main agent on Opus. Run the evals after changing a
-description, a routing rule or the skill set. Turn a real repeated routing
-failure into a new case; do not grow the catalog by intuition.
+description, a routing rule or the skill set. Every implicit skill keeps at
+least one routing case, except `clarify-change`: its trigger depends on what
+inspection finds, which a one-prompt case cannot reproduce. Beyond that floor,
+turn a real repeated routing failure into a new case; do not grow the catalog
+by intuition.
 
 The reuse-scout fixture in `scripts/fixtures/reuse-eval` checks delegation and
 evidence quality by hand: open it in a fresh read-only session, ask the main
@@ -414,6 +451,16 @@ action. If an organization policy disables auto mode, Claude falls back to
 prompting; pick another mode in `/permissions` for one session, or change
 `permissions.defaultMode` in `scripts/sync-ai.py` (it is a managed key, so a
 local edit is reported as a conflict).
+
+`bypassPermissions` is disabled (`permissions.disableBypassPermissionsMode`).
+In that mode the classifier and the `soft_deny` rules do not run, and the mode
+offers no protection against prompt injection
+([permission modes](https://code.claude.com/docs/en/permission-modes)). The
+key also works in user settings for Claude Desktop
+([Desktop](https://code.claude.com/docs/en/desktop)). On Pro and Max plans,
+also turn off **Settings → Claude Code → Allow bypass permissions mode** in
+Claude Desktop. On Team and Enterprise plans, organization policy controls
+that toggle.
 
 ## Project gate
 

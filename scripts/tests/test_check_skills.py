@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import runpy
 import subprocess
 import sys
@@ -21,6 +22,7 @@ def run_checker(
     *,
     required_agents: tuple[str, ...] = (),
     installed_skills_roots: tuple[Path, ...] = (),
+    env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     # Windows cannot run a script through its shebang line.
     command = [
@@ -41,6 +43,7 @@ def run_checker(
         encoding="utf-8",
         capture_output=True,
         check=False,
+        env={**os.environ, **(env or {})},
     )
 
 
@@ -208,6 +211,21 @@ class CheckCodexSkillsTest(unittest.TestCase):
             checked = run_checker(skills, agents)
             self.assertEqual(checked.returncode, 0, checked.stderr)
 
+    def test_reports_utf8_whatever_the_locale(self) -> None:
+        # Windows pipes default to cp1252, which cannot encode "✓" and gives
+        # "á" a byte that is not UTF-8.
+        locale = {"PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
+            valid = run_checker(skills, agents, env=locale)
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertIn("✓", valid.stdout)
+            invalid = run_checker(
+                skills, agents, required_agents=("reuse-scout",), env=locale
+            )
+            self.assertIn("Skills Codex inválidas", invalid.stderr)
+
     def test_rejects_unterminated_frontmatter_quote(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             skills, agents, skill = roots(Path(temporary))
@@ -266,10 +284,32 @@ class CheckCodexSkillsTest(unittest.TestCase):
             write_metadata(skill, implicit=True)
             document = skill / "SKILL.md"
             text = document.read_text(encoding="utf-8")
-            document.write_text(text.replace("\n---\n", "\ncontext: fork\n---\n", 1), encoding="utf-8")
+            fork = "\ncontext: fork\nagent: Explore\nbackground: false\n---\n"
+            document.write_text(text.replace("\n---\n", fork, 1), encoding="utf-8")
             self.assertEqual(run_checker(skills, agents).returncode, 0)
-            document.write_text(text.replace("\n---\n", "\ncontext: inline\n---\n", 1), encoding="utf-8")
-            self.assertNotEqual(run_checker(skills, agents).returncode, 0)
+            for invalid in ("\ncontext: inline\nagent: Explore\nbackground: false\n---\n",
+                            "\ncontext: fork\nagent: general-purpose\nbackground: false\n---\n",
+                            "\ncontext: fork\nagent: Explore\nbackground: true\n---\n"):
+                document.write_text(text.replace("\n---\n", invalid, 1), encoding="utf-8")
+                self.assertNotEqual(run_checker(skills, agents).returncode, 0, invalid)
+
+    def test_fork_fields_depend_on_each_other(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            skills, agents, skill = roots(Path(temporary), "engineering-flow")
+            write_metadata(skill, implicit=True)
+            document = skill / "SKILL.md"
+            text = document.read_text(encoding="utf-8")
+            partial = ("\ncontext: fork\n---\n",
+                       "\ncontext: fork\nbackground: false\n---\n",
+                       "\ncontext: fork\nagent: Explore\n---\n",
+                       "\nagent: Explore\nbackground: false\n---\n",
+                       "\nbackground: false\n---\n",
+                       "\nagent: Explore\n---\n")
+            for fields in partial:
+                document.write_text(text.replace("\n---\n", fields, 1), encoding="utf-8")
+                checked = run_checker(skills, agents)
+                self.assertNotEqual(checked.returncode, 0, fields)
+                self.assertIn("van siempre juntos", checked.stderr)
 
     def test_implicit_discipline_rejects_disabled_invocation(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

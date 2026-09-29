@@ -1,7 +1,6 @@
 ---
 name: review-web-pr
 description: Own the review of a Next.js, Nuxt or Vue branch or pull request, including checks against its specification. Use when the user asks to review a web branch, compare it with its base or check a web PR; stays read-only unless a fix is requested separately.
-context: fork
 ---
 
 # Review a Web PR
@@ -33,8 +32,9 @@ demand an incompatible abstraction, and do not treat established native HTML
 as duplication.
 
 Use `reviewer-web` or up to three subagents only when the axes are independent
-and the diff justifies it. Avoid style-only comments, hypotheses without a code
-path and generic advice.
+and the diff justifies it. Give each one the base, the range and any check
+results, and wait for every report before you write yours. Avoid style-only
+comments, hypotheses without a code path and generic advice.
 
 ## Validate findings
 

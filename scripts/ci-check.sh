@@ -42,6 +42,8 @@ run 'Sintaxis Fish Android' fish -n android/.config/fish/conf.d/android.fish
 run 'Configuración Zellij' env -u ZELLIJ_CONFIG_FILE ZELLIJ_CONFIG_DIR="$repo_root/zellij/.config/zellij" \
 	zellij setup --check
 run 'Versioned skills and Codex agent catalog' just skills-check
+run 'Adaptadores Codex generados desde ai/' env PYTHONDONTWRITEBYTECODE=1 \
+	python3 scripts/render-ai.py --check
 run 'Pruebas Python' env PYTHONDONTWRITEBYTECODE=1 \
 	python3 -m unittest discover -s scripts/tests -p 'test_*.py'
 run 'Generación de temas terminales y Micro' env PYTHONDONTWRITEBYTECODE=1 \
@@ -70,5 +72,9 @@ for test in \
 done
 
 run 'Whitespace Git' git diff --check
-run 'Whitespace del commit Git' git show --check --format= HEAD
+# A shallow clone shows HEAD as a root commit (the whole tree) and a full clone
+# shows a merge as an empty combined diff. Compare HEAD with the empty tree so
+# the scope does not depend on the clone depth.
+run 'Whitespace del árbol Git en HEAD' \
+	git diff --check "$(git hash-object -t tree /dev/null)" HEAD
 printf '%s\n' 'CI reproducible completado.'

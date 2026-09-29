@@ -21,7 +21,17 @@ YAML_KEY = re.compile(r"^( {2})([a-z_]+):\s*(.*)$")
 SKILL_NAME = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*\Z")
 # Claude Code frontmatter accepted in shared skills (verified: the Codex parser
 # ignores unknown keys). Invocation fields must match the routing inventory.
-CLAUDE_FIELDS = {"disable-model-invocation": {"true"}, "context": {"fork"}}
+# A fork must return one complete result in the invoking turn, so the three
+# fork fields go together: `background: false` makes the turn wait, and
+# `agent: Explore` has no Agent tool, so the fork cannot start background
+# subagents that outlive it (observed in the Agent SDK). Explore also has no
+# Edit or Write tool.
+CLAUDE_FIELDS = {
+    "disable-model-invocation": {"true"},
+    "context": {"fork"},
+    "agent": {"Explore"},
+    "background": {"false"},
+}
 MAX_CATALOG_SKILLS = 20
 MAX_DESCRIPTION_WORDS = 700
 # Las instalaciones normales enlazan una carpeta de skill por entrada. El límite
@@ -99,6 +109,11 @@ def parse_frontmatter(path: Path) -> dict[str, str]:
         if key not in {"name", "description"}:
             raise ValueError(f"clave de frontmatter no permitida: {key}")
         values[key] = parse_yaml_string(value, key)
+    fork_fields = {"context", "agent", "background"} & set(values)
+    if fork_fields and len(fork_fields) < 3:
+        raise ValueError(
+            "context: fork, agent: Explore y background: false van siempre juntos"
+        )
     if not {"name", "description"} <= set(values) or not values.get("name") or not values.get("description"):
         raise ValueError("frontmatter requiere name y description no vacíos")
     if not SKILL_NAME.fullmatch(values["name"]) or len(values["name"]) > 64:
@@ -352,6 +367,10 @@ def check_links(skill: Path, document: Path) -> None:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        # Windows pipes default to the ANSI code page (cp1252); report in UTF-8.
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     args = parse_args()
     failures: list[str] = []
     names: dict[str, Path] = {}

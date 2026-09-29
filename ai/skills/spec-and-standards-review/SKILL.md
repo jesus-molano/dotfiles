@@ -1,7 +1,6 @@
 ---
 name: spec-and-standards-review
-description: Review a specification, proposal, compliance question or non-web change against explicit requirements and engineering standards. Use for traceability or standards reviews; route Next.js, Nuxt and Vue branch reviews to review-web-pr.
-context: fork
+description: Review a non-web branch or pull request, a specification, a proposal or a compliance question against explicit requirements and engineering standards. Use when the user asks to review code that is not Next.js, Nuxt or Vue, compare a branch with its base or trace a change to its spec; route web branch reviews to review-web-pr.
 ---
 
 # Spec and Standards Review
@@ -11,8 +10,9 @@ Review without modifying the target.
 1. Fix the review range before judging it: base commit plus all committed,
    staged, unstaged, and relevant untracked changes in scope. Record exclusions.
 2. When custom agents are available, dispatch `reviewer-spec` and
-   `reviewer-standards` in parallel with the same range and evidence. Otherwise,
-   perform two independent passes and disclose the fallback.
+   `reviewer-standards` in parallel with the same range, requirements and
+   evidence, and wait for both reports. Otherwise, perform two independent
+   passes and disclose the fallback.
 3. The spec pass builds a traceability table: requirement, evidence location,
    status, and consequence. It marks specification gaps separately from
    implementation defects.
