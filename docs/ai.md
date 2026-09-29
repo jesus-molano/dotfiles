@@ -604,17 +604,25 @@ for path in (".e" + "nv", home + "/.s" + "sh", home + "/.claude" + ".json", home
 
 `ai/hooks/project-gate.py` gives each project deterministic verification without
 touching the project tree: it reads two optional keys from the repository's
-local Git config (`.git/config`, never committed) and does nothing where they
+local Git config only (`git config --local`: `.git/config`, never committed;
+`~/.gitconfig` and `includeIf` files do not count) and does nothing where they
 are absent.
 
 | Key | Hook | Behaviour |
 |---|---|---|
 | `ai.format` | `PostToolUse` on `Write`, `Edit`, `MultiEdit` | Runs the command with the edited file appended. Never blocks. |
-| `ai.check` | `Stop` | Runs the command when the working tree changed since the last passing run. A failure exits 2 with the last 40 output lines, so Claude fixes it before ending the turn. A second failure in the same stop cycle lets the turn end and tells Claude to report it. |
+| `ai.check` | `Stop` | Runs the command when the state changed since the last passing run. The state is HEAD, the `ai.check` text and the working tree (tracked diff and untracked files), so a commit or a stash made during the turn does not skip the check. A failure exits 2 with the last 40 output lines, so Claude fixes it before ending the turn. In the same stop cycle (`stop_hook_active`), an unchanged state is not checked again, and a second failure lets the turn end and tells Claude to report it. |
 
 Keep `ai.check` fast (lint and typecheck, or unit tests that finish in
-seconds); the hook allows 300 s. The last passing state is cached in
-`.git/ai-gate-pass`, so an unchanged tree is not checked twice.
+seconds). The Stop entry allows 300 s; the hook keeps one 290 s budget for
+all its Git calls and the check (the format hook: 27 s of 30 s). On timeout it
+kills the whole process tree (its own session and process group on Linux,
+`taskkill /T /F` on Windows), so no child keeps running. The last passing
+state is in `.git/ai-gate-pass` and the last failing one in
+`.git/ai-gate-fail`. The first Stop in a clean repository without these files
+records the state as the baseline without running the check, so a fresh clone
+with old failures does not stop a turn that changed nothing. After that, a new
+HEAD (a commit, a pull, a checkout) is checked at the next Stop.
 
 ```bash
 python3 ~/.claude/hooks/project-gate.py suggest .   # candidates from package.json

@@ -7,26 +7,41 @@ project tree or its history:
     git config --local ai.format "pnpm exec prettier --write --ignore-unknown"
     git config --local ai.check  "pnpm lint && pnpm typecheck"
 
+Only the repository's own config counts, never ~/.gitconfig or its includes.
 `format` (PostToolUse on Write|Edit|MultiEdit) runs `ai.format` with the edited
-file appended; it never blocks. `check` (Stop) runs `ai.check` when the working
-tree changed since the last passing run; a failure exits 2, so Claude keeps
-working on it instead of ending the turn. `suggest` prints candidate commands
-from package.json. A repository without the config is never touched.
+file appended; it never blocks. `check` (Stop) runs `ai.check` when HEAD, the
+working tree or the command changed since the last passing run; a failure exits
+2, so Claude keeps working on it instead of ending the turn. `suggest` prints
+candidate commands from package.json. A repository without the config is never
+touched.
 """
 import hashlib
 import json
+import os
 import shlex
+import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-CHECK_TIMEOUT = 280  # The Stop hook entry allows 300 s.
-FORMAT_TIMEOUT = 25  # The PostToolUse hook entry allows 30 s.
+# Budget for the whole hook, git calls included, below the hook entry timeouts
+# (Stop: 300 s, PostToolUse: 30 s).
+BUDGET = {"check": 290, "format": 27}
+GIT_TIMEOUT = 20
 TAIL = 40
+deadline = time.monotonic() + BUDGET["check"]
 
 
-def git(root: Path, *args: str) -> str:
-    result = subprocess.run(["git", "-C", str(root), *args], capture_output=True, timeout=20)
+def remaining() -> float:
+    return deadline - time.monotonic()
+
+
+def git(root: Path, *args: str, raw: bool = False):
+    result = subprocess.run(["git", "-C", str(root), *args], capture_output=True,
+                            timeout=max(1, min(GIT_TIMEOUT, remaining())))
+    if raw:
+        return result.stdout
     return result.stdout.decode("utf-8", "replace").strip() if result.returncode == 0 else ""
 
 
@@ -35,14 +50,17 @@ def repo(cwd: str) -> Path | None:
     return Path(top) if top else None
 
 
-def fingerprint(root: Path) -> str:
-    status = subprocess.run(["git", "-C", str(root), "status", "--porcelain=v1", "-uall", "-z"],
-                            capture_output=True, timeout=20).stdout
-    if not status:
-        return ""
-    diff = subprocess.run(["git", "-C", str(root), "diff", "HEAD", "--binary"],
-                          capture_output=True, timeout=20).stdout
-    digest = hashlib.sha256(status + diff)
+def setting(root: Path | None, key: str) -> str:
+    # --local: a global or included config must not run commands in every repository.
+    return git(root, "config", "--local", "--get", key) if root else ""
+
+
+def fingerprint(root: Path, command: str, status: bytes) -> str:
+    """HEAD, the command and the working tree: after a commit or a stash the state is new."""
+    digest = hashlib.sha256()
+    for part in (git(root, "rev-parse", "--verify", "-q", "HEAD").encode(), command.encode(),
+                 status, git(root, "diff", "HEAD", "--binary", raw=True)):
+        digest.update(hashlib.sha256(part).digest())
     # Untracked files have no diff; hash their content too.
     for entry in status.split(b"\0"):
         if entry.startswith(b"?? "):
@@ -52,48 +70,81 @@ def fingerprint(root: Path) -> str:
     return digest.hexdigest()
 
 
-def run(command: str, root: Path, timeout: int) -> tuple[int, str]:
+def kill_tree(process: subprocess.Popen) -> None:
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, timeout=10)
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGKILL)  # the shell leads its own process group
+        except ProcessLookupError:
+            pass
+    process.kill()
+
+
+def run(command: str, root: Path, timeout: float) -> tuple[int, str]:
+    if timeout < 1:
+        return 124, "no time left in the hook budget"
+    group = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
+             else {"start_new_session": True})
+    process = subprocess.Popen(command, shell=True, cwd=root, stdout=subprocess.PIPE,
+                               stderr=subprocess.STDOUT, **group)
     try:
-        result = subprocess.run(command, shell=True, cwd=root, capture_output=True, timeout=timeout)
+        output, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
-        return 124, f"timed out after {timeout} s"
-    output = (result.stdout + result.stderr).decode("utf-8", "replace")
-    return result.returncode, output
+        kill_tree(process)  # children would keep running and hold the output pipe open
+        process.communicate()
+        return 124, f"timed out after {int(timeout)} s"
+    return process.returncode, output.decode("utf-8", "replace")
+
+
+def read(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
 
 
 def format_file(event: dict) -> int:
     root = repo(event.get("cwd", ""))
     path = (event.get("tool_input") or {}).get("file_path")
-    command = git(root, "config", "--get", "ai.format") if root else ""
+    command = setting(root, "ai.format")
     if not (command and path):
         return 0
     file = Path(path) if Path(path).is_absolute() else root / path
     if not file.is_file() or not file.resolve().is_relative_to(root.resolve()):
         return 0
     quoted = f'"{file}"' if sys.platform == "win32" else shlex.quote(str(file))
-    run(f"{command} {quoted}", root, FORMAT_TIMEOUT)
+    run(f"{command} {quoted}", root, remaining() - 1)
     return 0
 
 
 def check(event: dict) -> int:
     root = repo(event.get("cwd", ""))
-    command = git(root, "config", "--get", "ai.check") if root else ""
+    command = setting(root, "ai.check")
     if not command:
         return 0
-    marker = Path(git(root, "rev-parse", "--absolute-git-dir")) / "ai-gate-pass"
-    state = fingerprint(root)
-    try:
-        passed = marker.read_text(encoding="utf-8").strip()
-    except OSError:
-        passed = ""
-    if not state or state == passed:
+    git_dir = Path(git(root, "rev-parse", "--absolute-git-dir"))
+    passed, failed = git_dir / "ai-gate-pass", git_dir / "ai-gate-fail"
+    status = git(root, "status", "--porcelain=v1", "-uall", "-z", raw=True)
+    state = fingerprint(root, command, status)
+    if state == read(passed):
         return 0
-    code, output = run(command, root, CHECK_TIMEOUT)
-    if code == 0:
-        marker.write_text(state, encoding="utf-8")
+    if not status and not (read(passed) or read(failed)):
+        # First visit with a clean tree: take it as the baseline instead of checking
+        # work that no gated session made (a fresh clone, an old repository).
+        passed.write_text(state, encoding="utf-8")
         return 0
-    if event.get("stop_hook_active"):
-        # Claude already continued once for this gate; report and let the turn end.
+    again = event.get("stop_hook_active")
+    # Claude already continued once for this gate and changed nothing: do not run it again.
+    if not (again and state == read(failed)):
+        code, output = run(command, root, remaining() - 2)
+        if code == 0:
+            passed.write_text(state, encoding="utf-8")
+            failed.unlink(missing_ok=True)
+            return 0
+        failed.write_text(state, encoding="utf-8")
+    if again:
+        # Report and let the turn end instead of looping.
         print(f"project-gate: `{command}` still fails; report it to the user.", file=sys.stderr)
         return 0
     tail = "\n".join(output.strip().splitlines()[-TAIL:])
@@ -122,9 +173,11 @@ def suggest(cwd: str) -> int:
 
 
 def main() -> int:
+    global deadline
     mode = sys.argv[1] if len(sys.argv) > 1 else ""
     if mode == "suggest":
         return suggest(sys.argv[2] if len(sys.argv) > 2 else ".")
+    deadline = time.monotonic() + BUDGET.get(mode, BUDGET["format"])
     try:
         event = json.loads(sys.stdin.buffer.read().decode("utf-8") or "{}")
     except ValueError:
