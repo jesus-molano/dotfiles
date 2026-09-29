@@ -6,6 +6,7 @@
 - Use `just check` for the hermetic simulation and `just plan` for the exact HOME preflight before deploying. Run `just apply` only after reviewing both. Never run Stow over every directory.
 - Treat `system-etc/` separately: target `/etc`, prior backup and explicit confirmation.
 - AI configuration lives in `ai/` and deploys with `just ai-plan`, `just ai-sync` and `just ai-check` (see `docs/ai.md`). Edit the source, then run `python3 scripts/render-ai.py`; never edit generated copies.
+- Deploy (`just ai-sync`, `just apply`) only from `~/.dotfiles` on `main`, after the PR is merged. `scripts/sync-ai.py` run from a worktree retargets every skill link to that worktree, and a local deploy of an unmerged commit forced a divergence recovery on 2026-09-28.
 - Never read or show `.env`; run secrets only for the process that needs them through `with-secrets`.
 - On CachyOS use Pacman or Shelly. CHWD owns the NVIDIA driver; never install generic branches or change ZRAM, boot, Btrfs, input or services without real inspection.
 - Keep other people's changes and make small, reversible changes.
