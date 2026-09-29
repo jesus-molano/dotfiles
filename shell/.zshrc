@@ -1,5 +1,14 @@
 source /usr/share/cachyos-zsh-config/cachyos-config.zsh
 
+# Claude Code copia los alias y funciones de este archivo a su Bash tool
+# (CLAUDECODE=1). El plugin git de oh-my-zsh esconde force pushes y resets
+# duros tras nombres cortos (gpf!, ggf, gpristine): los agentes no reciben
+# ninguno. Los alias propios de más abajo (g, gs, gd, gl) se mantienen.
+if [[ -n ${CLAUDECODE-} ]]; then
+  unalias -m 'g*'
+  unfunction -m 'gg*'
+fi
+
 export EDITOR=nvim
 export VISUAL=nvim
 export SUDO_EDITOR=nvim
