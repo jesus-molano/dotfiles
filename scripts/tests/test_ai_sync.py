@@ -57,7 +57,9 @@ class AISyncTest(unittest.TestCase):
         self.assertFalse((self.home / ".claude/skills/cachyos-host-audit").exists())
         self.assertTrue((self.home / ".claude/agents/reviewer-linux.md").exists())
         settings = sync.read_json(self.home / ".claude/settings.json")
-        self.assertNotIn("Stop", settings["hooks"])
+        # Windows has no desktop notifier; the only Stop entry is the project gate.
+        self.assertEqual([g["hooks"][0]["command"].split()[-1] for g in settings["hooks"]["Stop"]], ["check"])
+        self.assertTrue(settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"].endswith("project-gate.py\" format"))
         self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
         self.assertTrue((self.home / ".claude/hooks/ai-guard.py").is_file())
         self.assertIn("Read(**/.env)", settings["permissions"]["deny"])
@@ -66,7 +68,7 @@ class AISyncTest(unittest.TestCase):
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
         self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
         self.assertEqual(settings["model"], "opus")
-        self.assertEqual(settings["permissions"]["defaultMode"], "bypassPermissions")
+        self.assertEqual(settings["permissions"]["defaultMode"], "auto")
         self.assertEqual(self.build().operations, [])
         self.assertIsNone(self.build().apply())
 
@@ -336,7 +338,7 @@ class AISyncTest(unittest.TestCase):
         self.assertFalse(atlas.is_symlink())
         self.assertFalse((self.home / ".codex/agents/reuse-scout.toml").is_symlink())
         settings = sync.read_json(self.home / ".claude/settings.json")
-        self.assertEqual(len(settings["hooks"]["Stop"]), 2)
+        self.assertEqual(len(settings["hooks"]["Stop"]), 3)  # company, project gate, notify
         self.assertEqual(self.build("linux").operations, [])
         result = subprocess.run([sys.executable, str(SCRIPTS / "manage-codex-agent-files.py"), "--verify"],
             env=dict(os.environ, HOME=str(self.home), CODEX_HOME=str(self.home / ".codex"),
@@ -400,7 +402,8 @@ class AISyncTest(unittest.TestCase):
         self.build("linux").apply()
         settings = sync.read_json(self.home / ".claude/settings.json")
         self.assertNotIn("Read(~/retired/**)", settings["permissions"]["deny"])
-        self.assertEqual(settings["hooks"]["Stop"], [sync.NOTIFY])
+        self.assertEqual(settings["hooks"]["Stop"][-1], sync.NOTIFY)
+        self.assertEqual(len(settings["hooks"]["Stop"]), 2)
         self.assertNotIn("notify", sync.read_json(state_path)[key])
         self.assertEqual(self.build("linux").operations, [])
 
@@ -418,7 +421,7 @@ class AISyncTest(unittest.TestCase):
             self.assertIn("tools: Read, Glob, Grep", header)
             self.assertNotIn("Bash", header, "Roles are read-only")
         self.assertIn("maxTurns: 25", agents["reuse-scout.md"])
-        self.assertEqual(set(sources.hook_scripts()), {"ai-guard.py", "statusline.py"})
+        self.assertEqual(set(sources.hook_scripts()), {"ai-guard.py", "project-gate.py", "statusline.py"})
 
     def test_adopt_takes_over_an_earlier_deployment_without_a_ledger(self):
         revision = "ffd31373936d8ef55ba5f95db5ca9bd12ed326ab"

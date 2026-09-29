@@ -27,7 +27,7 @@ MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
 NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
 CLAUDE_KEYS = {
     ("language",): "spanish",
-    ("permissions", "defaultMode"): "bypassPermissions",
+    ("permissions", "defaultMode"): "auto",
     ("attribution", "commit"): "",
     ("attribution", "pr"): "",
     ("attribution", "sessionUrl"): False,
@@ -40,7 +40,7 @@ CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAM
 # /model or local choice is kept. Main agent: Opus (the alias follows the latest
 # Opus, Opus 5.5 today); reading roles set Haiku/Sonnet in their own files.
 CLAUDE_DEFAULTS = {("model",): "opus"}
-# Deny rules still apply in bypassPermissions. The ai-guard hook covers shell reads.
+# Deny rules apply before the auto-mode classifier. The ai-guard hook covers shell reads.
 DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
         "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)",
@@ -49,8 +49,7 @@ DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)"]
 
-# Rules for the auto-mode classifier. Inert under bypassPermissions; they make a
-# switch to `auto` safe from the first session. "$defaults" keeps the built-ins.
+# Rules for the auto-mode classifier (the default mode). "$defaults" keeps the built-ins.
 AUTO_SOFT_DENY = [
     "$defaults",
     "Pushing to a remote unless the user authorized that exact repository, branch and commit in this conversation",
@@ -438,6 +437,12 @@ class Sync:
             {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
+        # Per-project gate: inert until a repository sets ai.format / ai.check in its Git config.
+        gate = hook_command(self.home, self.platform, "project-gate.py")
+        wanted.append((("hooks", "PostToolUse"), {"matcher": "Write|Edit|MultiEdit", "hooks": [
+            {"type": "command", "command": f"{gate} format", "timeout": 30}]}))
+        wanted.append((("hooks", "Stop"), {"hooks": [
+            {"type": "command", "command": f"{gate} check", "timeout": 300}]}))
         if self.platform == "linux":
             wanted.append((("hooks", "Stop"), NOTIFY))
         entries = self.managed_entries(path, original, desired, wanted)

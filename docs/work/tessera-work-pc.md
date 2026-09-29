@@ -51,8 +51,8 @@ a working runtime, download another model or change drivers.
 
 Open a new Claude Code session and confirm with /memory, /skills, /agents,
 /hooks, /permissions and /mcp that the rules, skills, six roles, the ai-guard
-hook, the deny rules and the status line are active. In Code in Desktop enable
-bypass permissions only if company policy allows it.
+hook, the project gate, the deny rules and the status line are active, and that
+new sessions start in auto mode (company policy may disable it).
 
 Finish with the installed OID, deployed clients and skills, test results, the
 catalogs checked, the Kev runtime state, the backup path to revert the

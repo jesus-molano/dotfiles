@@ -10,9 +10,11 @@
   built-in Explore agent) uses Haiku; bulk reading and drafting
   (`catalog-writer`) uses Sonnet. Do not switch the main model to save tokens;
   delegate reading instead.
-- `bypassPermissions` removes technical prompts. The `ai-guard` hook and the
+- Auto mode approves routine actions. The `ai-guard` hook and the
   `permissions.deny` rules block the hard limits; every other human limit above
   still applies.
+- In projects with a `project-gate` check, a blocked stop means the project's
+  checks failed: fix the cause, never skip or weaken a check.
 - Use plan mode for large or ambiguous changes. Use `/clear` between unrelated
   tasks and `/compact` with a focus hint in long ones.
 - Linear: use the read-only `linear` server. Writes need a temporary MCP config

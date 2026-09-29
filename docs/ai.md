@@ -40,11 +40,13 @@ kept, including foreign hooks, deny rules, models and projects.
 |---|---|---|
 | `language` | `spanish` | Replies in Spanish; config and skills are English. |
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
-| `permissions.defaultMode` | `bypassPermissions` | No technical prompts (owner's choice). |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules still apply in bypass mode; `Edit` rules cover every file write. |
+| `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
+| `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
+| `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
-| `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Inert in bypass mode; makes a switch to `auto` safe from the first session. |
+| `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Teaches the classifier the authority rules. |
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
 | `pluginConfigs["agents-md@builtin"]` | `claude-md-and-agents-md` | Loads `AGENTS.md` next to `CLAUDE.md`. |
@@ -183,8 +185,8 @@ npm install --global @playwright/cli@0.1.21
 
 Do not run `playwright-cli install --skills` over the managed skills.
 
-In Desktop open **Settings → Claude Code**, enable **Allow bypass permissions
-mode** and pick **Bypass permissions** in a new session. `claude auth login`
+Code in Desktop starts in the `permissions.defaultMode` from `settings.json`
+(`auto`); check the mode selector in a new session. `claude auth login`
 authenticates the CLI separately. Never copy tokens between clients or machines.
 
 ## Windows (work PC)
@@ -342,14 +344,40 @@ the transcript and compare:
 | Native alternative on web | Rejects `NativeConfirm` for the browser and finds `SheetDialog`. |
 | Missing CSV importer | No invented candidate; inspected paths and missing capabilities. |
 
-## Switching to auto mode
+## Permission mode
 
-`bypassPermissions` is the owner's choice. The sync also manages
-`autoMode.soft_deny` rules that restate the authority rules (publishing,
-secrets, deletion, Stow and system changes, tracker writes, sending data out),
-so switching to `auto` (for example on the work PC, if policy disables bypass)
-is safe from the first session: set `permissions.defaultMode` to `auto` locally
-or pick it in `/permissions`. The classifier adds some token cost per action.
+The default mode is `auto`: a classifier model reviews each action, approves
+routine work without prompts and stops what the `autoMode.soft_deny` rules
+describe (publishing, secrets, deletion, Stow and system changes, tracker
+writes, sending data out). `permissions.deny` and the `ai-guard` hook run first
+and stay deterministic. The classifier adds a small token cost per checked
+action. If an organization policy disables auto mode, Claude falls back to
+prompting; pick another mode in `/permissions` for one session, or change
+`permissions.defaultMode` in `scripts/sync-ai.py` (it is a managed key, so a
+local edit is reported as a conflict).
+
+## Project gate
+
+`ai/hooks/project-gate.py` gives each project deterministic verification without
+touching the project tree: it reads two optional keys from the repository's
+local Git config (`.git/config`, never committed) and does nothing where they
+are absent.
+
+| Key | Hook | Behaviour |
+|---|---|---|
+| `ai.format` | `PostToolUse` on `Write`, `Edit`, `MultiEdit` | Runs the command with the edited file appended. Never blocks. |
+| `ai.check` | `Stop` | Runs the command when the working tree changed since the last passing run. A failure exits 2 with the last 40 output lines, so Claude fixes it before ending the turn. A second failure in the same stop cycle lets the turn end and tells Claude to report it. |
+
+Keep `ai.check` fast (lint and typecheck, or unit tests that finish in
+seconds); the hook allows 300 s. The last passing state is cached in
+`.git/ai-gate-pass`, so an unchanged tree is not checked twice.
+
+```bash
+python3 ~/.claude/hooks/project-gate.py suggest .   # candidates from package.json
+git config --local ai.check "pnpm lint && pnpm typecheck"
+git config --local ai.format "pnpm exec prettier --write --ignore-unknown"
+git config --local --unset ai.check                 # opt out
+```
 
 ## Backups and recovery
 
