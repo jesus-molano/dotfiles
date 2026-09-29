@@ -92,14 +92,25 @@ both parsers. The `Read(**/.env.*)` deny rule also hides
 ## Token efficiency
 
 - Always-loaded context is small: about 740 words of global rules and about
-  470 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
+  490 words of descriptions for the skills the model picks on its own. `scripts/check-skills.py` fails CI above 20 skills or 700
   description words.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
   (`test-driven-development`, `verify-web-change`) show only their name, so
   `engineering-flow` can still route to them at almost no context cost.
-- Review and research skills run with `context: fork`, so their reading stays
-  out of the main conversation.
+- `review-web-pr` and `spec-and-standards-review` run inline, so they keep the
+  scope and requirements from the conversation. `spec-and-standards-review`
+  sends the reading to `reviewer-spec` and `reviewer-standards` when custom
+  agents are available. `review-web-pr` reads the diff in the main conversation
+  and delegates to `reviewer-web` only when the diff justifies it; that reading
+  is the accepted cost of keeping the review context. The main agent waits for
+  every report before it merges them.
+- `research-primary-sources` runs with `context: fork` in the built-in Explore
+  agent and `background: false`: the turn waits for the answer, and the fetched
+  pages stay out of the main conversation. Explore has no Edit, Write or Agent
+  tool and skips CLAUDE.md, but it keeps Bash and MCP tools, so the skill body
+  carries its own read-only and untrusted-content rules. The fork does not see
+  the conversation, so pass the question and the decision as arguments.
 - Searches go to `reuse-scout` (Sonnet, at most 25 turns) or the built-in
   Explore agent, so the main context keeps only the conclusion.
 - Reviews are sized by `engineering-flow`: none for small low-risk changes, one
@@ -136,8 +147,19 @@ both parsers. The `Read(**/.env.*)` deny rule also hides
 The invocation policy lives in `scripts/ai_sources.py` and drives the Codex
 `agents/openai.yaml` check, the Claude `skillOverrides` and the
 `disable-model-invocation` frontmatter of user skills. Shared skills may use the
-Claude fields `disable-model-invocation` and `context: fork`; the Codex parser
-ignores unknown frontmatter keys (verified in openai/codex `skills/src/parser.rs`).
+Claude fields `disable-model-invocation`, `context: fork`, `agent: Explore` and
+`background: false`; the Codex parser ignores unknown frontmatter keys (verified
+in openai/codex `skills/src/parser.rs`), so Codex loads every skill inline.
+`scripts/check-skills.py` accepts the three fork fields only together. Reason: a
+fork does not see the conversation and, by default, returns in a later turn
+(`background: false` makes the turn wait). In `-p` mode and the Agent SDK,
+background subagents that a fork starts can outlive it and report to the main
+conversation without a synthesis; Explore has no Agent tool, so it cannot start
+them. A fork body must state a task; a guidelines-only body returns no useful
+output. Sources:
+<https://code.claude.com/docs/en/skills#run-skills-in-a-subagent> and
+<https://code.claude.com/docs/en/sub-agents> (checked 2026-09-29, Claude Code
+2.1.284).
 
 ## Roles
 
