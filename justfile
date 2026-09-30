@@ -69,8 +69,9 @@ ai-plan:
 ai-sync:
     python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" apply
 
-# Verify the deployed state, generated files, skills and tests without writing.
+# Verify the sandbox dependencies (Linux), the deployed state, generated files, skills and tests without writing.
 ai-check:
+    @if [ "$(uname -s)" = Linux ]; then missing=""; for tool in bwrap socat; do command -v "$tool" >/dev/null || missing="$missing $tool"; done; if [ -n "$missing" ]; then echo "ERROR: sandbox dependencies missing:$missing; Claude Code runs commands unsandboxed"; exit 1; fi; echo 'OK: bwrap and socat found. The optional seccomp filter (Unix socket blocking) shows only in /sandbox: a Dependencies tab means it is missing.'; fi
     python3 "{{ dotfiles_dir }}/scripts/sync-ai.py" check
     python3 "{{ dotfiles_dir }}/scripts/render-ai.py" --check
     @just --justfile "{{ justfile() }}" skills-check

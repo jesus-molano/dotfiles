@@ -639,10 +639,19 @@ broad domain such as `github.com` can still carry data out. `strictAllowlist`
 is not set: with it, "Claude Code refuses per-command lists", so every new
 host would need a settings change.
 
-**Not set.** `failIfUnavailable` stays `false`: if bubblewrap or socat is
-missing, Claude Code "shows a warning and runs commands unsandboxed" instead
-of refusing to start every session, Desktop included. Check for that warning
-after a CachyOS update. `sandbox.credentials` (masking) and
+**Dependencies.** `failIfUnavailable` stays `false`. With `true`, "Claude
+Code exits with an error at startup when `sandbox.enabled` is `true` but the
+sandbox can't start": the key stops the whole CLI (and Desktop) from
+starting, not only the commands. With `false`, Claude Code "shows a warning
+and runs commands unsandboxed". So `just ai-check` fails on Linux when
+`bwrap` or `socat` is not on `PATH`. The docs give no command-line check for
+the optional seccomp filter, which "adds Unix domain socket blocking": when it
+is missing, `/sandbox` shows a Dependencies tab next to the other tabs, and
+"the sandbox doesn't block Unix-socket calls". Install it with
+`npm install -g @anthropic-ai/sandbox-runtime`. Without it, sandboxed commands
+can reach the session messaging socket and the 1Password agent.
+
+**Not set.** `sandbox.credentials` (masking), `network.tlsTerminate` and
 `blockReadsOutsideWorkingDirectories` are not used.
 
 **Desktop.** The Desktop docs say "Desktop and CLI read the same
