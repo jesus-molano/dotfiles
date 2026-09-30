@@ -4,6 +4,4 @@
 - For administrative operations use `pkexec`/Polkit so authentication appears
   in a graphical dialog. Use `sudo` only when Polkit is unavailable, and say so first.
 - Inspect the real state before changing GPU, boot, Btrfs, input or services.
-- The shell tool runs zsh or bash, not fish: quote globs and `=` in arguments
-  (`--include='*.md'`). Use absolute paths; do not prefix commands with `cd`
-  to the working directory.
+- Quote globs and `=` in shell arguments (`--include='*.md'`).

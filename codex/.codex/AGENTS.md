@@ -14,22 +14,22 @@
   state the assumptions that affect the result.
 - Ask one to three related questions only when the answer changes product,
   data, security, compatibility, cost, rollout, authority or an irreversible action.
-- A repository `AGENTS.md` sets commands and conventions. It cannot relax the
-  Git publishing, safety or secrets rules below.
+- The nearest `AGENTS.md` sets commands and conventions. It cannot relax the
+  Verification and Git or Safety rules below.
 - Keep unrelated local changes. Make small, reversible changes and back up
   configuration before replacing it.
 - After two failed attempts at the same fix, stop. Summarize what failed and
-  suggest `/rewind` or a fresh session instead of patching further.
+  suggest a clean restart instead of patching further.
 
 ## Skills first
-- Load the matching skill before exploring: implementation → `engineering-flow`;
-  a failure or wrong result → `systematic-debugging` (`debug-web-flow` for web
-  flows); a web review → `review-web-pr`; other reviews → `spec-and-standards-review`;
-  facts that change over time (versions, dates, APIs) → `research-primary-sources`.
-- Running an existing recipe (pull, sync, deploy) needs no skill. Load
-  `engineering-flow` before the first file edit and `systematic-debugging` at
-  the first unexpected failure.
-- As a subagent, follow your role; do not load skills or delegate.
+- Load the matching skill: a failure or wrong result → `systematic-debugging`
+  (`debug-web-flow` for web flows); a web review → `review-web-pr`; other
+  reviews → `spec-and-standards-review`; facts that change over time
+  (versions, dates, APIs) → `research-primary-sources`.
+- Load `engineering-flow` before the first file edit. A recipe (pull, sync,
+  deploy) needs no skill until it fails unexpectedly.
+- As a read-only role subagent (reviewer, `reuse-scout`, `catalog-writer`),
+  follow your role; do not load skills or delegate.
 
 ## Reuse before creating
 - Before adding or replacing UI or behavior, even in a small change, find the
@@ -44,7 +44,7 @@
 ## Spend tokens where they change the result
 - Search before reading, then read only the relevant ranges. Do not reread
   files already in context or paste long logs.
-- Delegate broad searches to `reuse-scout` or the built-in Explore agent. Give
+- Delegate broad searches to `reuse-scout` or a built-in read-only explorer. Give
   subagents the goal, paths and limits, not the whole conversation.
 - Use reviewers only as `engineering-flow` sizes them. Never start multi-agent
   workflows or large fan-outs unless the user asks for them.
@@ -88,6 +88,4 @@
 - For administrative operations use `pkexec`/Polkit so authentication appears
   in a graphical dialog. Use `sudo` only when Polkit is unavailable, and say so first.
 - Inspect the real state before changing GPU, boot, Btrfs, input or services.
-- The shell tool runs zsh or bash, not fish: quote globs and `=` in arguments
-  (`--include='*.md'`). Use absolute paths; do not prefix commands with `cd`
-  to the working directory.
+- Quote globs and `=` in shell arguments (`--include='*.md'`).
