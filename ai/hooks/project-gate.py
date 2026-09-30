@@ -29,6 +29,8 @@ from pathlib import Path
 # (Stop: 300 s, PostToolUse: 30 s).
 BUDGET = {"check": 290, "format": 27}
 GIT_TIMEOUT = 20
+# Kept free inside the budget so a timed-out command can still be killed and reaped.
+KILL_TIME = 8
 TAIL = 40
 deadline = time.monotonic() + BUDGET["check"]
 
@@ -72,7 +74,11 @@ def fingerprint(root: Path, command: str, status: bytes) -> str:
 
 def kill_tree(process: subprocess.Popen) -> None:
     if os.name == "nt":
-        subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True, timeout=10)
+        try:
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(process.pid)], capture_output=True,
+                           timeout=KILL_TIME / 2)
+        except (OSError, subprocess.SubprocessError):
+            pass  # process.kill() below still stops the shell itself
     else:
         try:
             os.killpg(process.pid, signal.SIGKILL)  # the shell leads its own process group
@@ -82,6 +88,7 @@ def kill_tree(process: subprocess.Popen) -> None:
 
 
 def run(command: str, root: Path, timeout: float) -> tuple[int, str]:
+    timeout -= KILL_TIME
     if timeout < 1:
         return 124, "no time left in the hook budget"
     group = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
@@ -92,7 +99,17 @@ def run(command: str, root: Path, timeout: float) -> tuple[int, str]:
         output, _ = process.communicate(timeout=timeout)
     except subprocess.TimeoutExpired:
         kill_tree(process)  # children would keep running and hold the output pipe open
-        process.communicate()
+        try:
+            # A descendant that left the process group can keep the pipe open: do not wait for it.
+            process.communicate(timeout=KILL_TIME / 4)
+        except subprocess.TimeoutExpired:
+            pass
+        finally:
+            try:
+                process.stdout.close()
+                process.wait(timeout=1)  # the shell is dead; reap it
+            except (OSError, subprocess.TimeoutExpired):
+                pass
         return 124, f"timed out after {int(timeout)} s"
     return process.returncode, output.decode("utf-8", "replace")
 
@@ -123,8 +140,10 @@ def check(event: dict) -> int:
     command = setting(root, "ai.check")
     if not command:
         return 0
-    git_dir = Path(git(root, "rev-parse", "--absolute-git-dir"))
-    passed, failed = git_dir / "ai-gate-pass", git_dir / "ai-gate-fail"
+    git_dir = git(root, "rev-parse", "--absolute-git-dir")
+    if not git_dir:  # never write the state files into the working tree
+        return 0
+    passed, failed = Path(git_dir) / "ai-gate-pass", Path(git_dir) / "ai-gate-fail"
     status = git(root, "status", "--porcelain=v1", "-uall", "-z", raw=True)
     state = fingerprint(root, command, status)
     if state == read(passed):

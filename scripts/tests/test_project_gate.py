@@ -3,11 +3,14 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 GATE = Path(__file__).resolve().parents[2] / "ai/hooks/project-gate.py"
 
@@ -144,14 +147,62 @@ class ProjectGateTest(unittest.TestCase):
         gate.deadline = time.monotonic() + 60
         pid_file = self.repo.parent / "child.pid"
         started = time.monotonic()
-        code, output = gate.run(f"sleep 30 & echo $! > '{pid_file}'; wait", self.repo, 1)
+        code, output = gate.run(f"sleep 30 & echo $! > '{pid_file}'; wait", self.repo, gate.KILL_TIME + 1)
         self.assertEqual(code, 124)
-        self.assertLess(time.monotonic() - started, 10, "a child held the output pipe open")
+        self.assertLess(time.monotonic() - started, gate.KILL_TIME + 1, "a child held the output pipe open")
         pid = int(pid_file.read_text())
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline and alive(pid):
             time.sleep(0.05)
         self.assertFalse(alive(pid), "the background child survived the timeout")
+
+    @unittest.skipIf(os.name == "nt" or not shutil.which("setsid"), "POSIX sessions")
+    def test_a_descendant_outside_the_group_cannot_hold_the_hook(self):
+        gate = load_gate()
+        gate.deadline = time.monotonic() + 60
+        pid_file = self.repo.parent / "escaped.pid"
+        started = time.monotonic()
+        code, _ = gate.run(f"setsid sh -c 'echo $$ > \"{pid_file}\"; exec sleep 30' & wait",
+                           self.repo, gate.KILL_TIME + 1)
+        try:
+            self.assertEqual(code, 124)
+            # The run budget, then at most a quarter of the kill reserve to read the pipe.
+            self.assertLess(time.monotonic() - started, 1 + gate.KILL_TIME / 4 + 3)
+        finally:
+            if pid_file.exists():
+                try:
+                    os.kill(int(pid_file.read_text()), signal.SIGKILL)
+                except (ProcessLookupError, ValueError):
+                    pass
+
+    def test_a_taskkill_timeout_still_kills_the_shell(self):
+        gate = load_gate()
+        process = mock.Mock(pid=4242)
+        with mock.patch.object(gate.os, "name", "nt"), mock.patch.object(
+                gate.subprocess, "run", side_effect=subprocess.TimeoutExpired("taskkill", 4)):
+            gate.kill_tree(process)
+        process.kill.assert_called_once()
+
+    def test_the_kill_reserve_keeps_the_hook_inside_its_entry_timeout(self):
+        gate = load_gate()
+        gate.deadline = time.monotonic() + gate.KILL_TIME + 0.5
+        # Less than one second is left after the kill reserve: the command does not start.
+        self.assertEqual(gate.run("echo never", self.repo, gate.remaining())[1], "no time left in the hook budget")
+        self.assertLess(gate.BUDGET["check"] + 2, 300)
+
+    def test_no_git_dir_means_no_state_files_in_the_tree(self):
+        gate = load_gate()
+        self.git("config", "ai.check", self.python("raise SystemExit(1)"))
+        (self.repo / "a.txt").write_text("changed\n")
+        real = gate.git
+        gate.git = lambda root, *args, **kw: "" if args[:2] == ("rev-parse", "--absolute-git-dir") else real(root, *args, **kw)
+        before = os.getcwd()
+        os.chdir(self.repo)  # a relative state path would land here
+        try:
+            self.assertEqual(gate.check({"cwd": str(self.repo)}), 0)
+        finally:
+            os.chdir(before)
+        self.assertEqual(sorted(p.name for p in self.repo.iterdir() if p.name.startswith("ai-gate")), [])
 
     def test_git_calls_and_the_check_share_one_budget(self):
         gate = load_gate()
