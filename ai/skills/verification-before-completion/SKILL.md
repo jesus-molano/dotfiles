@@ -13,7 +13,7 @@ description: Select and run fresh, proportionate verification before claiming a 
    search before declaring completion.
 2. Run the smallest fresh command or observation that proves each changed
    behavior, then repository-mandated checks. Read exit status and relevant
-   output; never claim a pass from an earlier run.
+   output; never claim a pass from a run on an older tree or in another session.
    Keep verification proportionate. Skip a re-run only when you saw that
    check's output for the current tree in this session; cite that output.
    A hook or gate that printed nothing gives no result to cite.

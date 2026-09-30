@@ -409,7 +409,8 @@ them as `CLAUDE.md` instead, so treat those scores as close, not identical.
 The `ai-guard` hook is not loaded: `push-literal` models a block by withholding
 the Bash tool. The script grants no tool with `--allow-tools`, so `Bash`,
 `Write`, `Edit`, `WebFetch` and `WebSearch` are removed from every run. A
-`tool_used` grader on one of them always passes: do not add one.
+`tool_used` grader on one of them measures nothing (it always passes or always
+fails): do not add one.
 
 ### Outcome mode
 
@@ -432,13 +433,14 @@ appended rules, so `Δ` isolates what the skills add.
 
 ### Recording results
 
-Append one row per measurement. When a change of the skill descriptions or
-the cases makes a row stale, replace it. Take the values from
+Append one row per measurement and never rewrite old rows; a later row
+supersedes an older one. Take the values from
 `aggregate-result.json` (`claudeVersion`, `costUsd`, `durationSeconds`) and
 `git rev-parse HEAD`:
 
 | Date | Commit | Claude Code | Mode | Model | Cases | Runs per arm | Score | Δ | Cost | Time |
 |---|---|---|---|---|---|---|---|---|---|---|
+| 2026-09-29 | not recorded | 2.1.284 | routing | Sonnet | 15 | 3 | 45/45 | — | $2.15 | 138 s |
 | 2026-09-30 | `d8c69bf` | 2.1.284 | routing | not recorded | 21 | 1 | 21/21 | — | $2.32 | 358 s |
 
 Last routing measurement per case (2026-09-30, `main` at `d8c69bf`, Claude

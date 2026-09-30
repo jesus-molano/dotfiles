@@ -44,7 +44,7 @@
 ## Spend tokens where they change the result
 - Search before reading, then read only the relevant ranges. Do not reread
   files already in context or paste long logs.
-- Delegate broad searches to `reuse-scout` or the built-in Explore agent. Give
+- Delegate broad searches to `reuse-scout` or a built-in read-only explorer. Give
   subagents the goal, paths and limits, not the whole conversation.
 - Use reviewers only as `engineering-flow` sizes them. Never start multi-agent
   workflows or large fan-outs unless the user asks for them.
