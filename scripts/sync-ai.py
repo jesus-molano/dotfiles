@@ -22,6 +22,11 @@ import tomllib
 from ai_sources import NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
 
 MISSING = {"$absent": True}
+GRANTS = ".local/state/dotfiles/ai/workflow-grants"
+# Anchored regex (a plain `A|B` list is exact names, but `mcp__.*` needs the regex path).
+# The prompt senders and MCP tools are checked only for the workflow opt-in keyword.
+GUARD_MATCHER = ("^(Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit"
+                 "|CronCreate|ScheduleWakeup|RemoteTrigger|SendMessage|mcp__.*)$")
 MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
        "openaiDeveloperDocs": "https://developers.openai.com/mcp"}
 NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
@@ -54,7 +59,11 @@ DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
         # Claude applies Edit rules to every file write; Write deny rules are ignored.
         "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
-        "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)"]
+        "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)",
+        # Workflow opt-in markers (ai-guard.py grant_path): %USERPROFILE%\.local\state on
+        # Windows, the default XDG_STATE_HOME on Linux. Claude Code also adds Edit deny
+        # paths to the sandbox denyWrite list.
+        f"Edit(~/{GRANTS}/**)"]
 
 # Claude Code sandbox, Linux only (native Windows is not supported). Deny rules stop only
 # the reads Claude Code recognizes; the sandbox stops every sandboxed process at the OS level.
@@ -69,7 +78,7 @@ SANDBOX_DENY_READ = ["~/**/.env", "~/**/.env.*", "~/.ssh", "~/.gnupg", "~/.aws",
                      "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json",
                      "~/.codex/auth.json"]
 # The sync ledger, its backups and the workflow opt-in markers.
-SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai"]
+SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai", f"~/{GRANTS}"]
 # Dotfiles deployment writes to HOME by design; these exact recipes run outside the
 # sandbox and still go through the permission flow.
 SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply"]
@@ -85,6 +94,7 @@ AUTO_SOFT_DENY = [
     "Running GNU Stow over every package, or changing /etc, boot, Btrfs, GPU drivers or system services without an explicit request",
     "Creating, editing or commenting on issues or pull requests in Linear or GitHub without explicit authorization",
     "Sending project source or catalog data to an external service the task has not already been authorized to use",
+    "Creating, changing or deleting workflow opt-in markers",
 ]
 
 
@@ -465,7 +475,7 @@ class Sync:
             if get(original, route) == MISSING:
                 put(desired, route, value)
         guard_hook = {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}
-        guard = {"matcher": "Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit", "hooks": [guard_hook]}
+        guard = {"matcher": GUARD_MATCHER, "hooks": [guard_hook]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
         # The same guard records the user's workflow opt-in from a typed prompt or /workflow-authoring.
         wanted.append((("hooks", "UserPromptSubmit"), {"hooks": [guard_hook]}))

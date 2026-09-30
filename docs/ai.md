@@ -42,8 +42,8 @@ kept, including foreign hooks, deny rules, models and projects.
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
 | `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores) | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
-| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit` | Blocks the hard limits deterministically. |
+| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores), `Edit` of the [workflow opt-in](#workflow-opt-in) markers | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
+| `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and `mcp__.*`, as the anchored regular expression `^(...)$` | Blocks the hard limits deterministically. A matcher with characters other than letters, digits, `_`, `-`, spaces, `,` and `\|` is a "JavaScript regular expression, unanchored", so the sync anchors it ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)). |
 | `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
@@ -83,6 +83,7 @@ normal task:
 | `tessera.py consent` and any write to `provider-consent.json` (redirections, copies, deletes, `sed -i`, inline scripts, PowerShell write cmdlets); reading or searching it is allowed | Only the user grants provider consent. |
 | `Workflow` tool, unless the user opted in for this session | Multi-agent workflows only on request. See [Workflow opt-in](#workflow-opt-in). |
 | Any shell command, `Write`, `Edit`, `MultiEdit` or `apply_patch` that names `workflow-grants` (reads too: interpreter code cannot be told apart from a write) | Only the user grants the workflow opt-in. |
+| `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage`, any `mcp__*` tool and any shell command whose input holds `ultracode` as a word or `/workflow-authoring`; any shell command that names `CLAUDE_CODE_MESSAGING_*` or `cc-socks-` | A scheduled or sent prompt can come back as a prompt of this session. See [Workflow opt-in](#workflow-opt-in). |
 
 Secrets and publication fail closed. The guard scans the raw command text for
 them, independently of the parser, and every mention must lie inside a part of
@@ -154,17 +155,14 @@ valid for 6 hours and only for that session. A new opt-in removes expired
 markers. On the prompt events the hook always exits 0, so it never erases a
 prompt; if the marker cannot be written, Claude is told that workflows stay
 blocked. `AI_ALLOW_WORKFLOW=1 claude` still allows workflows for a whole CLI
-session. The model cannot grant itself the opt-in: `ai-guard` blocks every
-tool call that names `workflow-grants`, and on Linux the sandbox denies
-sandboxed writes to `~/.local/state/dotfiles/ai` (see [Sandbox](#sandbox)).
+session.
 
-Why only the start of the prompt: the hooks reference lists the
-`UserPromptSubmit` input as the common fields (`session_id`, `prompt_id`,
-`transcript_path`, `cwd`, `permission_mode`, `hook_event_name`, `agent_id` in
-subagents) plus `prompt`. There is no field that says who wrote the prompt.
-The docs do not say whether a message from another session, a channel event
-or a scheduled task fires `UserPromptSubmit`. Claude Code itself accepts the
-keyword "only in a prompt you type yourself"
+Why only the start of the prompt: the hooks reference says `UserPromptSubmit`
+receives, "In addition to the common input fields", only "the `prompt` field
+containing the text the user submitted"
+([hooks](https://code.claude.com/docs/en/hooks#userpromptsubmit-input)). No
+field tells a typed prompt from a scheduled or relayed one. Claude Code itself
+accepts the keyword "only in a prompt you type yourself"
 ([workflows](https://code.claude.com/docs/en/workflows#where-the-keyword-works)),
 but a hook cannot see that decision. So the hook:
 
@@ -172,20 +170,48 @@ but a hook cannot see that decision. So the hook:
   mentions in text, pasted content (it arrives inside `<pasted_content>`
   lines) and channel events (Claude receives them inside `<channel>` tags);
 - ignores events that carry `agent_id` (subagents);
-- trusts `UserPromptExpansion` for `/workflow-authoring`, because that event
-  fires only when the user types the command; a command inside a message from
-  another session "arrives as plain text. Claude Code never executes it"
+- trusts `UserPromptExpansion` for `/workflow-authoring`; a command inside a
+  message from another session "arrives as plain text. Claude Code never
+  executes it"
   ([cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging)).
 
-Residual risk: if Claude Code fires `UserPromptSubmit` for a message from
-another of your sessions or for a scheduled task prompt, and that text starts
-with `ultracode`, the hook grants the opt-in. Both come from your own
-account, and a workflow still runs under the same permission mode, deny
-rules, guard and sandbox as any other tool call. To close this path, set
-`crossSessionInbound` to `hold` in `~/.claude/settings.json`. The guard reads
-command text only: a script that builds the marker path at run time passes it.
-On Linux the sandbox still refuses that write; an unsandboxed retry and every
-command on Windows depend on the auto-mode classifier.
+**How the model is kept from granting it to itself.** A prompt that the model
+schedules or sends can come back as a prompt of this session: a scheduled
+task fires "the prompt to run"
+([scheduled tasks](https://code.claude.com/docs/en/scheduled-tasks)), and
+`SendMessage` or a Bash command that posts to `CLAUDE_CODE_MESSAGING_SOCKET`
+delivers a message into a session
+([cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging#the-sessions-inbox-socket)).
+The hook cannot tell these prompts from typed ones, so the guard stops them
+before they are sent:
+
+| Layer | What it stops |
+|---|---|
+| `ai-guard` on `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and every `mcp__*` tool | Any tool input string that holds `ultracode` as a word or `/workflow-authoring`. MCP calls without these words cost one substring test. |
+| `ai-guard` on `Bash`, `PowerShell`, `Monitor` | The same words, the name `CLAUDE_CODE_MESSAGING_*` and the socket directory `cc-socks-` in the command text. To find the keyword in files, use the Grep tool. |
+| `ai-guard` on every tool | A command, file path or patch that names `workflow-grants` (reads too). |
+| `permissions.deny` | `Edit(~/.local/state/dotfiles/ai/workflow-grants/**)`: the file tools and the shell redirections Claude Code recognizes. Claude Code also adds this path to the sandbox `denyWrite` list. |
+| Sandbox (Linux) | `denyWrite` for `~/.local/state/dotfiles/ai` and its `workflow-grants` directory, for every sandboxed process. |
+| `autoMode.soft_deny` | "Creating, changing or deleting workflow opt-in markers", for the classifier, which also reviews unsandboxed retries and excluded commands. |
+
+Residual risk. The tests cover each vector above, but the guard reads text
+only. These paths stay open, and only the classifier (and on Linux the
+sandbox) reviews them:
+
+- a script written in one call and run in the next, that builds the keyword,
+  the socket variable name or the marker path at run time. In the sandbox the
+  marker write fails; the socket is blocked only when the optional seccomp
+  filter is installed (see [Sandbox](#sandbox)). An unsandboxed retry, an
+  excluded command and every command on Windows depend on the classifier;
+- a scheduled prompt, a message or a routine that you create yourself and that
+  starts with `ultracode`: it grants the opt-in, as you intended or not;
+- `XDG_STATE_HOME` set to a directory other than `~/.local/state`: the deny
+  rule and the sandbox entry name the default path, `ai-guard` blocks the
+  directory name in any location.
+
+To close the messaging path completely, deny the tool
+(`"deny": ["SendMessage"]`) or set `crossSessionInbound` to `refuse` in
+`~/.claude/settings.json`; both also stop the features you may want.
 
 ## Token efficiency
 
@@ -589,7 +615,7 @@ work PC gets none of these keys.
 | `sandbox.autoAllowBashIfSandboxed` | `false` | The default `true` runs sandboxed commands "without a permission prompt". With `false`, "sandboxed commands go through the regular permission flow, so your allow rules and permission mode decide": the auto-mode classifier and its `soft_deny` rules keep reviewing every command, as before. The sandbox adds containment; it does not replace the review. |
 | `sandbox.allowUnsandboxedCommands` | `true` | See below. |
 | `sandbox.filesystem.denyRead` (entries) | `~/**/.env`, `~/**/.env.*`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json` | The default read policy "still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`". These are the same stores as the `permissions.deny` rules, now enforced for every sandboxed process. Wildcards work in read lists on Linux: Claude Code "expands a read entry to the concrete paths it matches". |
-| `sandbox.filesystem.denyWrite` (entry) | `~/.local/state/dotfiles/ai` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; this entry also holds when a session starts in `~` or adds it with `/add-dir`. |
+| `sandbox.filesystem.denyWrite` (entries) | `~/.local/state/dotfiles/ai`, `~/.local/state/dotfiles/ai/workflow-grants` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; these entries also hold when a session starts in `~` or adds it with `/add-dir`. On Linux, write entries must be concrete: Claude Code "skips an entry that contains `*`, `?`, or `[`". |
 | `sandbox.excludedCommands` (entries) | `just ai-plan`, `just ai-sync`, `just ai-check`, `just apply` | These recipes read the Claude config and write to `~/.claude`, `~/.codex`, `~/.agents`, `~/.local/state` or HOME (Stow) by design. `~/.claude` is a sandbox protected path that no `allowWrite` can open. "Excluded commands still go through the regular permission flow", so the classifier and `ai-guard` still review them. An entry applies only when it covers the whole call: `cd x && just apply` stays sandboxed. |
 
 **Unsandboxed retries.** With `allowUnsandboxedCommands: true` (also the

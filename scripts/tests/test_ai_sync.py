@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import shutil
@@ -67,8 +68,14 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(settings["autoMode"]["soft_deny"][0], "$defaults")
         self.assertEqual(len(settings["autoMode"]["soft_deny"]), len(sync.AUTO_SOFT_DENY))
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
-        self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
-        self.assertIn("Monitor", settings["hooks"]["PreToolUse"][0]["matcher"].split("|"))
+        matcher = re.compile(settings["hooks"]["PreToolUse"][0]["matcher"])
+        for tool in ("Bash", "PowerShell", "Monitor", "Workflow", "Write", "Edit", "MultiEdit", "CronCreate",
+                     "ScheduleWakeup", "RemoteTrigger", "SendMessage", "mcp__github__search_code"):
+            self.assertTrue(matcher.search(tool), tool)
+        for tool in ("NotebookEdit", "Read", "Grep", "EditFile", "xmcp__a__b"):
+            self.assertFalse(matcher.search(tool), f"anchored matcher must skip {tool}")
+        self.assertIn("Edit(~/.local/state/dotfiles/ai/workflow-grants/**)", settings["permissions"]["deny"])
+        self.assertIn("Creating, changing or deleting workflow opt-in markers", settings["autoMode"]["soft_deny"])
         self.assertNotIn("sandbox", settings, "native Windows has no Claude Code sandbox")
         # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
         guard = settings["hooks"]["PreToolUse"][0]["hooks"]
@@ -367,7 +374,8 @@ class AISyncTest(unittest.TestCase):
         for path in ("~/**/.env", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials", "~/.config/gh/hosts.yml",
                      "~/.claude.json", "~/.claude/.credentials.json", "~/.codex/auth.json"):
             self.assertIn(path, sandbox["filesystem"]["denyRead"])
-        self.assertEqual(sandbox["filesystem"]["denyWrite"], ["~/.local/state/dotfiles/ai"])
+        self.assertEqual(sandbox["filesystem"]["denyWrite"],
+                         ["~/.local/state/dotfiles/ai", "~/.local/state/dotfiles/ai/workflow-grants"])
         self.assertEqual(sandbox["excludedCommands"], ["just ai-plan", "just ai-sync", "just ai-check", "just apply"])
         self.assertEqual(self.build("linux", "claude").operations, [])
         path = self.home / ".claude/settings.json"
