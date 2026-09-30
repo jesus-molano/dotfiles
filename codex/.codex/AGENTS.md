@@ -92,3 +92,6 @@
 - Commit with `git commit -F <file>` as its own command. Claude Code runs a
   plain `git commit` outside its sandbox, where the signing agent is reachable;
   a message built with `$(...)` or a here-doc keeps the command sandboxed.
+  Write the message with the Write tool to a literal path in the repository
+  (for example `.git/COMMIT_DRAFT`), never under `$TMPDIR`, and do not add
+  `git -C` or `cd`: those forms stay sandboxed.

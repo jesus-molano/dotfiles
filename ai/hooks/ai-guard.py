@@ -121,7 +121,9 @@ GRANT_DIR = "workflow-grants"
 GRANT_TTL = 6 * 3600  # seconds
 GRANT_REASON = "only the user grants the workflow opt-in; its state directory is off limits"
 SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
-OPT_IN = re.compile(r"\s*(?:ultracode\b|/workflow-authoring(?:\s|$))", re.I)
+# The grant must be a strict subset of OPT_IN_TEXT below, or a scheduled prompt could pass
+# the send-side block and still grant: ASCII letters only, and no `-` after the keyword.
+OPT_IN = re.compile(r"\s*(?:ultracode(?![\w-])|/workflow-authoring(?:\s|$))", re.I | re.A)
 # The keyword anywhere, as a word. A scheduled prompt or a message to a session can
 # arrive as a prompt of this session, and the hook cannot see where a prompt came from.
 OPT_IN_TEXT = re.compile(r"(?<![\w-])ultracode(?![\w-])|/workflow-authoring(?![\w-])", re.I)

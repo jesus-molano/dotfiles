@@ -488,6 +488,23 @@ class WorkflowOptInTest(unittest.TestCase):
             self.assertIn("workflow opt-in", result.stderr)
             self.assertNotIn("ultracode", result.stderr.replace("`ultracode`", ""), "no echo of the input")
 
+    def test_every_prompt_that_grants_is_blocked_when_the_model_sends_it(self):
+        """The grant pattern must be a subset of the send-side block; otherwise a scheduled
+        prompt passes the block and still grants when it fires."""
+        samples = ("ultracode", "  ULTRACODE run it", "ultracode: go", "ultracode-mode: run the audit",
+                   "ultracode_x", "ultracoder", " ultracode", "/workflow-authoring",
+                   "/workflow-authoring fan out", "/workflow-authorıng fan out",
+                   "/WORKFLOW-AUTHORİNG fan out")
+        for index, text in enumerate(samples):
+            session = f"g{index}"
+            self.prompt(text, session)
+            granted = self.workflow(session) == 0
+            blocked = self.pre("CronCreate", {"cron": "0 9 * * *", "prompt": text}).returncode == 2
+            self.assertTrue(blocked or not granted, text)
+        for session, text in (("dash", "ultracode-mode: run the audit"), ("dotless", "/workflow-authorıng x")):
+            self.prompt(text, session)
+            self.assertEqual(self.workflow(session), 2, text)
+
     def test_the_model_cannot_use_the_session_socket(self):
         for command in ('printf "%s\\n" hi | socat - "UNIX-CONNECT:$CLAUDE_CODE_MESSAGING_SOCKET"',
                         "python3 -c 'import os; print(os.environ[\"CLAUDE_CODE_MESSAGING_TOKEN\"])'",
