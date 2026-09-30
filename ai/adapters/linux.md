@@ -7,3 +7,6 @@
 - The shell tool runs zsh or bash, not fish: quote globs and `=` in arguments
   (`--include='*.md'`). Use absolute paths; do not prefix commands with `cd`
   to the working directory.
+- Commit with `git commit -F <file>` as its own command. Claude Code runs a
+  plain `git commit` outside its sandbox, where the signing agent is reachable;
+  a message built with `$(...)` or a here-doc keeps the command sandboxed.

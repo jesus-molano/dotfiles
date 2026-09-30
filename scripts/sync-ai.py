@@ -52,7 +52,11 @@ CLAUDE_DEFAULTS = {("model",): "opus"}
 # file tools and only the shell commands Claude Code recognizes (cat, head, sed, tee,
 # redirections); indirect reads such as `grep -r`, interpreters or scripts pass them.
 # The ai-guard hook blocks shell commands that name these same stores.
-DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
+DENY = ["Read(**/.env)", "Read(**/.env.*)",
+        # gitignore negation: carves templates out of the path rules listed before it,
+        # so `cp .env.example .env` reads the template.
+        "Read(!.env.example)", "Read(!.env.sample)", "Read(!.env.template)",
+        "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
         "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)", "Read(~/.claude/.credentials.json)",
         "Read(~/.codex/auth.json)",
@@ -74,14 +78,24 @@ SANDBOX_KEYS = {
     # A blocked command may be retried unsandboxed, through the permission flow and ai-guard.
     ("sandbox", "allowUnsandboxedCommands"): True,
 }
-SANDBOX_DENY_READ = ["~/**/.env", "~/**/.env.*", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
+# Exact paths only: Claude Code expands a read glob to every path it matches, and a
+# `~/**` glob walks all of HOME. Dotfiles in the working directory come from the
+# Read(**/.env*) deny rules, which Claude Code merges into this list.
+SANDBOX_DENY_READ = ["~/.env", "~/.env.op", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
                      "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json",
                      "~/.codex/auth.json"]
+# Narrower than the ~/.ssh deny, so it re-opens only the public signer list that
+# `git log --show-signature` and `git verify-commit` read.
+SANDBOX_ALLOW_READ = ["~/.ssh/allowed_signers"]
 # The sync ledger, its backups and the workflow opt-in markers.
 SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai", f"~/{GRANTS}"]
-# Dotfiles deployment writes to HOME by design; these exact recipes run outside the
-# sandbox and still go through the permission flow.
-SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply"]
+# Exact commands (or `cmd *` prefixes) that run outside the sandbox. They still go through
+# the permission flow, the classifier and ai-guard. Dotfiles recipes read or write HOME by
+# design; git over SSH, signed commits (1Password agent socket) and gh (hosts.yml) cannot
+# work in the sandbox. See docs/ai.md, Sandbox.
+SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply",
+                    "just plan", "just status", "just doctor", "just doctor-live",
+                    "git fetch *", "git pull *", "git push *", "git commit *", "gh *"]
 # Keys whose local value the sync never adopts over, even with --adopt.
 SECURITY_KEYS = {"sandbox", "permissions"}
 
@@ -490,6 +504,7 @@ class Sync:
         if self.platform == "linux":
             wanted.append((("hooks", "Stop"), NOTIFY))
             wanted += [(("sandbox", "filesystem", "denyRead"), path) for path in SANDBOX_DENY_READ]
+            wanted += [(("sandbox", "filesystem", "allowRead"), path) for path in SANDBOX_ALLOW_READ]
             wanted += [(("sandbox", "filesystem", "denyWrite"), path) for path in SANDBOX_DENY_WRITE]
             wanted += [(("sandbox", "excludedCommands"), command) for command in SANDBOX_EXCLUDED]
         entries = self.managed_entries(path, original, desired, wanted)

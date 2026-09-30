@@ -75,6 +75,9 @@ class AISyncTest(unittest.TestCase):
         for tool in ("NotebookEdit", "Read", "Grep", "EditFile", "xmcp__a__b"):
             self.assertFalse(matcher.search(tool), f"anchored matcher must skip {tool}")
         self.assertIn("Edit(~/.local/state/dotfiles/ai/workflow-grants/**)", settings["permissions"]["deny"])
+        deny = settings["permissions"]["deny"]
+        # A gitignore negation carves out only the path rules listed before it.
+        self.assertLess(deny.index("Read(**/.env.*)"), deny.index("Read(!.env.example)"))
         self.assertIn("Creating, changing or deleting workflow opt-in markers", settings["autoMode"]["soft_deny"])
         self.assertNotIn("sandbox", settings, "native Windows has no Claude Code sandbox")
         # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
@@ -371,12 +374,20 @@ class AISyncTest(unittest.TestCase):
         self.assertIs(sandbox["allowUnsandboxedCommands"], True)
         self.assertEqual(sandbox["network"], {"allowedDomains": ["github.com"]}, "network stays the user's")
         self.assertEqual(sandbox["filesystem"]["denyRead"], ["~/private", *sync.SANDBOX_DENY_READ])
-        for path in ("~/**/.env", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials", "~/.config/gh/hosts.yml",
-                     "~/.claude.json", "~/.claude/.credentials.json", "~/.codex/auth.json"):
+        for path in ("~/.env", "~/.env.op", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
+                     "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json", "~/.codex/auth.json"):
             self.assertIn(path, sandbox["filesystem"]["denyRead"])
+        # No read glob that makes Claude Code walk the whole HOME.
+        self.assertFalse([p for p in sandbox["filesystem"]["denyRead"] if p.startswith("~/**")])
+        self.assertEqual(sandbox["filesystem"]["allowRead"], ["~/.ssh/allowed_signers"])
         self.assertEqual(sandbox["filesystem"]["denyWrite"],
                          ["~/.local/state/dotfiles/ai", "~/.local/state/dotfiles/ai/workflow-grants"])
-        self.assertEqual(sandbox["excludedCommands"], ["just ai-plan", "just ai-sync", "just ai-check", "just apply"])
+        self.assertEqual(sandbox["excludedCommands"], [
+            "just ai-plan", "just ai-sync", "just ai-check", "just apply",
+            "just plan", "just status", "just doctor", "just doctor-live",
+            "git fetch *", "git pull *", "git push *", "git commit *", "gh *"])
+        # Linux wildcard limit: write-list entries with *, ? or [ are skipped by Claude Code.
+        self.assertFalse([p for p in sandbox["filesystem"]["denyWrite"] if set(p) & set("*?[")])
         self.assertEqual(self.build("linux", "claude").operations, [])
         path = self.home / ".claude/settings.json"
         data = sync.read_json(path)

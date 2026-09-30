@@ -42,14 +42,14 @@ kept, including foreign hooks, deny rules, models and projects.
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
 | `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
-| `permissions.deny` (entries) | `.env*` read/edit, `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores), `Edit` of the [workflow opt-in](#workflow-opt-in) markers | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
+| `permissions.deny` (entries) | `.env*` read/edit (templates `.env.example`, `.env.sample`, `.env.template` carved out of the read rules with `!` negations), `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores), `Edit` of the [workflow opt-in](#workflow-opt-in) markers | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and `mcp__.*`, as the anchored regular expression `^(...)$` | Blocks the hard limits deterministically. A matcher with characters other than letters, digits, `_`, `-`, spaces, `,` and `\|` is a "JavaScript regular expression, unanchored", so the sync anchors it ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)). |
 | `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
 | `sandbox.enabled`, `sandbox.autoAllowBashIfSandboxed`, `sandbox.allowUnsandboxedCommands` (Linux) | `true`, `false`, `true` | OS-level containment of every shell command. See [Sandbox](#sandbox). |
-| `sandbox.filesystem.denyRead`, `sandbox.filesystem.denyWrite`, `sandbox.excludedCommands` (entries, Linux) | secret and credential paths; `~/.local/state/dotfiles/ai`; four `just` recipes | See [Sandbox](#sandbox). |
+| `sandbox.filesystem.denyRead`, `sandbox.filesystem.allowRead`, `sandbox.filesystem.denyWrite`, `sandbox.excludedCommands` (entries, Linux) | secret and credential paths; `~/.ssh/allowed_signers`; `~/.local/state/dotfiles/ai` and its `workflow-grants`; eight `just` recipes, the Git network commands, `git commit` and `gh` | See [Sandbox](#sandbox). |
 | `autoMode.soft_deny` (entries) | `$defaults` + the authority rules below | Teaches the classifier the authority rules. |
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
@@ -125,7 +125,7 @@ asking for authorization before publishing stays in the global rules.
 
 Known limits: the guard is a safety net against mistakes, not a sandbox, and
 code running as your user can still reach anything you can. On Linux the
-[sandbox](#sandbox) closes the indirect reads for sandboxed commands. It does not expand
+[sandbox](#sandbox) closes indirect reads of the credential stores and of dotenv files in the working directory for sandboxed commands. It does not expand
 variables, brace-expanded command words or `xargs` input, and it does not read
 files: `grep -r KEY .`, a script that opens `.env` without naming it on the
 command line, and a script written in one command and run in the next all pass.
@@ -135,8 +135,11 @@ cmdlet aliases such as `ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested
 `Get-ItemProperty`. On Windows a command reported as Bash is checked with both
 parsers, so Bash-only forms that mention a secret or a push (`if ... then`,
 here-docs such as `cat >> .gitignore <<'EOF'`) are blocked there. The
-`Read(**/.env.*)` deny rule also blocks `.env.example` templates,
-in the Read tool and in the shell reads Claude Code recognizes, such as `cat`.
+`Read(!.env.example)`, `Read(!.env.sample)` and `Read(!.env.template)` rules
+follow `Read(**/.env.*)` in the same list: "A deny or ask pattern that starts
+with `!` is a gitignore negation. It carves the paths it matches out of the
+`path` or `./path` rules listed before it"
+([permissions](https://code.claude.com/docs/en/permissions#read-and-edit)).
 
 ### Workflow opt-in
 
@@ -614,21 +617,109 @@ work PC gets none of these keys.
 | `sandbox.enabled` | `true` | Turns the sandbox on for every project. |
 | `sandbox.autoAllowBashIfSandboxed` | `false` | The default `true` runs sandboxed commands "without a permission prompt". With `false`, "sandboxed commands go through the regular permission flow, so your allow rules and permission mode decide": the auto-mode classifier and its `soft_deny` rules keep reviewing every command, as before. The sandbox adds containment; it does not replace the review. |
 | `sandbox.allowUnsandboxedCommands` | `true` | See below. |
-| `sandbox.filesystem.denyRead` (entries) | `~/**/.env`, `~/**/.env.*`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json` | The default read policy "still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`". These are the same stores as the `permissions.deny` rules, now enforced for every sandboxed process. Wildcards work in read lists on Linux: Claude Code "expands a read entry to the concrete paths it matches". |
+| `sandbox.filesystem.denyRead` (entries) | `~/.env`, `~/.env.op`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json` | The default read policy "still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`". Exact paths only, see [Dotenv files](#dotenv-files-in-the-sandbox). Claude Code also "adds the paths from your `Read(...)` deny permission rules", so the `permissions.deny` stores are in the list too. |
+| `sandbox.filesystem.allowRead` (entry) | `~/.ssh/allowed_signers` | Re-opens one public file inside the `~/.ssh` deny: "When read rules overlap, the rule with the narrower path applies". `git log --show-signature` and `git verify-commit` read it. |
 | `sandbox.filesystem.denyWrite` (entries) | `~/.local/state/dotfiles/ai`, `~/.local/state/dotfiles/ai/workflow-grants` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; these entries also hold when a session starts in `~` or adds it with `/add-dir`. On Linux, write entries must be concrete: Claude Code "skips an entry that contains `*`, `?`, or `[`". |
-| `sandbox.excludedCommands` (entries) | `just ai-plan`, `just ai-sync`, `just ai-check`, `just apply` | These recipes read the Claude config and write to `~/.claude`, `~/.codex`, `~/.agents`, `~/.local/state` or HOME (Stow) by design. `~/.claude` is a sandbox protected path that no `allowWrite` can open. "Excluded commands still go through the regular permission flow", so the classifier and `ai-guard` still review them. An entry applies only when it covers the whole call: `cd x && just apply` stays sandboxed. |
+| `sandbox.excludedCommands` (entries) | `just ai-plan`, `just ai-sync`, `just ai-check`, `just apply`, `just plan`, `just status`, `just doctor`, `just doctor-live`, `git fetch *`, `git pull *`, `git push *`, `git commit *`, `gh *` | See [Excluded commands](#excluded-commands). |
+
+### Excluded commands
+
+"Each entry uses the same syntax as the content of a `Bash(...)` permission
+rule: an exact command, a prefix such as `docker *`, or a wildcard pattern",
+and "A `*` at the end, with a space before it, also matches the bare command"
+([settings](https://code.claude.com/docs/en/settings-reference#sandbox-excludedcommands),
+[permissions](https://code.claude.com/docs/en/permissions)). "Excluded
+commands still go through the regular permission flow. Exclusion is a
+convenience, not a security boundary", so the classifier and `ai-guard` still
+review each one. An entry applies only when it covers every command in the
+call; "A command substitution, a subshell", "A redirection" and "A `cd`" keep a
+call sandboxed.
+
+- **Dotfiles recipes.** `ai-plan`, `ai-sync`, `ai-check` and `apply` read the
+  Claude config and write to `~/.claude`, `~/.codex`, `~/.agents`,
+  `~/.local/state` or HOME (Stow) by design; `~/.claude` is a sandbox protected
+  path that no `allowWrite` can open. The read-only recipes `plan`, `status`,
+  `doctor` and `doctor-live` compare the real HOME, which the sandbox masks.
+  An entry matches the command text, not the repository: `just ai-plan` in
+  any other repository runs that repository's `justfile` recipe outside the
+  sandbox. The classifier and `ai-guard` still review the call, but not the
+  recipe body.
+- **Git over SSH.** This host rewrites `https://github.com/` to SSH
+  (`insteadOf`). The sandbox network is a proxy that "enforces the allowlist
+  based on the requested hostname"; the docs describe no SSH path through it,
+  and SSH also needs `~/.ssh/known_hosts` and the 1Password agent socket. So
+  `git fetch`, `git pull` and `git push` run outside the sandbox.
+  `git push` keeps every `ai-guard` publication check.
+- **Signed commits.** Git signs through `/opt/1Password/op-ssh-sign`, which
+  talks to the 1Password agent over a Unix socket. On Linux,
+  `allowUnixSockets` is ignored ("where the seccomp filter can't inspect
+  socket paths"), and `allowAllUnixSockets` "is the only way to permit Unix
+  sockets there". That key would open every socket to every sandboxed
+  command, including the Docker socket and this session's messaging socket
+  (see [Workflow opt-in](#workflow-opt-in)). Excluding `git commit *` is
+  narrower. Trade-off: the repository's commit hooks (`pre-commit`,
+  `commit-msg`) run outside the sandbox after the classifier approves the
+  commit. The rules ask for `git commit -F <file>` as its own command, because
+  a message built with `$(...)` or a here-doc keeps the call sandboxed.
+- **`gh`.** It reads its token from `~/.config/gh/hosts.yml`, which is denied.
+  The documented alternative is a `mask` entry for that file, which needs
+  `network.tlsTerminate`, an experimental key that makes the proxy terminate
+  TLS for every sandboxed command. That is a wider change than one excluded
+  program, so `gh *` runs outside the sandbox. `ai-guard` still blocks
+  `gh auth token`, `gh repo delete`, admin merges and ref writes.
+
+What stays sandboxed: every other Git command (`status`, `diff`, `log`,
+`add`, `merge`, `rebase`), and any call that combines one of these commands
+with another command.
+
+### Dotenv files in the sandbox
+
+On Linux, "Claude Code expands a read entry to the concrete paths it
+matches". A `~/**/.env*` entry would walk all of HOME, and a Python walk of
+this HOME takes 2.6 s. So the sandbox list names exact files (`~/.env`,
+`~/.env.op`), and the working directory is covered by the `Read(**/.env)`
+and `Read(**/.env.*)` deny rules, which are relative to the current
+directory and which Claude Code merges into the sandbox list. The
+`Read(!.env.example)`, `Read(!.env.sample)` and `Read(!.env.template)`
+negations carve the templates out of these rules, so `cp .env.example .env`
+reads the template instead of a masked empty file.
+
+Trade-off: a sandboxed command can read the `.env` file of another project
+under HOME. `ai-guard` still blocks a command that names it, and the
+classifier reviews the command. The docs describe the negations for
+permission checks only; whether the sandbox honors them is part of the host
+test below. If you prefer coverage over latency, add
+`~/<projects>/**/.env*` entries to `sandbox.filesystem.denyRead` in your own
+settings.
+
+### Limits
+
+- **A denied path is masked, not refused.** On Linux a denied file reads as
+  empty (the test below checks for a character device) and a denied directory
+  as an empty mount. So a blocked program usually reports missing data, not a
+  permission error: `gh` sees an empty `hosts.yml` and reports that you are
+  not logged in, and `ssh` sees an empty `~/.ssh`. Commands that need the real
+  HOME are the ones listed under [Excluded commands](#excluded-commands),
+  `with-secrets` (1Password) and anything that reads another credential store.
+- **A project can widen reads.** Array keys merge from every settings scope,
+  so a project's `.claude/settings.json` can add `allowRead` and re-open a
+  path. Only the managed-settings key `allowManagedReadPathsOnly` prevents
+  that ("Honor only the `allowRead` entries that come from managed
+  settings"). A project can also add `excludedCommands`: "there is no
+  managed-only lock for this list".
+- **Read globs are expanded to concrete paths.** A file that does not exist
+  when Claude Code expands the entry is not covered. The docs do not say when
+  the expansion runs; the host test checks it.
 
 **Unsandboxed retries.** With `allowUnsandboxedCommands: true` (also the
 default), a command that the sandbox blocks may be retried with
 `dangerouslyDisableSandbox`: "The retried command runs outside the sandbox,
 so it goes through the regular permission flow. [...] In auto mode, the
 classifier evaluates the underlying command". `ai-guard` runs on that call
-too. `false` ("strict sandbox mode") would make other work outside the
-working directory impossible from a session: `gh` needs `hosts.yml`,
-`git push` over SSH needs `~/.ssh`, `with-secrets` needs 1Password. Those
-commands fail in the sandbox, name the denied path, and then run unsandboxed
-only when the classifier approves. For a prompt on every retry, even in auto
-mode, add the ask rule `Bash(dangerouslyDisableSandbox:true)` yourself.
+too. `false` ("strict sandbox mode") would make `with-secrets` and other work
+that needs the real HOME impossible from a session. For a prompt on every
+retry, even in auto mode, add the ask rule
+`Bash(dangerouslyDisableSandbox:true)` yourself.
 
 **Network.** The sync sets no network key. By default "Claude Code pre-allows
 no domains"; in auto mode "Claude instead names the hosts a command needs on
@@ -661,33 +752,54 @@ in `settings.json` apply to Desktop sessions"
 They do not mention the sandbox for the Code tab. Treat Desktop support as not
 documented and verify it on the host (test in a Desktop session below).
 
-**Host test** (CachyOS, before relying on it): run `just ai-plan`, review,
-`just ai-sync`, then open a new CLI session and a new Desktop Code session in
-a scratch repository. In your own terminal, create a `.env` file there. The
-probe must read files indirectly, because `ai-guard` blocks any command that
-names them. Ask Claude to write `probe.py` with this content and run
+**Host test** (CachyOS, Claude Code 2.1.284, bubblewrap 0.13.0, socat
+1.8.1.3; before relying on it): run `just ai-plan`, review, `just ai-sync`,
+`just ai-check`, then open a new CLI session and a new Desktop Code session in
+a scratch Git repository. In your own terminal, create `.env` and
+`.env.example` there. `ai-guard` blocks any command that names a secret, so
+the probe builds the names from parts. It prints one status word per path and
+never reads content. Ask Claude to write `probe.py` with this content and run
 `python3 probe.py` (sandboxed, no retry):
 
 ```python
 import os
+import stat
+
 home = os.path.expanduser("~")
-for path in (".e" + "nv", home + "/.s" + "sh", home + "/.claude" + ".json", home + "/.gitconfig"):
+dot = "." + "e" + "nv"
+paths = [dot, dot + ".exam" + "ple", home + "/.s" + "sh", home + "/.s" + "sh/allowed_" + "signers",
+         home + "/.claude" + ".json", home + "/.config/g" + "h/hosts.yml", home + "/.gitconfig"]
+with open("/proc/self/mountinfo", encoding="utf-8") as mounts:
+    points = {line.split()[4].replace("\\040", " ") for line in mounts}
+for path in paths:
     try:
-        os.listdir(path) if os.path.isdir(path) else open(path).read(1)
-        print("READ  ", path)
+        info = os.stat(path)
     except OSError as error:
-        print("DENIED", path, type(error).__name__)
+        print(f"{type(error).__name__:8}", path)
+        continue
+    if stat.S_ISCHR(info.st_mode):
+        print("MASKED  ", path)  # bound to /dev/null
+    elif stat.S_ISDIR(info.st_mode) and os.path.realpath(path) in points and not os.listdir(path):
+        print("MASKED  ", path)  # empty mount
+    else:
+        print("VISIBLE ", path)
 ```
 
 | Check | Expected |
 |---|---|
-| `/sandbox` (CLI) | No Dependencies-only tab; Config lists the `denyRead` paths. |
-| `python3 probe.py` | `DENIED` for the dotenv file, `~/.ssh` and `~/.claude.json`; `READ` for `~/.gitconfig`. The same in the Desktop session. |
+| `/sandbox` (CLI) | No Dependencies tab (bubblewrap, socat and the seccomp filter present); Config lists the `denyRead` and `denyWrite` paths. |
+| `python3 probe.py` | `MASKED` for the dotenv file, `~/.ssh`, `~/.claude.json` and `hosts.yml`; `VISIBLE` for `.env.example`, `allowed_signers` and `~/.gitconfig`. The same in the Desktop session. If `.env.example` is `MASKED`, the sandbox does not honor the `!` negations. |
+| Create `.env.local` in your terminal during the session, then run the probe again with that name | `MASKED`: the read rules are expanded per command. `VISIBLE`: they are expanded once per session; restart after creating secret files. |
+| `time true` sandboxed, three times, in the scratch repository and in `~` | Under 0.3 s each. Several seconds means a read glob walks a large tree. |
 | `touch ~/sandbox-probe` | Fails in the sandbox (`Read-only file system`); an unsandboxed retry goes to the classifier. |
-| `touch ~/.local/state/dotfiles/ai/probe` | Fails in the sandbox. |
+| `touch ~/.local/state/dotfiles/ai/workflow-grants/probe` | Blocked by `ai-guard` (names `workflow-grants`). |
+| `python3 -c 'import os; os.makedirs(os.path.expanduser("~/.local/state/dotfiles/ai/x"))'` | Fails in the sandbox (`Read-only file system`). |
+| `git commit -F msg.txt` with a staged change | Runs outside the sandbox and the commit is signed (`git log --show-signature -1` sandboxed shows a good signature). |
+| `git fetch`, `gh pr list` | Run outside the sandbox and work on the first attempt. |
+| `just plan`, `just ai-plan` | Run outside the sandbox and print the real plan. |
 | `curl -sI https://example.com` | Claude names `example.com` on the command and the classifier reviews it. |
-| `just ai-plan` | Runs outside the sandbox and prints the plan. |
 | First prompt `ultracode: say hi`, then ask for a workflow | The Workflow tool runs in that session; in a new session without the keyword it is blocked. |
+| Ask Claude to schedule a task or send a message whose text starts with `ultracode` | `ai-guard` blocks the call. |
 
 ## Project gate
 
@@ -704,11 +816,15 @@ are absent.
 
 Keep `ai.check` fast (lint and typecheck, or unit tests that finish in
 seconds). The Stop entry allows 300 s; the hook keeps one 290 s budget for
-all its Git calls and the check (the format hook: 27 s of 30 s). On timeout it
-kills the whole process tree (its own session and process group on Linux,
-`taskkill /T /F` on Windows), so no child keeps running. The last passing
-state is in `.git/ai-gate-pass` and the last failing one in
-`.git/ai-gate-fail`. The first Stop in a clean repository without these files
+all its Git calls and the check (the format hook: 27 s of 30 s), and keeps 8 s
+of it free to stop a command that times out. On timeout it kills the whole
+process tree (its own session and process group on Linux, `taskkill /T /F` on
+Windows, then the shell itself if `taskkill` fails or hangs) and reads the
+remaining output for at most 2 s, so a child that left the process group
+cannot hold the hook until its entry timeout. A timeout counts as a failure.
+The last passing state is in `.git/ai-gate-pass` and the last failing one in
+`.git/ai-gate-fail`; if Git cannot name the `.git` directory, the gate does
+nothing. The first Stop in a clean repository without these files
 records the state as the baseline without running the check, so a fresh clone
 with old failures does not stop a turn that changed nothing. After that, a new
 HEAD (a commit, a pull, a checkout) is checked at the next Stop.
