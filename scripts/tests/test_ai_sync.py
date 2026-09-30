@@ -383,6 +383,18 @@ class AISyncTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "different local value.*sandbox.enabled"):
             self.build("linux", "claude")
 
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_adopt_never_overwrites_a_local_security_key(self):
+        for local in ({"sandbox": {"enabled": False}}, {"sandbox": {"allowUnsandboxedCommands": False}},
+                      {"permissions": {"defaultMode": "default"}}):
+            self.json_write(".claude/settings.json", local)
+            adopted = sync.Sync(self.home, "linux", "claude", adopt=True)
+            with self.assertRaisesRegex(ValueError, "different local value"):
+                adopted.plan()
+        # Other keys are still adopted from an earlier deployment.
+        self.json_write(".claude/settings.json", {"language": "english"})
+        sync.Sync(self.home, "linux", "claude", adopt=True).plan()
+
     def test_list_entries_keep_foreign_items_and_conflict_when_removed(self):
         self.json_write(".claude/settings.json", {"permissions": {"deny": ["Bash(curl *)"]},
                                                   "hooks": {"PreToolUse": [{"matcher": "Edit", "hooks": []}]}})

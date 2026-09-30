@@ -73,6 +73,8 @@ SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai"]
 # Dotfiles deployment writes to HOME by design; these exact recipes run outside the
 # sandbox and still go through the permission flow.
 SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply"]
+# Keys whose local value the sync never adopts over, even with --adopt.
+SECURITY_KEYS = {"sandbox", "permissions"}
 
 # Rules for the auto-mode classifier (the default mode). "$defaults" keeps the built-ins.
 AUTO_SOFT_DENY = [
@@ -331,8 +333,10 @@ class Sync:
                 raise ValueError(f"Conflict: managed key modified: {path} ({'.'.join(route)})")
         owned = {tuple(item["path"]) for item in previous}
         for route in keys:
-            # Adopting a key the user already set to something else would erase their choice.
-            if (route not in owned and not (self.adopt and not previous) and get(desired, route) != MISSING
+            # Adopting a key the user already set to something else would erase their choice;
+            # for sandbox and permission keys it could also weaken a local hardening.
+            adopt = self.adopt and not previous and route[0] not in SECURITY_KEYS
+            if (route not in owned and not adopt and get(desired, route) != MISSING
                     and get(original, route) not in (MISSING, get(desired, route))):
                 raise ValueError(f"Conflict: new key already has a different local value: {path} ({'.'.join(map(str, route))})")
         projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
