@@ -13,9 +13,10 @@ description: Select and run fresh, proportionate verification before claiming a 
    search before declaring completion.
 2. Run the smallest fresh command or observation that proves each changed
    behavior, then repository-mandated checks. Read exit status and relevant
-   output; never claim a pass from an earlier run.
-   Keep verification proportionate. Do not re-run a check that a hook or
-   gate already ran on the same state of the tree; cite its result instead.
+   output; never claim a pass from a run on an older tree or in another session.
+   Keep verification proportionate. Skip a re-run only when you saw that
+   check's output for the current tree in this session; cite that output.
+   A hook or gate that printed nothing gives no result to cite.
 3. For web changes, invoke `verify-web-change` for the focused web checklist.
 4. Run `git diff --check` and confirm unrelated files were not changed.
 5. Report exactly what ran: commands, results, exclusions, and remaining
