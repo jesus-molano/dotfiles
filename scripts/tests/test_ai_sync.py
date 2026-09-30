@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import shutil
@@ -67,8 +68,22 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(settings["autoMode"]["soft_deny"][0], "$defaults")
         self.assertEqual(len(settings["autoMode"]["soft_deny"]), len(sync.AUTO_SOFT_DENY))
         self.assertTrue(settings["statusLine"]["command"].startswith(f'"{Path(sys.executable).as_posix()}" '))
-        self.assertIn("Write|Edit", settings["hooks"]["PreToolUse"][0]["matcher"])
-        self.assertIn("Monitor", settings["hooks"]["PreToolUse"][0]["matcher"].split("|"))
+        matcher = re.compile(settings["hooks"]["PreToolUse"][0]["matcher"])
+        for tool in ("Bash", "PowerShell", "Monitor", "Workflow", "Write", "Edit", "MultiEdit", "CronCreate",
+                     "ScheduleWakeup", "RemoteTrigger", "SendMessage", "mcp__github__search_code"):
+            self.assertTrue(matcher.search(tool), tool)
+        for tool in ("NotebookEdit", "Read", "Grep", "EditFile", "xmcp__a__b"):
+            self.assertFalse(matcher.search(tool), f"anchored matcher must skip {tool}")
+        self.assertIn("Edit(~/.local/state/dotfiles/ai/workflow-grants/**)", settings["permissions"]["deny"])
+        deny = settings["permissions"]["deny"]
+        # A gitignore negation carves out only the path rules listed before it.
+        self.assertLess(deny.index("Read(**/.env.*)"), deny.index("Read(!.env.example)"))
+        self.assertIn("Creating, changing or deleting workflow opt-in markers", settings["autoMode"]["soft_deny"])
+        self.assertNotIn("sandbox", settings, "native Windows has no Claude Code sandbox")
+        # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
+        guard = settings["hooks"]["PreToolUse"][0]["hooks"]
+        self.assertEqual(settings["hooks"]["UserPromptSubmit"], [{"hooks": guard}])
+        self.assertEqual(settings["hooks"]["UserPromptExpansion"], [{"matcher": "workflow-authoring", "hooks": guard}])
         self.assertEqual(settings["model"], "opus")
         self.assertEqual(settings["permissions"]["defaultMode"], "auto")
         self.assertEqual(settings["permissions"]["disableBypassPermissionsMode"], "disable")
@@ -348,6 +363,57 @@ class AISyncTest(unittest.TestCase):
                      XDG_STATE_HOME=str(self.home / ".local/state")), capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_sandbox_keys_and_entries(self):
+        self.json_write(".claude/settings.json", {"sandbox": {"filesystem": {"denyRead": ["~/private"]},
+                                                              "network": {"allowedDomains": ["github.com"]}}})
+        self.build("linux", "claude").apply()
+        sandbox = sync.read_json(self.home / ".claude/settings.json")["sandbox"]
+        self.assertIs(sandbox["enabled"], True)
+        self.assertIs(sandbox["autoAllowBashIfSandboxed"], False)
+        self.assertIs(sandbox["allowUnsandboxedCommands"], True)
+        self.assertEqual(sandbox["network"], {"allowedDomains": ["github.com"]}, "network stays the user's")
+        self.assertEqual(sandbox["filesystem"]["denyRead"], ["~/private", *sync.SANDBOX_DENY_READ])
+        for path in ("~/.env", "~/.env.op", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
+                     "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json", "~/.codex/auth.json"):
+            self.assertIn(path, sandbox["filesystem"]["denyRead"])
+        # No read glob that makes Claude Code walk the whole HOME.
+        self.assertFalse([p for p in sandbox["filesystem"]["denyRead"] if p.startswith("~/**")])
+        self.assertEqual(sandbox["filesystem"]["allowRead"], ["~/.ssh/allowed_signers"])
+        self.assertEqual(sandbox["filesystem"]["denyWrite"],
+                         ["~/.local/state/dotfiles/ai", "~/.local/state/dotfiles/ai/workflow-grants"])
+        self.assertEqual(sandbox["excludedCommands"], [
+            "just ai-plan", "just ai-sync", "just ai-check", "just apply",
+            "just plan", "just status", "just doctor", "just doctor-live",
+            "git fetch *", "git pull *", "git push *", "git commit *", "gh *"])
+        # Linux wildcard limit: write-list entries with *, ? or [ are skipped by Claude Code.
+        self.assertFalse([p for p in sandbox["filesystem"]["denyWrite"] if set(p) & set("*?[")])
+        self.assertEqual(self.build("linux", "claude").operations, [])
+        path = self.home / ".claude/settings.json"
+        data = sync.read_json(path)
+        data["sandbox"]["enabled"] = False
+        path.write_text(json.dumps(data), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "managed key modified"):
+            self.build("linux", "claude")
+
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_sandbox_never_overrides_a_local_choice(self):
+        self.json_write(".claude/settings.json", {"sandbox": {"enabled": False}})
+        with self.assertRaisesRegex(ValueError, "different local value.*sandbox.enabled"):
+            self.build("linux", "claude")
+
+    @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_adopt_never_overwrites_a_local_security_key(self):
+        for local in ({"sandbox": {"enabled": False}}, {"sandbox": {"allowUnsandboxedCommands": False}},
+                      {"permissions": {"defaultMode": "default"}}):
+            self.json_write(".claude/settings.json", local)
+            adopted = sync.Sync(self.home, "linux", "claude", adopt=True)
+            with self.assertRaisesRegex(ValueError, "different local value"):
+                adopted.plan()
+        # Other keys are still adopted from an earlier deployment.
+        self.json_write(".claude/settings.json", {"language": "english"})
+        sync.Sync(self.home, "linux", "claude", adopt=True).plan()
+
     def test_list_entries_keep_foreign_items_and_conflict_when_removed(self):
         self.json_write(".claude/settings.json", {"permissions": {"deny": ["Bash(curl *)"]},
                                                   "hooks": {"PreToolUse": [{"matcher": "Edit", "hooks": []}]}})
@@ -371,6 +437,7 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(hooks["PreToolUse"][0], foreign)
         self.assertEqual(hooks["PreToolUse"][1]["matcher"], "Bash|apply_patch")
         self.assertIn(".codex/hooks/ai-guard.py", hooks["PreToolUse"][1]["hooks"][0]["command"])
+        self.assertNotIn("UserPromptSubmit", hooks, "Codex has no Workflow tool to opt in to")
         self.assertEqual((self.home / ".codex/hooks/ai-guard.py").read_text(),
                          (sync.ROOT / "ai/hooks/ai-guard.py").read_text())
         self.assertEqual(self.build(platform, "codex").operations, [])

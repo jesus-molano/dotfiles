@@ -22,6 +22,11 @@ import tomllib
 from ai_sources import NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
 
 MISSING = {"$absent": True}
+GRANTS = ".local/state/dotfiles/ai/workflow-grants"
+# Anchored regex (a plain `A|B` list is exact names, but `mcp__.*` needs the regex path).
+# The prompt senders and MCP tools are checked only for the workflow opt-in keyword.
+GUARD_MATCHER = ("^(Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit"
+                 "|CronCreate|ScheduleWakeup|RemoteTrigger|SendMessage|mcp__.*)$")
 MCP = {"linear": "https://mcp.linear.app/mcp/readonly",
        "openaiDeveloperDocs": "https://developers.openai.com/mcp"}
 NOTIFY = {"hooks": [{"type": "command", "command": "claude-notify", "timeout": 5}]}
@@ -47,14 +52,52 @@ CLAUDE_DEFAULTS = {("model",): "opus"}
 # file tools and only the shell commands Claude Code recognizes (cat, head, sed, tee,
 # redirections); indirect reads such as `grep -r`, interpreters or scripts pass them.
 # The ai-guard hook blocks shell commands that name these same stores.
-DENY = ["Read(**/.env)", "Read(**/.env.*)", "Edit(**/.env)", "Edit(**/.env.*)",
+DENY = ["Read(**/.env)", "Read(**/.env.*)",
+        # gitignore negation: carves templates out of the path rules listed before it,
+        # so `cp .env.example .env` reads the template.
+        "Read(!.env.example)", "Read(!.env.sample)", "Read(!.env.template)",
+        "Edit(**/.env)", "Edit(**/.env.*)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
         "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)", "Read(~/.claude/.credentials.json)",
         "Read(~/.codex/auth.json)",
         # Claude applies Edit rules to every file write; Write deny rules are ignored.
         "Edit(~/.local/share/tessera/projects/*/provider-consent.json)",
         "Edit(~/AppData/Local/tessera/projects/*/provider-consent.json)",
-        "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)"]
+        "Edit(~/AppData/Local/Packages/*/LocalCache/Local/tessera/projects/*/provider-consent.json)",
+        # Workflow opt-in markers (ai-guard.py grant_path): %USERPROFILE%\.local\state on
+        # Windows, the default XDG_STATE_HOME on Linux. Claude Code also adds Edit deny
+        # paths to the sandbox denyWrite list.
+        f"Edit(~/{GRANTS}/**)"]
+
+# Claude Code sandbox, Linux only (native Windows is not supported). Deny rules stop only
+# the reads Claude Code recognizes; the sandbox stops every sandboxed process at the OS level.
+SANDBOX_KEYS = {
+    ("sandbox", "enabled"): True,
+    # Sandboxed commands still go to the auto-mode classifier and its soft_deny rules.
+    ("sandbox", "autoAllowBashIfSandboxed"): False,
+    # A blocked command may be retried unsandboxed, through the permission flow and ai-guard.
+    ("sandbox", "allowUnsandboxedCommands"): True,
+}
+# Exact paths only: Claude Code expands a read glob to every path it matches, and a
+# `~/**` glob walks all of HOME. Dotfiles in the working directory come from the
+# Read(**/.env*) deny rules, which Claude Code merges into this list.
+SANDBOX_DENY_READ = ["~/.env", "~/.env.op", "~/.ssh", "~/.gnupg", "~/.aws", "~/.git-credentials",
+                     "~/.config/gh/hosts.yml", "~/.claude.json", "~/.claude/.credentials.json",
+                     "~/.codex/auth.json"]
+# Narrower than the ~/.ssh deny, so it re-opens only the public signer list that
+# `git log --show-signature` and `git verify-commit` read.
+SANDBOX_ALLOW_READ = ["~/.ssh/allowed_signers"]
+# The sync ledger, its backups and the workflow opt-in markers.
+SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai", f"~/{GRANTS}"]
+# Exact commands (or `cmd *` prefixes) that run outside the sandbox. They still go through
+# the permission flow, the classifier and ai-guard. Dotfiles recipes read or write HOME by
+# design; git over SSH, signed commits (1Password agent socket) and gh (hosts.yml) cannot
+# work in the sandbox. See docs/ai.md, Sandbox.
+SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply",
+                    "just plan", "just status", "just doctor", "just doctor-live",
+                    "git fetch *", "git pull *", "git push *", "git commit *", "gh *"]
+# Keys whose local value the sync never adopts over, even with --adopt.
+SECURITY_KEYS = {"sandbox", "permissions"}
 
 # Rules for the auto-mode classifier (the default mode). "$defaults" keeps the built-ins.
 AUTO_SOFT_DENY = [
@@ -65,6 +108,7 @@ AUTO_SOFT_DENY = [
     "Running GNU Stow over every package, or changing /etc, boot, Btrfs, GPU drivers or system services without an explicit request",
     "Creating, editing or commenting on issues or pull requests in Linear or GitHub without explicit authorization",
     "Sending project source or catalog data to an external service the task has not already been authorized to use",
+    "Creating, changing or deleting workflow opt-in markers",
 ]
 
 
@@ -313,8 +357,10 @@ class Sync:
                 raise ValueError(f"Conflict: managed key modified: {path} ({'.'.join(route)})")
         owned = {tuple(item["path"]) for item in previous}
         for route in keys:
-            # Adopting a key the user already set to something else would erase their choice.
-            if (route not in owned and not (self.adopt and not previous) and get(desired, route) != MISSING
+            # Adopting a key the user already set to something else would erase their choice;
+            # for sandbox and permission keys it could also weaken a local hardening.
+            adopt = self.adopt and not previous and route[0] not in SECURITY_KEYS
+            if (route not in owned and not adopt and get(desired, route) != MISSING
                     and get(original, route) not in (MISSING, get(desired, route))):
                 raise ValueError(f"Conflict: new key already has a different local value: {path} ({'.'.join(map(str, route))})")
         projection = [{"path": list(route), "value": get(desired, route)} for route in keys]
@@ -433,6 +479,8 @@ class Sync:
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
         keys = dict(CLAUDE_KEYS)
+        if self.platform == "linux":
+            keys.update(SANDBOX_KEYS)
         keys[("statusLine",)] = {"type": "command", "padding": 0,
                                  "command": hook_command(self.home, self.platform, "statusline.py")}
         for route, value in keys.items():
@@ -440,9 +488,12 @@ class Sync:
         for route, value in CLAUDE_DEFAULTS.items():
             if get(original, route) == MISSING:
                 put(desired, route, value)
-        guard = {"matcher": "Bash|PowerShell|Monitor|Workflow|Write|Edit|MultiEdit", "hooks": [
-            {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}]}
+        guard_hook = {"type": "command", "command": hook_command(self.home, self.platform, "ai-guard.py"), "timeout": 10}
+        guard = {"matcher": GUARD_MATCHER, "hooks": [guard_hook]}
         wanted = [(("permissions", "deny"), rule) for rule in DENY] + [(("hooks", "PreToolUse"), guard)]
+        # The same guard records the user's workflow opt-in from a typed prompt or /workflow-authoring.
+        wanted.append((("hooks", "UserPromptSubmit"), {"hooks": [guard_hook]}))
+        wanted.append((("hooks", "UserPromptExpansion"), {"matcher": "workflow-authoring", "hooks": [guard_hook]}))
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
         # Per-project gate: inert until a repository sets ai.format / ai.check in its Git config.
         gate = hook_command(self.home, self.platform, "project-gate.py")
@@ -452,6 +503,10 @@ class Sync:
             {"type": "command", "command": f"{gate} check", "timeout": 300}]}))
         if self.platform == "linux":
             wanted.append((("hooks", "Stop"), NOTIFY))
+            wanted += [(("sandbox", "filesystem", "denyRead"), path) for path in SANDBOX_DENY_READ]
+            wanted += [(("sandbox", "filesystem", "allowRead"), path) for path in SANDBOX_ALLOW_READ]
+            wanted += [(("sandbox", "filesystem", "denyWrite"), path) for path in SANDBOX_DENY_WRITE]
+            wanted += [(("sandbox", "excludedCommands"), command) for command in SANDBOX_EXCLUDED]
         entries = self.managed_entries(path, original, desired, wanted)
         self.merged(path, original, desired, keys, json_text(desired))
         self.next_state[str(path.relative_to(self.home))]["entries"] = entries

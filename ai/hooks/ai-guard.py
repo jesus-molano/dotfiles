@@ -13,7 +13,16 @@ part of a normal task are blocked, so the guard stays cheap and quiet:
 - reading secret files (.env*), credential stores (Claude, Codex, gh, Git, SSH,
   GnuPG, AWS) or 1Password items directly;
 - `tessera.py consent` or writing `provider-consent.json`, which only the user may do;
-- the Workflow tool, unless the user started the session with AI_ALLOW_WORKFLOW=1.
+- the Workflow tool, unless the user opted in for this session: a prompt that starts
+  with `ultracode` or `/workflow-authoring`, or AI_ALLOW_WORKFLOW=1 at CLI start;
+- any tool call that names the opt-in state directory, and any call that could
+  put the opt-in keyword into a prompt of this session: a scheduled prompt
+  (CronCreate, ScheduleWakeup, RemoteTrigger), a message to a session
+  (SendMessage, MCP tools) or a shell command that names the keyword or the
+  session messaging socket. So the model cannot grant the opt-in to itself.
+
+The same script also runs on UserPromptSubmit and UserPromptExpansion. There it
+records the opt-in for the session and never blocks the prompt.
 
 Secrets and publication fail closed: every mention of them in the raw command
 text must lie inside a part that the parser understood as harmless, or the
@@ -32,6 +41,8 @@ import os
 import re
 import subprocess
 import sys
+import time
+from pathlib import Path
 
 MAX_DEPTH = 8
 PUSH_FLAGS = {"-f", "--force", "--mirror", "--delete", "-d", "--tags", "--all", "--prune",
@@ -103,6 +114,27 @@ SECRET_REASON = "secret files (.env*) and credential stores are never read or sh
 PLAIN_PUSH = "git push runs only in the plain form `git push [-u] [remote] [branch]` as its own command"
 ALIAS_REASON = "zsh git aliases hide what they push or reset; write the git command itself"
 HIDDEN = "; text that only mentions it belongs in a file (for example `git commit -F <file>`)"
+
+# Workflow opt-in. Hook input has no field that tells a typed prompt from a relayed
+# one, so only a prompt that starts with the keyword counts (see docs/ai.md).
+GRANT_DIR = "workflow-grants"
+GRANT_TTL = 6 * 3600  # seconds
+GRANT_REASON = "only the user grants the workflow opt-in; its state directory is off limits"
+SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+# The grant must be a strict subset of OPT_IN_TEXT below, or a scheduled prompt could pass
+# the send-side block and still grant: ASCII letters only, and no `-` after the keyword.
+OPT_IN = re.compile(r"\s*(?:ultracode(?![\w-])|/workflow-authoring(?:\s|$))", re.I | re.A)
+# The keyword anywhere, as a word. A scheduled prompt or a message to a session can
+# arrive as a prompt of this session, and the hook cannot see where a prompt came from.
+OPT_IN_TEXT = re.compile(r"(?<![\w-])ultracode(?![\w-])|/workflow-authoring(?![\w-])", re.I)
+OPT_IN_REASON = ("text that starts a workflow opt-in (`ultracode`, `/workflow-authoring`) never goes into a "
+                 "scheduled prompt, a message or a shell command; only the user types it (to find it in files, "
+                 "use the Grep tool)")
+# Tools that send text into a session as a prompt; MCP tools may do the same.
+PROMPT_SENDERS = {"CronCreate", "ScheduleWakeup", "RemoteTrigger", "SendMessage"}
+# The inbox socket of this session (Linux and macOS default directory: /tmp/cc-socks-<uid>).
+MESSAGING = re.compile(r"CLAUDE_CODE_MESSAGING_|cc-socks-", re.I)
+MESSAGING_REASON = "shell commands never use the session messaging socket; only the user sends to a session"
 
 
 def home_variants() -> set[str]:
@@ -896,16 +928,96 @@ def strings(value) -> list[str]:
     return []
 
 
+def patch_paths(data) -> list[str]:
+    """Files that a Codex apply_patch call adds, updates, deletes or moves to."""
+    return [path for text in strings(data) for path in re.findall(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", text, re.M)]
+
+
+def grant_path(session) -> Path | None:
+    """The opt-in marker of one session. Linux honors XDG_STATE_HOME; Windows uses
+    %USERPROFILE%\\.local\\state, which MSIX apps do not virtualize."""
+    if not (isinstance(session, str) and SESSION_ID.fullmatch(session)):
+        return None
+    base = os.environ.get("XDG_STATE_HOME", "") if os.name != "nt" else ""
+    root = Path(base) if os.path.isabs(base) else Path.home() / ".local/state"
+    return root / "dotfiles/ai" / GRANT_DIR / f"{session}.json"
+
+
+def opted_in(event: dict) -> bool:
+    if event.get("agent_id"):  # subagents never speak for the user
+        return False
+    if event.get("hook_event_name") == "UserPromptSubmit":
+        return isinstance(event.get("prompt"), str) and OPT_IN.match(event["prompt"]) is not None
+    # UserPromptExpansion fires only for a command the user typed, never for the Skill tool.
+    return (event.get("hook_event_name") == "UserPromptExpansion"
+            and event.get("expansion_type") == "slash_command"
+            and event.get("command_name") == "workflow-authoring")
+
+
+def record_grant(event: dict) -> str | None:
+    path = grant_path(event.get("session_id"))
+    if path is None or not opted_in(event):
+        return None
+    path.parent.mkdir(parents=True, exist_ok=True)
+    now = time.time()
+    for old in path.parent.glob("*.json"):  # expired markers of other sessions
+        try:
+            if now - old.stat().st_mtime > GRANT_TTL:
+                old.unlink()
+        except OSError:
+            pass
+    temporary = path.with_name(f".{path.stem}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps({"granted_at": now}), encoding="utf-8")
+    os.replace(temporary, path)
+    return f"ai-guard: the user opted in to multi-agent workflows for this session ({GRANT_TTL // 3600} h)."
+
+
+def workflow_granted(session) -> bool:
+    path = grant_path(session)
+    try:
+        granted = json.loads(path.read_text(encoding="utf-8"))["granted_at"]
+    except (AttributeError, OSError, ValueError, KeyError, TypeError):
+        return False
+    return isinstance(granted, (int, float)) and 0 <= time.time() - granted <= GRANT_TTL
+
+
+def names_grants(text) -> bool:
+    return isinstance(text, str) and GRANT_DIR in text.lower()
+
+
+def carries_opt_in(data) -> bool:
+    """Whether any string of a tool input holds the opt-in keyword. A cheap substring test
+    comes first, so a normal MCP call costs almost nothing."""
+    for text in strings(data):
+        lower = text.lower()
+        if ("ultracode" in lower or "workflow-authoring" in lower) and OPT_IN_TEXT.search(text):
+            return True
+    return False
+
+
 def decide(event: dict) -> str | None:
     tool = event.get("tool_name")
     data = event.get("tool_input") or {}
-    if tool == "Workflow" and os.environ.get("AI_ALLOW_WORKFLOW") != "1":
-        return ("multi-agent workflows need an explicit request; ask the user, who can start "
-                "the session with AI_ALLOW_WORKFLOW=1")
+    if tool == "Workflow" and os.environ.get("AI_ALLOW_WORKFLOW") != "1" and not workflow_granted(event.get("session_id")):
+        return ("multi-agent workflows need the user's opt-in; ask the user, who can start a prompt "
+                "with `ultracode` or run /workflow-authoring")
+    if isinstance(tool, str) and (tool in PROMPT_SENDERS or tool.startswith("mcp__")):
+        return OPT_IN_REASON if carries_opt_in(data) else None
+    # Reads are blocked too: interpreter code cannot be told apart from a write.
+    if tool in {"Bash", "Monitor", "PowerShell"} and names_grants(data.get("command")):
+        return GRANT_REASON
+    if tool in {"Bash", "Monitor", "PowerShell"} and isinstance(data.get("command"), str):
+        if MESSAGING.search(data["command"]):
+            return MESSAGING_REASON
+        if carries_opt_in(data["command"]):
+            return OPT_IN_REASON
+    if tool in {"Write", "Edit", "MultiEdit"} and names_grants(data.get("file_path")):
+        return GRANT_REASON
+    if tool == "apply_patch" and any(names_grants(path) for path in patch_paths(data)):
+        return GRANT_REASON
     if tool in {"Write", "Edit", "MultiEdit"} and "provider-consent" in str(data.get("file_path", "")):
         return "provider consent is granted by the user in their own terminal"
-    if tool == "apply_patch" and any("provider-consent" in path for text in strings(data) for path in
-                                     re.findall(r"^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$", text, re.M)):
+    if tool == "apply_patch" and any("provider-consent" in path for path in patch_paths(data)):
         return "provider consent is granted by the user in their own terminal"
     # Monitor runs a shell command in the background, with the same shell as Bash.
     if tool in {"Bash", "Monitor"} and isinstance(data.get("command"), str):
@@ -917,7 +1029,7 @@ def decide(event: dict) -> str | None:
 
 
 def main() -> int:
-    for stream in (sys.stdin, sys.stderr):
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
         # Windows defaults to the ANSI code page; hooks exchange UTF-8.
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -926,6 +1038,15 @@ def main() -> int:
     except (json.JSONDecodeError, UnicodeDecodeError):
         return 0
     if not isinstance(event, dict):
+        return 0
+    if event.get("hook_event_name") in {"UserPromptSubmit", "UserPromptExpansion"}:
+        # Exit 2 here would erase the user's prompt: always let it through.
+        try:
+            note = record_grant(event)
+        except Exception:
+            note = "ai-guard: the workflow opt-in could not be recorded; workflows stay blocked."
+        if note:
+            print(note)  # plain stdout on these events becomes context for Claude
         return 0
     if isinstance(event.get("cwd"), str) and os.path.isdir(event["cwd"]):
         os.chdir(event["cwd"])  # tag lookups run in the session's repository
