@@ -15,8 +15,11 @@ part of a normal task are blocked, so the guard stays cheap and quiet:
 - `tessera.py consent` or writing `provider-consent.json`, which only the user may do;
 - the Workflow tool, unless the user opted in for this session: a prompt that starts
   with `ultracode` or `/workflow-authoring`, or AI_ALLOW_WORKFLOW=1 at CLI start;
-- any tool call that names the opt-in state directory, so the model cannot grant
-  the opt-in to itself.
+- any tool call that names the opt-in state directory, and any call that could
+  put the opt-in keyword into a prompt of this session: a scheduled prompt
+  (CronCreate, ScheduleWakeup, RemoteTrigger), a message to a session
+  (SendMessage, MCP tools) or a shell command that names the keyword or the
+  session messaging socket. So the model cannot grant the opt-in to itself.
 
 The same script also runs on UserPromptSubmit and UserPromptExpansion. There it
 records the opt-in for the session and never blocks the prompt.
@@ -119,6 +122,17 @@ GRANT_TTL = 6 * 3600  # seconds
 GRANT_REASON = "only the user grants the workflow opt-in; its state directory is off limits"
 SESSION_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 OPT_IN = re.compile(r"\s*(?:ultracode\b|/workflow-authoring(?:\s|$))", re.I)
+# The keyword anywhere, as a word. A scheduled prompt or a message to a session can
+# arrive as a prompt of this session, and the hook cannot see where a prompt came from.
+OPT_IN_TEXT = re.compile(r"(?<![\w-])ultracode(?![\w-])|/workflow-authoring(?![\w-])", re.I)
+OPT_IN_REASON = ("text that starts a workflow opt-in (`ultracode`, `/workflow-authoring`) never goes into a "
+                 "scheduled prompt, a message or a shell command; only the user types it (to find it in files, "
+                 "use the Grep tool)")
+# Tools that send text into a session as a prompt; MCP tools may do the same.
+PROMPT_SENDERS = {"CronCreate", "ScheduleWakeup", "RemoteTrigger", "SendMessage"}
+# The inbox socket of this session (Linux and macOS default directory: /tmp/cc-socks-<uid>).
+MESSAGING = re.compile(r"CLAUDE_CODE_MESSAGING_|cc-socks-", re.I)
+MESSAGING_REASON = "shell commands never use the session messaging socket; only the user sends to a session"
 
 
 def home_variants() -> set[str]:
@@ -969,15 +983,32 @@ def names_grants(text) -> bool:
     return isinstance(text, str) and GRANT_DIR in text.lower()
 
 
+def carries_opt_in(data) -> bool:
+    """Whether any string of a tool input holds the opt-in keyword. A cheap substring test
+    comes first, so a normal MCP call costs almost nothing."""
+    for text in strings(data):
+        lower = text.lower()
+        if ("ultracode" in lower or "workflow-authoring" in lower) and OPT_IN_TEXT.search(text):
+            return True
+    return False
+
+
 def decide(event: dict) -> str | None:
     tool = event.get("tool_name")
     data = event.get("tool_input") or {}
     if tool == "Workflow" and os.environ.get("AI_ALLOW_WORKFLOW") != "1" and not workflow_granted(event.get("session_id")):
         return ("multi-agent workflows need the user's opt-in; ask the user, who can start a prompt "
                 "with `ultracode` or run /workflow-authoring")
+    if isinstance(tool, str) and (tool in PROMPT_SENDERS or tool.startswith("mcp__")):
+        return OPT_IN_REASON if carries_opt_in(data) else None
     # Reads are blocked too: interpreter code cannot be told apart from a write.
     if tool in {"Bash", "Monitor", "PowerShell"} and names_grants(data.get("command")):
         return GRANT_REASON
+    if tool in {"Bash", "Monitor", "PowerShell"} and isinstance(data.get("command"), str):
+        if MESSAGING.search(data["command"]):
+            return MESSAGING_REASON
+        if carries_opt_in(data["command"]):
+            return OPT_IN_REASON
     if tool in {"Write", "Edit", "MultiEdit"} and names_grants(data.get("file_path")):
         return GRANT_REASON
     if tool == "apply_patch" and any(names_grants(path) for path in patch_paths(data)):
