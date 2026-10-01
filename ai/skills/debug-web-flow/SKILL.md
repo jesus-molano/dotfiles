@@ -16,7 +16,7 @@ description: Reproduce and diagnose a complete Next.js, Nuxt or Vue flow with br
 4. Start only the services you need. Record URL, test data and the observed
    result without revealing secrets.
 5. Reproduce with minimal steps and capture the relevant console, network and
-   logs, using `playwright-cli` for the browser.
+   logs, using `playwright-cli` or the client's built-in browser.
 
 If the request is diagnosis only, do not edit code.
 

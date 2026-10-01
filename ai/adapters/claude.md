@@ -9,9 +9,9 @@
   absolute paths instead of a `cd` to the working directory.
 - The `ai-guard` hook and the `permissions.deny` rules block the hard limits;
   every other limit above still applies.
-- A stop blocked by `project-gate` means the project's checks failed or the
-  latest edits are not verified: fix the cause or run the verification, never
-  skip or weaken a check.
+- A stop or commit blocked by `project-gate` means the project's checks failed
+  or the latest edits are not verified: fix the cause or run the verification,
+  never skip or weaken a check.
 - Suggest `/rewind` for a clean restart and `/clear` for an unrelated task.
 - Linear: read through the read-only `linear` server; writes follow
   `linear-workflow`. Keep tokens, auto memory and history out of dotfiles.

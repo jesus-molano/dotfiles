@@ -496,10 +496,12 @@ class Sync:
         wanted.append((("hooks", "UserPromptExpansion"), {"matcher": "workflow-authoring", "hooks": [guard_hook]}))
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
         # Per-project gate: runs project commands only where a repository sets ai.format /
-        # ai.check in its Git config; the Stop entry also reminds Claude to verify edits.
+        # ai.check in its Git config; the Stop and pre-commit entries remind Claude to verify edits.
         gate = hook_command(self.home, self.platform, "project-gate.py")
         wanted.append((("hooks", "PostToolUse"), {"matcher": "Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": f"{gate} format", "timeout": 30}]}))
+        wanted.append((("hooks", "PreToolUse"), {"matcher": "^(Bash|PowerShell)$", "hooks": [
+            {"type": "command", "command": f"{gate} commit", "timeout": 30}]}))
         wanted.append((("hooks", "Stop"), {"hooks": [
             {"type": "command", "command": f"{gate} check", "timeout": 300}]}))
         if self.platform == "linux":

@@ -19,11 +19,14 @@ runs and nothing is written to the repository.
 session applied an edit inside the repository after its last verification
 skill, it blocks one stop and asks Claude to verify the current delta. It runs
 no command and keeps its one-shot marker in the system temp directory.
-`git config --local ai.remind false` turns it off for one repository.
+`commit` (PreToolUse on Bash|PowerShell) applies the same rule to a `git commit`
+command, once per unverified edit, so the commit waits for the verification.
+`git config --local ai.remind false` turns both off for one repository.
 """
 import hashlib
 import json
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -33,8 +36,8 @@ import time
 from pathlib import Path
 
 # Budget for the whole hook, git calls included, below the hook entry timeouts
-# (Stop: 300 s, PostToolUse: 30 s).
-BUDGET = {"check": 290, "format": 27}
+# (Stop: 300 s, PostToolUse and PreToolUse: 30 s).
+BUDGET = {"check": 290, "format": 27, "commit": 27}
 GIT_TIMEOUT = 20
 # Kept free inside the budget so a timed-out command can still be killed and reaped.
 KILL_TIME = 8
@@ -249,8 +252,33 @@ def disabled(root: Path) -> bool:
     return git(root, "config", "--local", "--type=bool", "--get", "ai.remind") == "false"
 
 
-def remind(event: dict) -> int:
-    """Block one stop when the session edited this repository after its last verification."""
+VERIFY = ("Load `verification-before-completion` for the current delta (web work: "
+          "`verify-web-change` and a browser check with `playwright-cli` or the client's built-in "
+          "browser). Size the review as `engineering-flow` step 7 says: launch the reviewer it "
+          "names, or state why none is needed. ")
+REMINDERS = {
+    "stop": ("project-gate: this session changed files after its last verification. " + VERIFY
+             + "Report what ran and end with one line: `Review: small|medium|large -> <reviewer> "
+             "or <reason for none>`. If the change is not finished yet, say so instead of "
+             "claiming it is done."),
+    "commit": ("project-gate: this commit includes edits made after the last verification. "
+               + VERIFY + "Commit after the checks pass; a commit is not a verification."),
+}
+# `git commit` as a command: at the start or after `;`, `&`, `|`, `(` or a new line, with optional
+# `VAR=value` prefixes, PowerShell's `&` call operator, a quoted path to git(.exe) and global
+# options such as `-C <path>`, `-c <key=value>`, `-P` or `--no-pager`. A mention inside quoted
+# text (`rg "git commit"`) is not a command and must not spend the one-shot reminder.
+QUOTED = r"""(?:"[^"]*"|'[^']*'|[^\s"';&|])+"""  # one shell word, quotes included
+COMMIT = re.compile(
+    r"(?:^|[;&|(\n])\s*(?:&\s*)?(?:\w+=" + QUOTED + r"\s+)*"
+    r"""(?:"[^"\n]*[\\/])?(?:[^\s"';&|]*[\\/])?git(?:\.exe)?"?"""
+    r"(?:\s+-C\s+(?P<path>" + QUOTED + r")|\s+-c\s+" + QUOTED + r"|\s+-[pP]"
+    r"|\s+--(?:git-dir|work-tree|namespace)(?:=|\s+)" + QUOTED + r"|\s+--[\w-]+(?:=" + QUOTED + r")?)*"
+    r"\s+commit(?![\w-])")
+
+
+def remind(event: dict, moment: str = "stop") -> int:
+    """Block once when the session edited this repository after its last verification."""
     root = repo(event.get("cwd", ""))
     transcript = Path(event.get("transcript_path") or "")
     if not root or not transcript.is_file() or disabled(root):
@@ -262,17 +290,15 @@ def remind(event: dict) -> int:
         return 0
     if not edit:
         return 0
-    # One reminder per unverified edit: the state lives outside the project tree.
-    marker = Path(tempfile.gettempdir()) / "ai-verify-reminder" / (event.get("session_id") or transcript.stem)
+    # One reminder per unverified edit and moment: the state lives outside the project tree.
+    session = event.get("session_id") or transcript.stem
+    marker = Path(tempfile.gettempdir()) / "ai-verify-reminder" / (
+        session if moment == "stop" else f"{session}.{moment}")
     if read(marker) == edit:
         return 0
     marker.parent.mkdir(parents=True, exist_ok=True)
     marker.write_text(edit, encoding="utf-8")
-    print("project-gate: this session changed files after its last verification. Load "
-          "`verification-before-completion` for the current delta (web work: `verify-web-change` "
-          "and `playwright-cli`), size the review as `engineering-flow` step 7 says, then report "
-          "what ran. If the change is not finished yet, say so instead of claiming it is done.",
-          file=sys.stderr)
+    print(REMINDERS[moment], file=sys.stderr)
     return 2
 
 
@@ -281,6 +307,21 @@ def stop(event: dict) -> int:
     if code == REPORTED:
         return 0  # the turn ends with the failure report; a reminder now would contradict it
     return code or remind(event)
+
+
+def pre_commit(event: dict) -> int:
+    """PreToolUse on Bash|PowerShell: block one `git commit` of unverified edits."""
+    command = (event.get("tool_input") or {}).get("command")
+    if event.get("tool_name") not in ("Bash", "PowerShell") or not isinstance(command, str):
+        return 0
+    match = COMMIT.search(command)
+    if not match:
+        return 0
+    if match.group("path"):
+        # `git -C <path> commit` commits in that repository, relative to the session cwd.
+        target = Path(event.get("cwd") or ".") / match.group("path").strip("\"'")
+        event = {**event, "cwd": str(target)}
+    return remind(event, "commit")
 
 
 def suggest(cwd: str) -> int:
@@ -313,7 +354,7 @@ def main() -> int:
     except ValueError:
         return 0
     try:
-        return {"format": format_file, "check": stop}.get(mode, lambda _: 0)(event)
+        return {"format": format_file, "check": stop, "commit": pre_commit}.get(mode, lambda _: 0)(event)
     except (OSError, subprocess.SubprocessError) as error:
         print(f"project-gate: {error}", file=sys.stderr)
         return 0
