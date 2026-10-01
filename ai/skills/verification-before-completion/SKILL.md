@@ -17,6 +17,15 @@ description: Select and run fresh, proportionate verification before claiming a 
    Keep verification proportionate. Skip a re-run only when you saw that
    check's output for the current tree in this session; cite that output.
    A hook or gate that printed nothing gives no result to cite.
+   - After a follow-up edit (a correction, a review fix, a test tweak), rerun
+     only the checks that cover the edited files: their unit tests or e2e spec,
+     lint and typecheck of those files, and one browser look for UI. Cite the
+     earlier passing runs for the rest.
+   - Run the full suites, the build and every e2e spec once, before the last
+     commit or the handoff of the task, not after every edit.
+   - To learn whether a failure already exists on the base branch, cite the
+     base CI or use a separate worktree. Never `git stash` the user's working
+     tree for it; if neither is cheap, report the failure as unverified.
 3. For web changes, invoke `verify-web-change` for the focused web checklist.
 4. Run `git diff --check` and confirm unrelated files were not changed.
 5. Report exactly what ran: commands, results, exclusions, and remaining

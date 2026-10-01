@@ -366,9 +366,11 @@ class VerifyReminderTest(GateCase):
         self.assertIsNone(load_gate().COMMIT.search('git -c a="' + "x " * 20000 + " status"))
         self.assertLess(time.monotonic() - start, 1)
 
-    def test_the_stop_reminder_asks_for_a_review_line(self):
+    def test_the_stop_reminder_asks_for_a_review_line_and_proportionate_checks(self):
         self.tool("Edit", file_path=str(self.repo / "a.txt"))
-        self.assertIn("Review: small|medium|large", self.stop().stderr)
+        message = self.stop().stderr
+        self.assertIn("Review: small|medium|large", message)
+        self.assertIn("Rerun only the checks that cover those edits", message)
 
     def test_a_check_that_still_fails_ends_the_turn_without_a_reminder(self):
         self.git("config", "ai.check", self.python("import sys; print('lint broke'); sys.exit(3)"))

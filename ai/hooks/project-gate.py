@@ -252,10 +252,12 @@ def disabled(root: Path) -> bool:
     return git(root, "config", "--local", "--type=bool", "--get", "ai.remind") == "false"
 
 
-VERIFY = ("Load `verification-before-completion` for the current delta (web work: "
-          "`verify-web-change` and a browser check with `playwright-cli` or the client's built-in "
-          "browser). Size the review as `engineering-flow` step 7 says: launch the reviewer it "
-          "names, or state why none is needed. ")
+VERIFY = ("Load `verification-before-completion` for the edits since the last verification "
+          "(web work: `verify-web-change` and a browser check with `playwright-cli` or the "
+          "client's built-in browser). Rerun only the checks that cover those edits and cite the "
+          "earlier passing runs for the rest; do not repeat full suites for a small edit. Size "
+          "the review as `engineering-flow` step 7 says: launch the reviewer it names, or state "
+          "why none is needed. ")
 REMINDERS = {
     "stop": ("project-gate: this session changed files after its last verification. " + VERIFY
              + "Report what ran and end with one line: `Review: small|medium|large -> <reviewer> "

@@ -10,6 +10,8 @@ description: Verify a completed Next.js, Nuxt or Vue change with the repository'
    package-manager command or run a rewriting formatter without authorization.
 2. Run relevant lint, typecheck, targeted tests, build, and smoke checks from
    fastest to slowest. Expand scope when the changed boundary warrants it.
+   For a follow-up edit, run only the checks that cover it; run the full
+   suites and the build once at the end, as `verification-before-completion` says.
 3. For interaction changes, check keyboard access, visible focus, logical order,
    focus restoration, and accessible name, role, and state.
 4. For SSR or routing changes, test direct load, reload, and client navigation;
