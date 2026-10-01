@@ -495,7 +495,8 @@ class Sync:
         wanted.append((("hooks", "UserPromptSubmit"), {"hooks": [guard_hook]}))
         wanted.append((("hooks", "UserPromptExpansion"), {"matcher": "workflow-authoring", "hooks": [guard_hook]}))
         wanted += [(("autoMode", "soft_deny"), rule) for rule in AUTO_SOFT_DENY]
-        # Per-project gate: inert until a repository sets ai.format / ai.check in its Git config.
+        # Per-project gate: runs project commands only where a repository sets ai.format /
+        # ai.check in its Git config; the Stop entry also reminds Claude to verify edits.
         gate = hook_command(self.home, self.platform, "project-gate.py")
         wanted.append((("hooks", "PostToolUse"), {"matcher": "Write|Edit|MultiEdit", "hooks": [
             {"type": "command", "command": f"{gate} format", "timeout": 30}]}))

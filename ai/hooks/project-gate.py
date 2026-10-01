@@ -12,8 +12,14 @@ Only the repository's own config counts, never ~/.gitconfig or its includes.
 file appended; it never blocks. `check` (Stop) runs `ai.check` when HEAD, the
 working tree or the command changed since the last passing run; a failure exits
 2, so Claude keeps working on it instead of ending the turn. `suggest` prints
-candidate commands from package.json. A repository without the config is never
-touched.
+candidate commands from package.json. Without the config, no project command
+runs and nothing is written to the repository.
+
+`check` also reads the session transcript, in every repository: when the
+session applied an edit inside the repository after its last verification
+skill, it blocks one stop and asks Claude to verify the current delta. It runs
+no command and keeps its one-shot marker in the system temp directory.
+`git config --local ai.remind false` turns it off for one repository.
 """
 import hashlib
 import json
@@ -22,6 +28,7 @@ import shlex
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -32,6 +39,8 @@ GIT_TIMEOUT = 20
 # Kept free inside the budget so a timed-out command can still be killed and reaped.
 KILL_TIME = 8
 TAIL = 40
+# check() result for a failure already reported in this stop cycle: the turn ends (exit 0).
+REPORTED = -1
 deadline = time.monotonic() + BUDGET["check"]
 
 
@@ -165,11 +174,113 @@ def check(event: dict) -> int:
     if again:
         # Report and let the turn end instead of looping.
         print(f"project-gate: `{command}` still fails; report it to the user.", file=sys.stderr)
-        return 0
+        return REPORTED
     tail = "\n".join(output.strip().splitlines()[-TAIL:])
     print(f"project-gate: `{command}` failed (exit {code}). Fix the cause, do not skip "
           f"or weaken checks, then finish.\n{tail}", file=sys.stderr)
     return 2
+
+
+EDIT_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+VERIFY_SKILLS = {"verification-before-completion", "verify", "verify-web-change"}
+
+
+def is_verification(name) -> bool:
+    # A plugin build of the same skills arrives namespaced, such as `dotfiles-ai:verify`.
+    return isinstance(name, str) and name.rsplit(":", 1)[-1] in VERIFY_SKILLS
+
+
+def inside(path, root: Path) -> bool:
+    if not isinstance(path, str) or not path:
+        return False
+    try:
+        file = Path(path) if Path(path).is_absolute() else root / path
+        return file.resolve().is_relative_to(root)
+    except (OSError, ValueError):
+        return False
+
+
+def last_edit_unverified(transcript: Path, root: Path) -> str:
+    """The id of the last applied edit inside root that no verification followed, or ""."""
+    root = root.resolve()
+    events, failed = [], set()  # ("edit", id) or ("verify", ""), in transcript order
+    with transcript.open(encoding="utf-8", errors="replace") as lines:
+        for line in lines:
+            if ('"tool_use"' not in line and "<command-name>" not in line
+                    and '"is_error":true' not in line):
+                continue
+            try:
+                entry = json.loads(line)
+                message = entry.get("message") or {}
+                content = message.get("content")
+            except (ValueError, AttributeError):
+                continue
+            from_user = entry.get("type") == "user" or message.get("role") == "user"
+            if isinstance(content, str):
+                content = [{"type": "text", "text": content}]
+            for item in content if isinstance(content, list) else []:
+                if not isinstance(item, dict):
+                    continue
+                kind = item.get("type")
+                if kind == "text" and from_user:
+                    # A typed /verification-before-completion arrives as a user command message.
+                    text = item.get("text") or ""
+                    if any(f"<command-name>/{name}</command-name>" in text for name in VERIFY_SKILLS):
+                        events.append(("verify", ""))
+                elif kind == "tool_result" and item.get("is_error") is True:
+                    # A denied or failed edit changed nothing.
+                    failed.add(item.get("tool_use_id"))
+                elif kind == "tool_use":
+                    name, args = item.get("name"), item.get("input")
+                    args = args if isinstance(args, dict) else {}
+                    if name == "Skill" and is_verification(args.get("skill")):
+                        events.append(("verify", ""))
+                    elif name in EDIT_TOOLS and inside(args.get("file_path") or args.get("notebook_path"), root):
+                        events.append(("edit", item.get("id") or "edit"))
+    for kind, edit in reversed(events):
+        if kind == "verify":
+            return ""
+        if edit not in failed:
+            return edit
+    return ""
+
+
+def disabled(root: Path) -> bool:
+    return git(root, "config", "--local", "--type=bool", "--get", "ai.remind") == "false"
+
+
+def remind(event: dict) -> int:
+    """Block one stop when the session edited this repository after its last verification."""
+    root = repo(event.get("cwd", ""))
+    transcript = Path(event.get("transcript_path") or "")
+    if not root or not transcript.is_file() or disabled(root):
+        return 0
+    try:
+        edit = last_edit_unverified(transcript, root)
+    except (TypeError, ValueError, AttributeError) as error:
+        print(f"project-gate: verification reminder skipped: {error}", file=sys.stderr)
+        return 0
+    if not edit:
+        return 0
+    # One reminder per unverified edit: the state lives outside the project tree.
+    marker = Path(tempfile.gettempdir()) / "ai-verify-reminder" / (event.get("session_id") or transcript.stem)
+    if read(marker) == edit:
+        return 0
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(edit, encoding="utf-8")
+    print("project-gate: this session changed files after its last verification. Load "
+          "`verification-before-completion` for the current delta (web work: `verify-web-change` "
+          "and `playwright-cli`), size the review as `engineering-flow` step 7 says, then report "
+          "what ran. If the change is not finished yet, say so instead of claiming it is done.",
+          file=sys.stderr)
+    return 2
+
+
+def stop(event: dict) -> int:
+    code = check(event)
+    if code == REPORTED:
+        return 0  # the turn ends with the failure report; a reminder now would contradict it
+    return code or remind(event)
 
 
 def suggest(cwd: str) -> int:
@@ -202,7 +313,7 @@ def main() -> int:
     except ValueError:
         return 0
     try:
-        return {"format": format_file, "check": check}.get(mode, lambda _: 0)(event)
+        return {"format": format_file, "check": stop}.get(mode, lambda _: 0)(event)
     except (OSError, subprocess.SubprocessError) as error:
         print(f"project-gate: {error}", file=sys.stderr)
         return 0
