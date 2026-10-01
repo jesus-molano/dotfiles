@@ -893,6 +893,13 @@ in 34 minutes instead of 62) the agent loaded the skill only when the
 pre-commit reminder blocked its commit, after it had already stashed the tree
 once; the rules inside the skill arrived after the work they govern.
 
+`engineering-flow` step 7 runs the reviewer in the foreground and waits for
+its result in the same turn. Why: in the third test the same day (67 minutes,
+no stash, a `Review:` line in every report) the agent twice launched
+`reviewer-web` in the background and ended the turn with "waiting for the
+review". The work looked finished to the user, and the Stop reminder made it
+repeat checks while it waited.
+
 A `PreToolUse` entry (`project-gate.py commit` on `Bash` and `PowerShell`)
 applies the same rule before a `git commit`. It blocks one commit per
 unverified edit with its own marker, so the Stop reminder still follows. It

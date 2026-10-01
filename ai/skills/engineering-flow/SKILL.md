@@ -38,6 +38,8 @@ description: Guides a request to implement, add, build, change, refactor or fix 
      `reviewer-standards`);
    - large or high risk: at least one read-only reviewer plus only the narrow
      specialists the changed domains justify.
+   Run the reviewer in the foreground and wait for its result in the same
+   turn; never end the turn or report the work while a reviewer still runs.
    Give reviewers the delta, the test results and the reuse decision. Require
    file/line evidence and verify findings before changing code. Fix blockers,
    rerun the affected checks and request one fresh review. Stop after two
