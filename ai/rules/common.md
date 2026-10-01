@@ -56,6 +56,9 @@
   `fix/hh-739-title`), put the key in uppercase in every commit subject. Follow
   the repository convention and commit linter; without one, end the subject
   with `(HH-707)`. Never invent a key.
+- Do not use Conventional Commits prefixes (`fix:`, `feat:`) in pull request
+  titles. When the task comes from Jira, start the title with the key, then a
+  short sentence: `HH-559 Keep the low quality modal circle round`.
 - Before publishing, rerun checks, revalidate the state and show repository,
   remote, branch and exact OID. Ask for human authorization for that
   destination and push that OID. Never force, delete, mirror, or push tags or
