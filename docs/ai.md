@@ -231,8 +231,9 @@ To close the messaging path completely, deny the tool
   and their models are listed in [Roles](#roles), not in the rules.
 - User skills (`codebase-design`, `domain-modeling`, `to-tickets`) are hidden
   from the model until you type `/name`. Named skills
-  (`test-driven-development`, `verify-web-change`) show only their name, so
-  `engineering-flow` can still route to them at almost no context cost.
+  (`test-driven-development`, `verify`, `verify-web-change`) show only their
+  name, so `engineering-flow` and Claude Code can still route to them at almost
+  no context cost.
 - `review-web-pr` and `spec-and-standards-review` run inline, so they keep the
   scope and requirements from the conversation. `spec-and-standards-review`
   sends the reading to `reviewer-spec` and `reviewer-standards` when custom
@@ -273,6 +274,7 @@ To close the messaging path completely, deny the tool
 | `playwright-cli` | automatic | Browser checks. |
 | `tessera` | automatic | Project reuse catalog lookup and maintenance. |
 | `test-driven-development` | named | RED-GREEN for isolatable behavior. |
+| `verify` | named | Claude Code runs a skill with this name before each commit, except docs-only and tests-only commits ([changelog 2.1.286](https://code.claude.com/docs/en/changelog)). It loads `verification-before-completion`. |
 | `verify-web-change` | named | Focused web verification checklist. |
 | `codebase-design` | `/name` | Module boundaries and contracts. |
 | `domain-modeling` | `/name` | Business concepts and invariants. |

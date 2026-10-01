@@ -1,0 +1,6 @@
+interface:
+  display_name: "Verify"
+  short_description: "Verify a change before committing it"
+  default_prompt: "Use $verify to verify this change before committing it."
+policy:
+  allow_implicit_invocation: false
