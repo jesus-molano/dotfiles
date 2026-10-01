@@ -19,7 +19,7 @@ IMPLICIT_SKILLS = frozenset({
     "review-web-pr", "spec-and-standards-review", "systematic-debugging", "tessera",
     "verification-before-completion",
 })
-NAMED_SKILLS = frozenset({"test-driven-development", "verify-web-change"})
+NAMED_SKILLS = frozenset({"test-driven-development", "verify", "verify-web-change"})
 USER_SKILLS = frozenset({"codebase-design", "domain-modeling", "to-tickets"})
 EXPLICIT_SKILLS = NAMED_SKILLS | USER_SKILLS
 
