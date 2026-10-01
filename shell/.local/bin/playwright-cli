@@ -3,7 +3,7 @@
 set -euo pipefail
 tool="$HOME/.npm-global/bin/playwright-cli"
 [[ -x "$tool" ]] || {
-	printf '%s\n' 'Instala la versión fijada: npm install --global @playwright/cli@0.1.21' >&2
+	printf '%s\n' 'Instala la versión fijada: npm install --global @playwright/cli@0.1.22' >&2
 	exit 127
 }
 exec "$tool" "$@"
