@@ -21,12 +21,16 @@ description: Guides a request to implement, add, build, change, refactor or fix 
    Use `test-driven-development` for an isolatable behavior change. Route a
    confirmed failure to `systematic-debugging`, or to `debug-web-flow` for a
    Next, Nuxt or Vue path that spans browser and server.
-6. Run focused checks, the required repository checks and
-   `verification-before-completion`. For web work check in a browser with
+6. Load `verification-before-completion` before the first verification run,
+   not at commit time, and follow it. For web work check in a browser with
    `playwright-cli` or the client's built-in browser. Inspect the complete task
    delta and report only evidence you obtained.
    A user correction that changes files starts a new delta: repeat steps 6 and 7
    for it before you report it done, even for a one-line fix.
+   - After a follow-up edit, rerun only the checks that cover it. Run the full
+     suites and the build once, before the last commit or the handoff.
+   - Never `git stash` the user's working tree to compare with the base
+     branch; cite the base CI or use a separate worktree.
 7. Size independent review to the completed delta:
    - small or low risk: no agent reviewer, unless the change crosses a public,
      security, data, accessibility-critical or deployment boundary;
@@ -37,8 +41,9 @@ description: Guides a request to implement, add, build, change, refactor or fix 
    Give reviewers the delta, the test results and the reuse decision. Require
    file/line evidence and verify findings before changing code. Fix blockers,
    rerun the affected checks and request one fresh review. Stop after two
-   review passes; report blocked or partial if a blocker remains. State the
-   size and the review decision in the report: the reviewer used, or why none.
+   review passes; report blocked or partial if a blocker remains. End the
+   report with one line: `Review: small|medium|large -> <reviewer> or <reason
+   for none>`.
 8. Commit only after steps 6 and 7 pass for the delta, when the governing
    instructions allow it.
    Keep the configured Git identity; never add `Co-authored-by`. Tracker
