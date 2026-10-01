@@ -46,7 +46,7 @@ CLAUDE_KEYS.update({("skillOverrides", name): "user-invocable-only" for name in 
 CLAUDE_KEYS.update({("skillOverrides", name): "name-only" for name in sorted(NAMED_SKILLS)})
 # Defaults set only when the key is absent and never owned afterwards, so a later
 # /model or local choice is kept. Main agent: Opus (the alias follows the latest
-# Opus, Opus 5.5 today); reading roles set Haiku/Sonnet in their own files.
+# Opus, Opus 5.5 today); reading roles set Sonnet in their own files.
 CLAUDE_DEFAULTS = {("model",): "opus"}
 # Deny rules apply before the auto-mode classifier. Read and Edit rules cover Claude's
 # file tools and only the shell commands Claude Code recognizes (cat, head, sed, tee,

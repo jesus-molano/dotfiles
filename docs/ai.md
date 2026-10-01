@@ -161,8 +161,9 @@ blocked. `AI_ALLOW_WORKFLOW=1 claude` still allows workflows for a whole CLI
 session.
 
 Why only the start of the prompt: the hooks reference says `UserPromptSubmit`
-receives, "In addition to the common input fields", only "the `prompt` field
-containing the text the user submitted"
+receives, "In addition to the common input fields", "the `prompt` field
+containing the text the user submitted", plus `session_title` when the session
+has a custom title
 ([hooks](https://code.claude.com/docs/en/hooks#userpromptsubmit-input)). No
 field tells a typed prompt from a scheduled or relayed one. Claude Code itself
 accepts the keyword "only in a prompt you type yourself"
@@ -218,9 +219,9 @@ To close the messaging path completely, deny the tool
 
 ## Token efficiency
 
-- Always-loaded context is small: the rendered Claude global rules are 98
-  lines and about 840 words (measured 2026-09-29 on the Linux render, header
-  included; 100 lines and 848 words before), plus about 530 words of
+- Always-loaded context is small: the rendered Claude global rules are 105
+  lines and about 910 words (measured 2026-10-01 on the Linux render, header
+  included; 98 lines and about 840 words on 2026-09-29), plus about 530 words of
   descriptions for the skills the model picks on its own.
   `scripts/check-skills.py` fails CI above 20 skills or 700 description words.
 - The global rules speak to the model only. Habits for you stay here: use plan
@@ -357,7 +358,10 @@ npm install --global @playwright/cli@0.1.21
 Do not run `playwright-cli install --skills` over the managed skills.
 
 Code in Desktop starts in the `permissions.defaultMode` from `settings.json`
-(`auto`); check the mode selector in a new session. `claude auth login`
+(`auto`), but "a mode you pick in the selector is remembered per folder and
+takes precedence over `defaultMode` for that folder"
+([desktop](https://code.claude.com/docs/en/desktop)); check the mode selector
+in a new session. `claude auth login`
 authenticates the CLI separately. Never copy tokens between clients or machines.
 
 ## Windows (work PC)
@@ -883,7 +887,8 @@ sync is running before removing that exact file.
 [Desktop on Linux](https://code.claude.com/docs/en/desktop-linux),
 [Desktop Extra](https://github.com/patrickjaja/claude-desktop-extra) and
 [Playwright CLI](https://github.com/microsoft/playwright-cli). Settings keys,
-skill overrides and subagent fields were checked against Claude Code 2.1.284.
+skill overrides and subagent fields were checked against Claude Code 2.1.284,
+and again against the docs of Claude Code 2.1.286 on 2026-10-01.
 
 ## Provenance
 
