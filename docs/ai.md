@@ -352,7 +352,7 @@ ownership ledger, so the two never disagree.
 The browser CLI is pinned to the vendored skill version:
 
 ```bash
-npm install --global @playwright/cli@0.1.21
+npm install --global @playwright/cli@0.1.22
 ```
 
 Do not run `playwright-cli install --skills` over the managed skills.
