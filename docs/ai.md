@@ -46,7 +46,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and `mcp__.*`, as the anchored regular expression `^(...)$` | Blocks the hard limits deterministically. A matcher with characters other than letters, digits, `_`, `-`, spaces, `,` and `\|` is a "JavaScript regular expression, unanchored", so the sync anchors it ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)). |
 | `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
-| `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects. |
+| `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects, and reminds Claude once to verify edits made after the last verification. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
 | `sandbox.enabled`, `sandbox.autoAllowBashIfSandboxed`, `sandbox.allowUnsandboxedCommands` (Linux) | `true`, `false`, `true` | OS-level containment of every shell command. See [Sandbox](#sandbox). |
 | `sandbox.filesystem.denyRead`, `sandbox.filesystem.allowRead`, `sandbox.filesystem.denyWrite`, `sandbox.excludedCommands` (entries, Linux) | secret and credential paths; `~/.ssh/allowed_signers`; `~/.local/state/dotfiles/ai` and its `workflow-grants`; eight `just` recipes, the Git network commands, `git commit` and `gh` | See [Sandbox](#sandbox). |
@@ -832,8 +832,8 @@ for path in paths:
 `ai/hooks/project-gate.py` gives each project deterministic verification without
 touching the project tree: it reads two optional keys from the repository's
 local Git config only (`git config --local`: `.git/config`, never committed;
-`~/.gitconfig` and `includeIf` files do not count) and does nothing where they
-are absent.
+`~/.gitconfig` and `includeIf` files do not count) and runs no project command
+where they are absent. Only the verification reminder below works without them.
 
 | Key | Hook | Behaviour |
 |---|---|---|
@@ -855,7 +855,25 @@ records the state as the baseline without running the check, so a fresh clone
 with old failures does not stop a turn that changed nothing. After that, a new
 HEAD (a commit, a pull, a checkout) is checked at the next Stop.
 
+The Stop entry also reminds Claude to verify, in every repository and without
+`ai.check`. It reads the session transcript only. When the last `Edit`,
+`Write`, `MultiEdit` or `NotebookEdit` inside the repository comes after the
+last `verification-before-completion`, `verify` or `verify-web-change` (loaded
+by Claude or typed as `/name`), it blocks one stop and asks for verification of
+the current delta and the review size from `engineering-flow` step 7. An edit
+whose tool result is an error (denied, rejected or failed) does not count, and
+a plugin name such as `dotfiles-ai:verify` counts as verification. It blocks
+once per unverified edit, so a later edit after a user correction blocks again.
+The marker is in the system temp directory, keyed by session; on a multi-user
+Linux host a `/tmp/ai-verify-reminder` owned by another user disables it. A
+failing `ai.check` is reported first, and when it still fails in the same stop
+cycle the turn ends with that report and no reminder. A malformed transcript
+skips the reminder with a one-line warning. Why: on 2026-10-01 no work session
+loaded a verification skill, and most fixes after user corrections went
+straight from edit to commit.
+
 ```bash
+git config --local ai.remind false                  # no verification reminder here
 python3 ~/.claude/hooks/project-gate.py suggest .   # candidates from package.json
 git config --local ai.check "pnpm lint && pnpm typecheck"
 git config --local ai.format "pnpm exec prettier --write --ignore-unknown"

@@ -36,7 +36,7 @@ def alive(pid):
             return False
 
 
-class ProjectGateTest(unittest.TestCase):
+class GateCase(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.repo = Path(self.tmp.name) / "project with spaces"
@@ -70,6 +70,8 @@ class ProjectGateTest(unittest.TestCase):
     def python(self, code):
         return f'"{Path(sys.executable).as_posix()}" -c "{code}"'
 
+
+class ProjectGateTest(GateCase):
     def test_unconfigured_repository_is_never_touched(self):
         (self.repo / "a.txt").write_text("changed\n")
         self.assertEqual(self.gate("check").returncode, 0)
@@ -227,6 +229,123 @@ class ProjectGateTest(unittest.TestCase):
         result = subprocess.run([sys.executable, str(GATE), "suggest", str(self.repo)], capture_output=True, text=True)
         self.assertIn("pnpm lint && pnpm typecheck", result.stdout)
         self.assertIn("pnpm exec prettier --write --ignore-unknown", result.stdout)
+
+
+class VerifyReminderTest(GateCase):
+    """The Stop reminder reads the session transcript; it needs no ai.check."""
+
+    def setUp(self):
+        super().setUp()
+        self.transcript = Path(self.tmp.name) / "session.jsonl"
+        self.transcript.write_text("")
+        temp = Path(self.tmp.name) / "temp"
+        temp.mkdir()
+        self.env = {"TMPDIR": str(temp), "TEMP": str(temp), "TMP": str(temp)}
+
+    def tool(self, name, **args):
+        self.tool_count = getattr(self, "tool_count", 0) + 1
+        message = {"role": "assistant", "content": [
+            {"type": "tool_use", "id": f"toolu_{self.tool_count}", "name": name, "input": args}]}
+        self.line({"type": "assistant", "message": message})
+        return f"toolu_{self.tool_count}"
+
+    def line(self, entry):
+        with self.transcript.open("a") as lines:
+            # Compact separators, as Claude Code writes its transcripts.
+            lines.write((entry if isinstance(entry, str) else json.dumps(entry, separators=(",", ":"))) + "\n")
+
+    def typed(self, text):
+        self.line({"type": "user", "message": {"role": "user", "content": text}})
+
+    def failed(self, tool_id):
+        self.line({"type": "user", "message": {"role": "user", "content": [
+            {"type": "tool_result", "tool_use_id": tool_id, "content": "denied", "is_error": True}]}})
+
+    def stop(self, again=False):
+        return self.gate("check", {"transcript_path": str(self.transcript), "session_id": "s1",
+                                   "stop_hook_active": again}, env=self.env)
+
+    def test_an_unverified_edit_blocks_one_stop(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        first = self.stop()
+        self.assertEqual(first.returncode, 2)
+        self.assertIn("verification-before-completion", first.stderr)
+        self.assertEqual(self.stop(again=True).returncode, 0)
+        self.assertEqual(self.stop().returncode, 0)
+
+    def test_a_new_edit_after_a_correction_blocks_again(self):
+        self.tool("Write", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.stop().returncode, 2)
+        self.typed("the logo is too big")
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.stop().returncode, 2)
+
+    def test_verification_after_the_last_edit_lets_the_turn_end(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.tool("Skill", skill="verification-before-completion")
+        self.assertEqual(self.stop().returncode, 0)
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.typed("<command-name>/verify</command-name>")
+        self.assertEqual(self.stop().returncode, 0)
+
+    def test_edits_outside_the_repository_are_ignored(self):
+        self.tool("Write", file_path=str(Path(self.tmp.name) / "memory.md"))
+        self.tool("Skill", skill="engineering-flow")
+        self.assertEqual(self.stop().returncode, 0)
+
+    def test_the_repository_can_opt_out_with_any_git_false(self):
+        self.git("config", "ai.remind", "no")
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.stop().returncode, 0)
+
+    def test_a_failed_edit_is_not_a_change(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.tool("Skill", skill="verify")
+        self.failed(self.tool("Edit", file_path=str(self.repo / "a.txt")))
+        self.assertEqual(self.stop().returncode, 0)
+        self.failed(self.tool("NotebookEdit", notebook_path=str(self.repo / "n.ipynb")))
+        self.tool("NotebookEdit", notebook_path=str(self.repo / "n.ipynb"))
+        self.assertEqual(self.stop().returncode, 2)
+
+    def test_a_namespaced_verification_skill_counts(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.tool("Skill", skill="dotfiles-ai:verification-before-completion")
+        self.assertEqual(self.stop().returncode, 0)
+
+    def test_only_a_user_command_message_counts(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.line({"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "type <command-name>/verify</command-name> next"}]}})
+        self.assertEqual(self.stop().returncode, 2)
+
+    def test_malformed_lines_do_not_break_the_reminder(self):
+        self.line('{"type": "assistant", "message": "tool_use"}')
+        self.line('{"message": {"content": [{"type": "tool_use", "name": "Edit", "input": "x"}]}}')
+        self.line('{"truncated": "tool_use')
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.tool("Write", file_path="bad\u0000path")
+        self.tool("Write", file_path=7)
+        result = self.stop()
+        self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_a_check_that_still_fails_ends_the_turn_without_a_reminder(self):
+        self.git("config", "ai.check", self.python("import sys; print('lint broke'); sys.exit(3)"))
+        (self.repo / "a.txt").write_text("changed\n")
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.stop().returncode, 2)
+        second = self.stop(again=True)
+        self.assertEqual(second.returncode, 0)
+        self.assertIn("still fails", second.stderr)
+        self.assertNotIn("verification-before-completion", second.stderr)
+
+    def test_a_failing_check_reports_before_the_reminder(self):
+        self.git("config", "ai.check", self.python("import sys; print('lint broke'); sys.exit(3)"))
+        (self.repo / "a.txt").write_text("changed\n")
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        first = self.stop()
+        self.assertEqual(first.returncode, 2)
+        self.assertIn("lint broke", first.stderr)
+        self.assertNotIn("verification-before-completion", first.stderr)
 
 
 if __name__ == "__main__":

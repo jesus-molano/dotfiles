@@ -24,6 +24,8 @@ description: Guides a request to implement, add, build, change, refactor or fix 
 6. Run focused checks, the required repository checks and
    `verification-before-completion`. For web work use `playwright-cli` for
    browser checks. Inspect the complete task delta and report only evidence you obtained.
+   A user correction that changes files starts a new delta: repeat steps 6 and 7
+   for it before you report it done, even for a one-line fix.
 7. Size independent review to the completed delta:
    - small or low risk: no agent reviewer, unless the change crosses a public,
      security, data, accessibility-critical or deployment boundary;
