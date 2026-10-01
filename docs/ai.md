@@ -886,6 +886,13 @@ contents on the legal pages, about 90 minutes) the agent reran the full unit
 suite 6 times and the e2e specs about 20 times, mostly after small edits, and
 stashed the working tree 6 times.
 
+`engineering-flow` step 6 repeats these two rules and step 7 the `Review:`
+line, and step 6 asks to load `verification-before-completion` before the
+first verification run. Why: in the repeated test the same day (first delivery
+in 34 minutes instead of 62) the agent loaded the skill only when the
+pre-commit reminder blocked its commit, after it had already stashed the tree
+once; the rules inside the skill arrived after the work they govern.
+
 A `PreToolUse` entry (`project-gate.py commit` on `Bash` and `PowerShell`)
 applies the same rule before a `git commit`. It blocks one commit per
 unverified edit with its own marker, so the Stop reminder still follows. It
