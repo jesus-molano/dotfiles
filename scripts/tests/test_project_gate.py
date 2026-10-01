@@ -328,6 +328,48 @@ class VerifyReminderTest(GateCase):
         result = self.stop()
         self.assertEqual(result.returncode, 2, result.stderr)
 
+    def commit(self, command, tool="Bash", cwd=None):
+        return self.gate("commit", {"transcript_path": str(self.transcript), "session_id": "s1",
+                                    "tool_name": tool, "tool_input": {"command": command},
+                                    **({"cwd": str(cwd)} if cwd else {})}, env=self.env)
+
+    def test_a_commit_of_unverified_edits_is_blocked_once(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        first = self.commit('git add a.txt && git commit -q -m "feat: x"')
+        self.assertEqual(first.returncode, 2)
+        self.assertIn("a commit is not a verification", first.stderr)
+        self.assertEqual(self.commit('git commit -m "feat: x"').returncode, 0)
+        # The commit reminder has its own marker: the Stop still reminds.
+        self.assertEqual(self.stop().returncode, 2)
+
+    def test_a_verified_commit_and_other_commands_pass(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.commit("git status && git log -1").returncode, 0)
+        self.assertEqual(self.commit("git commit-tree HEAD^{tree}").returncode, 0)
+        self.assertEqual(self.commit("git commit -m x", tool="Read").returncode, 0)
+        self.tool("Skill", skill="verify")
+        self.assertEqual(self.commit("git commit -m x").returncode, 0)
+
+    def test_commit_with_dash_c_checks_that_repository(self):
+        # The session starts in the parent folder, which is not a repository.
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        command = '& git -C "project with spaces" --no-pager commit -m x'
+        self.assertEqual(self.commit(command, tool="PowerShell", cwd=self.repo.parent).returncode, 2)
+
+    def test_a_quoted_mention_does_not_spend_the_commit_reminder(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertEqual(self.commit('rg "git commit" docs/ && echo "then git commit"').returncode, 0)
+        self.assertEqual(self.commit("git add . && git commit -m x").returncode, 2)
+
+    def test_the_commit_pattern_scans_long_commands_quickly(self):
+        start = time.monotonic()
+        self.assertIsNone(load_gate().COMMIT.search('git -c a="' + "x " * 20000 + " status"))
+        self.assertLess(time.monotonic() - start, 1)
+
+    def test_the_stop_reminder_asks_for_a_review_line(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.assertIn("Review: small|medium|large", self.stop().stderr)
+
     def test_a_check_that_still_fails_ends_the_turn_without_a_reminder(self):
         self.git("config", "ai.check", self.python("import sys; print('lint broke'); sys.exit(3)"))
         (self.repo / "a.txt").write_text("changed\n")

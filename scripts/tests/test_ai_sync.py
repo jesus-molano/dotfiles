@@ -61,7 +61,11 @@ class AISyncTest(unittest.TestCase):
         # Windows has no desktop notifier; the only Stop entry is the project gate.
         self.assertEqual([g["hooks"][0]["command"].split()[-1] for g in settings["hooks"]["Stop"]], ["check"])
         self.assertTrue(settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"].endswith("project-gate.py\" format"))
-        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 1)
+        # The guard first, then the project gate's pre-commit verification reminder.
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 2)
+        commit = settings["hooks"]["PreToolUse"][1]
+        self.assertEqual(commit["matcher"], "^(Bash|PowerShell)$")
+        self.assertTrue(commit["hooks"][0]["command"].endswith("project-gate.py\" commit"))
         self.assertTrue((self.home / ".claude/hooks/ai-guard.py").is_file())
         self.assertIn("Read(**/.env)", settings["permissions"]["deny"])
         self.assertIn("Read(~/.codex/auth.json)", settings["permissions"]["deny"])
@@ -421,7 +425,7 @@ class AISyncTest(unittest.TestCase):
         settings = sync.read_json(self.home / ".claude/settings.json")
         self.assertEqual(settings["permissions"]["deny"][0], "Bash(curl *)")
         self.assertEqual(len(settings["permissions"]["deny"]), 1 + len(sync.DENY))
-        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 2)
+        self.assertEqual(len(settings["hooks"]["PreToolUse"]), 3)  # foreign, guard, pre-commit
         settings["permissions"]["deny"].remove("Read(**/.env)")
         self.json_write(".claude/settings.json", settings)
         with self.assertRaisesRegex(ValueError, "managed entry removed"):

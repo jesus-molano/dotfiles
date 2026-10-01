@@ -22,8 +22,9 @@ description: Guides a request to implement, add, build, change, refactor or fix 
    confirmed failure to `systematic-debugging`, or to `debug-web-flow` for a
    Next, Nuxt or Vue path that spans browser and server.
 6. Run focused checks, the required repository checks and
-   `verification-before-completion`. For web work use `playwright-cli` for
-   browser checks. Inspect the complete task delta and report only evidence you obtained.
+   `verification-before-completion`. For web work check in a browser with
+   `playwright-cli` or the client's built-in browser. Inspect the complete task
+   delta and report only evidence you obtained.
    A user correction that changes files starts a new delta: repeat steps 6 and 7
    for it before you report it done, even for a one-line fix.
 7. Size independent review to the completed delta:
@@ -36,8 +37,10 @@ description: Guides a request to implement, add, build, change, refactor or fix 
    Give reviewers the delta, the test results and the reuse decision. Require
    file/line evidence and verify findings before changing code. Fix blockers,
    rerun the affected checks and request one fresh review. Stop after two
-   review passes; report blocked or partial if a blocker remains.
-8. Commit a coherent verified change when the governing instructions allow it.
+   review passes; report blocked or partial if a blocker remains. State the
+   size and the review decision in the report: the reviewer used, or why none.
+8. Commit only after steps 6 and 7 pass for the delta, when the governing
+   instructions allow it.
    Keep the configured Git identity; never add `Co-authored-by`. Tracker
    writes, deployment and push need their own explicit authority.
 9. Retro: if the task exposed a repeated failure or a user correction, propose

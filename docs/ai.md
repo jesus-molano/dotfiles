@@ -46,6 +46,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and `mcp__.*`, as the anchored regular expression `^(...)$` | Blocks the hard limits deterministically. A matcher with characters other than letters, digits, `_`, `-`, spaces, `,` and `\|` is a "JavaScript regular expression, unanchored", so the sync anchors it ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)). |
 | `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
+| `hooks.PreToolUse` (entry) | `project-gate.py commit` on `^(Bash\|PowerShell)$` | Blocks one `git commit` of edits made after the last verification. See [Project gate](#project-gate). |
 | `hooks.Stop` (entry) | `project-gate.py check` | Runs the project's fast checks before the turn ends, in opted-in projects, and reminds Claude once to verify edits made after the last verification. |
 | `hooks.Stop` (entry, Linux) | `claude-notify` | Generic desktop notification at end of turn. |
 | `sandbox.enabled`, `sandbox.autoAllowBashIfSandboxed`, `sandbox.allowUnsandboxedCommands` (Linux) | `true`, `false`, `true` | OS-level containment of every shell command. See [Sandbox](#sandbox). |
@@ -872,8 +873,32 @@ skips the reminder with a one-line warning. Why: on 2026-10-01 no work session
 loaded a verification skill, and most fixes after user corrections went
 straight from edit to commit.
 
+The Stop reminder also asks Claude to end the report with one line,
+`Review: small|medium|large -> <reviewer> or <reason for none>`, so the review
+decision of `engineering-flow` step 7 is never skipped in silence.
+
+A `PreToolUse` entry (`project-gate.py commit` on `Bash` and `PowerShell`)
+applies the same rule before a `git commit`. It blocks one commit per
+unverified edit with its own marker, so the Stop reminder still follows. It
+does not depend on the Claude Code version, unlike the `verify` skill (2.1.286
+or later). Why: in a test task on 2026-10-01 the first commit came before any
+verification, and the Stop reminder came only after it.
+
+- It matches `git commit` as a command: at the start or after `;`, `&`, `|`,
+  `(` or a new line, with `VAR=value` prefixes, PowerShell's `&`, a path to
+  `git.exe` and global options (`-C`, `-c`, `-P`, `--git-dir`, `--no-pager`).
+  A quoted mention such as `rg "git commit"` does not match, so it cannot spend
+  the reminder.
+- `git -C <path> commit` is checked against that repository, relative to the
+  session `cwd`.
+- Limits: `bash -c "git commit"`, `git merge`, `rebase`, `cherry-pick` and
+  `revert` are not checked. The transcript is written asynchronously, so an
+  edit or a verification in the same assistant message as the commit may not
+  be on disk yet. A subagent's edits are in its own transcript.
+- Budget: 27 s of the 30 s entry timeout, like the format hook.
+
 ```bash
-git config --local ai.remind false                  # no verification reminder here
+git config --local ai.remind false                  # no verification reminders here
 python3 ~/.claude/hooks/project-gate.py suggest .   # candidates from package.json
 git config --local ai.check "pnpm lint && pnpm typecheck"
 git config --local ai.format "pnpm exec prettier --write --ignore-unknown"
