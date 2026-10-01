@@ -358,7 +358,15 @@ Do not run `playwright-cli install --skills` over the managed skills.
 
 Code in Desktop starts in the `permissions.defaultMode` from `settings.json`
 (`auto`); check the mode selector in a new session. `claude auth login`
-authenticates the CLI separately. Never copy tokens between clients or machines.
+authenticates the CLI separately.
+
+`claude --desktop` (Claude Code 2.1.285 or later) "opens Desktop directly
+without starting a terminal session"; add `--continue` or `--resume <session-id>`
+to move a CLI session. It "has the same platform and sign-in requirements as
+`/desktop`", which "is available on macOS and x64 Windows when you are signed in
+with a Claude subscription", so it works on the Windows host but not on CachyOS
+([desktop](https://code.claude.com/docs/en/desktop#coming-from-the-cli),
+checked 2026-10-01). Never copy tokens between clients or machines.
 
 ## Windows (work PC)
 
