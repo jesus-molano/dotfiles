@@ -877,6 +877,15 @@ The Stop reminder also asks Claude to end the report with one line,
 `Review: small|medium|large -> <reviewer> or <reason for none>`, so the review
 decision of `engineering-flow` step 7 is never skipped in silence.
 
+Both reminders ask for proportionate checks: rerun only the checks that cover
+the edits since the last verification and cite earlier passing runs for the
+rest. `verification-before-completion` runs the full suites and the build once,
+before the last commit or the handoff, and never stashes the user's tree to
+compare with the base branch. Why: in a test task on 2026-10-01 (table of
+contents on the legal pages, about 90 minutes) the agent reran the full unit
+suite 6 times and the e2e specs about 20 times, mostly after small edits, and
+stashed the working tree 6 times.
+
 A `PreToolUse` entry (`project-gate.py commit` on `Bash` and `PowerShell`)
 applies the same rule before a `git commit`. It blocks one commit per
 unverified edit with its own marker, so the Stop reminder still follows. It
