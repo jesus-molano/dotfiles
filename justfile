@@ -81,8 +81,9 @@ ai-check:
     @just --justfile "{{ justfile() }}" ai-mods-check
 
 # Validate and test the Claude Code mods in ai/mods (no session, sign-in or network).
+# Before 2.1.287 the test runner needs the early-access switch; later builds ignore it.
 ai-mods-check:
-    @if command -v claude >/dev/null; then for manifest in "{{ dotfiles_dir }}"/ai/mods/*/.claude-plugin/plugin.json; do [ -f "$manifest" ] || continue; mod="${manifest%/.claude-plugin/plugin.json}"; claude plugin validate --strict "$mod" && claude plugin test "$mod" || exit 1; done; else echo 'claude not installed: skipped mods'; fi
+    @if command -v claude >/dev/null; then for manifest in "{{ dotfiles_dir }}"/ai/mods/*/.claude-plugin/plugin.json; do [ -f "$manifest" ] || continue; mod="${manifest%/.claude-plugin/plugin.json}"; claude plugin validate --strict "$mod" && CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1 claude plugin test "$mod" || exit 1; done; else echo 'claude not installed: skipped mods'; fi
 
 # Measure skill routing with real runs (costs tokens; defaults: 1 run per case, $4 cap). --outcome compares with and without the skills ($4 cap).
 ai-eval *args:
