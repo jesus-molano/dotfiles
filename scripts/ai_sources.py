@@ -65,6 +65,20 @@ def hook_scripts(root: Path = ROOT) -> dict[str, str]:
             for path in sorted((root / "ai/hooks").glob("*.py"))}
 
 
+def mod_files(root: Path = ROOT) -> dict[str, str]:
+    """Claude Code mods (ai/mods/<name>) deployed as regular files under ~/.claude/mods.
+
+    Only the manifest and the hooks module ship; tests stay in the checkout, and the
+    types Claude Code writes into .claude-plugin/types stay unowned."""
+    files = {}
+    for manifest in sorted((root / "ai/mods").glob("*/.claude-plugin/plugin.json")):
+        mod = manifest.parents[1]
+        for path in [manifest, *sorted((mod / "hooks").iterdir())]:
+            if path.is_file():
+                files[f"{mod.name}/{path.relative_to(mod).as_posix()}"] = path.read_text(encoding="utf-8")
+    return files
+
+
 def codex_outputs(root: Path = ROOT) -> dict[Path, str]:
     result = {root / "codex/.codex/AGENTS.md": instructions("codex", "linux", root)}
     result.update({root / "codex/.codex/agents" / name: value

@@ -78,6 +78,11 @@ ai-check:
     @just --justfile "{{ justfile() }}" ai-tests
     python3 "{{ dotfiles_dir }}/scripts/check-skills.py" --agents-root "${CODEX_HOME:-$HOME/.codex}/agents" --required-agent reuse-scout --required-agent catalog-writer --installed-skills-root "$HOME/.agents/skills"
     @if command -v claude >/dev/null; then claude plugin validate "{{ dotfiles_dir }}/ai/skills"; else echo 'claude not installed: skipped plugin validate'; fi
+    @just --justfile "{{ justfile() }}" ai-mods-check
+
+# Validate and test the Claude Code mods in ai/mods (no session, sign-in or network).
+ai-mods-check:
+    @if command -v claude >/dev/null; then for manifest in "{{ dotfiles_dir }}"/ai/mods/*/.claude-plugin/plugin.json; do [ -f "$manifest" ] || continue; mod="${manifest%/.claude-plugin/plugin.json}"; claude plugin validate --strict "$mod" && claude plugin test "$mod" || exit 1; done; else echo 'claude not installed: skipped mods'; fi
 
 # Measure skill routing with real runs (costs tokens; defaults: 1 run per case, $4 cap). --outcome compares with and without the skills ($4 cap).
 ai-eval *args:

@@ -1,0 +1,4 @@
+{
+  "description": "dotmods: parte, noctalia y odin",
+  "modules": ["./register.js"]
+}

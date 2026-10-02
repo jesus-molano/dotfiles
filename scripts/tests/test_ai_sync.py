@@ -368,6 +368,41 @@ class AISyncTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     @unittest.skipIf(os.name == "nt", "Linux symlink deployment only")
+    def test_linux_deploys_mods_as_copies(self):
+        self.json_write(".claude/settings.json", {"env": {"MY_VAR": "1"}})
+        self.build("linux", "claude").apply()
+        mod = self.home / ".claude/mods/dotmods"
+        env = sync.read_json(self.home / ".claude/settings.json")["env"]
+        self.assertEqual(env["CLAUDE_CODE_PLUGIN_DIRS"], str(mod))
+        self.assertEqual(env["MY_VAR"], "1", "other variables stay the user's")
+        self.assertFalse(mod.is_symlink())
+        self.assertEqual((mod / "hooks/register.js").read_text(encoding="utf-8"),
+                         (sync.ROOT / "ai/mods/dotmods/hooks/register.js").read_text(encoding="utf-8"))
+        self.assertTrue((mod / ".claude-plugin/plugin.json").is_file())
+        self.assertFalse((mod / "tests").exists(), "tests stay in the checkout")
+        # Claude Code writes the build's types beside a loaded mod; the sync does not own them.
+        (mod / ".claude-plugin/types").mkdir()
+        (mod / ".claude-plugin/types/index.d.ts").write_text("// types", encoding="utf-8")
+        self.assertEqual(self.build("linux", "claude").operations, [])
+
+    def test_a_removed_mod_file_is_retired(self):
+        self.build("linux", "claude").apply()
+        stale = self.home / ".claude/mods/dotmods/hooks/odin-mood.js"
+        self.assertTrue(stale.is_file())
+        current = sync.mod_files()
+        kept = {name: text for name, text in current.items() if not name.endswith("odin-mood.js")}
+        with patch.object(sync, "mod_files", return_value=kept):
+            self.build("linux", "claude").apply()
+            self.assertFalse(stale.exists())
+            self.assertTrue((self.home / ".claude/mods/dotmods/hooks/register.js").is_file())
+            self.assertEqual(self.build("linux", "claude").operations, [])
+
+    def test_windows_has_no_mods(self):
+        self.build("windows", "claude").apply()
+        self.assertFalse((self.home / ".claude/mods").exists())
+        env = sync.read_json(self.home / ".claude/settings.json").get("env", {})
+        self.assertNotIn("CLAUDE_CODE_PLUGIN_DIRS", env)
+
     def test_linux_sandbox_keys_and_entries(self):
         self.json_write(".claude/settings.json", {"sandbox": {"filesystem": {"denyRead": ["~/private"]},
                                                               "network": {"allowedDomains": ["github.com"]}}})

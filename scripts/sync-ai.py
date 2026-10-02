@@ -19,7 +19,8 @@ import uuid
 from pathlib import Path
 
 import tomllib
-from ai_sources import NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions, roles
+from ai_sources import (NAMED_SKILLS, USER_SKILLS, ROOT, LINUX_SKILLS, RETIRED, hook_scripts, instructions,
+                        mod_files, roles)
 
 MISSING = {"$absent": True}
 GRANTS = ".local/state/dotfiles/ai/workflow-grants"
@@ -96,6 +97,7 @@ SANDBOX_DENY_WRITE = ["~/.local/state/dotfiles/ai", f"~/{GRANTS}"]
 SANDBOX_EXCLUDED = ["just ai-plan", "just ai-sync", "just ai-check", "just apply",
                     "just plan", "just status", "just doctor", "just doctor-live",
                     "git fetch *", "git pull *", "git push *", "git commit *", "gh *"]
+
 # Keys whose local value the sync never adopts over, even with --adopt.
 SECURITY_KEYS = {"sandbox", "permissions"}
 
@@ -475,12 +477,24 @@ class Sync:
             self.asset(base / "agents" / name, file_value(text))
         for name, text in hook_scripts(self.root).items():
             self.asset(base / "hooks" / name, file_value(text))
+        # Linux only: the mods read Noctalia's palette. A copy, like the hooks, so an
+        # edit or a checkout in the repository does not change code that runs unsandboxed.
+        mods = mod_files(self.root) if self.platform == "linux" else {}
+        for name, text in mods.items():
+            self.asset(base / "mods" / name, file_value(text))
+        # A deployed mod file whose source is gone must stop running too.
+        for key in sorted(self.state):
+            if key.startswith(".claude/mods/") and key.removeprefix(".claude/mods/") not in mods:
+                self.asset(self.home / key, {"kind": "absent"})
         path = base / "settings.json"
         _, original = self.read_config(path)
         desired = copy.deepcopy(original)
         keys = dict(CLAUDE_KEYS)
         if self.platform == "linux":
             keys.update(SANDBOX_KEYS)
+        if mods:
+            names = sorted({name.split("/")[0] for name in mods})
+            keys[("env", "CLAUDE_CODE_PLUGIN_DIRS")] = ":".join(str(base / "mods" / name) for name in names)
         keys[("statusLine",)] = {"type": "command", "padding": 0,
                                  "command": hook_command(self.home, self.platform, "statusline.py")}
         for route, value in keys.items():

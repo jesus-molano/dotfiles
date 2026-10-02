@@ -25,6 +25,7 @@ Design goals, in order:
 | Skills | `ai/skills/` (17 own + vendored `playwright-cli`) | `~/.claude/skills/` | `~/.agents/skills/` |
 | Roles | `ai/roles/*.json` | `~/.claude/agents/*.md` | `~/.codex/agents/*.toml` |
 | Hooks | `ai/hooks/*.py` | `~/.claude/hooks/` + `settings.json` | — |
+| Mods (Linux) | `ai/mods/<name>/` | `~/.claude/mods/<name>/` (copies) + `env.CLAUDE_CODE_PLUGIN_DIRS` | — |
 | Settings | `scripts/sync-ai.py` | managed keys in `~/.claude/settings.json` | managed keys in `~/.codex/config.toml` |
 | MCP | `scripts/sync-ai.py` | `~/.claude.json` | `config.toml` |
 
@@ -55,6 +56,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `statusLine` | `statusline.py` | Model, project:branch, context %, 5h and 7d plan use. |
 | `attribution.*` | empty / `false` | No co-author trailers or session links. |
 | `pluginConfigs["agents-md@builtin"]` | `claude-md-and-agents-md` | Loads `AGENTS.md` next to `CLAUDE.md`. |
+| `env.CLAUDE_CODE_PLUGIN_DIRS` (Linux) | the deployed `~/.claude/mods/*` folders | Loads the house mods. The value is one owned string: a different local value stops the apply as a conflict. See [Mods](#mods). |
 | `skillOverrides` | `user-invocable-only` for user skills, `name-only` for named skills | See [Skills](#skills). |
 
 A managed entry that you remove by hand is reported as a conflict instead of
@@ -297,6 +299,43 @@ output. Sources:
 <https://code.claude.com/docs/en/skills#run-skills-in-a-subagent> and
 <https://code.claude.com/docs/en/sub-agents> (checked 2026-09-29, Claude Code
 2.1.284).
+
+## Mods
+
+A mod is a plugin whose JavaScript hooks run inside Claude Code: it can draw
+panes and the band above the prompt, add commands and react to tool calls
+([overview](https://code.claude.com/docs/en/plugins/mods/overview)). Each folder
+in `ai/mods/` with a `.claude-plugin/plugin.json` is one mod. On Linux the sync
+copies each mod's manifest and `hooks/` to `~/.claude/mods/<name>/`, like the
+hooks, and sets `env.CLAUDE_CODE_PLUGIN_DIRS` to those copies. A mod runs
+outside the sandbox with your permissions, so an edit or a checkout in the
+repository changes nothing until `just ai-sync`, which also deletes a deployed
+file whose source is gone. To try an edit live, start
+`claude --plugin-dir ~/.dotfiles/ai/mods/<name>`, which reloads on save. Tests
+stay in the checkout. The type declarations and the `tsconfig.json` that
+Claude Code writes beside a loaded mod (`.claude-plugin/types/`) are not owned
+by the sync and are ignored by Git.
+
+`ai/mods/dotmods` holds three features:
+
+| Feature | What you see |
+|---|---|
+| Noctalia | A ribbon in the active palette above the prompt, with the appearance name, and a toast when the theme changes. It reads `~/.config/noctalia/generated/active-palette.json` and `appearance-switch`'s state. `/noctalia` prints the swatches. For the rest of the interface, pick the theme "Dark mode (ANSI colors only)" in `/config`: it uses the terminal colors that Noctalia already renders. |
+| Odín | A kitten in a pane opened with `/odin`. A green test command (`just check`, `pytest`, `vitest`...) feeds him, a red one makes him hiss, a commit earns a mouse; denied or background commands do not count. The pane opens focused, so `a`, `c` and `j` pet, feed and play. His state is in the mod's store (`~/.claude/plugins/store/`), shared by every session. |
+| `/parte [días]` | A Slack stand-up from your commits, open branches (`~/.dotfiles`, `~/dev/*`, `~/Projects/*` and the session's repository) and `gh search prs --author=@me`. Haiku writes it; an unanswered or refused model call gives a plain list instead. It copies as `/copy` does (not in `claude -p`). Without days it covers yesterday from midnight, or Friday onwards on a Monday. |
+
+`claude plugin validate` follows the mods API (`$`) only inside the hooks
+module, never across an import, so `hooks/register.js` makes every call and the
+sibling modules hold plain rules that the tests drive directly. An event
+without a matcher takes one hook per mod, so `register.js` owns
+`session.start` and the band and composes each feature's part.
+
+Check them with `just ai-mods-check` (part of `just ai-check`): it runs
+`claude plugin validate --strict` and `claude plugin test`, with no session,
+sign-in or network. Mods need Claude Code 2.1.287 or later; an earlier build
+loads them only with `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`, an early-access
+switch that later builds ignore. Turn every mod off for one session with
+`claude --safe-mode`.
 
 ## Roles
 
