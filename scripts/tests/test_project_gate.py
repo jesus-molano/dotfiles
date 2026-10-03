@@ -293,6 +293,15 @@ class VerifyReminderTest(GateCase):
         self.tool("Skill", skill="engineering-flow")
         self.assertEqual(self.stop().returncode, 0)
 
+    def test_a_commit_message_draft_under_git_dir_is_not_an_edit(self):
+        self.tool("Edit", file_path=str(self.repo / "a.txt"))
+        self.tool("Skill", skill="verification-before-completion")
+        self.tool("Write", file_path=str(self.repo / ".git" / "COMMIT_DRAFT"))
+        self.tool("Write", file_path=".git/COMMIT_DRAFT")
+        self.assertEqual(self.stop().returncode, 0)
+        self.tool("Write", file_path=str(self.repo / ".github" / "ci.yml"))
+        self.assertEqual(self.stop().returncode, 2)
+
     def test_the_repository_can_opt_out_with_any_git_false(self):
         self.git("config", "ai.remind", "no")
         self.tool("Edit", file_path=str(self.repo / "a.txt"))

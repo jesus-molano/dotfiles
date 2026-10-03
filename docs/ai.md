@@ -863,8 +863,9 @@ The Stop entry also reminds Claude to verify, in every repository and without
 last `verification-before-completion`, `verify` or `verify-web-change` (loaded
 by Claude or typed as `/name`), it blocks one stop and asks for verification of
 the current delta and the review size from `engineering-flow` step 7. An edit
-whose tool result is an error (denied, rejected or failed) does not count, and
-a plugin name such as `dotfiles-ai:verify` counts as verification. It blocks
+whose tool result is an error (denied, rejected or failed) does not count;
+neither does a write under `.git/`, such as the `.git/COMMIT_DRAFT` message
+file. A plugin name such as `dotfiles-ai:verify` counts as verification. It blocks
 once per unverified edit, so a later edit after a user correction blocks again.
 The marker is in the system temp directory, keyed by session; on a multi-user
 Linux host a `/tmp/ai-verify-reminder` owned by another user disables it. A

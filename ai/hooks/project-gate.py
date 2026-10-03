@@ -16,7 +16,7 @@ candidate commands from package.json. Without the config, no project command
 runs and nothing is written to the repository.
 
 `check` also reads the session transcript, in every repository: when the
-session applied an edit inside the repository after its last verification
+session applied an edit inside the repository (outside `.git/`) after its last verification
 skill, it blocks one stop and asks Claude to verify the current delta. It runs
 no command and keeps its one-shot marker in the system temp directory.
 `commit` (PreToolUse on Bash|PowerShell) applies the same rule to a `git commit`
@@ -198,9 +198,11 @@ def inside(path, root: Path) -> bool:
         return False
     try:
         file = Path(path) if Path(path).is_absolute() else root / path
-        return file.resolve().is_relative_to(root)
+        parts = file.resolve().relative_to(root).parts
     except (OSError, ValueError):
         return False
+    # Git metadata, such as a `.git/COMMIT_DRAFT` message file, is not a project change.
+    return parts[:1] != (".git",)
 
 
 def last_edit_unverified(transcript: Path, root: Path) -> str:
