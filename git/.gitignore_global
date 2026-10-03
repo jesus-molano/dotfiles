@@ -39,3 +39,5 @@ _bmad-output/
 # Debug
 npm-debug.log*
 pnpm-debug.log*
+
+**/.claude/.cc-writes/
