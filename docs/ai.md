@@ -332,10 +332,11 @@ then run `python3 scripts/render-ai.py`.
 
 ## Linux: install and deploy
 
-Packages: `claude-code` (CachyOS), `claude-desktop-extra` (AUR, built with
-Shelly from the reviewed recipe and installed with Pacman) and Codex. Provenance
-is in `ai/runtime-sources.json`. No third-party repository, Cowork or computer
-use is configured.
+Packages: `claude-code` and `claude-desktop` (both from the signed CachyOS
+repository) and Codex. Provenance is in `ai/runtime-sources.json`. The official
+`claude-desktop` package depends on the Cowork VM stack (`qemu-system-x86`,
+`edk2-ovmf`, `virtiofsd`); Cowork also needs the user in the `kvm` group. No
+third-party repository is configured.
 
 ```bash
 python3 scripts/render-ai.py   # regenerate versioned Codex files after editing ai/
@@ -960,8 +961,7 @@ sync is running before removing that exact file.
 [skills](https://code.claude.com/docs/en/skills),
 [subagents](https://code.claude.com/docs/en/sub-agents),
 [status line](https://code.claude.com/docs/en/statusline),
-[Desktop on Linux](https://code.claude.com/docs/en/desktop-linux),
-[Desktop Extra](https://github.com/patrickjaja/claude-desktop-extra) and
+[Desktop on Linux](https://code.claude.com/docs/en/desktop-linux) and
 [Playwright CLI](https://github.com/microsoft/playwright-cli). Settings keys,
 skill overrides and subagent fields were checked against Claude Code 2.1.284,
 and again against the docs of Claude Code 2.1.286 on 2026-10-01.

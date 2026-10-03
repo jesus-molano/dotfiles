@@ -63,7 +63,7 @@ base,development,npm,native
 base,development,pnpm,native
 base,development,openai-codex,native
 base,development,claude-code,native
-base,development,claude-desktop-extra,aur
+base,development,claude-desktop,native
 base,development,shellcheck,native
 base,development,shfmt,native
 base,development,python,native

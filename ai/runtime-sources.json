@@ -1,14 +1,10 @@
 {
-  "reviewed_at": "2026-09-27",
-  "claude_desktop_extra": {
-    "registry": "https://aur.archlinux.org/claude-desktop-extra.git",
-    "recipe_commit": "16402b926812250a7f390a1525720bd983373893",
-    "version": "2.7032.0-3",
-    "upstream": "https://github.com/patrickjaja/claude-desktop-extra/releases/tag/v2.7032.0-3",
-    "source_x86_64_sha256": "04523c9c76961e57714ba029f976d2093dc69eeb7bd1e7600fc64d04e12a5dc3",
-    "build": "shelly build PKGBUILD --reviewed --check",
-    "install": "pacman -U",
-    "note": "No third-party pacman repository. Cowork optional dependencies excluded. Package hook creates AppArmor userns profile when ABI 4 exists."
+  "reviewed_at": "2026-10-03",
+  "claude_desktop": {
+    "registry": "cachyos",
+    "version_verified": "2.9939.4-1",
+    "validation": "Pacman SHA-256 and repository signature",
+    "note": "Official build packaged by CachyOS. Hard-depends on the Cowork VM stack. Ships chrome-sandbox SUID; no install script or AppArmor profile."
   },
   "claude_code": {
     "registry": "cachyos",
