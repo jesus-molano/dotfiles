@@ -54,9 +54,10 @@ CLAUDE_DEFAULTS = {("model",): "opus"}
 # The ai-guard hook blocks shell commands that name these same stores.
 DENY = ["Read(**/.env)", "Read(**/.env.*)",
         # gitignore negation: carves templates out of the path rules listed before it,
-        # so `cp .env.example .env` reads the template.
+        # so `cp .env.example .env` reads the template and Claude can edit it.
         "Read(!.env.example)", "Read(!.env.sample)", "Read(!.env.template)",
         "Edit(**/.env)", "Edit(**/.env.*)",
+        "Edit(!.env.example)", "Edit(!.env.sample)", "Edit(!.env.template)",
         "Read(~/.ssh/**)", "Read(~/.gnupg/**)", "Read(~/.aws/**)", "Read(~/.git-credentials)",
         "Read(~/.config/gh/hosts.yml)", "Read(~/.claude.json)", "Read(~/.claude/.credentials.json)",
         "Read(~/.codex/auth.json)",

@@ -42,7 +42,7 @@ kept, including foreign hooks, deny rules, models and projects.
 | `model` (default) | `opus` when absent | The main agent executes and reasons on Opus (Opus 5.5 today). Set only when missing and never owned, so a later `/model` or local choice is kept. |
 | `permissions.defaultMode` | `auto` | A classifier approves routine actions and stops risky ones; no technical prompts. |
 | `permissions.disableBypassPermissionsMode` | `disable` | Claude Code refuses `bypassPermissions`. That mode skips the classifier and the `soft_deny` rules. |
-| `permissions.deny` (entries) | `.env*` read/edit (templates `.env.example`, `.env.sample`, `.env.template` carved out of the read rules with `!` negations), `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores), `Edit` of the [workflow opt-in](#workflow-opt-in) markers | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
+| `permissions.deny` (entries) | `.env*` read/edit (templates `.env.example`, `.env.sample`, `.env.template` carved out of the read and edit rules with `!` negations), `~/.ssh`, `~/.gnupg`, `~/.aws`, Git and gh credentials, `~/.claude.json`, the Claude and Codex logins (`~/.claude/.credentials.json`, `~/.codex/auth.json`), `Edit` of Tessera `provider-consent.json` (also inside MSIX app stores), `Edit` of the [workflow opt-in](#workflow-opt-in) markers | Deny rules apply before the classifier; `Edit` rules cover every file write. `Read` and `Edit` rules also cover the shell commands Claude Code recognizes (`cat`, `head`, `tail`, `sed`, `tee`, redirections), but not indirect reads such as `grep -r` or scripts that open files. `ai-guard.py` blocks shell commands that name these files. |
 | `hooks.PreToolUse` (entry) | `ai-guard.py` on `Bash`, `PowerShell`, `Monitor`, `Workflow`, `Write`, `Edit`, `MultiEdit`, `CronCreate`, `ScheduleWakeup`, `RemoteTrigger`, `SendMessage` and `mcp__.*`, as the anchored regular expression `^(...)$` | Blocks the hard limits deterministically. A matcher with characters other than letters, digits, `_`, `-`, spaces, `,` and `\|` is a "JavaScript regular expression, unanchored", so the sync anchors it ([hooks](https://code.claude.com/docs/en/hooks#matcher-patterns)). |
 | `hooks.UserPromptSubmit`, `hooks.UserPromptExpansion` (entries) | `ai-guard.py` (the second only for `workflow-authoring`) | Records the user's per-session workflow opt-in. See [Workflow opt-in](#workflow-opt-in). |
 | `hooks.PostToolUse` (entry) | `project-gate.py format` on `Write`, `Edit`, `MultiEdit` | Formats the edited file in opted-in projects. See [Project gate](#project-gate). |
@@ -137,7 +137,8 @@ cmdlet aliases such as `ri`, `gc`, `rd /s`, `-Recurse:$true`, and nested
 parsers, so Bash-only forms that mention a secret or a push (`if ... then`,
 here-docs such as `cat >> .gitignore <<'EOF'`) are blocked there. The
 `Read(!.env.example)`, `Read(!.env.sample)` and `Read(!.env.template)` rules
-follow `Read(**/.env.*)` in the same list: "A deny or ask pattern that starts
+follow `Read(**/.env.*)` in the same list, and the matching `Edit(!...)` rules
+follow `Edit(**/.env.*)`: "A deny or ask pattern that starts
 with `!` is a gitignore negation. It carves the paths it matches out of the
 `path` or `./path` rules listed before it"
 ([permissions](https://code.claude.com/docs/en/permissions#read-and-edit)).

@@ -82,6 +82,7 @@ class AISyncTest(unittest.TestCase):
         deny = settings["permissions"]["deny"]
         # A gitignore negation carves out only the path rules listed before it.
         self.assertLess(deny.index("Read(**/.env.*)"), deny.index("Read(!.env.example)"))
+        self.assertLess(deny.index("Edit(**/.env.*)"), deny.index("Edit(!.env.example)"))
         self.assertIn("Creating, changing or deleting workflow opt-in markers", settings["autoMode"]["soft_deny"])
         self.assertNotIn("sandbox", settings, "native Windows has no Claude Code sandbox")
         # The guard also records the user's workflow opt-in; it has no matcher on UserPromptSubmit.
