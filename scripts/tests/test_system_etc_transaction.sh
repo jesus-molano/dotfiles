@@ -158,6 +158,18 @@ cp -- "$repo_root/system-etc/systemd/system/mnt-backups.automount" "$test_root/e
 DOTFILES_SYSTEM_ETC_TARGET_ROOT="$test_root/etc" XDG_CONFIG_HOME="$test_root/config" \
 	bash "$helper" --check systemd | grep -Fqx "= $test_root/etc/systemd/system/mnt-backups.mount"
 
+# sysctl se copia a /etc/sysctl.d, el único directorio que lee systemd-sysctl.
+DOTFILES_SYSTEM_ETC_TARGET_ROOT="$test_root/etc" XDG_CONFIG_HOME="$test_root/config" \
+	bash "$helper" --check sysctl | grep -Fqx "+ $test_root/etc/sysctl.d/90-arp-multihome.conf"
+grep -Fqx "system_packages := \"sddm udev snapper systemd sysctl\"" "$repo_root/justfile"
+mkdir -p "$test_root/sysctl-source/sysctl/nested"
+printf '%s\n' 'kernel.example = 1' >"$test_root/sysctl-source/sysctl/nested/10-ignored.conf"
+if DOTFILES_SYSTEM_ETC_SOURCE_ROOT="$test_root/sysctl-source" DOTFILES_SYSTEM_ETC_TARGET_ROOT="$test_root/etc" \
+	bash "$helper" --check sysctl >/dev/null 2>&1; then
+	printf '%s\n' 'sysctl debe rechazar subdirectorios que systemd-sysctl ignoraría.' >&2
+	exit 1
+fi
+
 grep -Fqx 'apply-backup-automount:' "$repo_root/justfile"
 grep -Fqx '    mount_unit=/etc/systemd/system/mnt-backups.mount' "$repo_root/justfile"
 grep -Fqx '    automount_unit=/etc/systemd/system/mnt-backups.automount' "$repo_root/justfile"

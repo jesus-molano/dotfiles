@@ -11,6 +11,7 @@ simulan y aplican por módulo, con Polkit, confirmación y copia previa.
 | `sddm` | `/etc/sddm.conf.d/` y `/etc/sddm/themes/` |
 | `snapper` | `/etc/snapper/` |
 | `systemd` | `/etc/systemd/system/` |
+| `sysctl` | `/etc/sysctl.d/` |
 
 No uses Stow contra `/etc`.
 
@@ -49,6 +50,7 @@ just check-system udev
 just check-system sddm
 just check-system snapper
 just check-system systemd
+just check-system sysctl
 ~~~
 
 Lee cada diff. Aplica solo el módulo revisado:
@@ -123,6 +125,33 @@ systemctl --user enable kanata.service
 ~~~
 
 Vuelve a entrar en la sesión para heredar el grupo `input`.
+
+Para `sysctl`, el archivo `90-arp-multihome.conf` evita el ARP cruzado cuando
+cable y wifi comparten subred. Sin él, el router puede asociar la IP del cable
+a la MAC del wifi y la red falla al apagar el wifi. Aplica y carga solo ese
+archivo:
+
+~~~bash
+just check-system sysctl
+just apply-system sysctl
+pkexec /usr/bin/sysctl -p /etc/sysctl.d/90-arp-multihome.conf
+~~~
+
+Antes de aplicar, anota los valores actuales. El kernel usa `0` por defecto:
+
+~~~bash
+sysctl net.ipv4.conf.all.arp_ignore net.ipv4.conf.all.arp_announce
+~~~
+
+Rollback, si el destino no existía antes (`+` en `check-system`):
+
+~~~bash
+pkexec /usr/bin/rm -- /etc/sysctl.d/90-arp-multihome.conf
+pkexec /usr/bin/sysctl -w net.ipv4.conf.all.arp_ignore=0 net.ipv4.conf.all.arp_announce=0
+~~~
+
+Si el destino ya existía (`~`), restaura su preimagen según el `journal.tsv`
+del snapshot.
 
 El mantenimiento físico se mantiene aparte:
 

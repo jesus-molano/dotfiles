@@ -1,7 +1,7 @@
 # Gestión segura de dotfiles con GNU Stow.
 
 dotfiles_dir := justfile_directory()
-system_packages := "sddm udev snapper systemd"
+system_packages := "sddm udev snapper systemd sysctl"
 
 default:
     @just --justfile "{{ justfile() }}" --list
@@ -180,6 +180,8 @@ apply-system module:
 
     if [[ "$module" == sddm ]]; then
         printf 'Destinos exactos: /etc/sddm.conf.d y /etc/sddm/themes\n'
+    elif [[ "$module" == sysctl ]]; then
+        printf 'Destino exacto: /etc/sysctl.d\n'
     else
         printf 'Destino exacto: %s\n' "$target_root"
     fi

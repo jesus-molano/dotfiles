@@ -21,7 +21,7 @@ state_root="${XDG_STATE_HOME:-$HOME/.local/state}/dotfiles"
 pkexec_cmd=${DOTFILES_SYSTEM_ETC_PKEXEC:-pkexec}
 
 case "$module" in
-	sddm|udev|snapper|systemd) ;;
+	sddm|udev|snapper|systemd|sysctl) ;;
 	*) printf 'Módulo de sistema no permitido: %s\n' "$module" >&2; exit 2 ;;
 esac
 [[ -d "$source_root" ]] || { printf 'No existe el módulo: %s\n' "$source_root" >&2; exit 2; }
@@ -71,6 +71,14 @@ target_for() {
 	local relative=$1
 	if [[ "$module" == sddm && "$relative" == conf.d/* ]]; then
 		printf '%s/sddm.conf.d/%s\n' "$target_root" "${relative#conf.d/}"
+	elif [[ "$module" == sysctl ]]; then
+		# systemd-sysctl solo lee archivos *.conf en la raíz de /etc/sysctl.d e
+		# ignora sin avisar cualquier otro nombre o subdirectorio.
+		[[ "$relative" != */* && "$relative" == *.conf ]] || {
+			printf 'sysctl solo admite archivos *.conf sin subdirectorio: %s\n' "$relative" >&2
+			exit 2
+		}
+		printf '%s/sysctl.d/%s\n' "$target_root" "$relative"
 	else
 		printf '%s/%s/%s\n' "$target_root" "$module" "$relative"
 	fi
