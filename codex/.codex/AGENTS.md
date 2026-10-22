@@ -41,6 +41,25 @@
 - `engineering-flow` holds the procedure. When evidence is missing, delegate
   one bounded search to `reuse-scout`; decide with its evidence and do not repeat it.
 
+## Code comments
+- This rule overrides any default to match the comment density of the
+  surrounding code. Comment the code you add or change; comment other code
+  only when the user asks.
+- Add a comment only where names and types do not show the intent quickly:
+  a business rule, a flow across several modules or calls, an order or timing
+  constraint, a workaround and its cause, or a surprising edge case.
+- Above an exported function, composable or utility with that complexity,
+  write a short doc comment (one to four lines): what it does, why it exists,
+  and its non-obvious inputs, results or side effects. Inside a long function,
+  put a one-line comment before each step that needs one.
+- Explain why, not what. Do not restate names, types or obvious code, and do
+  not describe the change or its history ("added", "fixed", ticket keys).
+- State only what the code you read proves. If the reason is not visible, do
+  not guess it: leave no comment. When a comment depends on another module,
+  name the function it relies on.
+- Write comments in the project's comment language, or in English when there
+  is no convention. Update or remove a comment when its code changes.
+
 ## Spend tokens where they change the result
 - Search before reading, then read only the relevant ranges. Do not reread
   files already in context or paste long logs.
