@@ -279,7 +279,7 @@ check_desktop_runtime() {
   if has bundles local-ai; then
     command -v whisper-cli >/dev/null 2>&1 && ok 'Whisper disponible' || fail 'Falta whisper-cli para local-ai'
     command -v wtype >/dev/null 2>&1 && ok 'Pegado de dictado disponible' || fail 'Falta wtype para local-ai'
-    pacman -Qq ggml-cpu ggml-vulkan >/dev/null 2>&1 && ok 'Backends GGML instalados' || fail 'Faltan backends GGML'
+    pacman -Qq ggml ggml-vulkan >/dev/null 2>&1 && ok 'Backends GGML instalados' || fail 'Faltan backends GGML'
     [[ -s "${XDG_DATA_HOME:-$HOME/.local/share}/whisper.cpp/ggml-base.bin" ]] && ok 'Modelo Whisper base presente' || warn 'Falta modelo Whisper base'
   else info 'Runtime local-ai no seleccionado'; fi
   if has bundles productivity-extra; then for command in ttyper codexbar qmd; do command -v "$command" >/dev/null 2>&1 && ok "Productividad: $command" || fail "Falta productividad: $command"; done; else info 'Runtime productivity-extra no seleccionado'; fi
