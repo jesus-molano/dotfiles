@@ -164,7 +164,7 @@ session.
 
 Why only the start of the prompt: the hooks reference says `UserPromptSubmit`
 receives, "In addition to the common input fields", "the `prompt` field
-containing the text the user submitted", plus `session_title` when the session
+containing the submitted text", plus `session_title` when the session
 has a custom title
 ([hooks](https://code.claude.com/docs/en/hooks#userpromptsubmit-input)). No
 field tells a typed prompt from a scheduled or relayed one. Claude Code itself
@@ -221,10 +221,11 @@ To close the messaging path completely, deny the tool
 
 ## Token efficiency
 
-- Always-loaded context is small: the rendered Claude global rules are 105
-  lines and about 910 words (measured 2026-10-01 on the Linux render, header
-  included; 98 lines and about 840 words on 2026-09-29), plus about 530 words of
-  descriptions for the skills the model picks on its own.
+- Always-loaded context is small: the rendered Claude global rules are 135
+  lines and about 1,235 words (measured 2026-11-01 on the Linux render, header
+  included; 105 lines and about 910 words on 2026-10-01), plus about 530 words of
+  descriptions for the skills the model picks on its own (694 words for all 19
+  skills).
   `scripts/check-skills.py` fails CI above 20 skills or 700 description words.
 - The global rules speak to the model only. Habits for you stay here: use plan
   mode for large or ambiguous changes, `/clear` between unrelated tasks (the
@@ -636,10 +637,10 @@ itself. For OS-level enforcement that blocks all processes from accessing a
 path, enable the sandbox"
 ([permissions](https://code.claude.com/docs/en/permissions)). So on Linux the
 sync turns on the Claude Code sandbox (bubblewrap and socat must be
-installed). It applies to "every Bash, PowerShell, or Monitor command and its
-child processes" ([sandboxing](https://code.claude.com/docs/en/sandboxing)).
-Native Windows is not supported ("Native Windows is not supported"), so the
-work PC gets none of these keys.
+installed). "The limits apply to Bash, PowerShell, and Monitor commands and
+the processes they start" ([sandboxing](https://code.claude.com/docs/en/sandboxing)).
+"On native Windows, Claude Code runs commands unsandboxed", so the work PC gets
+none of these keys.
 
 | Key | Value | Reason |
 |---|---|---|
@@ -648,7 +649,7 @@ work PC gets none of these keys.
 | `sandbox.allowUnsandboxedCommands` | `true` | See below. |
 | `sandbox.filesystem.denyRead` (entries) | `~/.env`, `~/.env.op`, `~/.ssh`, `~/.gnupg`, `~/.aws`, `~/.git-credentials`, `~/.config/gh/hosts.yml`, `~/.claude.json`, `~/.claude/.credentials.json`, `~/.codex/auth.json` | The default read policy "still allows reading credential files such as `~/.aws/credentials` and `~/.ssh/`". Exact paths only, see [Dotenv files](#dotenv-files-in-the-sandbox). Claude Code also "adds the paths from your `Read(...)` deny permission rules", so the `permissions.deny` stores are in the list too. |
 | `sandbox.filesystem.allowRead` (entry) | `~/.ssh/allowed_signers` | Re-opens one public file inside the `~/.ssh` deny: "When read rules overlap, the rule with the narrower path applies". `git log --show-signature` and `git verify-commit` read it. |
-| `sandbox.filesystem.denyWrite` (entries) | `~/.local/state/dotfiles/ai`, `~/.local/state/dotfiles/ai/workflow-grants` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; these entries also hold when a session starts in `~` or adds it with `/add-dir`. On Linux, write entries must be concrete: Claude Code "skips an entry that contains `*`, `?`, or `[`". |
+| `sandbox.filesystem.denyWrite` (entries) | `~/.local/state/dotfiles/ai`, `~/.local/state/dotfiles/ai/workflow-grants` | The sync ledger, its backups and the [workflow opt-in](#workflow-opt-in) markers. Sandboxed commands can already write only to the working directory and the session temp directory; these entries also hold when a session starts in `~` or adds it with `/add-dir`. On Linux, write entries must be concrete: for `allowWrite` and `denyWrite`, "Only a trailing `/**` works" ([settings](https://code.claude.com/docs/en/settings-reference#where-wildcards-work-in-sandbox-paths)). |
 | `sandbox.excludedCommands` (entries) | `just ai-plan`, `just ai-sync`, `just ai-check`, `just apply`, `just plan`, `just status`, `just doctor`, `just doctor-live`, `git fetch *`, `git pull *`, `git push *`, `git commit *`, `gh *` | See [Excluded commands](#excluded-commands). |
 
 ### Excluded commands
@@ -966,7 +967,8 @@ sync is running before removing that exact file.
 [Desktop on Linux](https://code.claude.com/docs/en/desktop-linux) and
 [Playwright CLI](https://github.com/microsoft/playwright-cli). Settings keys,
 skill overrides and subagent fields were checked against Claude Code 2.1.284,
-and again against the docs of Claude Code 2.1.286 on 2026-10-01.
+again against the docs of Claude Code 2.1.286 on 2026-10-01, and against the
+docs of Claude Code 2.1.316 on 2026-11-01.
 
 ## Provenance
 
